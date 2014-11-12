@@ -14,7 +14,7 @@ An ``expiring map'' $m \in M[K,V]$ is an abstraction that maps keys $k \in K$ to
 \paragraph{Abstract state $S(m\in M)$}
 \begin{itemize}
    \item $m$.\s{mapping}: a set of entries $[k,v,t]$, with each entry mapping key $k$ to value $v$ until time $t$, after which the mapping expires
-   \item $m$.\s{size}: the number of keys in m.\s{mapping} (for now, we assume at most one entry per key)
+   \item $m$.\s{size}: the number of unexpired keys in $m$.\s{mapping} (for now, we assume at most one entry per key)
    \item $m$.\s{maxSize}: the maximum number of keys that this map $m$ can accommodate
 \end{itemize}
 
@@ -42,16 +42,18 @@ each subsequence $<S_{i-1}, o_i, S_i>$ indicating that operation $o_i$ transform
 An accessor does not mutate state, so it leaves the abstract state unchanged.
 We use the shorthand $\s{component}_t$ to indicate the value of $S.$\s{component} immediately after $o_t$ completes and before $o_{t+1}$ commences.
 
+{\it Note:} Symbol $\simeq$ in the following context: $o_t\simeq ...$ means that lefthand {\it operation} ($o_t$) can be equal to the righthand operation. E.g. $\forall k \in K, m \in M o_t\simeq \o{has}_t(m, k) \Leftrightarrow \p{const}_t(m)$ means, that the operation number t ($o_t$) may be $\o{has}(m, k)$ (not the result of such function call) if and only if holds $\p{const}_t(m)$.
+
+By default, if symbols $m, e, k, v$ are used in a formula, and not mentioned before in that formula, the universal quantifier $\forall$ is implied: $\forall m\in M, k \in K, v\in V, e\in \nintset$.
+
 \paragraph{Helper predicates}
 \begin{itemize}
    \item An ``empty'' map is one without any keys \\
-            $\p{empty}_t(m\in M) \Rightarrow (\forall k\in K \Rightarrow \neg \o{has}_t(m, k))$ \\
-            (it can be easily shown that $\p{empty}_t(m) \Leftrightarrow m.\s{size}_t=0$)
+            $\p{empty}_t(m\in M) \Leftrightarrow [k, v, e] \not\in m.\s{mapping}_t$
    \item A ``const'' operation does not modify nonexpired mappings:\\
-     $\p{const}_t(m\in M) ~\Leftrightarrow~\\ \Big(\forall k\in K,v \in V, e\in \nintset : \o{has}_{t-1}(m, k), (v,e)=\o{get}_{t-1}(m, k), e>t \Rightarrow \o{has}_t(m, k),\o{get}_t(m, k)=(v,e)\Big)\wedge\\ \Big(\forall k\in K: \neg \o{has}_{t-1}(m, k) \Rightarrow \neg\o{has}_t(m, k)\Big)$
+     $\p{const}_t(m\in M) ~\Leftrightarrow~\\ \Big([k, v, e] \in m.\s{mapping}_{t-1} \wedge e>t \Rightarrow [k, v, e] \in m.\s{mapping}_t\Big)\wedge\\ \Big([k, v, e] \not\in m.\s{mapping}_{t-1} \Rightarrow [k, v, e] \not\in m.\s{mapping}_t\Big)\wedge m.\s{size}_{t-1} \ge m.\s{size}_t$
    \item An ``isolated'' operation does not modify nonexpired mappings, except for a single one:\\
-     $\p{isolated}_t(m\in M, k'\in K) ~\Leftrightarrow~\\ \Big(\forall k\in K,v \in V, e\in \nintset : k\neq k', \o{has}_{t-1}(m, k), (v,e)=\o{get}_{t-1}(m, k), e>t \Rightarrow \o{has}_t(m, k),\o{get}_t(m, k)=(v,e)\Big)\wedge\\ \Big(\forall k\in K:k\neq k', \neg \o{has}_{t-1}(m, k) \Rightarrow \neg\o{has}_t(m, k)\Big)$
-   \item ...
+     $\p{isolated}_t(m\in M, k'\in K) ~\Leftrightarrow~\\ \Big(k\neq k' \wedge [k, v, e] \in m.\s{mapping}_{t-1} \wedge e>t \Rightarrow [k, v, e] \in m.\s{mapping}_t\Big)\wedge\\ \Big(k\neq k' \wedge [k, v, e] \not\in m.\s{mapping}_{t-1} \Rightarrow [k, v, e] \not\in m.\s{mapping}_t\Big)$
    
 \end{itemize}
 
@@ -59,19 +61,17 @@ We use the shorthand $\s{component}_t$ to indicate the value of $S.$\s{component
 \begin{itemize}
    \item[has]
      \begin{itemize}
-       \item $\o{has}_t(m \in M, k \in K) ~\Leftrightarrow~ \exists [k,v,e] \in m.\s{mapping}_t$\\
-       \item If the map is empty, there no keys in it:\\
-         $$m.\s{size}_t=0 \Rightarrow \forall k\in K \o{has}_t(m, k) = false $$
-       \item It does not change nonexpired mappings:\\
-         $$\o{has}_t(m, k) ~\Leftrightarrow~ \p{const}_t(m)$$
+       \item $\o{has}_t(m \in M, k \in K) ~\Leftrightarrow~ \exists [k,v,e] \in m.\s{mapping}_t \wedge o_t=\o{has}_t(m, k)$\\
+       \item It does not change nonexpired mappings:
+         $$o_t \simeq \o{has}_t(m, k) ~\Leftrightarrow~ \p{const}_t(m)$$
      \end{itemize}
      \item[get]
        \begin{itemize}
-         \item One can get a mapping only if it exists in the map:\\
-           $$\o{get}_t(m \in M, k \in K) \rightarrow fail ~\Leftrightarrow~ \neg\o{has}_t(m \in M, k \in K)$$
-           $$(v\in V,e\in \nintset)\gets \o{get}_t(m \in M, k \in K) ~\Leftrightarrow~ \o{has}_t(m \in M, k \in K) \wedge \exists [k,v,e] \in m.\s{mapping}_t$$
-         \item In anyway, it does not change existing unexpired mappings:\\
-           $$\o{get}_t(m, k) ~\Leftrightarrow~ \p{const}_t(m)$$
+         \item One can get a mapping only if it exists in the map:
+           $$\o{get}_t(m \in M, k \in K) \rightarrow fail ~\Leftrightarrow~ [k,v,e] \not\in m.\s{mapping}_t \wedge o_t=\o{get}_t(m, k)$$
+           $$(v\in V,e\in \nintset)\gets \o{get}_t(m \in M, k \in K) ~\Leftrightarrow~ \exists [k,v,e] \in m.\s{mapping}_t \wedge o_t=\o{get}_t(m, k)$$
+         \item In anyway, it does not change existing unexpired mappings:
+           $$o_t \simeq \o{get}_t(m, k) ~\Leftrightarrow~ \p{const}_t(m)$$
        \end{itemize}
 \end{itemize}
 
@@ -81,54 +81,96 @@ We use the shorthand $\s{component}_t$ to indicate the value of $S.$\s{component
   \item[constructor]
     \begin{itemize}
       \item The constructor forms a new empty map \\
-        $m=\o{constructor}_0(s \in \nintset) \rightarrow \p{empty}_0(m) \wedge m.\s{maxSize}_t=s$
+        $m \gets \o{constructor}_0(s \in \nintset) \Leftrightarrow \p{empty}_0(m) \wedge \forall t \in \nintset m.\s{maxSize}_t=s$
       \item The constructor must be called once and only once, at the very beginning of $\tau$ (i.e., $\tau$ contains no other constructor call after the first one) \\
-        $o_0 \equiv \o{constructor}_0 \wedge (\forall t>0 \Rightarrow o_t \neq \o{constructor}_t)$ 
+        $o_0 \equiv \o{constructor}_0 \wedge (\forall t\in \moreset{1} \Rightarrow o_t \neq \o{constructor}_t)$ 
     \end{itemize}
   \item[erase]
     \begin{itemize}
       \item ``Erase'' deletes an entry with a given key. If the entry does not exist in the \p{mapping}, it fails. It does not change other mappings if they are not expired.
-        $$\Big(x=\o{erase}_t(m\in M, k\in K) ~\Leftrightarrow~ \p{isolated}_t(m, k)\Big) \wedge$$
-      \item If there were such a mapping for $k$, ``erase'' will remove it.
-        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=success \wedge \neg\o{has}_t(m, k) \wedge m.\s{size}_t \le m.\s{size}_{t-1}-1 \Big) \wedge$$
-      \item If there were not --- it will fail. 
-        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \neg\o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=fail\wedge m.\s{size}_t \le m.\s{size}_{t-1}\Big)$$
+        $$\Big(o_t \simeq \o{erase}_t(m\in M, k\in K) ~\Leftrightarrow~ \p{isolated}_t(m, k)\Big) \wedge$$
+      \item If there was a such mapping for $k$, ``erase'' will remove it.
+        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \exists [k, v, e] \in m.\s{mapping}_{t-1} ~\Leftrightarrow~$$
+        $$x=success \wedge \big(\forall v'\in V, e'\in \nintset \Rightarrow [k, v', e'] \not\in m.\s{mapping}_t\big) \wedge m.\s{size}_t \le m.\s{size}_{t-1}-1 \Big) \wedge$$
+      \item If there was not --- it will fail. 
+        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge [k,v,e]\not\in m.\s{mapping}_{t-1} ~\Leftrightarrow~$$
+        $$x=fail \wedge \p{const}_t(m)\Big)$$
     \end{itemize}
     \item[put]
       \begin{itemize}
         \item ``Put'' inserts a new mapping, if the number of unexpired elements is less than \s{maxSize} and there is no unexpired entry with the same key.
           This function does not touch any unexpired entry with key other than $k$.
-          $$\Big(x=\o{put}_t(m\in M, k\in K, v\in V, e\in \moreset{t}) ~\Leftrightarrow~ \p{isolated}_t(m, k)\Big) \wedge$$
-        \item If there were not such mupping before, and there is enough room, it will succeed.
-          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} < m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \Leftrightarrow $$
-          $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1}+1 \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
-        \item If there is no room, but some mappings have expired, one still can put.
-          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \wedge$$
-          $$\big(\exists k'\in K, e'\in \nintset: \o{has}_{t-1}(m,k')\wedge (\cdot,e')=\o{get}_{t-1}(m, k) \wedge e'<t \big) \Leftrightarrow$$
-          $$x=success \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
-        \item If there is an unexpired mapping with the same key, put will fail.
-          $$\Big(x=\o{put}_t(m, k, v, e) \wedge \o{has}_{t-1}(m, k) \wedge (v, e)=\o{get}_{t-1}(m, k) \wedge e \ge t \Leftrightarrow$$
-          $$x=fail \wedge m.\s{size}_t \le m.\s{size}_{t-1} \wedge \o{has}_t(m, k) \wedge \o{get}_t(m, k) = (v, e)\Big)\wedge$$
-        \item Into full map, one can not put any more keys.
-          $$\Big(x=\o{put}_t(m, k, v, e) \wedge$$
-          $$\big(\forall k'\in K,e'\in \nintset :\o{has}_{t-1}(m, k')\wedge(\cdot,e')=\o{get}_{t-1}(m,k') \Rightarrow e' \ge t \big) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \Leftrightarrow$$
-          $$x=fail \wedge m.\s{size}_t = m.\s{size}_{t-1} \wedge \p{const}_t(m, k)\Big)\wedge$$
+          $$\Big(o_t \simeq \o{put}_t(m\in M, k\in K, v\in V, e\in \moreset{t}) ~\Leftrightarrow~ \p{isolated}_t(m, k)\Big) \wedge$$
+        \item If there was no such mupping before, and there is enough room, it will succeed.
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} < m.\s{maxSize}_{t-1} \wedge \big(\forall v'\in V, e'\in \nintset \Rightarrow [k, v', e'] \not\in m.\s{mapping}_{t-1}\big) \Leftrightarrow $$
+          $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1}+1 \wedge [k, v, e] \in m.\s{mapping}_t\Big)\wedge$$
+        \item If a mapping with key $k$ allready exists, and it does not expires on $t$, put will fail.
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge \big(\exists v'\in V, e'\in \nintset: [k, v', e']\in m.\s{mapping}_{t-1} \wedge e > t \big) \Leftrightarrow$$
+          $$x=fail \wedge \p{const}_t(m)\Big)\wedge$$
+        \item If a mapping with key $k$ expires on $t$, put will replace it:
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge \big(\exists v'\in V: [k, v', t]\in m.\s{mapping}_{t-1}\big) \Leftrightarrow$$
+          $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1} \wedge [k, v, e] \in m.\s{mapping}_t\Big)\wedge$$
+        \item If there is no room, but some mappings expire on $t$, put will succed:
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge [k, v, e] \not\in m.\s{mapping}_{t-1} \wedge $$
+          $$\big(\exists k'\in K, v'\in V: [k', v', t] \in m.\s{mapping}_{t-1}\big) \Leftrightarrow$$
+          $$x=success \wedge m.\s{state}_t \le m.\s{state}_{t-1} \wedge [k, v, t] \in m.\s{mapping}_t\Big)\wedge$$
+        \item If there is no room, and no mappings expire on $t$, put will fail:
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge $$
+          $$\big(\forall k'\in K, v'\in V, e' \in \nintset: [k', v', e'] \in m.\s{mapping}_{t-1} \Rightarrow e' > t \big) \Leftrightarrow$$
+          $$x=fail \wedge \p{const}_t(m)\Big)$$
+%        \item If there is no room, but some mappings have expired, one still can put.
+%          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \wedge$$
+%          $$\big(\exists k'\in K, e'\in \nintset: \o{has}_{t-1}(m,k')\wedge (\cdot,e')=\o{get}_{t-1}(m, k) \wedge e'<t \big) \Leftrightarrow$$
+%          $$x=success \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
+
+
+%          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \wedge$$
+%          $$\big(\exists k'\in K, e'\in \nintset: \o{has}_{t-1}(m,k')\wedge (\cdot,e')=\o{get}_{t-1}(m, k) \wedge e'<t \big) \Leftrightarrow$$
+%          $$x=success \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
+%        \item If there is an unexpired mapping with the same key, put will fail.
+%          $$\Big(x=\o{put}_t(m, k, v, e) \wedge \o{has}_{t-1}(m, k) \wedge (v, e)=\o{get}_{t-1}(m, k) \wedge e \ge t \Leftrightarrow$$
+%          $$x=fail \wedge m.\s{size}_t \le m.\s{size}_{t-1} \wedge \o{has}_t(m, k) \wedge \o{get}_t(m, k) = (v, e)\Big)\wedge$$
+%        \item Into full map, one can not put any more keys.
+%          $$\Big(x=\o{put}_t(m, k, v, e) \wedge$$
+%          $$\big(\forall k'\in K,e'\in \nintset :\o{has}_{t-1}(m, k')\wedge(\cdot,e')=\o{get}_{t-1}(m,k') \Rightarrow e' \ge t \big) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \Leftrightarrow$$
+%          $$x=fail \wedge m.\s{size}_t = m.\s{size}_{t-1} \wedge \p{const}_t(m, k)\Big)\wedge$$
       \end{itemize}
      
 \end{itemize}
 
 \paragraph{Properties to be proven}
 \begin{itemize}
- \item The size of the map is always properly bounded 
+  \item $\p{empty}_t(m) \Leftrightarrow m.\s{size}_t=0$
+  \item If the map is empty, there no keys in it:
+    $$m.\s{size}_t=0 \Rightarrow \forall k\in K \o{has}_t(m, k) = false $$
+  \item $\o{has}_t(m, k) \Leftrightarrow \o{get}_t(m, k) \not\rightarrow fail$
+
+      \item If there was a such mapping for $k$, ``erase'' will remove it.
+        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=success \wedge \neg\o{has}_t(m, k) \wedge m.\s{size}_t \le m.\s{size}_{t-1}-1 \Big) \wedge$$
+      \item If there were not --- it will fail. 
+        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \neg\o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=fail\wedge m.\s{size}_t \le m.\s{size}_{t-1}\Big)$$
+
+      \item 
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} < m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \Leftrightarrow $$
+          $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1}+1 \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
+
+  \item The size of the map is always properly bounded 
    $$\forall t\in \nintset: t>0  \wedge m=\o{constructor}_0(s \in \nintset) \Rightarrow 0 \le m.\s{size}_t \le m.\s{maxSize}$$
- \item No operation except for $\o{constructor}_0$ can change map capacity:
+  \item No operation except for $\o{constructor}_0$ can change map capacity:
    $$\forall t\in \nintset: t > 0 \Rightarrow m.\s{maxSize}_t=m.\s{maxSize}_0$$
- \item For any subsequence of operations other than \o{put}, size of the map may only decrease:
+  \item For any subsequence of operations other than \o{put}, size of the map may only decrease:
    $$\forall a\in \nintset,b\in \nintset: a<b \wedge \big(\forall t\in \nintset:a<t<b \Rightarrow o_t \neq \o{put}_t \big) \Rightarrow \s{size}_a \ge \s{size}_b$$
- \item If a subsequence of operations does not include \o{erase} for key $k\in K$, and there is a mapping, it will be kept until the end of the subsequence, if not expired:
+  \item If a subsequence of operations does not include \o{erase} for key $k\in K$, and there is a mapping, it will be kept until the end of the subsequence, if not expired:
    $$\forall a\in \nintset,b, k\in K, m\in M, v\in V, e\in \moreset{b}: a < b \wedge \o{has}_a(m, k) \wedge (v, e)=\o{get}_a{m, k} \wedge e \ge b ~ \wedge$$
    $$\big(\forall t\in \nintset: a<t<b \Rightarrow o_t\neq \o{erase}_t(m, k)\big) \Rightarrow$$
    $$\o{has}_b(m, k) \wedge \o{get}_b(m, k) = (v,e)$$
+  \item $$\p{isolated}_t(m\in M, k'\in K) ~\Leftrightarrow~$$
+     $$\Big(\forall k\in K,v \in V, e\in \nintset : k\neq k' \wedge \o{has}_{t-1}(m, k) \wedge (v,e)=\o{get}_{t-1}(m, k) \wedge e>t \Rightarrow \o{has}_t(m, k) \wedge \o{get}_t(m, k)=(v,e)\Big)\wedge$$
+     $$\Big(\forall k\in K:k\neq k' \wedge \neg \o{has}_{t-1}(m, k) \Rightarrow \neg\o{has}_t(m, k)\Big)$$
+  \item $$\p{const}_t(m\in M) ~\Leftrightarrow~$$
+     $$\Big(\forall k\in K,v \in V, e\in \nintset : \o{has}_{t-1}(m, k) \wedge (v,e)=\o{get}_{t-1}(m, k) \wedge e>t \Rightarrow \o{has}_t(m, k) \wedge \o{get}_t(m, k)=(v,e)\Big)\wedge$$
+     $$\Big(\forall k\in K: \neg \o{has}_{t-1}(m, k) \Rightarrow \neg\o{has}_t(m, k)\Big)$$
+
 \end{itemize}
 
 
