@@ -63,7 +63,9 @@ By default, if symbols $m, e, k, v$ are used in a formula, and not mentioned bef
      \begin{itemize}
        \item $\o{has}_t(m \in M, k \in K) ~\Leftrightarrow~ \exists [k,v,e] \in m.\s{mapping}_t \wedge o_t=\o{has}_t(m, k)$\\
        \item It does not change nonexpired mappings:
-         $$o_t \simeq \o{has}_t(m, k) ~\Leftrightarrow~ \p{const}_t(m)$$
+         \begin{equation}
+           o_t \simeq \o{has}_t(m, k) ~\Leftrightarrow~ \p{const}_t(m)
+         \end{equation}
      \end{itemize}
      \item[get]
        \begin{itemize}
@@ -110,7 +112,7 @@ By default, if symbols $m, e, k, v$ are used in a formula, and not mentioned bef
         \item If a mapping with key $k$ expires on $t$, put will replace it:
           $$\Big(x=\o{put}_t(m, k, v, e) \wedge \big(\exists v'\in V: [k, v', t]\in m.\s{mapping}_{t-1}\big) \Leftrightarrow$$
           $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1} \wedge [k, v, e] \in m.\s{mapping}_t\Big)\wedge$$
-        \item If there is no room, but some mappings expire on $t$, put will succed:
+        \item If there is no room, but some mappings expire on $t$, put will succeed:
           $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge [k, v, e] \not\in m.\s{mapping}_{t-1} \wedge $$
           $$\big(\exists k'\in K, v'\in V: [k', v', t] \in m.\s{mapping}_{t-1}\big) \Leftrightarrow$$
           $$x=success \wedge m.\s{state}_t \le m.\s{state}_{t-1} \wedge [k, v, t] \in m.\s{mapping}_t\Big)\wedge$$
@@ -118,6 +120,26 @@ By default, if symbols $m, e, k, v$ are used in a formula, and not mentioned bef
           $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge $$
           $$\big(\forall k'\in K, v'\in V, e' \in \nintset: [k', v', e'] \in m.\s{mapping}_{t-1} \Rightarrow e' > t \big) \Leftrightarrow$$
           $$x=fail \wedge \p{const}_t(m)\Big)$$
+      \end{itemize}
+     
+\end{itemize}
+
+\paragraph{Properties to be proven}
+\begin{itemize}
+  \item $\p{empty}_t(m) \Leftrightarrow m.\s{size}_t=0$
+  \item If the map is empty, there no keys in it:
+    $$m.\s{size}_t=0 \Leftrightarrow \forall k\in K \o{has}_t(m, k) = false $$
+  \item $\o{has}_t(m, k) \Leftrightarrow \o{get}_t(m, k) \not\rightarrow fail$
+
+      \item If there was a such mapping for $k$, ``erase'' will remove it.
+        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=success \wedge \neg\o{has}_t(m, k) \wedge m.\s{size}_t \le m.\s{size}_{t-1}-1 \Big) \wedge$$
+      \item If there were not --- it will fail. 
+        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \neg\o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=fail\wedge m.\s{size}_t \le m.\s{size}_{t-1}\Big)$$
+
+      \item 
+          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} < m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \Leftrightarrow $$
+          $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1}+1 \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
+
 %        \item If there is no room, but some mappings have expired, one still can put.
 %          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \wedge$$
 %          $$\big(\exists k'\in K, e'\in \nintset: \o{has}_{t-1}(m,k')\wedge (\cdot,e')=\o{get}_{t-1}(m, k) \wedge e'<t \big) \Leftrightarrow$$
@@ -134,25 +156,6 @@ By default, if symbols $m, e, k, v$ are used in a formula, and not mentioned bef
 %          $$\Big(x=\o{put}_t(m, k, v, e) \wedge$$
 %          $$\big(\forall k'\in K,e'\in \nintset :\o{has}_{t-1}(m, k')\wedge(\cdot,e')=\o{get}_{t-1}(m,k') \Rightarrow e' \ge t \big) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \Leftrightarrow$$
 %          $$x=fail \wedge m.\s{size}_t = m.\s{size}_{t-1} \wedge \p{const}_t(m, k)\Big)\wedge$$
-      \end{itemize}
-     
-\end{itemize}
-
-\paragraph{Properties to be proven}
-\begin{itemize}
-  \item $\p{empty}_t(m) \Leftrightarrow m.\s{size}_t=0$
-  \item If the map is empty, there no keys in it:
-    $$m.\s{size}_t=0 \Rightarrow \forall k\in K \o{has}_t(m, k) = false $$
-  \item $\o{has}_t(m, k) \Leftrightarrow \o{get}_t(m, k) \not\rightarrow fail$
-
-      \item If there was a such mapping for $k$, ``erase'' will remove it.
-        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=success \wedge \neg\o{has}_t(m, k) \wedge m.\s{size}_t \le m.\s{size}_{t-1}-1 \Big) \wedge$$
-      \item If there were not --- it will fail. 
-        $$\Big(x=\o{erase}_t(m\in M, k\in K) \wedge \neg\o{has}_{t-1}(m, k) ~\Leftrightarrow~ x=fail\wedge m.\s{size}_t \le m.\s{size}_{t-1}\Big)$$
-
-      \item 
-          $$\Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} < m.\s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(m, k) \Leftrightarrow $$
-          $$ x=success \wedge m.\s{size}_t \le m.\s{size}_{t-1}+1 \wedge \o{has}_t(m, k)\wedge\o{get}_t(m, k) = (v, e)\Big)\wedge$$
 
   \item The size of the map is always properly bounded 
    $$\forall t\in \nintset: t>0  \wedge m=\o{constructor}_0(s \in \nintset) \Rightarrow 0 \le m.\s{size}_t \le m.\s{maxSize}$$
