@@ -40,10 +40,10 @@ We use the shorthand $\o{operation}_t(...)$ to indicate the operation that occur
 An execution is an interleaving of operations and ``snapshots'' of the abstract state
 $\epsilon = <o_0, S_0, o_1, S_1, ..., o_n, S_n>$, with
 each subsequence $<S_{i-1}, o_i, S_i>$ indicating that operation $o_i$ transforms abstract state $S_{i-1}$ into $S_i$.
-An accessor does not mutate state, so it leaves the abstract state unchanged.
+An accessor does not mutate state, so it leaves the abstract state unchanged, but the state can change due to continuous expiration process.
 We use the shorthand $\s{component}_t$ to indicate the value of $S.$\s{component} immediately after $o_t$ completes and before $o_{t+1}$ commences.
 
-{\it Note:} Symbol $\simeq$ in the following context: $o_t\simeq ...$ means that lefthand {\it operation} ($o_t$) can be equal to the righthand operation. E.g. $\forall k \in K, m \in M o_t\simeq \o{has}_t(m, k) \Leftrightarrow \p{const}_t(m)$ means, that the operation number t ($o_t$) may be $\o{has}(m, k)$ (not the result of such function call) if and only if holds $\p{const}_t(m)$.
+{\it Note:} Symbol $\simeq$ in the following context: $o_t\simeq ...$ means that lefthand {\it operation} ($o_t$) can be equal to the righthand operation. E.g. $\forall k \in K, m \in M o_t\simeq \o{has}_t(m, k) \Leftrightarrow \p{const}_t(m)$ means, that the operation number t ($o_t$) may be the $\o{has}(m, k)$ call (not the result of it) if and only if holds $\p{const}_t(m)$. \underline{Attention}: $x=\o{has}_t(m, k)$ has different meaning then $o_t=\o{has}_t(m, k)$.
 
 By default, if symbols $m, e, k, v, t$ are used in a formula, and not mentioned before in that formula, the universal quantifier $\forall$ is implied: $\forall m\in M, k \in K, v\in V, e\in \nintset, t\in \nintset$.
 
@@ -107,7 +107,7 @@ These predicates allways hold:
   \end{itemize}
 \item[erase]
   \begin{itemize}
-  \item ``Erase'' deletes an entry with a given key. If the entry does not exist in the \p{mapping}, it fails. It does not change other mappings if they are not expired.
+  \item ``Erase'' deletes an entry with a given key. If the entry does not exist in the \s{mapping}, it fails. It does not change other mappings if they are not expired.
     \begin{gather*}
       \Big(o_t \simeq \o{erase}_t(m\in M, k\in K) ~\Leftrightarrow~ \p{isolated}_t(m, k)\Big) \wedge
     \end{gather*}
@@ -120,7 +120,7 @@ These predicates allways hold:
   \item If there was not --- it will fail.
     \begin{gather}
       \Big( x=\o{erase}_t(m\in M, k\in K) \wedge [k,v,e]\not\in m.\s{mapping}_{t-1} ~\Leftrightarrow~ \nonumber\\
-      x=fail \wedge \p{const}_t(m)\Big)
+      x=fail \wedge \p{const}_t(m) \wedge o_t=\o{erase}_t(m, k)\Big)
       \label{eq:erase2}
     \end{gather}
   \end{itemize}
@@ -139,8 +139,8 @@ These predicates allways hold:
     \end{gather}
   \item If a mapping with key $k$ allready exists, and it does not expires on $t$, put will fail.
     \begin{gather}
-      \Big(x=\o{put}_t(m, k, v, e) \wedge \big(\exists v'\in V, e'\in \nintset: [k, v', e']\in m.\s{mapping}_{t-1} \wedge e > t \big) \Leftrightarrow\nonumber\\
-      x=fail \wedge \p{const}_t(m)\Big)\wedge
+      \Big(x=\o{put}_t(m, k, v, e) \wedge \big(\exists v'\in V, e'\in \nintset: [k, v', e']\in m.\s{mapping}_{t-1} \wedge e > t\big) \Leftrightarrow\nonumber\\
+      x=fail \wedge \p{const}_t(m) \wedge o_t = \o{put}_t(m,k,v,e)\Big)\wedge
       \label{eq:put2}
     \end{gather}
   \item If a mapping with key $k$ expires on $t$, put will replace it:
@@ -160,7 +160,7 @@ These predicates allways hold:
     \begin{gather}
       \Big(x=\o{put}_t(m, k, v, e) \wedge m.\s{size}_{t-1} = m.\s{maxSize}_{t-1} \wedge \nonumber\\
       \big(\forall k'\in K, v'\in V, e' \in \nintset: [k', v', e'] \in m.\s{mapping}_{t-1} \Rightarrow e' > t \big) \Leftrightarrow\nonumber\\
-      x=fail \wedge \p{const}_t(m)\Big)
+      x=fail \wedge \p{const}_t(m) \wedge o_t = \o{put}_t(m,k,v,e)\Big)
       \label{eq:put5}
     \end{gather}
   \end{itemize}
