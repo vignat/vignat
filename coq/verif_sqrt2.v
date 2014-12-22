@@ -1,6 +1,6 @@
 Require Import floyd.proofauto.
-Require Import progs.sqrt.
-Require Import progs.sqr2.
+Require Import sqrt.
+Require Import sqr2.
 Require Import ZArith.Znat.
 Local Open Scope logic.
 Local Open Scope Z.
