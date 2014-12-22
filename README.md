@@ -14,7 +14,7 @@ To make sure, that sqrt.c indeed corresponds to sqr.v which conforms the specifi
 
 To install coq and proofgeneral in Ubuntu, use 
 ```
-    $ apt-get install coq proofgeneral
+    $ sudo apt-get install coq proofgeneral
 ```
 Or download it from the links, supplied above.
 Compcert and VST are in the standard Ubunto repo, so you have to download, unpack and build them by hand.
