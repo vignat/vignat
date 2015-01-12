@@ -7,3 +7,5 @@
 *#
 .#*
 fullpage.sty
+*.vo
+*.glob
