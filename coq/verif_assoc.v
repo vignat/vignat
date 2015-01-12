@@ -5,12 +5,42 @@ Require Import assoc_spec.
 Local Open Scope logic.
 Local Open Scope Z.
 
+Inductive repr : Z -> val -> Prop :=
+| mk_repr : forall z, z >= 0 -> z < Int.modulus -> repr z (Vint (Int.repr z)).
+
+Lemma k_in_range: forall k : Z, 0 <= k < 100 -> Int.min_signed <= k <= Int.max_signed.
+Proof.
+  split.
+  unfold Int.min_signed, Int.half_modulus, Int.modulus.
+  unfold Int.wordsize, Wordsize_32.wordsize.
+  unfold two_power_nat.
+  unfold shift_nat.
+  unfold nat_iter.
+  simpl.
+  omega.
+  unfold Int.max_signed, Int.half_modulus, Int.modulus,
+  Int.wordsize, Wordsize_32.wordsize,
+  two_power_nat, shift_nat, nat_iter.
+  simpl; omega.
+Qed.
+
+
+Lemma k_from_val: forall (k:Z) (karg : int), repr k (Vint karg) -> 0 <= k < 100 ->
+                                             Int.signed karg = k.
+Proof.
+intros.
+inversion H.
+apply Int.signed_repr.
+apply k_in_range.
+assumption.
+Qed.
 
 Definition get_spec :=
   DECLARE _get
     WITH sh : share, k : Z, arr : Z->val, vk : val, varr : val
-    PRE [_key OF tint, _arr OF (tptr tint)]
-        PROP (0 <= k < 100; forall i, 0 <= i < 100 -> is_int (arr i))
+    PRE [_key OF tint, _rez OF tint, _arr OF (tptr tint)]
+        PROP (0 <= k < 100; forall i, 0 <= i < 100 -> is_int (arr i);
+              repr k vk)
         LOCAL (`(eq vk) (eval_id _key);
                `(eq varr) (eval_id _arr);
                `isptr (eval_id _arr))
@@ -36,7 +66,6 @@ Definition set_spec :=
                              0 100 varr).
 
 Definition Vprog : varspecs := nil.
-
 Definition Gprog : funspecs := get_spec :: set_spec :: nil.
 
 Lemma body_get: semax_body Vprog Gprog f_get get_spec.
@@ -44,11 +73,21 @@ Proof.
   start_function.
   name karg _key.
   name arrarg _arr.
+  name rezloc _rez.
   forward.
   entailer!.
-  admit.
-  admit.
-  admit.
+  - rewrite k_from_val with (k:=k) by assumption.
+    omega.
+  - rewrite k_from_val with (k:=k) by assumption.
+    omega.
+  - rewrite k_from_val with (k:=k) by assumption.
+    apply H0.
+    assumption.
+  - forward.
+    entailer!.
+    rewrite <- H2.
+    rewrite k_from_val with (k:=k) by assumption.
+    tauto.
 Qed.
 
 Lemma body_set: semax_body Vprog Gprog f_set set_spec.
@@ -57,7 +96,10 @@ Proof.
   name karg _key.
   name valarg _val.
   name arrarg _arr.
-  admit.
+  forward.
+
+
+
 SearchAbout force_val.
   SearchAbout offset_val.
   SearchAbout add_ptr_int.

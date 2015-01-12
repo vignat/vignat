@@ -4,7 +4,7 @@ Local Open Scope Z_scope.
 
 Definition ___builtin_read32_reversed : ident := 32%positive.
 Definition ___compcert_va_int32 : ident := 16%positive.
-Definition _main : ident := 38%positive.
+Definition _set : ident := 38%positive.
 Definition ___builtin_fsqrt : ident := 24%positive.
 Definition ___builtin_clz : ident := 22%positive.
 Definition ___compcert_va_int64 : ident := 17%positive.
@@ -15,14 +15,15 @@ Definition ___builtin_annot_intval : ident := 10%positive.
 Definition ___builtin_negl : ident := 3%positive.
 Definition ___builtin_write32_reversed : ident := 2%positive.
 Definition ___builtin_write16_reversed : ident := 1%positive.
-Definition _val : ident := 36%positive.
+Definition _get : ident := 36%positive.
 Definition ___builtin_read16_reversed : ident := 31%positive.
 Definition ___builtin_va_copy : ident := 14%positive.
 Definition ___builtin_mull : ident := 6%positive.
 Definition ___builtin_fmin : ident := 26%positive.
 Definition ___builtin_bswap : ident := 19%positive.
+Definition _main : ident := 39%positive.
 Definition ___builtin_membar : ident := 11%positive.
-Definition _set : ident := 37%positive.
+Definition _val : ident := 37%positive.
 Definition ___builtin_addl : ident := 4%positive.
 Definition ___builtin_fmsub : ident := 28%positive.
 Definition ___builtin_fabs : ident := 7%positive.
@@ -36,7 +37,7 @@ Definition ___builtin_fmax : ident := 25%positive.
 Definition ___builtin_va_end : ident := 15%positive.
 Definition _key : ident := 34%positive.
 Definition ___builtin_fnmadd : ident := 29%positive.
-Definition _get : ident := 35%positive.
+Definition _rez : ident := 35%positive.
 Definition ___builtin_fnmsub : ident := 30%positive.
 Definition ___builtin_ctz : ident := 23%positive.
 Definition ___builtin_bswap32 : ident := 20%positive.
@@ -47,11 +48,14 @@ Definition f_get := {|
   fn_callconv := cc_default;
   fn_params := ((_arr, (tptr tint)) :: (_key, tint) :: nil);
   fn_vars := nil;
-  fn_temps := nil;
+  fn_temps := ((_rez, tint) :: nil);
   fn_body :=
-(Sreturn (Some (Ederef
-                 (Ebinop Oadd (Etempvar _arr (tptr tint))
-                   (Etempvar _key tint) (tptr tint)) tint)))
+(Ssequence
+  (Sset _rez
+    (Ederef
+      (Ebinop Oadd (Etempvar _arr (tptr tint)) (Etempvar _key tint)
+        (tptr tint)) tint))
+  (Sreturn (Some (Etempvar _rez tint))))
 |}.
 
 Definition f_set := {|
