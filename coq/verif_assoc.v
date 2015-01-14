@@ -50,19 +50,22 @@ Definition get_spec :=
                            0 100 varr) &&
                  local(`(eq (arr k)) retval).
 
+Function aPut (arr:Z -> val) (k:Z) (v:val) : Z -> val :=
+  fun (kk:Z) => if (Z.eq_dec k kk) then v else arr kk.
+
 Definition set_spec :=
   DECLARE _set
-     WITH sh : share, k : Z, v : Z, arr : Z->Z, vk : val, vv : val, varr : val
+     WITH sh : share, k : Z, arr : Z->val, vk : val, v : val, varr : val
      PRE [_key OF tint, _val OF tint, _arr OF (tptr tint)]
-         PROP (0 <= k < 100; forall i, 0 <= i < 100 -> is_int (Vint (Int.repr (arrGet arr i)));
-               writable_share sh)
+         PROP (0 <= k < 100; forall i, 0 <= i < 100 -> is_int (arr i);
+               writable_share sh; repr k vk; is_int v)
          LOCAL (`(eq vk) (eval_id _key);
-                `(eq vv) (eval_id _val);
+                `(eq v) (eval_id _val);
                 `(eq varr) (eval_id _arr);
                 `isptr (eval_id _arr))
-         SEP (`(array_at tint sh (fun x:Z => (Vint (Int.repr (arrGet arr x)))) 0 100)
+         SEP (`(array_at tint sh arr 0 100)
                          (eval_id _arr))
-     POST [tvoid] `(array_at tint sh (fun x:Z => (Vint (Int.repr (arrGet (arrPut arr k v) x))))
+     POST [tvoid] `(array_at tint sh (aPut arr k v)
                              0 100 varr).
 
 Definition Vprog : varspecs := nil.
@@ -98,18 +101,29 @@ Proof.
   name arrarg _arr.
   forward.
 
+  instantiate (1:=v).
+  instantiate (2:=k).
+  assert (offset_val (Int.repr (sizeof tint * k)) (eval_id _arr rho) =
+          force_val (sem_add_pi tint (eval_id _arr rho) (eval_id _key rho))).
+  inversion H2.
+  rewrite sem_add_pi_ptr.
+  unfold force_val.
+  apply f_equal2.
+  rewrite mul_repr.
+  auto.
+  auto.
+  assumption.
 
-
-SearchAbout force_val.
-  SearchAbout offset_val.
-  SearchAbout add_ptr_int.
-  Qed.
-
-
-
+  assert (eval_id _val rho = force_val (sem_cast_neutral (eval_id _val rho))).
+  apply is_int_e in H3.
+  destruct H3 as [n VtoN].
+  rewrite VtoN.
+  auto.
+  entailer.
+  forward.
+Qed.
 
 Existing Instance NullExtension.Espec.
-
 
 
 Theorem all_funcs_correct:
@@ -117,6 +131,7 @@ Theorem all_funcs_correct:
 Proof.
 unfold Gprog, prog, prog_funct; simpl.
 semax_func_skipn.
+semax_func_cons body_get.
 pose proof body_get.
 Check semax_func_cons.
 Check mk_funspec.
