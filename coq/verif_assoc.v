@@ -38,7 +38,7 @@ Qed.
 Definition get_spec :=
   DECLARE _get
     WITH sh : share, k : Z, arr : Z->val, vk : val, varr : val
-    PRE [_key OF tint, _rez OF tint, _arr OF (tptr tint)]
+    PRE [_arr OF (tptr tint), _key OF tint(*, _rez OF tint*)]
         PROP (0 <= k < 100; forall i, 0 <= i < 100 -> is_int (arr i);
               repr k vk)
         LOCAL (`(eq vk) (eval_id _key);
@@ -56,7 +56,7 @@ Function aPut (arr:Z -> val) (k:Z) (v:val) : Z -> val :=
 Definition set_spec :=
   DECLARE _set
      WITH sh : share, k : Z, arr : Z->val, vk : val, v : val, varr : val
-     PRE [_key OF tint, _val OF tint, _arr OF (tptr tint)]
+     PRE [_arr OF (tptr tint), _key OF tint, _val OF tint]
          PROP (0 <= k < 100; forall i, 0 <= i < 100 -> is_int (arr i);
                writable_share sh; repr k vk; is_int v)
          LOCAL (`(eq vk) (eval_id _key);
@@ -131,13 +131,6 @@ Theorem all_funcs_correct:
 Proof.
 unfold Gprog, prog, prog_funct; simpl.
 semax_func_skipn.
-semax_func_cons body_get.
-pose proof body_get.
-Check semax_func_cons.
-Check mk_funspec.
-apply semax_func_cons with (V:=Vprog) (G:=Gprog) (G':=set_spec::nil) (fs:=set_spec::nil)
-                                      (id:=_get) (f:=f_get).
-SearchAbout semax_func.
 semax_func_cons body_get.
 semax_func_cons body_set.
 apply semax_func_nil.

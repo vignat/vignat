@@ -1,8 +1,4 @@
 
-#define SIZE (100)
-
-//int mapping[SIZE];
-
 int get(int* arr, int key)
 {
     int rez = arr[key]; //using memory access (arr[key]) in an expression
