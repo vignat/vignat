@@ -1,6 +1,7 @@
 Require Import floyd.proofauto.
 Require Import assoc.
 Require Import assoc_spec.
+Require Import Coq.Logic.FunctionalExtensionality.
 
 Local Open Scope logic.
 Local Open Scope Z.
@@ -37,36 +38,32 @@ Qed.
 
 Definition get_spec :=
   DECLARE _get
-    WITH sh : share, k : Z, arr : Z->Z, vk : val, varr : val
+    WITH sh : share, k : Z, arr : ArrayZ, vk : val, varr : val
     PRE [_arr OF (tptr tint), _key OF tint]
         PROP (0 <= k < 100; repr k vk)
         LOCAL (`(eq vk) (eval_id _key);
                `(eq varr) (eval_id _arr);
                `isptr (eval_id _arr))
-        SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arr x))))
+        SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
                         0 100) (eval_id _arr))
-    POST [tint] `(array_at tint sh (fun x => (Vint (Int.repr (arr x))))
+    POST [tint] `(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
                            0 100 varr) &&
-                 local(`(eq (Vint (Int.repr (arr k)))) retval).
-
-Function aPut (arr:Z -> val) (k:Z) (v:val) : Z -> val :=
-  fun (kk:Z) => if (Z.eq_dec k kk) then v else arr kk.
+                 local(`(eq (Vint (Int.repr (arrGet arr k)))) retval).
 
 Definition set_spec :=
   DECLARE _set
-     WITH sh : share, k : Z, v : Z, arr : Z->Z, vk : val, vv : val, varr : val
+     WITH sh : share, k : Z, v : Z, arr : ArrayZ, vk : val, vv : val, varr : val
      PRE [_arr OF (tptr tint), _key OF tint, _val OF tint]
-         PROP (0 <= k < 100;(* forall i, 0 <= i < 100 -> is_int (arr i); *)
-               writable_share sh; repr k vk; repr v vv)
+         PROP (0 <= k < 100; writable_share sh; repr k vk; repr v vv)
          LOCAL (`(eq vk) (eval_id _key);
                 `(eq vv) (eval_id _val);
                 `(eq varr) (eval_id _arr);
                 `isptr (eval_id _arr))
-         SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arr x))))
+         SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
                          0 100)
                          (eval_id _arr))
-     POST [tvoid] `(array_at tint sh (fun x =>
-                                        (Vint (Int.repr ((arrPut arr k v) x))))
+     POST [tvoid] `(array_at tint sh 
+                             (fun x => (Vint (Int.repr (arrGet (arrPut arr k v) x))))
                              0 100 varr).
 
 Definition Vprog : varspecs := nil.
@@ -123,18 +120,31 @@ Proof.
   simpl.
   tauto.
   entailer.
+  rename H1 into RK.
+  rename H2 into RV.
   forward.
   
-  assert ((upd (fun x : Z => Vint (Int.repr (arr x))) k (Vint valarg)) = 
-          (fun x : Z => Vint (Int.repr (arrPut arr k v x)))) as ARR_PUT.
-  unfold arrPut.
+  assert ((upd (fun x : Z => Vint (Int.repr (arrGet arr x))) k (Vint valarg)) = 
+          (fun x : Z => Vint (Int.repr (arrGet (arrPut arr k v) x)))) as ARR_PUT.
+  (*unfold arrPut.*)
   unfold upd.
-  Require Import Logick.FunctionalExtentionality.
-  Locate functional_extentionality.
-  extensionality
-
-  rewrite ARR_PUT.
-  entailer.
+  apply functional_extensionality.
+  intro.
+  unfold eq_dec.
+  unfold initial_world.EqDec_Z.
+  unfold zeq.
+  elim (Z.eq_dec k x).
+  - intro HEQ.
+    rewrite HEQ.
+    rewrite getput1.
+    inversion RV.
+    tauto.
+  - intro HNEQ.
+    rewrite getput2.
+    tauto.
+    assumption.
+  - rewrite ARR_PUT.
+    entailer.
 Qed.
 
 Existing Instance NullExtension.Espec.
