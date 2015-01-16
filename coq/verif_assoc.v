@@ -66,8 +66,137 @@ Definition set_spec :=
                              (fun x => (Vint (Int.repr (arrGet (arrPut arr k v) x))))
                              0 100 varr).
 
+Definition c_get_spec :=
+  DECLARE _cGet
+    WITH sh : share, k : Z, arr : CircleArrayZ, vk : val, varr : val
+    PRE [_arr OF (tptr tint), _key OF tint]
+        PROP (repr k vk)
+        LOCAL (`(eq vk) (eval_id _key);
+               `(eq varr) (eval_id _arr);
+               `isptr (eval_id _arr))
+        SEP (`(array_at tint sh (fun x => (Vint (Int.repr (caGet arr x))))
+                        0 100) (eval_id _arr))
+    POST [tint] `(array_at tint sh (fun x => (Vint (Int.repr (caGet arr x))))
+                           0 100 varr) &&
+                 local(`(eq (Vint (Int.repr (caGet arr k)))) retval).
+
+Definition c_set_spec :=
+  DECLARE _cSet
+     WITH sh : share, k : Z, v : Z, arr : CircleArrayZ, vk : val, vv : val, varr : val
+     PRE [_arr OF (tptr tint), _key OF tint, _val OF tint]
+         PROP (writable_share sh; Int.min_signed <= k <= Int.max_signed;
+               repr k vk; Int.min_signed <= v <= Int.max_signed; repr v vv)
+         LOCAL (`(eq vk) (eval_id _key);
+                `(eq vv) (eval_id _val);
+                `(eq varr) (eval_id _arr);
+                `isptr (eval_id _arr))
+         SEP (`(array_at tint sh (fun x => (Vint (Int.repr (caGet arr x))))
+                         0 100)
+                         (eval_id _arr))
+     POST [tvoid] `(array_at tint sh 
+                             (fun x => (Vint (Int.repr (caGet (caPut arr k v) x))))
+                             0 100 varr).
+
 Definition Vprog : varspecs := nil.
-Definition Gprog : funspecs := get_spec :: set_spec :: nil.
+Definition Gprog : funspecs := get_spec :: set_spec :: c_get_spec :: c_set_spec :: nil.
+
+Lemma body_c_get: semax_body Vprog Gprog f_cGet c_get_spec.
+Proof.
+  start_function.
+  name karg _key.
+  name arrarg _arr.
+  name rezloc _rez.
+  forward_call (sh,(Zmod k 100),arr,(Vint (Int.repr (Zmod k 100))), varr).
+  entailer!.
+  simpl.
+  
+  unfold Int.mone.
+  
+  SearchAbout Int.eq.
+  
+  assert (Int.eq (Int.repr 100) (Int.repr (-1)) = false).
+  apply Int.eq_false.
+  unfold Int.repr.
+  simpl.
+  admit.
+
+  rewrite H2.
+  rewrite andb_false_r.
+  simpl.
+  auto.
+  apply Z_mod_lt; omega.
+  apply Z_mod_lt; omega.
+  apply mk_repr.
+  apply Z.le_ge.
+  apply Z_mod_lt; omega.
+  unfold Int.modulus.
+  unfold two_power_nat, Int.wordsize.
+  unfold Wordsize_32.wordsize, shift_nat.
+  unfold nat_iter.
+
+  assert (forall a b c, a < b -> b < c -> a < c) as Lt_Lt_trans by admit.
+  apply Lt_Lt_trans with 100.
+  apply Z_mod_lt; omega.
+  omega.
+  rewrite H1 in H.
+  assert (karg = (Int.repr k)).
+  inv H.
+  tauto.
+  rewrite H2.
+  unfold sem_mod.
+  unfold sem_binarith.
+  unfold classify_binarith.
+  unfold tint.
+  unfold both_int.
+  unfold sem_cast.
+  unfold classify_cast.
+  unfold binarith_type.
+  unfold sem_cast_neutral.
+  simpl.
+  unfold Int.mone.
+  assert (Int.eq (Int.repr 100) (Int.repr (-1)) = false) by admit.
+  rewrite H3.
+  rewrite andb_false_r.
+  unfold force_val.
+  
+  unfold Int.mods.
+  rewrite Int.signed_repr.
+  rewrite Int.signed_repr.
+  repeat apply f_equal.
+  destruct k.
+  auto.
+  rewrite Zquot.Zrem_Zmod_pos;auto.
+  admit.
+  omega.
+  unfold Z.rem.
+  unfold Z.quotrem.
+  unfold Zmod.
+  admit.
+  unfold Int.min_signed, Int.max_signed, Int.half_modulus, Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize, shift_nat, nat_iter.
+  simpl.
+  omega.
+  admit.
+  after_call.
+  forward.
+Qed.
+
+Lemma body_c_set: semax_body Vprog Gprog f_cSet c_set_spec.
+Proof.
+  start_function.
+  name karg _key.
+  name arrarg _arr.
+  name valarg _val.
+  forward_call (sh, (Zmod k 100), v, arr, (Vint (Int.repr (Zmod k 100))), vv, varr).
+  entailer!.
+  admit.
+  apply Z_mod_lt; omega.
+  apply Z_mod_lt; omega.
+  admit.
+  rewrite <- H6. assumption.
+  admit.
+  after_call.
+  forward.
+Qed.
 
 Lemma body_get: semax_body Vprog Gprog f_get get_spec.
 Proof.
@@ -126,7 +255,6 @@ Proof.
   
   assert ((upd (fun x : Z => Vint (Int.repr (arrGet arr x))) k (Vint valarg)) = 
           (fun x : Z => Vint (Int.repr (arrGet (arrPut arr k v) x)))) as ARR_PUT.
-  (*unfold arrPut.*)
   unfold upd.
   apply functional_extensionality.
   intro.
@@ -157,6 +285,8 @@ unfold Gprog, prog, prog_funct; simpl.
 semax_func_skipn.
 semax_func_cons body_get.
 semax_func_cons body_set.
+semax_func_cons body_c_get.
+semax_func_cons body_c_set.
 apply semax_func_nil.
 Qed.
 

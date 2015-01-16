@@ -2,6 +2,7 @@ Require Import Clightdefs.
 
 Local Open Scope Z_scope.
 
+Definition _cSet : ident := 40%positive.
 Definition ___builtin_read32_reversed : ident := 32%positive.
 Definition ___compcert_va_int32 : ident := 16%positive.
 Definition _set : ident := 38%positive.
@@ -21,7 +22,7 @@ Definition ___builtin_va_copy : ident := 14%positive.
 Definition ___builtin_mull : ident := 6%positive.
 Definition ___builtin_fmin : ident := 26%positive.
 Definition ___builtin_bswap : ident := 19%positive.
-Definition _main : ident := 39%positive.
+Definition _cGet : ident := 39%positive.
 Definition ___builtin_membar : ident := 11%positive.
 Definition _val : ident := 37%positive.
 Definition ___builtin_addl : ident := 4%positive.
@@ -30,6 +31,7 @@ Definition ___builtin_fabs : ident := 7%positive.
 Definition ___builtin_bswap16 : ident := 21%positive.
 Definition ___compcert_va_float64 : ident := 18%positive.
 Definition ___builtin_annot : ident := 9%positive.
+Definition _main : ident := 41%positive.
 Definition ___builtin_va_arg : ident := 13%positive.
 Definition ___builtin_fmadd : ident := 27%positive.
 Definition _arr : ident := 33%positive.
@@ -69,6 +71,38 @@ Definition f_set := {|
   (Ederef
     (Ebinop Oadd (Etempvar _arr (tptr tint)) (Etempvar _key tint)
       (tptr tint)) tint) (Etempvar _val tint))
+|}.
+
+Definition f_cGet := {|
+  fn_return := tint;
+  fn_callconv := cc_default;
+  fn_params := ((_arr, (tptr tint)) :: (_key, tint) :: nil);
+  fn_vars := nil;
+  fn_temps := ((42%positive, tint) :: nil);
+  fn_body :=
+(Ssequence
+  (Scall (Some 42%positive)
+    (Evar _get (Tfunction (Tcons (tptr tint) (Tcons tint Tnil)) tint
+                 cc_default))
+    ((Etempvar _arr (tptr tint)) ::
+     (Ebinop Omod (Etempvar _key tint) (Econst_int (Int.repr 100) tint) tint) ::
+     nil))
+  (Sreturn (Some (Etempvar 42%positive tint))))
+|}.
+
+Definition f_cSet := {|
+  fn_return := tvoid;
+  fn_callconv := cc_default;
+  fn_params := ((_arr, (tptr tint)) :: (_key, tint) :: (_val, tint) :: nil);
+  fn_vars := nil;
+  fn_temps := nil;
+  fn_body :=
+(Scall None
+  (Evar _set (Tfunction (Tcons (tptr tint) (Tcons tint (Tcons tint Tnil)))
+               tvoid cc_default))
+  ((Etempvar _arr (tptr tint)) ::
+   (Ebinop Omod (Etempvar _key tint) (Econst_int (Int.repr 100) tint) tint) ::
+   (Etempvar _val tint) :: nil))
 |}.
 
 Definition prog : Clight.program := {|
@@ -211,7 +245,8 @@ prog_defs :=
                    (mksignature (AST.Tint :: AST.Tint :: nil) None
                      cc_default)) (Tcons (tptr tuint) (Tcons tuint Tnil))
      tvoid cc_default)) :: (_get, Gfun(Internal f_get)) ::
- (_set, Gfun(Internal f_set)) :: nil);
+ (_set, Gfun(Internal f_set)) :: (_cGet, Gfun(Internal f_cGet)) ::
+ (_cSet, Gfun(Internal f_cSet)) :: nil);
 prog_main := _main
 |}.
 

@@ -10,3 +10,13 @@ void set(int* arr, int key, int val)
     arr[key] = val;
 }
 
+
+int cGet(int* arr, int key)
+{
+    return get(arr, key%100);
+}
+
+void cSet(int* arr, int key, int val)
+{
+    set(arr, key%100, val);
+}
