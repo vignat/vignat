@@ -10,13 +10,20 @@ void set(int* arr, int key, int val)
     arr[key] = val;
 }
 
+int hash(int key)
+{
+    if (key < 0)
+        return key%100 + 99;
+    return key%100;
+}
 
 int cGet(int* arr, int key)
 {
-    return get(arr, key%100);
+    int h = hash(key);
+    return get(arr, h);
 }
 
 void cSet(int* arr, int key, int val)
 {
-    set(arr, key%100, val);
+    set(arr, hash(key), val);
 }

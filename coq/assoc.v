@@ -2,7 +2,7 @@ Require Import Clightdefs.
 
 Local Open Scope Z_scope.
 
-Definition _cSet : ident := 40%positive.
+Definition _h : ident := 40%positive.
 Definition ___builtin_read32_reversed : ident := 32%positive.
 Definition ___compcert_va_int32 : ident := 16%positive.
 Definition _set : ident := 38%positive.
@@ -11,6 +11,7 @@ Definition ___builtin_clz : ident := 22%positive.
 Definition ___compcert_va_int64 : ident := 17%positive.
 Definition ___builtin_memcpy_aligned : ident := 8%positive.
 Definition ___builtin_subl : ident := 5%positive.
+Definition _main : ident := 43%positive.
 Definition ___builtin_va_start : ident := 12%positive.
 Definition ___builtin_annot_intval : ident := 10%positive.
 Definition ___builtin_negl : ident := 3%positive.
@@ -22,16 +23,17 @@ Definition ___builtin_va_copy : ident := 14%positive.
 Definition ___builtin_mull : ident := 6%positive.
 Definition ___builtin_fmin : ident := 26%positive.
 Definition ___builtin_bswap : ident := 19%positive.
-Definition _cGet : ident := 39%positive.
+Definition _hash : ident := 39%positive.
 Definition ___builtin_membar : ident := 11%positive.
 Definition _val : ident := 37%positive.
 Definition ___builtin_addl : ident := 4%positive.
 Definition ___builtin_fmsub : ident := 28%positive.
 Definition ___builtin_fabs : ident := 7%positive.
+Definition _cSet : ident := 42%positive.
 Definition ___builtin_bswap16 : ident := 21%positive.
 Definition ___compcert_va_float64 : ident := 18%positive.
 Definition ___builtin_annot : ident := 9%positive.
-Definition _main : ident := 41%positive.
+Definition _cGet : ident := 41%positive.
 Definition ___builtin_va_arg : ident := 13%positive.
 Definition ___builtin_fmadd : ident := 27%positive.
 Definition _arr : ident := 33%positive.
@@ -43,6 +45,7 @@ Definition _rez : ident := 35%positive.
 Definition ___builtin_fnmsub : ident := 30%positive.
 Definition ___builtin_ctz : ident := 23%positive.
 Definition ___builtin_bswap32 : ident := 20%positive.
+Definition _h' : ident := 44%positive.
 
 
 Definition f_get := {|
@@ -73,21 +76,44 @@ Definition f_set := {|
       (tptr tint)) tint) (Etempvar _val tint))
 |}.
 
+Definition f_hash := {|
+  fn_return := tint;
+  fn_callconv := cc_default;
+  fn_params := ((_key, tint) :: nil);
+  fn_vars := nil;
+  fn_temps := nil;
+  fn_body :=
+(Ssequence
+  (Sifthenelse (Ebinop Olt (Etempvar _key tint)
+                 (Econst_int (Int.repr 0) tint) tint)
+    (Sreturn (Some (Ebinop Oadd
+                     (Ebinop Omod (Etempvar _key tint)
+                       (Econst_int (Int.repr 100) tint) tint)
+                     (Econst_int (Int.repr 99) tint) tint)))
+    Sskip)
+  (Sreturn (Some (Ebinop Omod (Etempvar _key tint)
+                   (Econst_int (Int.repr 100) tint) tint))))
+|}.
+
 Definition f_cGet := {|
   fn_return := tint;
   fn_callconv := cc_default;
   fn_params := ((_arr, (tptr tint)) :: (_key, tint) :: nil);
   fn_vars := nil;
-  fn_temps := ((42%positive, tint) :: nil);
+  fn_temps := ((_h, tint) :: (45%positive, tint) :: (_h', tint) :: nil);
   fn_body :=
 (Ssequence
-  (Scall (Some 42%positive)
-    (Evar _get (Tfunction (Tcons (tptr tint) (Tcons tint Tnil)) tint
-                 cc_default))
-    ((Etempvar _arr (tptr tint)) ::
-     (Ebinop Omod (Etempvar _key tint) (Econst_int (Int.repr 100) tint) tint) ::
-     nil))
-  (Sreturn (Some (Etempvar 42%positive tint))))
+  (Ssequence
+    (Scall (Some _h')
+      (Evar _hash (Tfunction (Tcons tint Tnil) tint cc_default))
+      ((Etempvar _key tint) :: nil))
+    (Sset _h (Etempvar _h' tint)))
+  (Ssequence
+    (Scall (Some 45%positive)
+      (Evar _get (Tfunction (Tcons (tptr tint) (Tcons tint Tnil)) tint
+                   cc_default))
+      ((Etempvar _arr (tptr tint)) :: (Etempvar _h tint) :: nil))
+    (Sreturn (Some (Etempvar 45%positive tint)))))
 |}.
 
 Definition f_cSet := {|
@@ -95,14 +121,17 @@ Definition f_cSet := {|
   fn_callconv := cc_default;
   fn_params := ((_arr, (tptr tint)) :: (_key, tint) :: (_val, tint) :: nil);
   fn_vars := nil;
-  fn_temps := nil;
+  fn_temps := ((46%positive, tint) :: nil);
   fn_body :=
-(Scall None
-  (Evar _set (Tfunction (Tcons (tptr tint) (Tcons tint (Tcons tint Tnil)))
-               tvoid cc_default))
-  ((Etempvar _arr (tptr tint)) ::
-   (Ebinop Omod (Etempvar _key tint) (Econst_int (Int.repr 100) tint) tint) ::
-   (Etempvar _val tint) :: nil))
+(Ssequence
+  (Scall (Some 46%positive)
+    (Evar _hash (Tfunction (Tcons tint Tnil) tint cc_default))
+    ((Etempvar _key tint) :: nil))
+  (Scall None
+    (Evar _set (Tfunction (Tcons (tptr tint) (Tcons tint (Tcons tint Tnil)))
+                 tvoid cc_default))
+    ((Etempvar _arr (tptr tint)) :: (Etempvar 46%positive tint) ::
+     (Etempvar _val tint) :: nil)))
 |}.
 
 Definition prog : Clight.program := {|
@@ -245,8 +274,8 @@ prog_defs :=
                    (mksignature (AST.Tint :: AST.Tint :: nil) None
                      cc_default)) (Tcons (tptr tuint) (Tcons tuint Tnil))
      tvoid cc_default)) :: (_get, Gfun(Internal f_get)) ::
- (_set, Gfun(Internal f_set)) :: (_cGet, Gfun(Internal f_cGet)) ::
- (_cSet, Gfun(Internal f_cSet)) :: nil);
+ (_set, Gfun(Internal f_set)) :: (_hash, Gfun(Internal f_hash)) ::
+ (_cGet, Gfun(Internal f_cGet)) :: (_cSet, Gfun(Internal f_cSet)) :: nil);
 prog_main := _main
 |}.
 
