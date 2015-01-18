@@ -66,6 +66,6 @@ To make sure, that sqrt.c indeed corresponds to sqr.v which conforms the specifi
       $ proofgeneral verif_sqrt.v
   ```
 
-On the first run, Coq will need to compile everything. Enter `coq-compile-before-require-toggle` command. For that press `M-x`(or Alt-Option + x ), and then type `coq-compile-before-require-toggle` into the emerged commandline. (Make sure to do it exactly once, since it is a toggle).
-Use `next` button on the top panel (or `C-c C-n`), to go through the proof step-by-step. First step may take a long time up to hours, because, here Coq compiles everything it can reach.
+On the first run, Coq will need to compile everything.
+Use `next` button on the top panel (or `C-c C-n` - Ctrl+c, then Ctrl+n), to go through the proof step-by-step. First step may take a long time up to hours, because, here Coq compiles everything it can reach.
    
