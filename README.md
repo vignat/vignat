@@ -44,7 +44,8 @@ To make sure, that sqrt.c indeed corresponds to sqr.v which conforms the specifi
   ;; proofgeneral CoQ mode:
   (setq vst-base-path (expand-file-name "--- /path/to/vst ---"))
   (setq compcert-install-path (expand-file-name "--- /path/to/compcert ---"))
-  
+  (setq coq-compile-before-require 1)
+
   (setq coq-load-path `((,(concat vst-base-path "/msl") "msl")
                         (,(concat vst-base-path "/sepcomp") "sepcomp")
                         (,(concat vst-base-path "/veric") "veric")
