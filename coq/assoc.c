@@ -25,5 +25,6 @@ int cGet(int* arr, int key)
 
 void cSet(int* arr, int key, int val)
 {
-    set(arr, hash(key), val);
+    int h = hash(key);
+    set(arr, h, val);
 }

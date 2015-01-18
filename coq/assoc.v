@@ -45,6 +45,7 @@ Definition _rez : ident := 35%positive.
 Definition ___builtin_fnmsub : ident := 30%positive.
 Definition ___builtin_ctz : ident := 23%positive.
 Definition ___builtin_bswap32 : ident := 20%positive.
+Definition _h'1 : ident := 46%positive.
 Definition _h' : ident := 44%positive.
 
 
@@ -121,16 +122,18 @@ Definition f_cSet := {|
   fn_callconv := cc_default;
   fn_params := ((_arr, (tptr tint)) :: (_key, tint) :: (_val, tint) :: nil);
   fn_vars := nil;
-  fn_temps := ((46%positive, tint) :: nil);
+  fn_temps := ((_h, tint) :: (_h'1, tint) :: nil);
   fn_body :=
 (Ssequence
-  (Scall (Some 46%positive)
-    (Evar _hash (Tfunction (Tcons tint Tnil) tint cc_default))
-    ((Etempvar _key tint) :: nil))
+  (Ssequence
+    (Scall (Some _h'1)
+      (Evar _hash (Tfunction (Tcons tint Tnil) tint cc_default))
+      ((Etempvar _key tint) :: nil))
+    (Sset _h (Etempvar _h'1 tint)))
   (Scall None
     (Evar _set (Tfunction (Tcons (tptr tint) (Tcons tint (Tcons tint Tnil)))
                  tvoid cc_default))
-    ((Etempvar _arr (tptr tint)) :: (Etempvar 46%positive tint) ::
+    ((Etempvar _arr (tptr tint)) :: (Etempvar _h tint) ::
      (Etempvar _val tint) :: nil)))
 |}.
 

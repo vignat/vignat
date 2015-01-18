@@ -20,6 +20,7 @@ Definition get_spec :=
         LOCAL (`(eq vk) (eval_id _key);
                `(eq varr) (eval_id _arr);
                `isptr (eval_id _arr))
+
         SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
                         0 100) (eval_id _arr))
     POST [tint] `(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
@@ -49,7 +50,7 @@ Definition hash_spec :=
         PROP ( repr k vk)
         LOCAL (`(eq vk) (eval_id _key))
         SEP ()
-    POST [tint] local(`(eq (Vint (Int.repr (hash k)))) retval).
+    POST [tint] local(`(eq (Vint (Int.repr (hash k)))) retval) && emp.
 
 Definition c_get_spec :=
   DECLARE _cGet
@@ -86,24 +87,6 @@ Definition Gprog : funspecs := get_spec :: set_spec :: hash_spec
                                         :: c_get_spec :: c_set_spec :: nil.
 
 (* Auxillary lemmas *)
-
-(*
-Lemma k_in_range: forall k : Z, 0 <= k < 100 -> Int.min_signed <= k <= Int.max_signed.
-Proof.
-  split.
-  unfold Int.min_signed, Int.half_modulus, Int.modulus.
-  unfold Int.wordsize, Wordsize_32.wordsize.
-  unfold two_power_nat.
-  unfold shift_nat.
-  unfold nat_iter.
-  simpl.
-  omega.
-  unfold Int.max_signed, Int.half_modulus, Int.modulus,
-  Int.wordsize, Wordsize_32.wordsize,
-  two_power_nat, shift_nat, nat_iter.
-  simpl; omega.
-Qed.
-*)
 
 Lemma k_from_val: forall (k:Z) (karg : int), repr k (Vint karg) -> 0 <= k < 100 ->
                                              Int.signed karg = k.
@@ -158,6 +141,8 @@ Proof.
   apply Z_mod_lt;auto.
   assumption.
 Qed.
+
+(* Proofs for spec-body correspondence *)
 
 Lemma body_hash: semax_body Vprog Gprog f_hash hash_spec.
 Proof.
@@ -265,9 +250,7 @@ Proof.
   forward_call (sh,k,vk). (* hash(key) *)
   entailer!.
   rewrite <- H1; assumption.
-  
-
-  admit.
+  auto with closed.
   after_call.
   forward_call (sh,(hash k),arr,(Vint (Int.repr (hash k))), varr).
   entailer!. (* get(arr, h) *)
@@ -275,94 +258,8 @@ Proof.
   - apply hash_lt_100.
   - apply mk_repr.
     apply hash_bound.
-  -
-
-  unfold sem_add_default, sem_mod, force_val.
-simpl.  
-  unfold sem_cast_neutral, both_int.
-  rewrite neq_100_mone.
-  rewrite neq_100_zero.
-  simpl.
-  rewrite andb_false_r.
-  unfold denote_tc_nodivover.
-  rewrite neq_100_mone.
-  rewrite andb_false_r.
-  simpl.
-  auto.
-  rewrite neq_100_mone.
-  rewrite andb_false_r.
-  simpl.
-  auto.
-  apply Z_mod_lt; omega.
-  apply Z_mod_lt; omega.
-  apply mk_repr.
-  apply Z.le_ge.
-  apply Z_mod_lt; omega.
-  unfold Int.modulus.
-  unfold two_power_nat, Int.wordsize.
-  unfold Wordsize_32.wordsize, shift_nat.
-  unfold nat_iter.
-  apply Zmod_less; omega.
-
-  assert (Vint (Int.repr k) = Vint karg) as kEQkarg by (inv H;assumption).
-  rewrite <- kEQkarg.
-  unfold sem_mod.
-  simpl. 
-  unfold both_int.
-  simpl.
-  rewrite neq_100_mone.
-  rewrite andb_false_r.
-  unfold Int.mods.
-  simpl.
-  rewrite andb_false_r.
-  unfold sem_cast_neutral, force_val.
-  repeat apply f_equal.
-  rewrite add_repr.
-  repeat rewrite Int.signed_repr.
-  apply Zmod_eq_pos_Zrem.
-
- unfold sem_binarith.
-  unfold classify_binarith.
-  unfold tint.
-  unfold both_int.
-  unfold sem_cast.
-  unfold classify_cast.
-  unfold binarith_type.
-  unfold sem_cast_neutral.
-  simpl.
-  rewrite neq_100_mone.
-  rewrite andb_false_r.
-  unfold force_val.
-  unfold Int.mods.
-  rewrite Int.signed_repr.
-  rewrite Int.signed_repr.
-  repeat apply f_equal.
-
-Eval compute in Z.rem (-5) 100.
-
-  Print Z.modulo.
-  Print Z.pos_div_eucl.
-  Print Z.quotrem.
-
-
-  destruct k.
-  auto.
-  rewrite Zquot.Zrem_Zmod_pos;auto.
-  lia.
-  omega.
-  unfold Z.rem.
-  unfold Z.quotrem.
-  unfold Zmod.
-
-Eval compute Z.div_eucl
-
-  admit.
-  unfold Int.min_signed, Int.max_signed, Int.half_modulus, Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize, shift_nat, nat_iter.
-  simpl.
-  omega.
-  admit.
-  after_call.
-  forward.
+  - after_call.
+    forward.
 Qed.
 
 Lemma body_c_set: semax_body Vprog Gprog f_cSet c_set_spec.
@@ -371,16 +268,20 @@ Proof.
   name karg _key.
   name arrarg _arr.
   name valarg _val.
-  forward_call (sh, (Zmod k 100), v, arr, (Vint (Int.repr (Zmod k 100))), vv, varr).
+  name hloc _h.
+  forward_call (sh, k, vk). (* hash(key) *)
   entailer!.
-  admit.
-  apply Z_mod_lt; omega.
-  apply Z_mod_lt; omega.
-  admit.
-  rewrite <- H6. assumption.
-  admit.
+  rewrite <- H3; assumption.
   after_call.
-  forward.
+  forward_call (sh, (hash k), v, arr, (Vint (Int.repr (hash k))), vv, varr).
+  entailer!.
+  - apply Zero_le_hash.
+  - apply hash_lt_100.
+  - apply mk_repr.
+    apply hash_bound.
+  - rewrite <- H4; assumption.
+  - after_call.
+    forward.
 Qed.
 
 Lemma body_get: semax_body Vprog Gprog f_get get_spec.
@@ -470,6 +371,7 @@ unfold Gprog, prog, prog_funct; simpl.
 semax_func_skipn.
 semax_func_cons body_get.
 semax_func_cons body_set.
+semax_func_cons body_hash.
 semax_func_cons body_c_get.
 semax_func_cons body_c_set.
 apply semax_func_nil.

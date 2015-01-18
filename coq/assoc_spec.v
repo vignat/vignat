@@ -36,10 +36,10 @@ Function hash (k:Z): Z :=
   if (Z.ltb k 0) then (Z.rem k 100) + 99 else (Z.rem k 100).
 
 Function caPut (arr: CircleArrayZ) (k:Z) (v:Z) : CircleArrayZ :=
-  arrPut arr (Zmod k 100) v.
+  arrPut arr (hash k) v.
 
 Function caGet (arr:CircleArrayZ) (k:Z) : Z :=
-  arrGet arr (Zmod k 100).
+  arrGet arr (hash k).
 
 Lemma Cgetput1: forall arr k v, caGet (caPut arr k v) k = v.
 Proof.
@@ -48,7 +48,7 @@ unfold caGet, caPut.
 apply getput1.
 Qed.
 
-Lemma Cgetput2: forall arr k1 k2 v2, k2 mod 100 <> k1 mod 100 -> 
+Lemma Cgetput2: forall arr k1 k2 v2, hash k2 <> hash k1 -> 
                                      caGet (caPut arr k2 v2) k1 =
                                      caGet arr k1.
 Proof.
@@ -56,6 +56,16 @@ intros.
 unfold caGet, caPut.
 apply getput2.
 assumption.
+Qed.
+
+Lemma caPut_is: forall arr k v, caPut arr k v = arrPut arr (hash k) v.
+Proof.
+  unfold caPut; auto.
+Qed.
+
+Lemma caGet_is: forall arr k, caGet arr k = arrGet arr (hash k).
+Proof.
+  unfold caGet; auto.
 Qed.
 
 Lemma Zero_le_hash: forall k, 0 <= hash k.
