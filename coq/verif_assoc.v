@@ -16,10 +16,9 @@ Definition get_spec :=
   DECLARE _get
     WITH sh : share, k : Z, arr : ArrayZ, vk : val, varr : val
     PRE [_arr OF (tptr tint), _key OF tint]
-        PROP (0 <= k < 100; repr k vk)
+        PROP (0 <= k < 100; repr k vk; isptr varr)
         LOCAL (`(eq vk) (eval_id _key);
-               `(eq varr) (eval_id _arr);
-               `isptr (eval_id _arr))
+               `(eq varr) (eval_id _arr))
 
         SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
                         0 100) (eval_id _arr))
@@ -31,11 +30,11 @@ Definition set_spec :=
   DECLARE _set
      WITH sh : share, k : Z, v : Z, arr : ArrayZ, vk : val, vv : val, varr : val
      PRE [_arr OF (tptr tint), _key OF tint, _val OF tint]
-         PROP (0 <= k < 100; writable_share sh; repr k vk; repr v vv)
+         PROP (0 <= k < 100; writable_share sh; repr k vk; repr v vv;
+              isptr varr)
          LOCAL (`(eq vk) (eval_id _key);
                 `(eq vv) (eval_id _val);
-                `(eq varr) (eval_id _arr);
-                `isptr (eval_id _arr))
+                `(eq varr) (eval_id _arr))
          SEP (`(array_at tint sh (fun x => (Vint (Int.repr (arrGet arr x))))
                          0 100)
                          (eval_id _arr))
@@ -56,10 +55,9 @@ Definition c_get_spec :=
   DECLARE _cGet
     WITH sh : share, k : Z, arr : CircleArrayZ, vk : val, varr : val
     PRE [_arr OF (tptr tint), _key OF tint]
-        PROP (repr k vk)
+        PROP (repr k vk; isptr varr)
         LOCAL (`(eq vk) (eval_id _key);
-               `(eq varr) (eval_id _arr);
-               `isptr (eval_id _arr))
+               `(eq varr) (eval_id _arr))
         SEP (`(array_at tint sh (fun x => (Vint (Int.repr (caGet arr x))))
                         0 100) (eval_id _arr))
     POST [tint] `(array_at tint sh (fun x => (Vint (Int.repr (caGet arr x))))
@@ -70,11 +68,10 @@ Definition c_set_spec :=
   DECLARE _cSet
      WITH sh : share, k : Z, v : Z, arr : CircleArrayZ, vk : val, vv : val, varr : val
      PRE [_arr OF (tptr tint), _key OF tint, _val OF tint]
-         PROP (writable_share sh; repr k vk; repr v vv)
+         PROP (writable_share sh; repr k vk; repr v vv; isptr varr)
          LOCAL (`(eq vk) (eval_id _key);
                 `(eq vv) (eval_id _val);
-                `(eq varr) (eval_id _arr);
-                `isptr (eval_id _arr))
+                `(eq varr) (eval_id _arr))
          SEP (`(array_at tint sh (fun x => (Vint (Int.repr (caGet arr x))))
                          0 100)
                          (eval_id _arr))
@@ -86,15 +83,80 @@ Definition Vprog : varspecs := nil.
 Definition Gprog : funspecs := get_spec :: set_spec :: hash_spec
                                         :: c_get_spec :: c_set_spec :: nil.
 
-(* Auxillary lemmas *)
+(* Helper tactics *)
 
-Lemma k_from_val: forall (k:Z) (karg : int), repr k (Vint karg) -> 0 <= k < 100 ->
-                                             Int.signed karg = k.
+Ltac unfold_int_limits :=
+  unfold Int.min_signed, Int.max_signed, Int.half_modulus,
+         Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize,
+         shift_nat, nat_iter;
+  simpl.
+
+Ltac auto_logic :=
+  repeat rewrite andb_false_r; repeat rewrite andb_false_l; simpl; auto.
+
+Ltac unfold_to_bare_Z :=
+  unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith;
+  simpl;
+  unfold both_int, sem_cast_neutral;
+  simpl;
+  unfold Int.mods;
+  repeat rewrite Int.signed_repr;
+  try (unfold_int_limits; omega);
+  repeat rewrite add_repr;
+  repeat rewrite sem_add_pi_ptr;
+  repeat unfold force_val;
+  repeat rewrite mul_repr.
+
+Ltac repr_bound k :=
+  match goal with
+    |[H:repr k _ |-Int.min_signed <= k <= Int.max_signed] => inv H; assumption
+    |[H:repr k _ |-context[Int.min_signed <= k]] => inv H
+    |[H:repr k _ |-context[k <= Int.max_signed]] => inv H
+  end.
+
+Ltac get_repr k :=
+  repeat
+    match goal with
+      |[H:?a = (Int.repr k)|-context[Int.signed ?a]] =>
+       rewrite H; rewrite Int.signed_repr;[|repr_bound k]
+      |[H:?a = (Int.repr k)|-context[?a]] => rewrite H
+      |[H:?a = (Vint (Int.repr k))|-context[?a]] => rewrite H; idtac "ololo"
+      |[H:k = ?a|-context[?a]]=>rewrite <- H
+      |[H:repr k (Vint ?a) |-context[?a]] =>
+       let H' := fresh a "EQ" k in
+       assert (a = (Int.repr k)) as H' by (inv H;tauto)
+      |[H:repr k ?a |-context[?a]] =>
+       let H' := fresh "EQ" k in
+       assert (a = (Vint (Int.repr k))) as H' by (inv H; tauto)
+    end.
+
+(* Auxillary lemmas *)
+Lemma klt0_is_false: forall k, 0 <= k -> (k <? 0) = false.
 Proof.
-intros.
-inversion H.
-apply Int.signed_repr.
-assumption.
+  intro.
+  unfold "<?", "?=".
+  destruct k;[tauto|tauto|pose (Zlt_neg_0 p); omega].
+Qed.
+
+Lemma klt0_is_true: forall k, k < 0 -> (k <? 0) = true.
+Proof.
+  intro.
+  unfold "<?".
+  unfold "?=".
+  destruct k; [omega|pose (Zgt_pos_0 p);omega|tauto].
+Qed.
+
+Lemma int_lt_to_zlt: forall a b, Int.lt (Int.repr a) (Int.repr b) = true ->
+                                 Int.min_signed <= a <= Int.max_signed ->
+                                 Int.min_signed <= b <= Int.max_signed -> a < b.
+Proof.
+  intros.
+  unfold Int.lt in H.
+  rewrite Int.signed_repr in H by assumption.
+  rewrite Int.signed_repr in H by assumption.
+  destruct (zlt a b).
+  assumption.
+  discriminate H.
 Qed.
 
 Lemma f_notequal: forall (A B : Type) (f : A -> B) (x y : A), ~ f x = f y -> ~ x = y.
@@ -125,25 +187,11 @@ Qed.
 Lemma hash_bound: forall k, Int.min_signed <= hash k <= Int.max_signed.
 Proof.
   intro.
-  unfold Int.min_signed, Int.max_signed, Int.half_modulus, Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize, shift_nat, nat_iter;simpl.
-  split.
-  pose (Zero_le_hash k).
-  omega.
-  pose (hash_lt_100 k).
-  omega.
-Qed.
-
-Lemma Zmod_less: forall a b c, b > 0 -> b <= c -> a mod b < c.
-Proof.
-  intros.
-  assert (forall a b c, a < b -> b <= c -> a < c) as lt_le_trans by (intros; lia).
-  apply lt_le_trans with b.
-  apply Z_mod_lt;auto.
-  assumption.
+  unfold_int_limits.
+  split;[pose (Zero_le_hash k);omega | pose (hash_lt_100 k); omega].
 Qed.
 
 (* Proofs for spec-body correspondence *)
-
 Lemma body_hash: semax_body Vprog Gprog f_hash hash_spec.
 Proof.
   start_function.
@@ -151,93 +199,42 @@ Proof.
   forward_if (PROP (Int.min_signed <= k <= Int.max_signed; repr k vk;
                     0 <= k)
                    LOCAL (`(eq vk) (eval_id _key)) SEP()).
-  - forward. rename H into REPRK. rename H0 into KLT0.
+  - forward; rename H0 into KLT0.
     entailer!.
     + rewrite neq_100_mone.
-      rewrite andb_false_r.
-      simpl; auto.
-      
-    + unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith.
-      simpl.
-      unfold both_int, sem_cast_neutral.
-      simpl.
+      auto_logic.
+    + unfold_to_bare_Z.
       rewrite neq_100_mone.
-      rewrite andb_false_r.
-      unfold is_int.
-      auto.
-
-    + assert (karg = (Int.repr k)) as KARGEQK by (inv REPRK;tauto).
-      rewrite KARGEQK.
-      unfold force_val, sem_mod, sem_add_default, sem_cast_neutral.
-      unfold sem_binarith, both_int, sem_cast_neutral.
-      simpl.
+      auto_logic.
+    + get_repr k.
+      unfold_to_bare_Z; [|repr_bound k].
       rewrite neq_100_mone.
-      rewrite andb_false_r.
-      simpl.
-      apply f_equal.
-      unfold Int.mods.
-      repeat rewrite Int.signed_repr.
-      rewrite add_repr.
-      apply f_equal.
+      auto_logic.
+      unfold_to_bare_Z.
       unfold hash.
-      assert (k < 0) as KLESS0.
-      rewrite KARGEQK in KLT0.
-      unfold Int.lt in KLT0.
-      rewrite Int.signed_repr in KLT0.
-      rewrite Int.signed_repr in KLT0.
-      destruct (zlt k 0).
-      assumption.
-      discriminate KLT0.
-      unfold Int.min_signed, Int.max_signed, Int.half_modulus, Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize, shift_nat, nat_iter.      
-      split;simpl;omega.
-      inv REPRK.
-      assumption.
-      assert ((k <? 0) = true).
-      unfold "<?".
-      unfold "?=".
-      destruct k; [omega|pose (Zgt_pos_0 p);omega|tauto].
-      rewrite H.
+      rewrite kargEQk in KLT0.
+      apply int_lt_to_zlt in KLT0.
+      rewrite klt0_is_true by assumption.
       tauto.
-      unfold Int.min_signed, Int.max_signed, Int.half_modulus, Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize, shift_nat, nat_iter.
-      split;simpl;omega.
-      inv REPRK;assumption.
+      repr_bound k.
+      unfold_int_limits;split;omega.
   - forward.
-    entailer. rename H into REPRK.
-    inv REPRK. entailer.
+    entailer.
+    repr_bound k. entailer.
   - forward.
     entailer!.
     + rewrite neq_100_mone.
-      rewrite andb_false_r.
-      simpl.
-      auto.
-    + unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith.
-      simpl.
-      unfold both_int, sem_cast_neutral.
-      simpl.
+      auto_logic.
+    + unfold_to_bare_Z.
       rewrite neq_100_mone.
-      rewrite andb_false_r.
-      unfold is_int.
-      auto.
-    + unfold force_val, sem_mod, sem_add_default, sem_cast_neutral.
-      unfold sem_binarith, both_int, sem_cast_neutral.
-      simpl.
+      auto_logic.
+    + unfold_to_bare_Z.
       rewrite neq_100_mone.
-      rewrite andb_false_r.
-      apply f_equal.
-      unfold Int.mods.
-      repeat rewrite Int.signed_repr.
-      apply f_equal.
-      inv H.
-      rewrite Int.signed_repr.
+      auto_logic.
+      get_repr k.
       unfold hash.
-      assert ((k <? 0) = false).
-      unfold "<?", "?=".
-      destruct k;[tauto|tauto|pose (Zlt_neg_0 p); omega].
-      rewrite H.
+      rewrite klt0_is_false by assumption.
       tauto.
-      split;assumption.
-      unfold Int.min_signed, Int.max_signed, Int.half_modulus, Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize, shift_nat, nat_iter.
-      split;simpl;omega.
 Qed.
 
 Lemma body_c_get: semax_body Vprog Gprog f_cGet c_get_spec.
@@ -249,14 +246,14 @@ Proof.
   name hloc _h.
   forward_call (sh,k,vk). (* hash(key) *)
   entailer!.
-  rewrite <- H1; assumption.
+  get_repr vk; assumption.
   auto with closed.
   after_call.
   forward_call (sh,(hash k),arr,(Vint (Int.repr (hash k))), varr).
   entailer!. (* get(arr, h) *)
   - apply Zero_le_hash.
   - apply hash_lt_100.
-  - apply mk_repr.
+  - constructor.
     apply hash_bound.
   - after_call.
     forward.
@@ -271,7 +268,7 @@ Proof.
   name hloc _h.
   forward_call (sh, k, vk). (* hash(key) *)
   entailer!.
-  rewrite <- H3; assumption.
+  get_repr vk; assumption.
   after_call.
   forward_call (sh, (hash k), v, arr, (Vint (Int.repr (hash k))), vv, varr).
   entailer!.
@@ -279,7 +276,7 @@ Proof.
   - apply hash_lt_100.
   - apply mk_repr.
     apply hash_bound.
-  - rewrite <- H4; assumption.
+  - get_repr vv; assumption.
   - after_call.
     forward.
 Qed.
@@ -292,18 +289,15 @@ Proof.
   name rezloc _rez.
   forward.
   entailer!.
-  - rewrite k_from_val with (k:=k) by assumption.
-    omega.
-  - rewrite k_from_val with (k:=k) by assumption.
-    omega.
-  - rewrite k_from_val with (k:=k) by assumption.
-    simpl.
-    auto.
+  - get_repr k; omega. 
+  - get_repr k; omega.
+  - get_repr k; simpl; auto.
   - forward.
     entailer!.
-    rewrite k_from_val with (k:=k) by assumption.
-    tauto.
+    get_repr k; trivial.
 Qed.
+
+
 
 Lemma body_set: semax_body Vprog Gprog f_set set_spec.
 Proof.
@@ -319,46 +313,33 @@ Proof.
   instantiate (1:=vv).
   instantiate (2:=k).
 
-  assert (offset_val (Int.repr (sizeof tint * k)) (eval_id _arr rho) =
-          force_val (sem_add_pi tint (eval_id _arr rho) (eval_id _key rho))).
-  inversion RK.
-  rewrite sem_add_pi_ptr.
-  unfold force_val.
-  apply f_equal2.
-  rewrite mul_repr.
-  auto.
-  auto.
-  assumption.
-
-  assert (eval_id _val rho = force_val (sem_cast_neutral (eval_id _val rho))).
-  inversion RV.
-  simpl.
-  tauto.
-  entailer.
-  rename H1 into RK.
-  rename H2 into RV.
-  forward.
-  
-  assert ((upd (fun x : Z => Vint (Int.repr (arrGet arr x))) k (Vint valarg)) = 
-          (fun x : Z => Vint (Int.repr (arrGet (arrPut arr k v) x)))) as ARR_PUT.
-  unfold upd.
-  apply functional_extensionality.
-  intro.
-  unfold eq_dec.
-  unfold initial_world.EqDec_Z.
-  unfold zeq.
-  elim (Z.eq_dec k x).
-  - intro HEQ.
-    rewrite HEQ.
-    rewrite getput1.
-    inversion RV.
+  entailer!.
+  - get_repr k.
+    unfold_to_bare_Z.
+    auto.
+    auto.
+  - get_repr v.
+    simpl.
     tauto.
-  - intro HNEQ.
-    rewrite getput2.
-    tauto.
-    assumption.
-  - rewrite ARR_PUT.
-    entailer.
+  - forward.
+    assert ((upd (fun x : Z => Vint (Int.repr (arrGet arr x))) k (Vint valarg)) = 
+            (fun x : Z => Vint (Int.repr (arrGet (arrPut arr k v) x)))) as ARR_PUT.
+    unfold upd.
+    apply functional_extensionality.
+    intro.
+    unfold eq_dec, initial_world.EqDec_Z, zeq.
+    elim (Z.eq_dec k x).
+    + intro HEQ.
+      rewrite HEQ.
+      rewrite getput1.
+      get_repr v.
+      trivial.
+    + intro HNEQ.
+      rewrite getput2.
+      tauto.
+      assumption.
+    + rewrite ARR_PUT.
+      entailer.
 Qed.
 
 Existing Instance NullExtension.Espec.
