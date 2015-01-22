@@ -294,23 +294,6 @@ Proof.
     assumption.
 Qed.
 
-(*
-Lemma amFindEmptyOnAnyNext:
-  forall m k i x, 0 < i -> 0 <= x -> find_empty m k i <> None ->
-                  find_empty m k (i + x) <> None.
-Proof.
-  intros.
-  pose (n := Z.to_nat x).
-  assert (x = Z.of_nat n) as REWR.
-  subst n.
-  symmetry.
-  apply Z2Nat.id.
-  assumption.
-  rewrite REWR.
-  apply amFindEmptyOnAnyNextNat; assumption.
-Qed.
-*)
-
 Lemma amFindEmptySameForEach100: forall m k n (i:nat),
                                       find_empty m k i = 
                                       find_empty m (k + 100*n) i.
@@ -339,24 +322,6 @@ Proof.
     tauto.
 Qed.
 
-(*
-Lemma amFindEmptySameForEach100: forall m k i n, 0 <= i ->
-                                   find_empty m k i =
-                                   find_empty m (k + 100*n) i.
-Proof.
-  intros.
-  pose (z:=Z.to_nat i).
-  assert (IZ: i=Z.of_nat z). {
-    subst z.
-    destruct i.
-    - auto.
-    - simpl; symmetry; apply positive_nat_Z.
-    - pose (Zlt_neg_0 p); omega.
-  }
-  rewrite IZ.
-  apply amFindEmptySameForEach100Nat.
-Qed.
-*)
 Lemma amFindEmptyStartingFromPrev:
   forall m k (i:nat), find_empty m k i <> None ->
                       find_empty m (k - 1) (S i) <> None.
@@ -415,30 +380,59 @@ Proof.
   induction n.
   - auto.
   - rewrite find_empty_equation in H.
-    replace (k + (100 + Z.of_nat (S n)))
-    with (k + Z.of_nat (S n) + 100) in H;[|omega].
+    replace (1 + k + Z.of_nat (99 + S n))
+    with (k + Z.of_nat (S n) + 100) in H;[|lia].
     replace (loop (k + Z.of_nat (S n) + 100))
     with (loop (k + Z.of_nat (S n))) in H;[|symmetry; apply loop_100].
     remember (busybits m (loop (k + Z.of_nat (S n)))) as BB.
     destruct BB.
-    + destruct (1 <? 100 + Z.of_nat (S n)).
-      replace (100 + Z.of_nat (S n) - 1)
-      with (100 + Z.of_nat n) in H; [|rewrite Nat2Z.inj_succ;omega].
+    + replace (99 + S n)%nat with (S (99 + n))%nat in H;[|omega].
       apply IHn in H.
-      destruct H.
-      * left; assumption.
-      * right.
-        replace (Z.of_nat (S n))
-        with (Z.of_nat n + 1);[|rewrite Nat2Z.inj_succ;omega].
-        apply amFindEmptyOnNext.
-        
-        
-
-+ right.
+      decompose sum H.
+      * left;assumption.
+      * right;apply amFindEmptyOnNext;assumption.
+    + right.
       rewrite find_empty_equation.
-      rewrite <- HeqBB.
-      
-    + 
+      destruct (busybits m (loop (1 + k + Z.of_nat (S n)))).
+      * rewrite find_empty_equation.
+        replace (1 + k + Z.of_nat n)
+        with (k + Z.of_nat (S n));[|lia].
+        rewrite <- HeqBB.
+        discriminate.
+      * discriminate.
+Qed.
+
+Lemma amFindEmpty99PlusABit:
+  forall m k (n x:nat), find_empty m k (99*x + n) <> None ->
+                        find_empty m k 99 <> None \/
+                        find_empty m k n <> None.
+Proof.
+  intros.
+  induction x.
+  - auto.
+  - replace (99 * S x + n)%nat 
+    with (99 + 99*x + n)%nat in H; [|omega].
+    apply amFindEmpty99orMore with (n:=(99*x + n)%nat) in H.
+    decompose sum H.
+    + left; assumption.
+    + apply IHx; assumption.
+Qed.
+
+Lemma amFindEmpty99IsEnough:
+  forall m k (n:nat), find_empty m k n <> None ->
+                      find_empty m k 99 <> None.
+Proof.
+  intros.
+  pose (x := Z.to_nat ((Z.of_nat n)/99)).
+  pose (r := Z.to_nat ((Z.of_nat n) mod 99)).
+  assert (n = (99*x + r)%nat) as REPR. {
+    subst x r.
+    SearchAbout Z.of_nat.
+    assert (n = Z.to_nat (Z.of_nat n)) as N2Z by (symmetry;apply Nat2Z.id).
+    rewrite N2Z at 1.
+    assert (99 = Z.to_nat (Z.of_nat 99))%nat as TMP by auto.
+    rewrite TMP at 1.
+    
 
 
 Lemma amFindEmptyStartingAnywhere:
