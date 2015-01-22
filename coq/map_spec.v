@@ -72,108 +72,37 @@ Record ArrMapZ := mk_lmap {
                       busybits : Z->bool
                     }.
 
-Print well_founded.
-
-Definition less_order (a b : Z) : Prop :=
-  0 <= a < b.
-
-Lemma less_order_nat_wf' : forall bound x:nat, (x <= bound)%nat ->
-                                              Acc less_order (Z.of_nat x).
-Proof.
-  intro bound. (*can not intro x, because need forall quantificator in IH *)
-  unfold less_order.
-  induction bound;constructor;intros.
-  - omega.
-  - pose (z:=Z.to_nat y).
-    assert (YZ: y=Z.of_nat z).
-    subst z.
-    destruct y.
-    auto.
-    simpl.
-    symmetry.
-    apply positive_nat_Z.
-    pose (Zlt_neg_0 p); omega.
-    rewrite YZ.
-    apply IHbound.
-    omega.
-Qed.
-
-Lemma less_order_wf' : forall x, Acc less_order x.
-Proof.
-  intros.
-  destruct x;constructor;intros.
-  - unfold less_order; unfold less_order in H; omega.
-  - destruct y.
-    + rewrite <- inj_0 at 1.
-      apply less_order_nat_wf' with (bound:=0%nat) (x:=0%nat).
-      auto.
-    + unfold less_order in H.
-      rewrite <- positive_nat_Z.
-      apply less_order_nat_wf' with (bound:=Z.to_nat(Z.pos p)) (x:=Z.to_nat(Z.pos p0)).
-      rewrite <- Z2Nat.inj_le; omega.
-    + unfold less_order in H.
-      pose (Zlt_neg_0 p0); omega.
-  - unfold less_order in H.
-    pose (Zlt_neg_0 p); omega.
-Qed.
-
-Lemma less_order_wf : well_founded less_order.
-Proof.
-  unfold well_founded.
-  apply less_order_wf'.
-Qed.
-
-Lemma decr_wf: forall x, x > 0 -> less_order (x - 1) x.
-Proof.
-intros.
-unfold less_order.
-omega.
-Qed.
-
-Check Fix.
-
-Require Import Recdef.
-
 (* search goes from index + 100 down with round up from 0,
- so i runs from 100 down to 1. first checked cell is
+ so i runs from 99 down to 0. first checked cell are
  start + 100 = start. then
- start + 99 = start - 1 mod 100*)
+ start + 99 = start - 1 mod 100
+ etc.*)
 
-Function find_empty (m : ArrMapZ) (start : Z) (i : Z) {wf less_order i}: option Z :=
-  if (busybits m (loop (start + i)))
-  then if (Z.ltb 1 i)
-       then find_empty m start (i - 1)
-       else None
-  else Some (loop (start + i)).
-intros.
-apply decr_wf.
-destruct i; [|apply Zgt_pos_0|]; discriminate teq0.
-apply less_order_wf.
-Defined.
+Function find_empty (m : ArrMapZ) (start : Z) (i : nat): option Z :=
+  if (busybits m (loop (1 + start + Z.of_nat i)))
+  then match i with
+         | S p => find_empty m start p
+         | O => None
+       end
+  else Some (loop (1 + start + Z.of_nat i)).
 
-Function find_key (m : ArrMapZ) (start : Z) (key : Z) (i : Z)
-         {wf less_order i}: option Z :=
-  if (busybits m (loop (start + i)))
-  then if (Z.eq_dec key (keys m (loop (start + i))))
-       then Some (loop (start + i))
-       else if (Z.ltb 1 i)
-            then find_key m start key (i - 1)
-            else None
-  else None.
-intros.
-apply decr_wf.
-destruct i; [|apply Zgt_pos_0|]; discriminate teq1.
-apply less_order_wf.
-Defined.
+Function find_key (m : ArrMapZ) (start : Z) (key : Z) (i : nat): option Z :=
+  if (andb (busybits m (loop (1 + start + Z.of_nat i)))
+           (Z.eqb key (keys m (loop (1 + start + Z.of_nat i)))))
+  then Some (loop (1 + start + Z.of_nat i))
+  else match i with
+         | S p => find_key m start key p
+         | O => None
+       end.
 
 Function amGet (map : ArrMapZ) (key : Z) : option Z :=
-  match find_key map (loop key) key 100 with
+  match find_key map (loop key) key 99 with
     |Some index => Some (values map index)
     |None => None
   end.
 
 Function amPut (map : ArrMapZ) (key : Z) (val : Z) : option ArrMapZ :=
-  match find_empty map (loop key) 100 with
+  match find_empty map (loop key) 99 with
     |Some index => Some {|values:= (fun (i:Z) =>
                                       if (Z.eq_dec i index)
                                       then val
@@ -209,8 +138,6 @@ Proof.
   unfold "~".
   apply H1.
 Qed.
-
-Check find_empty_ind.
 
 Lemma loop_100: forall k, loop (k + 100) = loop k.
 Proof.
@@ -334,7 +261,7 @@ Proof.
   omega.
 Qed.  
 
-Lemma amFindEmptyOnEmpty: forall m k, busybits m (loop k) = false ->
+Lemma amFindEmptyOnEmpty: forall m k, busybits m (loop (1 + k)) = false ->
                                       find_empty m k 100 <> None.
 Proof.
   intros.
@@ -344,40 +271,30 @@ Proof.
   discriminate.
 Qed.
 
-Lemma amFindEmptyOnNext: forall m k i, 0 < i -> find_empty m k i <> None ->
-                                       find_empty m k (i + 1) <> None.
+Lemma amFindEmptyOnNext: forall m k i, find_empty m k i <> None ->
+                                       find_empty m k (S i) <> None.
 Proof.
   intros.
   rewrite find_empty_equation.
-  destruct (busybits m (loop (k + (i + 1)))).
-  assert (1 < i + 1) as TMP by omega.
-  rewrite Zlt_is_lt_bool in TMP.
-  rewrite TMP.
-  assert (i + 1 - 1 = i) as TMP2 by omega; rewrite TMP2.
+  destruct (busybits m (loop (1 + k + Z.of_nat (S i)))).
   assumption.
   discriminate.
 Qed.
 
-Lemma amFindEmptyOnAnyNextNat: 
-  forall m (k i : Z) (n : nat), 0 < i ->
-                                find_empty m k i <> None ->
-                                find_empty m k (i + Z.of_nat n) <> None.
+Lemma amFindEmptyOnAnyNext: 
+  forall m (k : Z) (i n : nat), find_empty m k i <> None ->
+                                find_empty m k (i + n) <> None.
 Proof.
   intros.
   induction n.
-  - assert (i + Z.of_nat 0 = i) as TMP by (simpl;omega); rewrite TMP.
+  - assert (i + 0 = i)%nat as TMP by (simpl;omega); rewrite TMP.
     assumption.
-  - assert (i + Z.of_nat (S n) = i + Z.of_nat n + 1) as TMP.
-    rewrite Nat2Z.inj_succ.
-    SearchAbout Z.succ.
-    rewrite <- Z.add_1_r.
-    omega.
-    rewrite TMP.
+  - replace (i + (S n))%nat with (S (i + n))%nat;[|omega].
     apply amFindEmptyOnNext.
-    omega.
     assumption.
 Qed.
 
+(*
 Lemma amFindEmptyOnAnyNext:
   forall m k i x, 0 < i -> 0 <= x -> find_empty m k i <> None ->
                   find_empty m k (i + x) <> None.
@@ -392,39 +309,37 @@ Proof.
   rewrite REWR.
   apply amFindEmptyOnAnyNextNat; assumption.
 Qed.
+*)
 
-Lemma amFindEmptySameForEach100Nat: forall m k (i:nat) n,
-                                      find_empty m k (Z.of_nat i) =
-                                      find_empty m (k + 100*n) (Z.of_nat i).
+Lemma amFindEmptySameForEach100: forall m k n (i:nat),
+                                      find_empty m k i = 
+                                      find_empty m (k + 100*n) i.
 Proof.
   intros.
-  induction i.
-  - rewrite find_empty_equation.
-    symmetry.
-    rewrite find_empty_equation.
-    replace (loop (k + 100*n + Z.of_nat 0)) with (loop (k + 0)).
-    auto.
-    replace (k + 0) with k;[|omega].
-    replace (k + 100*n + Z.of_nat 0) with (k + 100*n);[|simpl;omega].
-    apply loop_x100.
-  - rewrite find_empty_equation.
-    symmetry.
-    rewrite find_empty_equation.
-    assert (loop (k + 100*n + Z.of_nat (S i)) =
-            loop (k + Z.of_nat (S i))) as REWR.
-    replace (k + 100 * n + Z.of_nat (S i)) with (k + Z.of_nat (S i) + 100 * n).
-    symmetry; apply loop_x100.
-    omega.
+  induction i;(
+      rewrite find_empty_equation;
+      symmetry;
+      rewrite find_empty_equation
+    ).
+  - assert (loop (1 + (k + 100*n) + Z.of_nat 0) = loop (1 + k + 0)) as REWR. {
+      replace (1 + (k + 100 * n) + Z.of_nat 0) with ((1 + k) + 100*n);[|lia].
+      replace (1 + k + 0) with (1 + k);[|omega].
+      symmetry;apply loop_x100.
+    }
+    rewrite REWR; auto.
+  - assert (loop (1 + (k + 100*n) + Z.of_nat (S i)) =
+            loop (1 + k + Z.of_nat (S i))) as REWR. {
+      replace (1 + (k + 100 * n) + Z.of_nat (S i))
+      with (1 + k + Z.of_nat (S i) + 100 * n);[|omega].
+      symmetry; apply loop_x100.
+    }
     rewrite REWR.
-    destruct (busybits m (loop (k + Z.of_nat (S i)))).
-    destruct (1 <? Z.of_nat (S i)).
-    replace (Z.of_nat (S i) - 1) 
-    with (Z.of_nat i);[|rewrite Nat2Z.inj_succ;omega].
+    destruct (busybits m (loop (1 + k + Z.of_nat (S i)))).
     symmetry; apply IHi.
-    tauto.
     tauto.
 Qed.
 
+(*
 Lemma amFindEmptySameForEach100: forall m k i n, 0 <= i ->
                                    find_empty m k i =
                                    find_empty m (k + 100*n) i.
@@ -441,46 +356,31 @@ Proof.
   rewrite IZ.
   apply amFindEmptySameForEach100Nat.
 Qed.
-
-Lemma amFindEmptyStartingFromPrevNat:
-  forall m k (i:nat), find_empty m k (Z.of_nat i) <> None ->
-                      find_empty m (k - 1) (Z.of_nat (i + 1)) <> None.
+*)
+Lemma amFindEmptyStartingFromPrev:
+  forall m k (i:nat), find_empty m k i <> None ->
+                      find_empty m (k - 1) (S i) <> None.
 Proof.
   intros.
   induction i.
   - rewrite find_empty_equation.
-    simpl.
     rewrite find_empty_equation in H.
-    simpl in H.
-    replace (k - 1 + 1) with (k + 0); [|omega].
+    replace (1 + (k - 1) + Z.of_nat 1) with (1 + k + Z.of_nat 0); [|lia].
+    destruct (busybits m (loop (1 + k + Z.of_nat 0))).
+    tauto.
     apply H.
   - rewrite find_empty_equation.
     rewrite find_empty_equation in H.
-    replace (k - 1 + Z.of_nat (S i + 1)) with (k + Z.of_nat (S i));[|lia].
-    destruct (busybits m (loop (k + Z.of_nat (S i))));[|discriminate].
-    destruct i.
-    + simpl in H; tauto.
-    + assert (is_true (1 <? Z.of_nat (S (S i)))) as REWR.
-      destruct (1 <? Z.of_nat (S (S i))); [auto|tauto].
-      rewrite REWR in H.
-      replace (Z.of_nat (S (S i)) - 1) with (Z.of_nat (S i)) in H.
-      apply IHi in H.
-      replace (Z.of_nat (S (S i) + 1) - 1) with (Z.of_nat (S i + 1)).
-      cut (if 1 <? Z.of_nat (S (S i) + 1)
-           then 1 < Z.of_nat (S (S i) + 1)
-           else 1 >= Z.of_nat (S (S i) + 1)); [|apply Zlt_cases].
-      destruct (1 <? Z.of_nat (S (S i) + 1)). 
-      intro.
-      apply H.
-      intro.
-      lia.
-      lia.
-      lia.
+    replace (1 + (k - 1) + Z.of_nat (S (S i)))
+    with (1 + k + Z.of_nat (S i));[|lia].
+    destruct (busybits m (loop (1 + k + Z.of_nat (S i))));[|discriminate].
+    apply IHi.
+    apply H.
 Qed.
 
-Lemma amFindEmptyStartingFromAnyPrevNat:
-  forall m k (i:nat) (x:nat), find_empty m k (Z.of_nat i) <> None ->
-                              find_empty m (k - Z.of_nat x) (Z.of_nat (i + x)) <> None.
+Lemma amFindEmptyStartingFromAnyPrev:
+  forall m k (i:nat) (x:nat), find_empty m k i <> None ->
+                              find_empty m (k - Z.of_nat x) (i + x) <> None.
 Proof.
   intros.
   induction x.
@@ -488,33 +388,58 @@ Proof.
     replace (i + 0)%nat with i; [|simpl;omega].
     apply H.
   - replace (k - Z.of_nat (S x)) with (k - Z.of_nat x - 1);[|lia].
-    replace (i + S x)%nat with (i + x + 1)%nat;[|omega].
-    apply amFindEmptyStartingFromPrevNat.
+    replace (i + S x)%nat with (S (i + x))%nat;[|omega].
+    apply amFindEmptyStartingFromPrev.
     apply IHx.
+Qed.
+
+Lemma amFindEmpty99NoLess:
+  forall m k (i:nat), (i < 100)%nat -> find_empty m k i <> None ->
+                find_empty m k 99 <> None.
+Proof.
+  intros.
+  pose (x:= (99 - i)%nat).
+  replace 99%nat with (i + x)%nat;[|subst x; omega].
+  apply amFindEmptyOnAnyNext.
+  assumption.
 Qed.
 
 (* Done so far *)
 
-Lemma amFindEmpty100NoLess:
-  forall m k i, 0 < i <= 100 -> find_empty m k i <> None ->
-                find_empty m k 100 <> None.
+Lemma amFindEmpty99orMore:
+  forall m k (n:nat), find_empty m k (99 + n) <> None ->
+                      find_empty m k 99 <> None \/ 
+                      find_empty m k n <> None.
 Proof.
   intros.
-  pose (x:= 100 - i).
-  replace 100 with (i + x);[|subst x; omega].
-  apply amFindEmptyOnAnyNext.
-  omega.
-  subst x;omega.
-  assumption.
-Qed.
+  induction n.
+  - auto.
+  - rewrite find_empty_equation in H.
+    replace (k + (100 + Z.of_nat (S n)))
+    with (k + Z.of_nat (S n) + 100) in H;[|omega].
+    replace (loop (k + Z.of_nat (S n) + 100))
+    with (loop (k + Z.of_nat (S n))) in H;[|symmetry; apply loop_100].
+    remember (busybits m (loop (k + Z.of_nat (S n)))) as BB.
+    destruct BB.
+    + destruct (1 <? 100 + Z.of_nat (S n)).
+      replace (100 + Z.of_nat (S n) - 1)
+      with (100 + Z.of_nat n) in H; [|rewrite Nat2Z.inj_succ;omega].
+      apply IHn in H.
+      destruct H.
+      * left; assumption.
+      * right.
+        replace (Z.of_nat (S n))
+        with (Z.of_nat n + 1);[|rewrite Nat2Z.inj_succ;omega].
+        apply amFindEmptyOnNext.
+        
+        
 
-Lemma amFindEmpty100IsEnough:
-  forall m k i, 100 < i -> find_empty m k i <> None ->
-                find_empty m k 100 <> None.
-Proof.
-  intros.
-  pose (x := 
-  
++ right.
+      rewrite find_empty_equation.
+      rewrite <- HeqBB.
+      
+    + 
+
 
 Lemma amFindEmptyStartingAnywhere:
   forall m k x, find_empty m k 100 <> None ->
