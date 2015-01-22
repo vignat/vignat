@@ -118,8 +118,13 @@ Function amPut (map : ArrMapZ) (key : Z) (val : Z) : option ArrMapZ :=
     |None => None
   end.
 
+(*
 Definition full (m : ArrMapZ) :=
   forall i, 0 <= i < 100 -> is_true (busybits m i).
+*)
+
+Definition full (m : ArrMapZ):Prop :=
+  forall k, is_true (busybits m (loop k)).
 
 Lemma not_forall_exists: forall A, forall P:A->Prop,
                            ~ (forall x:A, P x) -> exists x:A, ~ P x.
@@ -384,8 +389,7 @@ Proof.
     with (k + Z.of_nat (S n) + 100) in H;[|lia].
     replace (loop (k + Z.of_nat (S n) + 100))
     with (loop (k + Z.of_nat (S n))) in H;[|symmetry; apply loop_100].
-    remember (busybits m (loop (k + Z.of_nat (S n)))) as BB.
-    destruct BB.
+    destruct (busybits m (loop (k + Z.of_nat (S n)))) eqn: BB.
     + replace (99 + S n)%nat with (S (99 + n))%nat in H;[|omega].
       apply IHn in H.
       decompose sum H.
@@ -397,7 +401,7 @@ Proof.
       * rewrite find_empty_equation.
         replace (1 + k + Z.of_nat n)
         with (k + Z.of_nat (S n));[|lia].
-        rewrite <- HeqBB.
+        rewrite BB.
         discriminate.
       * discriminate.
 Qed.
@@ -432,34 +436,118 @@ Proof.
     rewrite N2Z at 1.
     assert (99 = Z.to_nat (Z.of_nat 99))%nat as TMP by auto.
     rewrite TMP at 1.
+    pose (Zle_0_nat n).
+    pose (Zle_0_nat 99).
+    assert (0 <= Z.of_nat n / 99) by (apply Z_div_pos;omega).
+    rewrite <- Z2Nat.inj_mul;[|omega|auto].
+    rewrite <- Z2Nat.inj_add;
+      [|apply Z.mul_nonneg_nonneg;omega|apply Z_mod_lt;omega].
+    apply f_equal.
+    apply Z_div_mod_eq;omega.
+  }
+  assert (r < 99)%nat. {
+    subst r.
+    replace 99%nat with (Z.to_nat 99);[|auto].
+    apply Z2Nat.inj_lt;[|omega|];apply Z_mod_lt;omega.
+  }
+  rewrite REPR in H.
+  apply amFindEmpty99PlusABit in H.
+  decompose sum H.
+  - tauto.
+  - apply amFindEmpty99NoLess with r;[omega|assumption].
+Qed.
     
-
-
 Lemma amFindEmptyStartingAnywhere:
-  forall m k x, find_empty m k 100 <> None ->
-                find_empty m (k - x) 100 <> None.
+  forall m k x, 0 <= x -> find_empty m k 99 <> None ->
+                find_empty m (k - x) 99 <> None.
+Proof.
+  intros m k x XLE0 H.
+  apply amFindEmptyStartingFromAnyPrev with (x:=Z.to_nat x) in H.
+  replace (Z.of_nat (Z.to_nat x)) with x in H.
+  apply amFindEmpty99IsEnough in H.
+  assumption.
+  destruct x.
+  - auto.
+  - symmetry; apply positive_nat_Z.
+  - pose (Zlt_neg_0 p);omega.
+Qed.
+
+Check dec_Zlt.
+
+Lemma amWillFindEmptyBehind: forall m k x i, k <= x -> find_empty m x i <> None ->
+                                             find_empty m k 99 <> None.
 Proof.
   intros.
-  
+  pose (d := x - k).
+  assert (0 <= d) by (subst d; omega).
+  replace k with (x - d);[|subst d; omega].
+  apply amFindEmptyStartingAnywhere.
+  - omega.
+  - apply amFindEmpty99IsEnough in H0.
+    assumption.
+Qed.
 
-Lemma amWillFindEmpty: forall m k x i, find_empty m x 100 <> None ->
-                                       find_empty m k 100 <> None.
+Lemma amWillFindEmpty: forall m k x i , find_empty m x i <> None ->
+                                        find_empty m k 99 <> None.
 Proof.
   intros.
-  pose (d:=k - x
-  
+  pose (XLTK:=dec_Zlt x k).
+  unfold Decidable.decidable in XLTK.
+  decompose sum XLTK.
+  - pose (a:= (k - x)/100 + 1).
+    pose (b:= k - (100*a)).
+    assert (b <= x). {
+      subst b a.
+      SearchAbout (_*(_+_)).
+      rewrite Z.mul_add_distr_l.
+      assert (k - x - (k - x) mod 100 = 100 * ((k - x) / 100)) as REWR. {
+        pose (Z_div_mod_eq (k-x) 100).
+        omega.
+      }
+      rewrite <- REWR.
+      remember ((k - x) mod 100) as a.
+      assert (0 <= a < 100) by (subst a; apply Z_mod_lt;omega).
+      omega.
+    }
+    replace k with (b + (100*a));[|subst b;omega].
+    rewrite <- amFindEmptySameForEach100.
+    apply amWillFindEmptyBehind with x i;[omega|assumption].
+  - apply amWillFindEmptyBehind with x i;[omega|assumption].
+Qed.
 
-Lemma amNonFullCanFindEmpty: forall m k, ~(full m) -> find_empty m k 100 <> None.
+Lemma amFindEmptyNotBlind: forall m k, 0 <= k < 100 ->
+                                       (~is_true (busybits m k)) ->
+                                       find_empty m k 99 <> None.
+Proof.
+  intros m k KBOUND H.
+  rewrite find_empty_equation.
+  replace (1 + k + Z.of_nat 99) with (k + 100);[|lia].
+  rewrite loop_100.
+  rewrite loop_small;[|assumption].
+  unfold is_true in H.
+  destruct (busybits m k).
+  - tauto.
+  - discriminate.
+Qed.
+
+Lemma amNonFullCanFindEmpty: forall m k, ~(full m) -> find_empty m k 99 <> None.
 Proof.
   intros.
   unfold full in H.
   apply not_forall_exists in H.
   destruct H.
-  unfold find_empty.
-  unfold find_empty_terminate.
-  
+  remember (loop x) as k0.
+  assert (0 <= k0 < 100) by (subst k0;apply Loop_bound).
+  apply amWillFindEmpty with k0 99%nat.
+  apply amFindEmptyNotBlind;assumption.
+Qed.
+
 Lemma amCanPut: forall m k v, ~(full m) -> amPut m k v <> None.
 Proof.
   intros.
-
-  
+  unfold amPut.
+  apply amNonFullCanFindEmpty with (k:=(loop k)) in H.
+  destruct (find_empty m (loop k) 99).
+  - discriminate.
+  - tauto.
+Qed.
