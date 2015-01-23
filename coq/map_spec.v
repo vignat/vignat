@@ -6,6 +6,7 @@ Require Import ZArith.Zdiv.
 Require Import Coq.Setoids.Setoid.
 Require Import Classical.
 Require Import Psatz.
+Require Import FunctionalExtensionality.
 
 Local Open Scope Z.
 
@@ -417,7 +418,6 @@ Proof.
   pose (r := Z.to_nat ((Z.of_nat n) mod 99)).
   assert (n = (99*x + r)%nat) as REPR. {
     subst x r.
-    SearchAbout Z.of_nat.
     assert (n = Z.to_nat (Z.of_nat n)) as N2Z by (symmetry;apply Nat2Z.id).
     rewrite N2Z at 1.
     assert (99 = Z.to_nat (Z.of_nat 99))%nat as TMP by auto.
@@ -586,7 +586,6 @@ Proof.
     tauto.
   - intro.
     unfold is_true in H.
-    SearchAbout andb.
     apply Bool.andb_true_iff in H.
     destruct H as [BB EQ].
     rewrite BB.
@@ -619,7 +618,7 @@ Proof.
   - assumption.
 Qed.
 
-Lemma amFindEmptyBound: forall m k i, match (find_empty m k i) with
+Lemma amFindEmptyBound: forall m s i, match (find_empty m s i) with
                                         |Some z => 0 <= z < 100
                                         |None => True
                                       end.
@@ -627,6 +626,21 @@ Proof.
   intros.
   unfold find_empty.
   apply amFindIfBound.
+Qed.
+
+Lemma amFindEmptyCorrect: forall m s i, match (find_empty m s i) with
+                                          |Some z => (busybits m z = false)
+                                          |None => True
+                                        end.
+Proof.
+  intros.
+  destruct (find_empty m s i) eqn: Heqfe.
+  unfold find_empty in Heqfe.
+  - pose (amFindIfCorrect
+            (fun k : Z => negb (busybits m k)) s i) as FIC.
+    rewrite Heqfe in FIC.
+    destruct (busybits m z);auto.
+  - tauto.
 Qed.
 
 Lemma amFindKeyBound: forall m k s i, match (find_key m s k i) with
@@ -721,31 +735,28 @@ Qed.
 Lemma amGetPut1: forall m k v, ~(full m) ->
                                ~(contains m k) ->
                                match (amPut m k v) with
-                                 |Some map => match (amGet map k) with
-                                                  |Some val => val = v
-                                                  |None => False
-                                              end
+                                 |Some map => amGet map k = Some v
                                  |None => False
                                end.
 Proof.
   intros m k v NONFULL ABSCENT.
   assert (H1 := amCanPut m k v NONFULL).
-  destruct (amPut m k v) eqn: PUT.
+  destruct (amPut m k v) eqn: PUT'.
   - unfold amGet.
-    unfold amPut in PUT.
+    unfold amPut in PUT'.
     destruct (find_empty m (loop k) 99) eqn: FE.
-    + injection PUT as PUT1.
+    + injection PUT' as PUT.
       rename z into x.
       rename a into map.
       assert (FEB:=amFindEmptyBound m (loop k) 99).
       rewrite FE in FEB.
       assert (keys map x = k) as EQ. {
-        rewrite <- PUT1.
+        rewrite <- PUT.
         simpl.
         destruct (Z.eq_dec x x);[auto|tauto].
       }
       assert (is_true (busybits map x)) as BB. {
-        rewrite <- PUT1;simpl;destruct (Z.eq_dec x x);[auto|tauto].
+        rewrite <- PUT;simpl;destruct (Z.eq_dec x x);[auto|tauto].
       }
       assert (forall y : Z,
                 y <> x ->
@@ -755,14 +766,62 @@ Proof.
         unfold contains in ABSCENT.
         contradict ABSCENT.
         exists y.
-        rewrite <- PUT1 in ABSCENT; simpl in ABSCENT.
+        rewrite <- PUT in ABSCENT; simpl in ABSCENT.
         destruct (Z.eq_dec y x);tauto.
       }
       assert (FEK:= amFindExactKey map k (loop k) x FEB EQ BB UNIQUE).
       destruct (find_key map (loop k) k 99).
-      * rewrite <- PUT1. simpl. rewrite FEK.
+      * rewrite <- PUT. simpl. rewrite FEK.
         destruct (Z.eq_dec x x); tauto.
       * tauto.
-    + symmetry in PUT. contradiction.
+    + symmetry in PUT'. contradiction.
   - tauto.
+Qed.
+
+Lemma amGetPut2: forall m k1 k2 v, ~(full m) -> k1 <> k2 ->
+                                   match (amPut m k1 v) with
+                                     |Some map => amGet map k2 = amGet m k2
+                                     |None => False
+                                   end.
+Proof.
+  intros m k1 k2 v NONFULL NEQ.
+  assert (H1 := amCanPut m k1 v NONFULL).
+  destruct (amPut m k1 v) eqn: PUT';[|tauto].
+  unfold amPut in PUT'.
+  destruct (find_empty m (loop k1) 99) eqn: FE;
+    [|symmetry in PUT';contradiction].
+  rename z into ind, a into map.
+  injection PUT' as PUT.
+  unfold amGet.
+  assert (FEC:=amFindEmptyCorrect m (loop k1) 99).
+  rewrite FE in FEC.
+  assert (forall k, ((busybits map k && (k2 =? keys map k)) = 
+                     (busybits m k && (k2 =? keys m k))))%bool as EQCOND. {
+    intro.
+    rewrite <- PUT.
+    simpl.
+    destruct (Z.eq_dec k ind) eqn: KIND.
+    - replace (k2 =? k1) with false;[|symmetry;apply Z.eqb_neq;auto].
+      subst k.
+      rewrite FEC.
+      auto.
+    - tauto.
+  }
+  apply functional_extensionality in EQCOND.
+  unfold find_key.
+  rewrite EQCOND.
+  replace (find_if (fun k : Z =>
+                      (busybits m k && (k2 =? keys m k))%bool) (loop k2) 99)
+  with (find_key m (loop k2) k2 99);[|unfold find_key;tauto].
+  destruct (find_key m (loop k2) k2 99) eqn: Heqfk;[|tauto].
+  pose (FRK:=amFindRightKey m k2 (loop k2) 99).
+  rewrite Heqfk in FRK.
+  destruct FRK as [BB EQ].
+  rewrite <- PUT.
+  simpl.
+  destruct (Z.eq_dec z ind);[|tauto].
+  unfold is_true in BB.
+  subst z.
+  rewrite FEC in BB.
+  discriminate BB.
 Qed.
