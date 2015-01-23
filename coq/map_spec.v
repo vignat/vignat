@@ -90,8 +90,8 @@ Function find_empty (m : ArrMapZ) (start : Z) (i : nat): option Z :=
   find_if (fun k => negb (busybits m k)) start i.
 
 Function find_key (m : ArrMapZ) (start : Z) (key : Z) (i : nat): option Z :=
-  find_if (fun k => andb (busybits m (loop (1 + start + Z.of_nat i)))
-                         (Z.eqb key (keys m (loop (1 + start + Z.of_nat i)))))
+  find_if (fun k => andb (busybits m k)
+                         (Z.eqb key (keys m k)))
           start i.
 
 Function amGet (map : ArrMapZ) (key : Z) : option Z :=
@@ -124,6 +124,10 @@ Definition full (m : ArrMapZ) :=
 
 Definition full (m : ArrMapZ):Prop :=
   forall k, is_true (busybits m (loop k)).
+
+Definition contains (m : ArrMapZ) (k : Z) :=
+  exists x, 0 <= x < 100 /\ is_true (busybits m x) /\ keys m x = k.
+
 
 Lemma not_forall_exists: forall A, forall P:A->Prop,
                            ~ (forall x:A, P x) -> exists x:A, ~ P x.
@@ -495,20 +499,48 @@ Proof.
   - apply amWillFindIfBehind with x i;[omega|assumption].
 Qed.
 
-Lemma amFindEmptyNotBlind: forall m k, 0 <= k < 100 ->
-                                       (~is_true (busybits m k)) ->
-                                       find_empty m k 99 <> None.
+Lemma amFindIfNotBlind: forall cond k, 0 <= k < 100 ->
+                                       is_true (cond k) ->
+                                       find_if cond k 99 <> None.
 Proof.
-  intros m k KBOUND H.
-  unfold find_empty.
+  intros cond k KBOUND H.
   rewrite find_if_equation.
   replace (1 + k + Z.of_nat 99) with (k + 100);[|lia].
   rewrite loop_100.
   rewrite loop_small;[|assumption].
   unfold is_true in H.
-  destruct (busybits m k).
-  - tauto.
-  - discriminate.
+  rewrite H.
+  discriminate.
+Qed.
+
+Lemma amFindIfBound: forall cond k i, match (find_if cond k i) with
+                                        | Some z => 0 <= z < 100
+                                        | None => True
+                                      end.
+Proof.
+  intros.
+  rewrite find_if_equation.
+  induction i.
+  - destruct (cond (loop (1 + k + Z.of_nat 0))).
+    + apply Loop_bound.
+    + tauto.    
+  - rewrite <- find_if_equation in IHi.
+    destruct (cond (loop (1 + k + Z.of_nat (S i)))).
+    + apply Loop_bound.
+    + apply IHi.      
+Qed.
+
+Lemma amFindIfCorrect: forall cond s i, match (find_if cond s i) with
+                                            |Some z => is_true (cond z)
+                                            |None => True
+                                        end.
+Proof.
+  intros.
+  rewrite find_if_equation.
+  induction i.
+  - destruct (cond (loop (1 + s + Z.of_nat 0))) eqn: COND; auto.
+  - rewrite <- find_if_equation in IHi.
+    destruct (cond (loop (1 + s + Z.of_nat (S i)))) eqn: COND; auto.
 Qed.
 
 Lemma amNonFullCanFindEmpty: forall m k, ~(full m) -> find_empty m k 99 <> None.
@@ -520,9 +552,10 @@ Proof.
   remember (loop x) as k0.
   assert (0 <= k0 < 100) by (subst k0;apply Loop_bound).
   unfold find_empty.
-  Check amWillFindIf.
   apply amWillFindIf with (x:=k0) (i:=99%nat).
-  apply amFindEmptyNotBlind;assumption.
+  apply amFindIfNotBlind.
+  - assumption.
+  - destruct (busybits m k0); auto.
 Qed.
 
 Lemma amCanPut: forall m k v, ~(full m) -> amPut m k v <> None.
@@ -532,5 +565,204 @@ Proof.
   apply amNonFullCanFindEmpty with (k:=(loop k)) in H.
   destruct (find_empty m (loop k) 99).
   - discriminate.
+  - tauto.
+Qed.
+
+Lemma isKeyEquivalence: forall m k key, 
+                          (is_true (busybits m k) /\
+                           keys m k = key) <->
+                          is_true(andb (busybits m k)
+                                       (Z.eqb key (keys m k))).
+Proof.
+  intros.
+  split.
+  - intro.
+    destruct H as [BB EQ].
+    unfold is_true in BB.
+    rewrite BB.
+    rewrite EQ.
+    unfold is_true;simpl.
+    apply Z.eqb_eq.
+    tauto.
+  - intro.
+    unfold is_true in H.
+    SearchAbout andb.
+    apply Bool.andb_true_iff in H.
+    destruct H as [BB EQ].
+    rewrite BB.
+    split;auto.
+    symmetry;apply Z.eqb_eq;assumption.
+Qed.
+
+
+Lemma amContainsCanFindKey: forall m k s, contains m k ->
+                                          find_key m s k 99 <> None.
+Proof.
+  intros.
+  unfold contains in H.
+  destruct H.
+  destruct H as [BOUND COND].
+  unfold find_key.
+  apply amWillFindIf with (x:=x) (i:=99%nat).
+  apply amFindIfNotBlind.
+  - assumption.
+  - apply isKeyEquivalence;assumption.
+Qed.    
+
+Lemma amCanGet: forall m k, contains m k -> amGet m k <> None.
+Proof.
+  intros.
+  unfold amGet.
+  apply amContainsCanFindKey with (s:=loop k) in H.
+  destruct (find_key m (loop k) k 99).
+  - discriminate.
+  - assumption.
+Qed.
+
+Lemma amFindEmptyBound: forall m k i, match (find_empty m k i) with
+                                        |Some z => 0 <= z < 100
+                                        |None => True
+                                      end.
+Proof.
+  intros.
+  unfold find_empty.
+  apply amFindIfBound.
+Qed.
+
+Lemma amFindKeyBound: forall m k s i, match (find_key m s k i) with
+                                         |Some z => 0 <= z < 100
+                                         |None => True
+                                     end.
+Proof.
+  intros; unfold find_key; apply amFindIfBound.
+Qed.
+  
+Lemma amPutContains: forall m k v, ~(full m) -> match (amPut m k v) with
+                                                    |Some map => contains map k
+                                                    |None => False
+                                                end.
+Proof.
+  intros.
+  assert (H1 := amCanPut m k v H).
+  destruct (amPut m k v) eqn: PUT.
+  - unfold contains.
+    remember (find_empty m (loop k) 99) as found.
+    pose (amFindEmptyBound m (loop k) 99) as FEbound.
+    destruct found.
+    + rewrite <- Heqfound in FEbound.
+      exists z.
+      constructor.
+      * apply FEbound.
+      * unfold amPut in PUT.
+        rewrite <- Heqfound in PUT.
+        injection PUT as P.
+        rewrite <- P.
+        simpl.
+        destruct (Z.eq_dec z z);auto;constructor;[auto|tauto].
+    + apply amNonFullCanFindEmpty with m (loop k) in H.
+      symmetry in Heqfound.
+      contradiction.
+  - tauto.
+Qed.
+
+
+Lemma amFindRightKey: forall m k s i, match (find_key m s k i) with
+                                        |Some z => is_true (busybits m z) /\
+                                                   keys m z = k
+                                        |None => True
+                                      end.
+Proof.
+  intros.
+  destruct (find_key m s k i) eqn: Heqfk.
+  unfold find_key in Heqfk.
+  - pose (amFindIfCorrect
+            (fun k0:Z => (busybits m k0 && (k =? keys m k0))%bool)
+            s i) as FIC.
+    simpl in FIC.
+    rewrite Heqfk in FIC.
+    apply isKeyEquivalence;assumption.
+  - tauto.
+Qed.
+
+Lemma amFindExactKey: forall m k s x,
+                        0 <= x < 100 ->
+                        (keys m x = k) ->
+                        is_true (busybits m x) ->
+                        (forall y, y <> x ->
+                                   ~(0 <= y < 100 /\ is_true (busybits m y) /\
+                                     (keys m y = k))) ->
+                        match (find_key m s k 99) with
+                          |Some z => z = x
+                          |None => False
+                        end.
+Proof.
+  intros m k s x BOUND KEY BUSY UNIQUE.
+  assert (FRK := amFindRightKey m k s 99).
+  destruct (find_key m s k 99) eqn: Heqfk.
+  - specialize UNIQUE with z.
+    destruct (Z.eq_dec z x).
+    + assumption.
+    + apply UNIQUE in n.
+      pose (amFindKeyBound m k s 99) as FKbound.
+      rewrite Heqfk in FKbound.
+      contradict n.
+      intuition.
+  - assert (contains m k) as CONT. {
+      unfold contains.
+      exists x.
+      auto.
+    }
+    apply amContainsCanFindKey with (s:=s) in CONT.
+    unfold amGet in CONT.
+    rewrite Heqfk in CONT.
+    tauto.
+Qed.  
+
+Lemma amGetPut1: forall m k v, ~(full m) ->
+                               ~(contains m k) ->
+                               match (amPut m k v) with
+                                 |Some map => match (amGet map k) with
+                                                  |Some val => val = v
+                                                  |None => False
+                                              end
+                                 |None => False
+                               end.
+Proof.
+  intros m k v NONFULL ABSCENT.
+  assert (H1 := amCanPut m k v NONFULL).
+  destruct (amPut m k v) eqn: PUT.
+  - unfold amGet.
+    unfold amPut in PUT.
+    destruct (find_empty m (loop k) 99) eqn: FE.
+    + injection PUT as PUT1.
+      rename z into x.
+      rename a into map.
+      assert (FEB:=amFindEmptyBound m (loop k) 99).
+      rewrite FE in FEB.
+      assert (keys map x = k) as EQ. {
+        rewrite <- PUT1.
+        simpl.
+        destruct (Z.eq_dec x x);[auto|tauto].
+      }
+      assert (is_true (busybits map x)) as BB. {
+        rewrite <- PUT1;simpl;destruct (Z.eq_dec x x);[auto|tauto].
+      }
+      assert (forall y : Z,
+                y <> x ->
+                ~ (0 <= y < 100 /\ is_true (busybits map y) /\
+                   keys map y = k)) as UNIQUE. {
+        intros.
+        unfold contains in ABSCENT.
+        contradict ABSCENT.
+        exists y.
+        rewrite <- PUT1 in ABSCENT; simpl in ABSCENT.
+        destruct (Z.eq_dec y x);tauto.
+      }
+      assert (FEK:= amFindExactKey map k (loop k) x FEB EQ BB UNIQUE).
+      destruct (find_key map (loop k) k 99).
+      * rewrite <- PUT1. simpl. rewrite FEK.
+        destruct (Z.eq_dec x x); tauto.
+      * tauto.
+    + symmetry in PUT. contradiction.
   - tauto.
 Qed.
