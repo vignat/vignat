@@ -732,12 +732,12 @@ Proof.
     tauto.
 Qed.  
 
-Lemma amGetPut1: forall m k v, ~(full m) ->
-                               ~(contains m k) ->
-                               match (amPut m k v) with
-                                 |Some map => amGet map k = Some v
-                                 |None => False
-                               end.
+Theorem amGetPut1: forall m k v, ~(full m) ->
+                                 ~(contains m k) ->
+                                 match (amPut m k v) with
+                                   |Some map => amGet map k = Some v
+                                   |None => False
+                                 end.
 Proof.
   intros m k v NONFULL ABSCENT.
   assert (H1 := amCanPut m k v NONFULL).
@@ -778,11 +778,11 @@ Proof.
   - tauto.
 Qed.
 
-Lemma amGetPut2: forall m k1 k2 v, ~(full m) -> k1 <> k2 ->
-                                   match (amPut m k1 v) with
-                                     |Some map => amGet map k2 = amGet m k2
-                                     |None => False
-                                   end.
+Theorem amGetPut2: forall m k1 k2 v, ~(full m) -> k1 <> k2 ->
+                                     match (amPut m k1 v) with
+                                       |Some map => amGet map k2 = amGet m k2
+                                       |None => False
+                                     end.
 Proof.
   intros m k1 k2 v NONFULL NEQ.
   assert (H1 := amCanPut m k1 v NONFULL).
