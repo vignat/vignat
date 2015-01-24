@@ -191,3 +191,108 @@ Definition put_spec :=
 Definition Vprog : varspecs := nil.
 Definition Gprog : funspecs := loop_spec :: find_empty_spec :: find_key_spec
                                          :: get_spec :: put_spec :: nil.
+
+
+(* Helper tactics *)
+Ltac unfold_int_limits :=
+  unfold Int.min_signed, Int.max_signed, Int.half_modulus,
+         Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize,
+         shift_nat, nat_iter;
+  simpl.
+
+Ltac unfold_to_bare_Z :=
+  unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith;
+  simpl;
+  unfold both_int, sem_cast_neutral;
+  simpl;
+  unfold Int.mods;
+  repeat rewrite Int.signed_repr;
+  try (unfold_int_limits; omega);
+  repeat rewrite add_repr;
+  repeat rewrite sem_add_pi_ptr;
+  repeat unfold force_val;
+  repeat rewrite mul_repr.
+
+Ltac auto_logic :=
+  repeat rewrite andb_false_r; repeat rewrite andb_false_l; simpl; auto.
+
+Ltac repr_bound k :=
+  match goal with
+    |[H:repr k _ |-Int.min_signed <= k <= Int.max_signed] => inv H; assumption
+    |[H:repr k _ |-context[Int.min_signed <= k]] => inv H
+    |[H:repr k _ |-context[k <= Int.max_signed]] => inv H
+  end.
+
+Ltac get_repr k :=
+  repeat
+    match goal with
+      |[H:?a = (Int.repr k)|-context[Int.signed ?a]] =>
+       rewrite H; rewrite Int.signed_repr;[|repr_bound k]
+      |[H:?a = (Int.repr k)|-context[?a]] => rewrite H
+      |[H:?a = (Vint (Int.repr k))|-context[?a]] => rewrite H; idtac "ololo"
+      |[H:k = ?a|-context[?a]]=>rewrite <- H
+      |[H:repr k (Vint ?a) |-context[?a]] =>
+       let H' := fresh a "EQ" k in
+       assert (a = (Int.repr k)) as H' by (inv H;tauto)
+      |[H:repr k ?a |-context[?a]] =>
+       let H' := fresh "EQ" k in
+       assert (a = (Vint (Int.repr k))) as H' by (inv H; tauto)
+    end.
+
+(* Auxillary lemmas *)
+Lemma f_notequal: forall (A B : Type) (f : A -> B) (x y : A), ~ f x = f y -> ~ x = y.
+Proof.
+  pose proof f_equal as FEQ.
+  assert (forall A B:Prop, (A -> B) -> (~B -> ~A)) as CONTRAPOSITION by tauto.
+  intros A B f x y.
+  apply CONTRAPOSITION.
+  apply FEQ.
+Qed.
+
+Lemma neq_100_mone: (Int.eq (Int.repr 100) Int.mone = false).
+Proof.
+  apply Int.eq_false.
+  apply f_notequal with Z Int.intval. 
+  simpl.
+  omega.
+Qed.
+
+(* Proofs for spec-body correspondence *)
+Lemma body_loop: semax_body Vprog Gprog f_loop loop_spec.
+Proof.
+  start_function.
+  name karg _k.
+  forward.
+  entailer!.
+  - unfold_to_bare_Z.
+    rewrite neq_100_mone.
+    auto_logic.
+    rewrite neq_100_mone.
+    auto_logic.
+  - rewrite neq_100_mone.
+    auto_logic.
+  - unfold_to_bare_Z.
+    rewrite neq_100_mone.
+    auto_logic.
+  - unfold_to_bare_Z.
+    rewrite neq_100_mone.
+    auto_logic.
+    unfold_to_bare_Z.
+    unfold_to_bare_Z.
+    unfold loop.
+    get_repr k.
+    + tauto.
+    + assert (-100 <= Z.rem (Int.signed karg) 100 <= 100). {
+        assert (Z.abs (Z.rem (Int.signed karg) 100) < Z.abs 100)
+          by (apply Z.rem_bound_abs;omega).
+        unfold Z.abs in H0.
+        destruct (Z.rem (Int.signed karg) 100).
+        - omega.
+        - pose (Zgt_pos_0 p); omega.
+        - pose (Zgt_pos_0 p).
+          SearchAbout Z.pos.
+          replace (Z.neg p) with (- Z.pos p);[|apply Pos2Z.opp_pos].
+          omega.
+      }
+      unfold_to_bare_Z.
+Qed.
