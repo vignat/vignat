@@ -198,10 +198,20 @@ Definition Gprog : funspecs := loop_spec :: find_empty_spec :: find_key_spec
 
 (* Helper tactics *)
 Ltac unfold_int_limits :=
+  
   unfold Int.min_signed, Int.max_signed, Int.half_modulus,
          Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize,
          shift_nat, nat_iter;
-  simpl.
+  repeat match goal with
+             |[H:context[Int.max_signed]|-_] =>
+              unfold Int.min_signed, Int.max_signed, Int.half_modulus,
+              Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize,
+              shift_nat, nat_iter in H
+             |[H:context[Int.min_signed]|-_] =>
+              unfold Int.min_signed, Int.max_signed, Int.half_modulus,
+              Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize,
+              shift_nat, nat_iter in H
+         end.
 
 Ltac unfold_to_bare_Z :=
   unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith;
@@ -210,7 +220,7 @@ Ltac unfold_to_bare_Z :=
   simpl;
   unfold Int.mods;
   repeat rewrite Int.signed_repr;
-  try (unfold_int_limits; omega);
+  try (unfold_int_limits; simpl; omega);
   repeat rewrite add_repr;
   repeat rewrite sem_add_pi_ptr;
   repeat unfold force_val;
@@ -274,6 +284,51 @@ Proof.
   omega.
 Qed.
 
+Lemma int_if_false: forall expr:bool,
+                      Int.eq (Int.repr (if expr then 1 else 0))
+                             (Int.repr 0) = true ->
+                      expr = false.
+Proof.
+  intros.
+  destruct expr.
+  apply int_eq_e in H.
+  discriminate H.
+  tauto.
+Qed.
+
+Lemma repr0_is_0 n i:
+  Nrepr n (Vint i) -> Int.eq i (Int.repr 0) = true -> (n = 0)%nat.
+Proof.
+  inversion 1. subst. intro A.
+  symmetry in A. apply binop_lemmas.int_eq_true in A.
+  inv A.
+  rewrite Int.Z_mod_modulus_eq in H1.
+  rewrite <- Nat2Z.inj_iff.
+  rewrite <- Zmod_small with (x:=Z.of_nat n) (y:=Int.modulus).
+  simpl; assumption.
+  split.
+  - omega.
+  - inv H2.
+    rewrite Nat2Z.inj_le in H3.
+    rewrite Z2Nat.id in H3.
+    unfold_int_limits; simpl in H3; omega.
+    unfold_int_limits; simpl; omega.
+Qed.
+
+
+Lemma repr_neq_0 n i:
+  Nrepr n (Vint i) -> Int.eq i (Int.repr 0) = false -> (n <> 0)%nat.
+Proof.
+  inversion 1. subst. intro A.
+  SearchAbout Int.eq.
+  pose (B:=Int.eq_spec (Int.repr (Z.of_nat n)) (Int.repr 0)).
+  rewrite A in B.
+  destruct n.
+  simpl in B.
+  auto.
+  auto.
+Qed.
+
 (* Proofs for spec-body correspondence *)
 Lemma body_loop: semax_body Vprog Gprog f_loop loop_spec.
 Proof.
@@ -323,14 +378,15 @@ Proof.
   name indexloc _index.
   name bbloc _bb.
   forward_call (sh,(start + Z.of_nat i + 1), (* loop(1 + start + i) *)
-                (Vint (Int.repr (start + Z.of_nat i + 1)))).
-  entailer!.
-  - constructor.
-    unfold_to_bare_Z.
-  - get_repr start.
-    get_repr i.
-    unfold_to_bare_Z.
-    apply f_equal;omega.
+                (Vint (Int.repr (start + Z.of_nat i + 1)))). {
+    entailer!. 
+    - constructor.
+      unfold_to_bare_Z.
+    - get_repr start.
+      get_repr i.
+      unfold_to_bare_Z.
+      apply f_equal;omega.
+  }
   - auto with closed.
   - after_call.
     forward.
@@ -348,30 +404,21 @@ Proof.
                                                      else 0))))
                          0 100 vbb))).
     + pose (Loop_bound (start + Z.of_nat i + 1)).
-      forward. entailer!.
+      forward. entailer!. rename H4 into BB.
       unfold find_empty.
       rewrite find_if_equation.
-      rewrite Int.signed_repr in H4.
-      assert ( busybits m (loop (1 + start + Z.of_nat i)) = false) as REWR. {
-        replace (1 + start + Z.of_nat i) with (start + Z.of_nat i + 1);[|omega].
-        destruct ( busybits m (loop (start + Z.of_nat i + 1))).
-        apply int_eq_e in H4.
-        discriminate H4.
-        tauto.
-      }
-      rewrite REWR.
+      rewrite Int.signed_repr in BB;[|unfold_to_bare_Z].
+      apply int_if_false in BB.
       replace (1 + start + Z.of_nat i) with (start + Z.of_nat i + 1);[|omega].
-      simpl.
-      tauto.
-      unfold_to_bare_Z.
-    + forward.
-      entailer!.
-      rewrite Int.signed_repr in H4.
-      destruct ( busybits m (loop (start + Z.of_nat i + 1))).
-      tauto.
-      rewrite Int.eq_true in H4.
-      discriminate H4.
-      pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
+      rewrite BB.
+      simpl;tauto.
+    + forward. entailer!. rename H4 into BB.
+      rewrite Int.signed_repr in BB.
+      * destruct ( busybits m (loop (start + Z.of_nat i + 1))).
+        tauto.
+        rewrite Int.eq_true in BB.
+        discriminate BB.
+      * pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
     + forward_if (PROP((0 < i)%nat;
                        busybits m (loop (start + Z.of_nat i + 1)) = true)
                   LOCAL(`(eq vi) (eval_id _i);
@@ -382,58 +429,46 @@ Proof.
                                                              then 1
                                                              else 0))))
                                  0 100 vbb))).
-      forward. entailer!.
-      * replace (start + Z.of_nat i + 1) with (1 + start + Z.of_nat i) in H4;[|omega].
-        assert (i = 0)%nat. {
-        admit.
-        }
+      * forward. entailer!. rename H4 into BB.
+        replace (start + Z.of_nat i + 1)
+        with (1 + start + Z.of_nat i) in BB;[|omega].
+        assert (i=0)%nat by (apply repr0_is_0 with iarg;assumption).
         subst i.
         unfold find_empty.
         rewrite find_if_equation.
-        rewrite H4.
+        rewrite BB.
         auto_logic.
       * forward.
         entailer!.
-        assert (i <> 0)%nat by admit.
+        assert (i<>0)%nat by (apply repr_neq_0 with iarg;assumption).
         omega.
-      * {forward_call(sh, m, start, (i - 1)%nat, vbb, vstart,
-                     (Vint (Int.repr (Z.of_nat (i - 1))))).
-         entailer!.
-         - rewrite <- H8.
-           assumption.
-         - constructor.
-           try omega.
-           split.
-           omega.
-           apply Nat2Z.inj_le.
-           rewrite Nat2Z.inj_sub.
-           rewrite Z2Nat.id.
-           simpl.
-           unfold_int_limits.
-           omega.
-           unfold_int_limits;omega.
-           omega.
-         - rewrite Nat2Z.inj_sub.
-           omega.
-           omega.
-         - get_repr i.
-           rewrite sub_repr.
-           rewrite Nat2Z.inj_sub.
-           simpl.
-           tauto.
-           omega.
-         - after_call.
-           forward.
-           entailer!.
-           unfold find_empty.
-           rewrite find_if_equation.
-           replace (start + Z.of_nat i + 1) with (1 + start + Z.of_nat i) in H5;[|omega].
-           rewrite H5.
-           simpl.
-           destruct i.
-           omega.
-           unfold find_empty in H6.
-           replace (S i - 1)%nat with i in H6;[|omega].
-           assumption.
+      * forward_call(sh, m, start, (i - 1)%nat, vbb, vstart,
+                     (Vint (Int.repr (Z.of_nat (i - 1))))). {
+          entailer!. (* find_key(busybits, keys, start, key, i - 1) *)
+          - replace (Vint sarg) with (vstart);assumption.
+          - constructor.
+            split.
+            omega.
+            apply Nat2Z.inj_le.
+            rewrite Nat2Z.inj_sub;[|omega].
+            rewrite Z2Nat.id;[|unfold_int_limits;simpl;omega].
+            unfold_int_limits;simpl;omega.
+          - rewrite Nat2Z.inj_sub;omega.
+          - get_repr i.
+            rewrite sub_repr.
+            rewrite Nat2Z.inj_sub;[simpl;tauto|omega].
         }
+        after_call.
+        forward.
+        entailer!. rename H5 into BB, H6 into FIN.
+        unfold find_empty.
+        rewrite find_if_equation.
+        replace (start + Z.of_nat i + 1) with (1 + start + Z.of_nat i) in BB;[|omega].
+        rewrite BB.
+        simpl.
+        destruct i;[omega|].
+        unfold find_empty in FIN.
+        replace (S i - 1)%nat with i in FIN;[|omega].
+        assumption.
 Qed.
+
