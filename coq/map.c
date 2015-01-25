@@ -8,6 +8,7 @@ int find_empty (int* busybits, int start, int i)
 {
     int index = loop(1 + start + i);
     int bb = busybits[index];
+
     if (bb == 0)
     {
         return index;
@@ -16,7 +17,7 @@ int find_empty (int* busybits, int start, int i)
     {
         return -1;
     }
-    return find_empty(busybits, start + 1, i - 1);
+    return find_empty(busybits, start, i - 1);
 }
 
 int find_key (int* busybits, int* keys, int start, int key, int i)
@@ -24,6 +25,7 @@ int find_key (int* busybits, int* keys, int start, int key, int i)
     int index = loop(1 + start + i);
     int bb = busybits[index];
     int k = keys[index];
+
     if (bb == 1 && k == key)
     {
         return index;
@@ -32,13 +34,14 @@ int find_key (int* busybits, int* keys, int start, int key, int i)
     {
         return -1;
     }
-    return find_key(busybits, keys, start + 1, key, i - 1);
+    return find_key(busybits, keys, start, key, i - 1);
 }
 
 int get(int* busybits, int* keys, int* values, int key)
 {
     int start = loop(key);
     int index = find_key(busybits, keys, start, key, 99);
+
     if (-1 == index)
     {
         return -1;
@@ -51,13 +54,14 @@ int put(int* busybits, int* keys, int* values, int key, int value)
 {
     int start = loop(key);
     int index = find_empty(busybits, start, 99);
+
     if (-1 == index)
     {
         return -1;
     }
     busybits[index] = 1;
-    keys[index] = key;
-    values[index] = value;
+    keys    [index] = key;
+    values  [index] = value;
     return 0;
 }
 

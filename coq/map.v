@@ -112,9 +112,7 @@ Definition f_find_empty := {|
                                 (Tcons (tptr tint)
                                   (Tcons tint (Tcons tint Tnil))) tint
                                 cc_default))
-            ((Etempvar _busybits (tptr tint)) ::
-             (Ebinop Oadd (Etempvar _start tint)
-               (Econst_int (Int.repr 1) tint) tint) ::
+            ((Etempvar _busybits (tptr tint)) :: (Etempvar _start tint) ::
              (Ebinop Osub (Etempvar _i tint) (Econst_int (Int.repr 1) tint)
                tint) :: nil))
           (Sreturn (Some (Etempvar 51%positive tint))))))))
@@ -176,9 +174,7 @@ Definition f_find_key := {|
                                       (Tcons tint (Tcons tint Tnil))))) tint
                                 cc_default))
               ((Etempvar _busybits (tptr tint)) ::
-               (Etempvar _keys (tptr tint)) ::
-               (Ebinop Oadd (Etempvar _start tint)
-                 (Econst_int (Int.repr 1) tint) tint) ::
+               (Etempvar _keys (tptr tint)) :: (Etempvar _start tint) ::
                (Etempvar _key tint) ::
                (Ebinop Osub (Etempvar _i tint) (Econst_int (Int.repr 1) tint)
                  tint) :: nil))
