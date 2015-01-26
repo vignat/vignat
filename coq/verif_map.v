@@ -90,7 +90,8 @@ Definition find_key_spec :=
         PROP (0 <= start < 100;
               repr start vstart;
               repr key vkey; Nrepr i vi; isptr vbb; isptr vkeys;
-              (Z.of_nat i < 261905)(*my max recursion depth*))
+              (Z.of_nat i < 261905);(*my max recursion depth*)
+              (forall x, (Int.min_signed <= keys m x <= Int.max_signed)))
         LOCAL (`(eq vstart) (eval_id _start);
                `(eq vkey) (eval_id _key);
                `(eq vi) (eval_id _i);
@@ -123,7 +124,8 @@ Definition get_spec :=
          vbb : val, vkeys : val, vvals : val, vkey : val
     PRE [_busybits OF (tptr tint), _keys OF (tptr tint),
          _values OF (tptr tint), _key OF tint]
-         PROP (repr key vkey; isptr vbb; isptr vkeys; isptr vvals)
+         PROP (repr key vkey; isptr vbb; isptr vkeys; isptr vvals;
+              (forall x, (Int.min_signed <= keys m x <= Int.max_signed)))
          LOCAL (`(eq vkey) (eval_id _key);
                 `(eq vbb) (eval_id _busybits);
                 `(eq vkeys) (eval_id _keys);
@@ -296,6 +298,50 @@ Proof.
   tauto.
 Qed.
 
+Lemma int_modulus_eq: forall a b, Int.min_signed <= a <= Int.max_signed ->
+                                  Int.min_signed <= b <= Int.max_signed ->
+                                  ((Int.Z_mod_modulus a = Int.Z_mod_modulus b) <->
+                                   (a = b)).
+Proof.
+  intros a b ABOUND BBOUND.
+  rewrite Int.Z_mod_modulus_eq.
+  rewrite Int.Z_mod_modulus_eq.
+  unfold_int_limits.
+  simpl in ABOUND, BBOUND.
+  destruct a.
+  - destruct b.
+    + rewrite Zmod_small;[tauto|omega].
+    + pose (Zgt_pos_0 p).
+      rewrite Zmod_small;[|omega].
+      rewrite Zmod_small;[tauto|omega].
+    + pose (Zlt_neg_0 p).
+      rewrite Zmod_small;[|omega].
+      replace (Z.neg p mod 4294967296)
+      with ((Z.neg p + 1*4294967296) mod 4294967296);[|apply Z_mod_plus_full].
+      rewrite Zmod_small;omega.
+  - pose (Zgt_pos_0 p); destruct b.
+    + rewrite Zmod_small;[|omega].
+      rewrite Zmod_small;omega.
+    + rewrite Zmod_small;[|omega].
+      pose (Zgt_pos_0 p0);rewrite Zmod_small;[tauto|omega].
+    + pose (Zlt_neg_0 p0).
+      replace (Z.neg p0 mod 4294967296)
+      with ((Z.neg p0 + 1*4294967296) mod 4294967296);[|apply Z_mod_plus_full].
+      rewrite Zmod_small;[|omega].
+      rewrite Zmod_small;omega.
+  - replace (Z.neg p mod 4294967296)
+    with ((Z.neg p + 1*4294967296) mod 4294967296);[|apply Z_mod_plus_full].
+    pose (Zlt_neg_0 p).
+    rewrite Zmod_small;[|omega];destruct b.
+    + rewrite Zmod_small;omega.
+    + pose (Zgt_pos_0 p0).
+      rewrite Zmod_small;omega.
+    + pose (Zlt_neg_0 p0).
+      replace (Z.neg p0 mod 4294967296)
+      with ((Z.neg p0 + 1*4294967296) mod 4294967296);[|apply Z_mod_plus_full].
+      rewrite Zmod_small;omega.
+Qed.
+
 Lemma repr0_is_0 n i:
   Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = true -> (0 = n)%nat.
 Proof.
@@ -368,7 +414,6 @@ Proof.
       }
       unfold_to_bare_Z.
 Qed.
-
 
 Lemma body_find_empty: semax_body Vprog Gprog f_find_empty find_empty_spec.
 Proof.
@@ -473,7 +518,6 @@ Proof.
         assumption.
 Qed.
 
-
 Lemma body_find_key: semax_body Vprog Gprog f_find_key find_key_spec.
 Proof.
   start_function.
@@ -512,8 +556,8 @@ Proof.
                             (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
                 LOCAL (`(eq vi) (eval_id _i);
                        `(eq vstart) (eval_id _start);
-                       `(eq vbb) (eval_id _busybits);
                        `(eq vkey) (eval_id _key);
+                       `(eq vbb) (eval_id _busybits);
                        `(eq vkeys) (eval_id _keys))
                 SEP(`(array_at tint sh (fun x =>
                                           (Vint (Int.repr (if (busybits m x)
@@ -522,11 +566,12 @@ Proof.
                                0 100 vbb);
                     `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                0 100 vkeys))).
-    + forward_if (PROP (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))) = false)
+    + forward_if (PROP ((andb (busybits m (loop (start + Z.of_nat i + 1)))
+                            (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
                   LOCAL (`(eq vi) (eval_id _i);
                          `(eq vstart) (eval_id _start);
-                         `(eq vbb) (eval_id _busybits);
                          `(eq vkey) (eval_id _key);
+                         `(eq vbb) (eval_id _busybits);
                          `(eq vkeys) (eval_id _keys))
                   SEP(`(array_at tint sh (fun x =>
                                             (Vint (Int.repr (if (busybits m x)
@@ -535,23 +580,59 @@ Proof.
                                  0 100 vbb);
                       `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                  0 100 vkeys))).
-      * forward. entailer!. rename H6 into KEQ, H7 into BB.
+      * forward. entailer!. rename H7 into KEQ, H8 into BB, H6 into KEYSBOUND.
         rewrite Int.signed_repr in KEQ, BB.
-        admit.
+
+        unfold find_key; rewrite find_if_equation.
+        assert ((key =? keys m (loop (start + Z.of_nat i + 1))) = true) as KK.
+        apply int_eq_e in KEQ.
+        assert (keyarg = (Int.repr key)) as KREP by (get_repr key;tauto).
+        rewrite KREP in KEQ.
+        injection KEQ.
+        rewrite int_modulus_eq.
+        intro KEQK.
+        rewrite KEQK.
+        apply Z.eqb_eq;tauto.
+        apply KEYSBOUND.
+        repr_bound key.
+        replace (1 + start + Z.of_nat i)
+        with (start + Z.of_nat i + 1);[|omega].
+        rewrite KK.
+        destruct (busybits m (loop (start + Z.of_nat i + 1))).
+        simpl;tauto.
+        pose (EQSPEC:=Int.eq_spec (Int.repr 1) (Int.repr 0)).
+        rewrite BB in EQSPEC.
+        discriminate EQSPEC.
         pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
         pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
-      * forward. entailer!.
-                         admit.
-      * admit.
-    + forward. entailer!.
-                       admit.
+      * forward. entailer!. rename H7 into KEQ.
+        rewrite Int.signed_repr in KEQ.
+        destruct (Z.eq_dec key (keys m (loop (start + Z.of_nat i + 1)))) eqn:DE.
+        rewrite <- e in KEQ.
+        replace keyarg with (Int.repr key) in KEQ;[|get_repr key;tauto].
+        rewrite Int.eq_true in KEQ.
+        discriminate KEQ.
+        replace (key =? keys m (loop (start + Z.of_nat i + 1)))
+        with false;[|symmetry; apply Z.eqb_neq;assumption].
+        auto_logic.
+        pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
+    + forward. entailer!. rename H7 into BB.
+      rewrite Int.signed_repr in BB.
+      assert (busybits m (loop (start + Z.of_nat i + 1)) = false) as FS. {
+        destruct (busybits m (loop (start + Z.of_nat i + 1))).
+        - rewrite Int.eq_true in BB; discriminate BB.
+        - tauto.
+      }
+      rewrite FS.
+      simpl;tauto.
+      pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
     + forward_if (PROP((0 < i)%nat;
                        (andb (busybits m (loop (start + Z.of_nat i + 1)))
                             (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
                   LOCAL(`(eq vi) (eval_id _i);
                         `(eq vstart) (eval_id _start);
-                        `(eq vbb) (eval_id _busybits);
                         `(eq vkey) (eval_id _key);
+                        `(eq vbb) (eval_id _busybits);
                         `(eq vkeys) (eval_id _keys))
                   SEP(`(array_at tint sh (fun x =>
                                             (Vint (Int.repr (if (busybits m x)
@@ -560,17 +641,26 @@ Proof.
                                  0 100 vbb);
                       `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                  0 100 vkeys))).
-      * forward. entailer!.
+      * forward. entailer!. rename H7 into COND.
         unfold find_key.
         rewrite find_if_equation.
         replace (1 + start + Z.of_nat i)
         with (start + Z.of_nat i + 1);[|omega].
-        rewrite H6.
-        assert (i = 0)%nat by admit.
+        rewrite COND.
+        assert (0=i)%nat. {
+          apply repr0_is_0 with iarg.
+          - assumption.
+          - rewrite Int.eq_sym;assumption.
+        }
         subst i.
-        admit.
+        tauto.
       * forward. entailer!.
-                         admit.
+        assert (i<>0)%nat. {
+          apply repr_neq_0 with iarg.
+          - assumption.
+          - rewrite Int.eq_sym;assumption.
+        }
+        omega.
       * forward_call(sh, m, start, key, (i - 1)%nat, vbb, vkeys,
                      vstart, vkey, (Vint (Int.repr (Z.of_nat (i - 1))))). {
           entailer!. (* find_key(busybits, keys, start, key, i - 1) *)
@@ -590,7 +680,7 @@ Proof.
         }
         after_call.
         forward.
-        entailer!. rename H7 into COND, H8 into FIN.
+        entailer!. rename H8 into COND, H9 into FIN.
         unfold find_key.
         rewrite find_if_equation.
         replace (start + Z.of_nat i + 1)
