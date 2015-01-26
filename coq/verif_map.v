@@ -113,9 +113,9 @@ Definition find_key_spec :=
                                     (Vint (Int.repr (if (busybits m x)
                                                      then 1
                                                      else 0))))
-                         0 100) (eval_id _busybits);
+                         0 100 vbb);
               `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                         0 100) (eval_id _keys)).
+                         0 100 vkeys)).
 
 Definition get_spec :=
   DECLARE _get
@@ -147,11 +147,11 @@ Definition get_spec :=
                                      (Vint (Int.repr (if (busybits m x)
                                                       then 1
                                                       else 0))))
-                          0 100) (eval_id _busybits);
+                          0 100 vbb);
                `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                          0 100) (eval_id _keys);
+                          0 100 vkeys);
                `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
-                          0 100) (eval_id _values)).
+                          0 100 vvals)).
 
 Definition put_spec :=
   DECLARE _put
@@ -445,7 +445,7 @@ Proof.
         omega.
       * forward_call(sh, m, start, (i - 1)%nat, vbb, vstart,
                      (Vint (Int.repr (Z.of_nat (i - 1))))). {
-          entailer!. (* find_key(busybits, keys, start, key, i - 1) *)
+          entailer!. (* find_empty(busybits, start, i - 1) *)
           - replace (Vint sarg) with (vstart);assumption.
           - constructor.
             split.
@@ -473,3 +473,131 @@ Proof.
         assumption.
 Qed.
 
+
+Lemma body_find_key: semax_body Vprog Gprog f_find_key find_key_spec.
+Proof.
+  start_function.
+  name bbarg _busybits.
+  name ksarg _keys.
+  name sarg _start.
+  name keyarg _key.
+  name iarg _i.
+  name indexloc _index.
+  name bbloc _bb.
+  name kloc _k.
+  forward_call (sh,(start + Z.of_nat i + 1), (* loop(1 + start + i) *)
+                (Vint (Int.repr (start + Z.of_nat i + 1)))). {
+    entailer!. 
+    - constructor.
+      unfold_to_bare_Z.
+    - get_repr start.
+      get_repr i.
+      unfold_to_bare_Z.
+      apply f_equal;omega.
+  }
+  - auto with closed.
+  - after_call.
+    forward.
+    pose (Loop_bound (start + Z.of_nat i + 1)).
+    entailer!.
+    apply Loop_bound.
+    simpl;auto.
+    forward.
+    pose (Loop_bound (start + Z.of_nat i + 1)).
+    entailer!.
+    apply Loop_bound.
+    simpl;auto.
+    (* pose (vk := Vint (Int.repr (keys m (loop (start + Z.of_nat i + 1))))).*)
+    forward_if (PROP ((andb (busybits m (loop (start + Z.of_nat i + 1)))
+                            (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
+                LOCAL (`(eq vi) (eval_id _i);
+                       `(eq vstart) (eval_id _start);
+                       `(eq vbb) (eval_id _busybits);
+                       `(eq vkey) (eval_id _key);
+                       `(eq vkeys) (eval_id _keys))
+                SEP(`(array_at tint sh (fun x =>
+                                          (Vint (Int.repr (if (busybits m x)
+                                                           then 1
+                                                           else 0))))
+                               0 100 vbb);
+                    `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
+                               0 100 vkeys))).
+    + forward_if (PROP (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))) = false)
+                  LOCAL (`(eq vi) (eval_id _i);
+                         `(eq vstart) (eval_id _start);
+                         `(eq vbb) (eval_id _busybits);
+                         `(eq vkey) (eval_id _key);
+                         `(eq vkeys) (eval_id _keys))
+                  SEP(`(array_at tint sh (fun x =>
+                                            (Vint (Int.repr (if (busybits m x)
+                                                             then 1
+                                                             else 0))))
+                                 0 100 vbb);
+                      `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
+                                 0 100 vkeys))).
+      * forward. entailer!. rename H6 into KEQ, H7 into BB.
+        rewrite Int.signed_repr in KEQ, BB.
+        admit.
+        pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
+        pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
+      * forward. entailer!.
+                         admit.
+      * admit.
+    + forward. entailer!.
+                       admit.
+    + forward_if (PROP((0 < i)%nat;
+                       (andb (busybits m (loop (start + Z.of_nat i + 1)))
+                            (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
+                  LOCAL(`(eq vi) (eval_id _i);
+                        `(eq vstart) (eval_id _start);
+                        `(eq vbb) (eval_id _busybits);
+                        `(eq vkey) (eval_id _key);
+                        `(eq vkeys) (eval_id _keys))
+                  SEP(`(array_at tint sh (fun x =>
+                                            (Vint (Int.repr (if (busybits m x)
+                                                             then 1
+                                                             else 0))))
+                                 0 100 vbb);
+                      `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
+                                 0 100 vkeys))).
+      * forward. entailer!.
+        unfold find_key.
+        rewrite find_if_equation.
+        replace (1 + start + Z.of_nat i)
+        with (start + Z.of_nat i + 1);[|omega].
+        rewrite H6.
+        assert (i = 0)%nat by admit.
+        subst i.
+        admit.
+      * forward. entailer!.
+                         admit.
+      * forward_call(sh, m, start, key, (i - 1)%nat, vbb, vkeys,
+                     vstart, vkey, (Vint (Int.repr (Z.of_nat (i - 1))))). {
+          entailer!. (* find_key(busybits, keys, start, key, i - 1) *)
+          - replace (Vint sarg) with (vstart);assumption.
+          - replace (Vint keyarg) with (vkey);assumption.
+          - constructor.
+            split.
+            omega.
+            apply Nat2Z.inj_le.
+            rewrite Nat2Z.inj_sub;[|omega].
+            rewrite Z2Nat.id;[|unfold_int_limits;simpl;omega].
+            unfold_int_limits;simpl;omega.
+          - rewrite Nat2Z.inj_sub;omega.
+          - get_repr i.
+            rewrite sub_repr.
+            rewrite Nat2Z.inj_sub;[simpl;tauto|omega].
+        }
+        after_call.
+        forward.
+        entailer!. rename H7 into COND, H8 into FIN.
+        unfold find_key.
+        rewrite find_if_equation.
+        replace (start + Z.of_nat i + 1)
+        with (1 + start + Z.of_nat i) in COND;[|omega].
+        rewrite COND.
+        destruct i;[omega|].
+        unfold find_key in FIN.
+        replace (S i - 1)%nat with i in FIN;[|omega].
+        assumption.
+Qed.
