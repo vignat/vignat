@@ -285,8 +285,8 @@ Proof.
 Qed.
 
 Lemma int_if_false: forall expr:bool,
-                      Int.eq (Int.repr (if expr then 1 else 0))
-                             (Int.repr 0) = true ->
+                      Int.eq (Int.repr 0)
+                             (Int.repr (if expr then 1 else 0)) = true ->
                       expr = false.
 Proof.
   intros.
@@ -297,7 +297,7 @@ Proof.
 Qed.
 
 Lemma repr0_is_0 n i:
-  Nrepr n (Vint i) -> Int.eq i (Int.repr 0) = true -> (n = 0)%nat.
+  Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = true -> (0 = n)%nat.
 Proof.
   inversion 1. subst. intro A.
   symmetry in A. apply binop_lemmas.int_eq_true in A.
@@ -317,11 +317,11 @@ Qed.
 
 
 Lemma repr_neq_0 n i:
-  Nrepr n (Vint i) -> Int.eq i (Int.repr 0) = false -> (n <> 0)%nat.
+  Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = false -> (n <> 0)%nat.
 Proof.
   inversion 1. subst. intro A.
   SearchAbout Int.eq.
-  pose (B:=Int.eq_spec (Int.repr (Z.of_nat n)) (Int.repr 0)).
+  pose (B:=Int.eq_spec  (Int.repr 0) (Int.repr (Z.of_nat n))).
   rewrite A in B.
   destruct n.
   simpl in B.
@@ -368,6 +368,7 @@ Proof.
       }
       unfold_to_bare_Z.
 Qed.
+
 
 Lemma body_find_empty: semax_body Vprog Gprog f_find_empty find_empty_spec.
 Proof.
@@ -432,7 +433,7 @@ Proof.
       * forward. entailer!. rename H4 into BB.
         replace (start + Z.of_nat i + 1)
         with (1 + start + Z.of_nat i) in BB;[|omega].
-        assert (i=0)%nat by (apply repr0_is_0 with iarg;assumption).
+        assert (0=i)%nat by (apply repr0_is_0 with iarg;assumption).
         subst i.
         unfold find_empty.
         rewrite find_if_equation.

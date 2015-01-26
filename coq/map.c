@@ -9,11 +9,11 @@ int find_empty (int* busybits, int start, int i)
     int index = loop(1 + start + i);
     int bb = busybits[index];
 
-    if (bb == 0)
+    if (0 == bb)
     {
         return index;
     }
-    if (i == 0)
+    if (0 == i)
     {
         return -1;
     }
@@ -26,9 +26,12 @@ int find_key (int* busybits, int* keys, int start, int key, int i)
     int bb = busybits[index];
     int k = keys[index];
 
-    if (bb == 1 && k == key)
+    if (1 == bb)
     {
-        return index;
+        if (k == key)
+        {
+            return index;
+        }
     }
     if (i == 0)
     {

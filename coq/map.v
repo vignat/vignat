@@ -51,12 +51,12 @@ Definition ___builtin_fnmsub : ident := 30%positive.
 Definition ___builtin_ctz : ident := 23%positive.
 Definition _put : ident := 48%positive.
 Definition ___builtin_bswap32 : ident := 20%positive.
+Definition _start' : ident := 54%positive.
 Definition _index' : ident := 50%positive.
-Definition _start'1 : ident := 57%positive.
-Definition _index'3 : ident := 58%positive.
+Definition _index'3 : ident := 57%positive.
 Definition _index'1 : ident := 52%positive.
-Definition _index'2 : ident := 56%positive.
-Definition _start' : ident := 55%positive.
+Definition _start'1 : ident := 56%positive.
+Definition _index'2 : ident := 55%positive.
 
 
 Definition f_loop := {|
@@ -97,13 +97,13 @@ Definition f_find_empty := {|
         (Ebinop Oadd (Etempvar _busybits (tptr tint)) (Etempvar _index tint)
           (tptr tint)) tint))
     (Ssequence
-      (Sifthenelse (Ebinop Oeq (Etempvar _bb tint)
-                     (Econst_int (Int.repr 0) tint) tint)
+      (Sifthenelse (Ebinop Oeq (Econst_int (Int.repr 0) tint)
+                     (Etempvar _bb tint) tint)
         (Sreturn (Some (Etempvar _index tint)))
         Sskip)
       (Ssequence
-        (Sifthenelse (Ebinop Oeq (Etempvar _i tint)
-                       (Econst_int (Int.repr 0) tint) tint)
+        (Sifthenelse (Ebinop Oeq (Econst_int (Int.repr 0) tint)
+                       (Etempvar _i tint) tint)
           (Sreturn (Some (Eunop Oneg (Econst_int (Int.repr 1) tint) tint)))
           Sskip)
         (Ssequence
@@ -125,8 +125,7 @@ Definition f_find_key := {|
                 (_start, tint) :: (_key, tint) :: (_i, tint) :: nil);
   fn_vars := nil;
   fn_temps := ((_index, tint) :: (_bb, tint) :: (_k, tint) ::
-               (54%positive, tint) :: (53%positive, tint) ::
-               (_index'1, tint) :: nil);
+               (53%positive, tint) :: (_index'1, tint) :: nil);
   fn_body :=
 (Ssequence
   (Ssequence
@@ -147,26 +146,20 @@ Definition f_find_key := {|
           (Ebinop Oadd (Etempvar _keys (tptr tint)) (Etempvar _index tint)
             (tptr tint)) tint))
       (Ssequence
-        (Ssequence
-          (Sifthenelse (Ebinop Oeq (Etempvar _bb tint)
-                         (Econst_int (Int.repr 1) tint) tint)
-            (Ssequence
-              (Sset 53%positive
-                (Ecast
-                  (Ebinop Oeq (Etempvar _k tint) (Etempvar _key tint) tint)
-                  tbool))
-              (Sset 53%positive (Ecast (Etempvar 53%positive tbool) tint)))
-            (Sset 53%positive (Econst_int (Int.repr 0) tint)))
-          (Sifthenelse (Etempvar 53%positive tint)
+        (Sifthenelse (Ebinop Oeq (Econst_int (Int.repr 1) tint)
+                       (Etempvar _bb tint) tint)
+          (Sifthenelse (Ebinop Oeq (Etempvar _k tint) (Etempvar _key tint)
+                         tint)
             (Sreturn (Some (Etempvar _index tint)))
-            Sskip))
+            Sskip)
+          Sskip)
         (Ssequence
           (Sifthenelse (Ebinop Oeq (Etempvar _i tint)
                          (Econst_int (Int.repr 0) tint) tint)
             (Sreturn (Some (Eunop Oneg (Econst_int (Int.repr 1) tint) tint)))
             Sskip)
           (Ssequence
-            (Scall (Some 54%positive)
+            (Scall (Some 53%positive)
               (Evar _find_key (Tfunction
                                 (Tcons (tptr tint)
                                   (Tcons (tptr tint)
@@ -178,7 +171,7 @@ Definition f_find_key := {|
                (Etempvar _key tint) ::
                (Ebinop Osub (Etempvar _i tint) (Econst_int (Int.repr 1) tint)
                  tint) :: nil))
-            (Sreturn (Some (Etempvar 54%positive tint)))))))))
+            (Sreturn (Some (Etempvar 53%positive tint)))))))))
 |}.
 
 Definition f_get := {|
