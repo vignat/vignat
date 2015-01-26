@@ -342,7 +342,7 @@ Proof.
       rewrite Zmod_small;omega.
 Qed.
 
-Lemma repr0_is_0 n i:
+Lemma Nrepr0_is_0 n i:
   Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = true -> (0 = n)%nat.
 Proof.
   inversion 1. subst. intro A.
@@ -362,7 +362,7 @@ Proof.
 Qed.
 
 
-Lemma repr_neq_0 n i:
+Lemma Nrepr_neq_0 n i:
   Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = false -> (n <> 0)%nat.
 Proof.
   inversion 1. subst. intro A.
@@ -478,7 +478,7 @@ Proof.
       * forward. entailer!. rename H4 into BB.
         replace (start + Z.of_nat i + 1)
         with (1 + start + Z.of_nat i) in BB;[|omega].
-        assert (0=i)%nat by (apply repr0_is_0 with iarg;assumption).
+        assert (0=i)%nat by (apply Nrepr0_is_0 with iarg;assumption).
         subst i.
         unfold find_empty.
         rewrite find_if_equation.
@@ -486,7 +486,7 @@ Proof.
         auto_logic.
       * forward.
         entailer!.
-        assert (i<>0)%nat by (apply repr_neq_0 with iarg;assumption).
+        assert (i<>0)%nat by (apply Nrepr_neq_0 with iarg;assumption).
         omega.
       * forward_call(sh, m, start, (i - 1)%nat, vbb, vstart,
                      (Vint (Int.repr (Z.of_nat (i - 1))))). {
@@ -648,7 +648,7 @@ Proof.
         with (start + Z.of_nat i + 1);[|omega].
         rewrite COND.
         assert (0=i)%nat. {
-          apply repr0_is_0 with iarg.
+          apply Nrepr0_is_0 with iarg.
           - assumption.
           - rewrite Int.eq_sym;assumption.
         }
@@ -656,7 +656,7 @@ Proof.
         tauto.
       * forward. entailer!.
         assert (i<>0)%nat. {
-          apply repr_neq_0 with iarg.
+          apply Nrepr_neq_0 with iarg.
           - assumption.
           - rewrite Int.eq_sym;assumption.
         }
@@ -690,4 +690,102 @@ Proof.
         unfold find_key in FIN.
         replace (S i - 1)%nat with i in FIN;[|omega].
         assumption.
+Qed.
+
+Lemma body_get: semax_body Vprog Gprog f_get get_spec.
+Proof.
+  start_function.
+  name bbarg _busybits.
+  name ksarg _keys.
+  name valsarg _values.
+  name karg _key.
+  name startloc _start.
+  name indexloc _index.
+  forward_call(sh, key, vkey). {
+    entailer!.
+    rewrite <- H5;assumption.
+  }
+  auto with closed.
+  after_call.
+  forward_call(sh, m, loop key, key, 99%nat, vbb, vkeys,
+                     Vint (Int.repr (loop key)), vkey, (Vint (Int.repr 99))). {
+    pose (Loop_bound key).
+    entailer!.
+    - constructor; unfold_to_bare_Z.
+    - rewrite <- H5;assumption.
+    - constructor.
+      split;[omega|].
+      rewrite Nat2Z.inj_le.
+      rewrite Z2Nat.id.
+      unfold_to_bare_Z.
+      unfold_to_bare_Z.
+  }
+  auto with closed.
+  after_call.
+  pose (vindex:=Vint (Int.repr (match find_key m (loop key) key 99 with
+                                  |Some x => x
+                                  |None => -1
+                                end))).
+  forward_if (PROP(None <> (find_key m (loop key) key 99))
+                  LOCAL(`(eq vindex) (eval_id _index);
+                        `(eq vbb) (eval_id _busybits);
+                        `(eq vkeys) (eval_id _keys);
+                        `(eq vvals) (eval_id _values))
+                  SEP(`(array_at tint sh (fun x =>
+                                            (Vint (Int.repr (if (busybits m x)
+                                                             then 1
+                                                             else 0))))
+                                 0 100 vbb);
+                      `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
+                                 0 100 vkeys);
+                      `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
+                                 0 100 vvals))).
+  - forward. entailer!. rename H4 into IEQ, H5 into FIN.
+    assert (indexloc = (Int.repr (-1))) as ILOC. {
+      apply int_eq_e in IEQ.
+      SearchAbout Int.neg.
+      replace (-1) with (- (1));[|omega].
+      rewrite <- Int.neg_repr.
+      symmetry;assumption.
+    }
+    rewrite ILOC in FIN.
+    assert (BND:=amFindKeyBound m key (loop key) 99).
+    destruct (find_key m (loop key) key 99) eqn:FK.
+    + injection FIN as ZEQ.
+      replace 4294967295 with (Int.Z_mod_modulus (-1)) in ZEQ.
+      rewrite int_modulus_eq in ZEQ.
+      omega.
+      unfold_to_bare_Z.
+      unfold_to_bare_Z.
+      rewrite Int.Z_mod_modulus_eq.
+      replace (-1 mod Int.modulus)
+      with ((-1 + 1*Int.modulus) mod Int.modulus);[|apply Z_mod_plus_full].
+      rewrite Zmod_small;unfold_to_bare_Z.
+    + unfold amGet.
+      rewrite FK.
+      auto.
+  - forward. entailer!. rename H4 into IEQ, H5 into FIN.
+    + destruct (find_key m (loop key) key 99).
+      * discriminate.
+      * replace (Int.neg (Int.repr 1)) with (Int.repr (-1)) in IEQ;[|auto].
+        injection FIN as FIN'.
+        rewrite FIN' in IEQ.
+        rewrite Int.eq_true in IEQ.
+        discriminate.
+    + destruct (find_key m (loop key) key 99);subst vindex;assumption.
+  - forward. assert (BND:=amFindKeyBound m key (loop key) 99).
+    entailer!. rename H4 into FK.
+    + destruct (find_key m (loop key) key 99).
+      * rewrite Int.signed_repr;unfold_to_bare_Z.
+      * tauto.
+    + destruct (find_key m (loop key) key 99).
+      * rewrite Int.signed_repr;unfold_to_bare_Z.
+      * tauto.
+    + simpl;auto.
+    + forward. entailer!. rename H4 into FK.
+      unfold amGet.
+      assert (BND:=amFindKeyBound m key (loop key) 99).
+      destruct (find_key m (loop key) key 99).
+      * rewrite Int.signed_repr;[tauto|unfold_to_bare_Z].
+      * tauto.
 Qed.
