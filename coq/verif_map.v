@@ -217,16 +217,14 @@ Ltac unfold_int_limits :=
 
 Ltac unfold_to_bare_Z :=
   unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith;
-  simpl;
-  unfold both_int, sem_cast_neutral;
-  simpl;
-  unfold Int.mods;
+  unfold both_int, sem_cast_neutral, Int.mods, force_val; simpl;
   repeat rewrite Int.signed_repr;
-  try (unfold_int_limits; simpl; omega);
   repeat rewrite add_repr;
   repeat rewrite sem_add_pi_ptr;
-  repeat unfold force_val;
-  repeat rewrite mul_repr.
+  repeat rewrite mul_repr;
+  simpl;
+  try (unfold_int_limits; simpl; omega);
+  try tauto.
 
 Ltac auto_logic :=
   repeat rewrite andb_false_r; repeat rewrite andb_false_l; simpl; auto.
@@ -375,6 +373,22 @@ Proof.
   auto.
 Qed.
 
+Lemma rem_bound: forall a b, b > 0 -> -b < Z.rem a b < b.
+Proof.
+  intros.
+  assert (Z.abs (Z.rem a b) < Z.abs b) as ABS
+    by (apply Z.rem_bound_abs;omega).
+  unfold Z.abs in ABS.
+  destruct b;[omega| |pose (Zlt_neg_0 p);omega].
+  destruct (Z.rem a (Z.pos p)).
+  - omega.
+  - pose (Zgt_pos_0 p0); omega.
+  - pose (Zgt_pos_0 p0).
+    replace (Z.neg p0) with (- Z.pos p0);[|apply Pos2Z.opp_pos].
+    omega.
+Qed.
+
+
 (* Proofs for spec-body correspondence *)
 Lemma body_loop: semax_body Vprog Gprog f_loop loop_spec.
 Proof.
@@ -392,27 +406,21 @@ Proof.
   - unfold_to_bare_Z.
     rewrite neq_100_mone.
     auto_logic.
+    unfold_to_bare_Z.
+    auto_logic.
   - unfold_to_bare_Z.
     rewrite neq_100_mone.
     auto_logic.
     unfold_to_bare_Z.
-    unfold_to_bare_Z.
+    auto_logic.
     unfold loop.
     get_repr k.
-    + tauto.
-    + assert (-100 <= Z.rem (Int.signed karg) 100 <= 100). {
-        assert (Z.abs (Z.rem (Int.signed karg) 100) < Z.abs 100)
-          by (apply Z.rem_bound_abs;omega).
-        unfold Z.abs in H0.
-        destruct (Z.rem (Int.signed karg) 100).
-        - omega.
-        - pose (Zgt_pos_0 p); omega.
-        - pose (Zgt_pos_0 p).
-          SearchAbout Z.pos.
-          replace (Z.neg p) with (- Z.pos p);[|apply Pos2Z.opp_pos].
-          omega.
-      }
+    unfold_to_bare_Z.
+    + repr_bound k.
+    + assert (- (100) < Z.rem k 100 < 100)
+        by (apply rem_bound;omega).
       unfold_to_bare_Z.
+    + repr_bound k.
 Qed.
 
 Lemma body_find_empty: semax_body Vprog Gprog f_find_empty find_empty_spec.
@@ -430,8 +438,8 @@ Proof.
       unfold_to_bare_Z.
     - get_repr start.
       get_repr i.
+      replace (start + Z.of_nat i + 1) with (1 + start + Z.of_nat i);[|omega].
       unfold_to_bare_Z.
-      apply f_equal;omega.
   }
   - auto with closed.
   - after_call.
@@ -536,8 +544,9 @@ Proof.
       unfold_to_bare_Z.
     - get_repr start.
       get_repr i.
+      replace (start + Z.of_nat i + 1)
+        with (1 + start + Z.of_nat i);[|omega].
       unfold_to_bare_Z.
-      apply f_equal;omega.
   }
   - auto with closed.
   - after_call.
@@ -551,7 +560,6 @@ Proof.
     entailer!.
     apply Loop_bound.
     simpl;auto.
-    (* pose (vk := Vint (Int.repr (keys m (loop (start + Z.of_nat i + 1))))).*)
     forward_if (PROP ((andb (busybits m (loop (start + Z.of_nat i + 1)))
                             (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
                 LOCAL (`(eq vi) (eval_id _i);
@@ -581,51 +589,45 @@ Proof.
                       `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                  0 100 vkeys))).
       * forward. entailer!. rename H7 into KEQ, H8 into BB, H6 into KEYSBOUND.
-        rewrite Int.signed_repr in KEQ, BB.
-
+        pose (Loop_bound (start + Z.of_nat i + 1)).
+        rewrite Int.signed_repr in KEQ, BB;[|unfold_to_bare_Z|unfold_to_bare_Z].
         unfold find_key; rewrite find_if_equation.
-        assert ((key =? keys m (loop (start + Z.of_nat i + 1))) = true) as KK.
-        apply int_eq_e in KEQ.
-        assert (keyarg = (Int.repr key)) as KREP by (get_repr key;tauto).
-        rewrite KREP in KEQ.
-        injection KEQ.
-        rewrite int_modulus_eq.
-        intro KEQK.
-        rewrite KEQK.
-        apply Z.eqb_eq;tauto.
-        apply KEYSBOUND.
-        repr_bound key.
+        assert ((key =? keys m (loop (start + Z.of_nat i + 1))) = true) as KK. {
+          apply int_eq_e in KEQ.
+          replace keyarg with (Int.repr key) in KEQ;[|(get_repr key;tauto)].
+          injection KEQ.
+          rewrite int_modulus_eq;[|apply KEYSBOUND|repr_bound key].
+          intro KEQK;rewrite KEQK.
+          apply Z.eqb_eq;tauto.
+        }
         replace (1 + start + Z.of_nat i)
         with (start + Z.of_nat i + 1);[|omega].
         rewrite KK.
-        destruct (busybits m (loop (start + Z.of_nat i + 1))).
-        simpl;tauto.
+        destruct (busybits m (loop (start + Z.of_nat i + 1)));[simpl;tauto|].
         pose (EQSPEC:=Int.eq_spec (Int.repr 1) (Int.repr 0)).
         rewrite BB in EQSPEC.
         discriminate EQSPEC.
-        pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
-        pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
       * forward. entailer!. rename H7 into KEQ.
-        rewrite Int.signed_repr in KEQ.
-        destruct (Z.eq_dec key (keys m (loop (start + Z.of_nat i + 1)))) eqn:DE.
-        rewrite <- e in KEQ.
+        pose (Loop_bound (start + Z.of_nat i + 1)).
+        rewrite Int.signed_repr in KEQ;[|unfold_to_bare_Z].
         replace keyarg with (Int.repr key) in KEQ;[|get_repr key;tauto].
-        rewrite Int.eq_true in KEQ.
-        discriminate KEQ.
-        replace (key =? keys m (loop (start + Z.of_nat i + 1)))
-        with false;[|symmetry; apply Z.eqb_neq;assumption].
-        auto_logic.
-        pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
+        { destruct (Z.eq_dec key (keys m (loop (start + Z.of_nat i + 1)))).
+          - rewrite <- e in KEQ.
+            rewrite Int.eq_true in KEQ.
+            discriminate KEQ.
+          - replace (key =? keys m (loop (start + Z.of_nat i + 1)))
+            with false;[|symmetry; apply Z.eqb_neq;assumption].
+            auto_logic.
+        }
     + forward. entailer!. rename H7 into BB.
-      rewrite Int.signed_repr in BB.
-      assert (busybits m (loop (start + Z.of_nat i + 1)) = false) as FS. {
-        destruct (busybits m (loop (start + Z.of_nat i + 1))).
-        - rewrite Int.eq_true in BB; discriminate BB.
-        - tauto.
+      pose (Loop_bound (start + Z.of_nat i + 1)).
+      rewrite Int.signed_repr in BB;[|unfold_to_bare_Z].
+      { replace (busybits m (loop (start + Z.of_nat i + 1))) with (false).
+        - simpl;tauto.
+        - destruct (busybits m (loop (start + Z.of_nat i + 1))).
+          + rewrite Int.eq_true in BB; discriminate BB.
+          + tauto.
       }
-      rewrite FS.
-      simpl;tauto.
-      pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
     + forward_if (PROP((0 < i)%nat;
                        (andb (busybits m (loop (start + Z.of_nat i + 1)))
                             (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
@@ -642,8 +644,7 @@ Proof.
                       `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                  0 100 vkeys))).
       * forward. entailer!. rename H7 into COND.
-        unfold find_key.
-        rewrite find_if_equation.
+        unfold find_key; rewrite find_if_equation.
         replace (1 + start + Z.of_nat i)
         with (start + Z.of_nat i + 1);[|omega].
         rewrite COND.
@@ -879,15 +880,11 @@ Proof.
       assert (BND:=amFindEmptyBound m (loop key) 99).
       destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
       entailer!.
-      unfold force_signed_int, force_int.
-      rewrite Int.signed_repr.
-      rewrite <- H6.
-      rewrite sem_add_pi_ptr.
-      * unfold force_val.
+      * unfold_to_bare_Z.
+        rewrite <- H6.
+        rewrite sem_add_pi_ptr;[|assumption].
         rewrite mul_repr.
         tauto.
-      * assumption.
-      * unfold_to_bare_Z.
       * unfold_to_bare_Z.
       * unfold_to_bare_Z.
     }
@@ -897,19 +894,14 @@ Proof.
       assert (BND:=amFindEmptyBound m (loop key) 99).
       destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
       entailer!.
-      unfold force_signed_int, force_int.
-      rewrite Int.signed_repr.
-      rewrite <- H6.
-      rewrite sem_add_pi_ptr.
-      * unfold force_val.
+      * unfold_to_bare_Z.
+        rewrite <- H6.
+        rewrite sem_add_pi_ptr;[|assumption].
         rewrite mul_repr.
         tauto.
-      * assumption.
       * unfold_to_bare_Z.
       * unfold_to_bare_Z.
-      * unfold_to_bare_Z.
-      * get_repr key.
-        unfold_to_bare_Z;tauto.
+      * get_repr key;unfold_to_bare_Z.
     }
     forward. {
       instantiate (2:=force_signed_int(vindex)).
@@ -917,55 +909,30 @@ Proof.
       assert (BND:=amFindEmptyBound m (loop key) 99).
       destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
       entailer!.
-      unfold force_signed_int, force_int.
-      rewrite Int.signed_repr.
-      rewrite <- H6.
-      rewrite sem_add_pi_ptr.
-      * unfold force_val.
+      * unfold_to_bare_Z.
+        rewrite <- H6.
+        rewrite sem_add_pi_ptr;[|assumption].
         rewrite mul_repr.
         tauto.
-      * assumption.
       * unfold_to_bare_Z.
       * unfold_to_bare_Z.
-      * unfold_to_bare_Z.
-      * get_repr val.
-        unfold_to_bare_Z;tauto.
+      * get_repr val;unfold_to_bare_Z.
     }
     forward.
     assert (BND:=amFindEmptyBound m (loop key) 99).
     destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
-    assert (amPut m key val =
-            Some {|values:= (fun (i:Z) =>
-                               if (Z.eq_dec i z)
-                               then val
-                               else values m i);
-                   keys:= (fun (i:Z) =>
-                             if (Z.eq_dec i z)
-                             then key
-                             else keys m i);
-                   busybits:= (fun (i:Z) =>
-                                 if (Z.eq_dec i z)
-                                 then true
-                                 else busybits m i) |}) as PUT. {
-      unfold amPut.
-      rewrite FE.
-      tauto.
-    }
+
     pose (ret := {|
                   values := fun i : Z => if Z.eq_dec i z then val else values m i;
                   keys := fun i : Z => if Z.eq_dec i z then key else keys m i;
                   busybits := fun i : Z =>
                                 if Z.eq_dec i z then true else busybits m i |}).
-    assert ((upd (fun x : Z => Vint (Int.repr (if busybits m x then 1 else 0))) z
-                 (Vint (Int.repr 1))) = 
+    assert ((upd (fun x : Z => Vint (Int.repr (if busybits m x then 1 else 0)))
+                 z (Vint (Int.repr 1))) = 
             (fun x : Z =>
-               Vint (Int.repr (if busybits ret x then 1 else 0)))). {
-      unfold upd.
-      unfold ret.
-      apply functional_extensionality.
-      intro.
-      simpl.
-      unfold initial_world.EqDec_Z, zeq.
+               Vint (Int.repr (if busybits ret x then 1 else 0)))) as BBEQ. {
+      unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
+      unfold initial_world.EqDec_Z, zeq;
       destruct (Z.eq_dec z x), (Z.eq_dec x z).
       - tauto.
       - subst z.
@@ -975,14 +942,9 @@ Proof.
     }
     assert ((upd (fun x : Z => Vint (Int.repr (keys m x))) z
                  (Vint (Int.repr key))) = 
-            (fun x : Z =>
-               Vint (Int.repr (keys ret x)))). {
-      unfold upd.
-      unfold ret.
-      apply functional_extensionality.
-      intro.
-      simpl.
-      unfold initial_world.EqDec_Z, zeq.
+            (fun x : Z => Vint (Int.repr (keys ret x)))) as KEYSEQ. {
+      unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
+      unfold initial_world.EqDec_Z, zeq;
       destruct (Z.eq_dec z x), (Z.eq_dec x z).
       - tauto.
       - rewrite e in n;tauto.
@@ -991,25 +953,21 @@ Proof.
     }
     assert ((upd (fun x : Z => Vint (Int.repr (values m x))) z
                  (Vint (Int.repr val))) = 
-            (fun x : Z =>
-               Vint (Int.repr (values ret x)))). {
-      unfold upd.
-      unfold ret.
-      apply functional_extensionality.
-      intro.
-      simpl.
-      unfold initial_world.EqDec_Z, zeq.
+            (fun x : Z => Vint (Int.repr (values ret x)))) as VALSEQ. {
+      unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
+      unfold initial_world.EqDec_Z, zeq;
       destruct (Z.eq_dec z x), (Z.eq_dec x z).
       - tauto.
       - rewrite e in n;tauto.
       - rewrite e in n;tauto.
       - tauto.
     }
-    rewrite PUT.
+    unfold amPut.
+    rewrite FE.
     subst ret.
-    rewrite <- H7.
-    rewrite <- H8.
-    rewrite <- H9.
+    rewrite <- BBEQ.
+    rewrite <- KEYSEQ.
+    rewrite <- VALSEQ.
     rewrite Int.signed_repr;[|unfold_to_bare_Z].
     entailer!.
 Qed.
