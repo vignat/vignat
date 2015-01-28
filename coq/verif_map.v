@@ -183,10 +183,10 @@ Definition put_spec :=
                                            (fun x => (Vint (Int.repr
                                                               (if (busybits ret x)
                                                                then 1 else 0))))
-                                           0 100 vbb) &&
+                                           0 100 vbb) *
                                  `(array_at tint sh
                                            (fun x => (Vint (Int.repr (keys ret x))))
-                                           0 100 vkeys) &&
+                                           0 100 vkeys) *
                                  `(array_at tint sh
                                            (fun x => (Vint (Int.repr (values ret x))))
                                            0 100 vvals))
@@ -788,4 +788,243 @@ Proof.
       destruct (find_key m (loop key) key 99).
       * rewrite Int.signed_repr;[tauto|unfold_to_bare_Z].
       * tauto.
+Qed.
+
+Lemma body_put: semax_body Vprog Gprog f_put put_spec.
+Proof.
+  start_function.
+  name bbarg _busybits.
+  name ksarg _keys.
+  name valsarg _values.
+  name karg _key.
+  name varg _value.
+  name startloc _start.
+  name indexloc _index.
+  forward_call(sh, key, vkey). {
+    entailer!.
+    rewrite <- H6;assumption.
+  }
+  auto with closed.
+  after_call.
+  forward_call(sh, m, loop key, 99%nat, vbb,
+                     Vint (Int.repr (loop key)), (Vint (Int.repr 99))). {
+    pose (Loop_bound key).
+    entailer!.
+    - constructor; unfold_to_bare_Z.
+    - constructor.
+      split;[omega|].
+      rewrite Nat2Z.inj_le.
+      rewrite Z2Nat.id.
+      unfold_to_bare_Z.
+      unfold_to_bare_Z.
+  }
+  auto with closed.
+  after_call.
+  pose (vindex:=Vint (Int.repr (match find_empty m (loop key) 99 with
+                                  |Some x => x
+                                  |None => -1
+                                end))).
+  forward_if (PROP(None <> (find_empty m (loop key) 99))
+                  LOCAL(`(eq vindex) (eval_id _index);
+                        `(eq vkey) (eval_id _key);
+                        `(eq vval) (eval_id _value);
+                        `(eq vbb) (eval_id _busybits);
+                        `(eq vkeys) (eval_id _keys);
+                        `(eq vvals) (eval_id _values))
+                  SEP(`(array_at tint sh (fun x =>
+                                            (Vint (Int.repr (if (busybits m x)
+                                                             then 1
+                                                             else 0))))
+                                 0 100 vbb);
+                      `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
+                                 0 100 vkeys);
+                      `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
+                                 0 100 vvals))).
+  - forward. entailer!. rename H6 into IEQ, H7 into FIN.
+    assert (indexloc = (Int.repr (-1))) as ILOC. {
+      apply int_eq_e in IEQ.
+      SearchAbout Int.neg.
+      replace (-1) with (- (1));[|omega].
+      rewrite <- Int.neg_repr.
+      symmetry;assumption.
+    }
+    rewrite ILOC in FIN.
+    assert (BND:=amFindEmptyBound m (loop key) 99).
+    destruct (find_empty m (loop key) 99) eqn:FK.
+    + injection FIN as ZEQ.
+      replace 4294967295 with (Int.Z_mod_modulus (-1)) in ZEQ.
+      rewrite int_modulus_eq in ZEQ.
+      omega.
+      unfold_to_bare_Z.
+      unfold_to_bare_Z.
+      rewrite Int.Z_mod_modulus_eq.
+      replace (-1 mod Int.modulus)
+      with ((-1 + 1*Int.modulus) mod Int.modulus);[|apply Z_mod_plus_full].
+      rewrite Zmod_small;unfold_to_bare_Z.
+    + unfold amPut.
+      rewrite FK.
+      entailer.
+  - forward. entailer!. rename H5 into IEQ, H6 into FIN.
+    + destruct (find_empty m (loop key) 99).
+      * discriminate.
+      * replace (Int.neg (Int.repr 1)) with (Int.repr (-1)) in IEQ;[|auto].
+        injection FIN as FIN'.
+        rewrite FIN' in IEQ.
+        rewrite Int.eq_true in IEQ.
+        discriminate.
+    + destruct (find_empty m (loop key) 99);subst vindex;assumption.
+  - forward. {
+      instantiate (2:=force_signed_int(vindex)).
+      instantiate (1:=Vint (Int.repr 1)). 
+      assert (BND:=amFindEmptyBound m (loop key) 99).
+      destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
+      entailer!.
+      unfold force_signed_int, force_int.
+      rewrite Int.signed_repr.
+      rewrite <- H6.
+      rewrite sem_add_pi_ptr.
+      * unfold force_val.
+        rewrite mul_repr.
+        tauto.
+      * assumption.
+      * unfold_to_bare_Z.
+      * unfold_to_bare_Z.
+      * unfold_to_bare_Z.
+    }
+    forward. {
+      instantiate (2:=force_signed_int(vindex)).
+      instantiate (1:=Vint (Int.repr key)).
+      assert (BND:=amFindEmptyBound m (loop key) 99).
+      destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
+      entailer!.
+      unfold force_signed_int, force_int.
+      rewrite Int.signed_repr.
+      rewrite <- H6.
+      rewrite sem_add_pi_ptr.
+      * unfold force_val.
+        rewrite mul_repr.
+        tauto.
+      * assumption.
+      * unfold_to_bare_Z.
+      * unfold_to_bare_Z.
+      * unfold_to_bare_Z.
+      * get_repr key.
+        unfold_to_bare_Z;tauto.
+    }
+    forward. {
+      instantiate (2:=force_signed_int(vindex)).
+      instantiate (1:=Vint (Int.repr val)).
+      assert (BND:=amFindEmptyBound m (loop key) 99).
+      destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
+      entailer!.
+      unfold force_signed_int, force_int.
+      rewrite Int.signed_repr.
+      rewrite <- H6.
+      rewrite sem_add_pi_ptr.
+      * unfold force_val.
+        rewrite mul_repr.
+        tauto.
+      * assumption.
+      * unfold_to_bare_Z.
+      * unfold_to_bare_Z.
+      * unfold_to_bare_Z.
+      * get_repr val.
+        unfold_to_bare_Z;tauto.
+    }
+    forward.
+    assert (BND:=amFindEmptyBound m (loop key) 99).
+    destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
+    assert (amPut m key val =
+            Some {|values:= (fun (i:Z) =>
+                               if (Z.eq_dec i z)
+                               then val
+                               else values m i);
+                   keys:= (fun (i:Z) =>
+                             if (Z.eq_dec i z)
+                             then key
+                             else keys m i);
+                   busybits:= (fun (i:Z) =>
+                                 if (Z.eq_dec i z)
+                                 then true
+                                 else busybits m i) |}) as PUT. {
+      unfold amPut.
+      rewrite FE.
+      tauto.
+    }
+    pose (ret := {|
+                  values := fun i : Z => if Z.eq_dec i z then val else values m i;
+                  keys := fun i : Z => if Z.eq_dec i z then key else keys m i;
+                  busybits := fun i : Z =>
+                                if Z.eq_dec i z then true else busybits m i |}).
+    assert ((upd (fun x : Z => Vint (Int.repr (if busybits m x then 1 else 0))) z
+                 (Vint (Int.repr 1))) = 
+            (fun x : Z =>
+               Vint (Int.repr (if busybits ret x then 1 else 0)))). {
+      unfold upd.
+      unfold ret.
+      apply functional_extensionality.
+      intro.
+      simpl.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z).
+      - tauto.
+      - subst z.
+        tauto.
+      - subst z;tauto.
+      - tauto.
+    }
+    assert ((upd (fun x : Z => Vint (Int.repr (keys m x))) z
+                 (Vint (Int.repr key))) = 
+            (fun x : Z =>
+               Vint (Int.repr (keys ret x)))). {
+      unfold upd.
+      unfold ret.
+      apply functional_extensionality.
+      intro.
+      simpl.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z).
+      - tauto.
+      - rewrite e in n;tauto.
+      - rewrite e in n;tauto.
+      - tauto.
+    }
+    assert ((upd (fun x : Z => Vint (Int.repr (values m x))) z
+                 (Vint (Int.repr val))) = 
+            (fun x : Z =>
+               Vint (Int.repr (values ret x)))). {
+      unfold upd.
+      unfold ret.
+      apply functional_extensionality.
+      intro.
+      simpl.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z).
+      - tauto.
+      - rewrite e in n;tauto.
+      - rewrite e in n;tauto.
+      - tauto.
+    }
+    rewrite PUT.
+    subst ret.
+    rewrite <- H7.
+    rewrite <- H8.
+    rewrite <- H9.
+    rewrite Int.signed_repr;[|unfold_to_bare_Z].
+    entailer!.
+Qed.
+
+Existing Instance NullExtension.Espec.
+
+Theorem all_funcs_correct:
+  semax_func Vprog Gprog (prog_funct prog) Gprog.
+Proof.
+unfold Gprog, prog, prog_funct; simpl.
+semax_func_skipn.
+semax_func_cons body_loop.
+semax_func_cons body_find_empty.
+semax_func_cons body_find_key.
+semax_func_cons body_get.
+semax_func_cons body_put.
+apply semax_func_nil.
 Qed.
