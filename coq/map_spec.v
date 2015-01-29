@@ -10,62 +10,8 @@ Require Import FunctionalExtensionality.
 
 Local Open Scope Z.
 
-Record ClosureMapZ := mk_map {
-                   contents: Z->option Z;
-                   size: Z
-                 }.
-
-Function mGet (m : ClosureMapZ) (k : Z) : option Z :=
-  (contents m) k.
-
-
-Function mPut (m : ClosureMapZ) (k : Z) (v : Z) : ClosureMapZ := 
-  {| contents := (fun (x:Z) => if (Z.eq_dec x k)
-                               then Some v
-                               else (contents m) x);
-     size := (match mGet m k with
-                | Some _ => (size m)
-                | None => (size m) + 1
-              end) |}.
-
-Lemma mGetPut1: forall m k v, mGet (mPut m k v) k = Some v.
-Proof.
-  intros.
-  unfold mGet, mPut.
-  simpl.
-  destruct Z.eq_dec;tauto.  
-Qed.
-
-Lemma mGetPut2: forall m k1 k2 v, k1 <> k2 -> mGet (mPut m k1 v) k2 = mGet m k2.
-Proof.
-  intros.
-  unfold mGet, mPut.
-  simpl.
-  destruct Z.eq_dec;[rewrite e in H|];tauto.
-Qed.
-
-Lemma mPutOld: forall m k v, mGet m k = None -> size (mPut m k v) = size m + 1.
-Proof.
-  intros.
-  unfold mPut.
-  simpl.
-  rewrite H.
-  tauto.
-Qed.
-
-Lemma mPutNew: forall m k v x, mGet m k = Some x -> size (mPut m k v) = size m.
-Proof.
-  intros.
-  unfold mPut.
-  simpl.
-  rewrite H.
-  tauto.
-Qed.
-
 Function loop (k:Z): Z :=
   Z.rem ((Z.rem k 100) + 100) 100.
-
-Definition Bound := 100.
 
 Record ArrMapZ := mk_lmap {
                       values : Z->Z;
@@ -118,10 +64,16 @@ Function amPut (map : ArrMapZ) (key : Z) (val : Z) : option ArrMapZ :=
     |None => None
   end.
 
-(*
-Definition full (m : ArrMapZ) :=
-  forall i, 0 <= i < 100 -> is_true (busybits m i).
-*)
+Function amErase (map : ArrMapZ) (key : Z) : option ArrMapZ :=
+  match find_key map (loop key) key 99 with
+    |Some index => Some {|values:= values map;
+                          keys:= keys map;
+                          busybits:= (fun (i:Z) =>
+                                        if (Z.eq_dec i index)
+                                        then false
+                                        else busybits map i) |}
+    |None => None
+  end.
 
 Definition full (m : ArrMapZ):Prop :=
   forall k, is_true (busybits m (loop k)).
@@ -129,6 +81,16 @@ Definition full (m : ArrMapZ):Prop :=
 Definition contains (m : ArrMapZ) (k : Z) :=
   exists x, 0 <= x < 100 /\ is_true (busybits m x) /\ keys m x = k.
 
+Definition contains_single (m : ArrMapZ) (k : Z) :=
+  contains m k /\ forall x y, 0 <= x < 100 -> 0 <= y < 100 ->
+                              is_true(busybits m x) ->
+                              is_true(busybits m y) ->
+                              keys m x = k ->
+                              keys m y = k ->
+                              y = x.
+(*  exists x, 0 <= x < 100 /\ is_true (busybits m x) /\ keys m x = k /\
+            (forall y, is_true (busybits m y) -> keys m y = k -> y = x).
+*)
 
 Lemma not_forall_exists: forall A, forall P:A->Prop,
                            ~ (forall x:A, P x) -> exists x:A, ~ P x.
@@ -634,13 +596,12 @@ Lemma amFindEmptyCorrect: forall m s i, match (find_empty m s i) with
                                         end.
 Proof.
   intros.
-  destruct (find_empty m s i) eqn: Heqfe.
+  destruct (find_empty m s i) eqn: Heqfe;[|tauto].
   unfold find_empty in Heqfe.
-  - pose (amFindIfCorrect
-            (fun k : Z => negb (busybits m k)) s i) as FIC.
-    rewrite Heqfe in FIC.
-    destruct (busybits m z);auto.
-  - tauto.
+  pose (amFindIfCorrect
+          (fun k : Z => negb (busybits m k)) s i) as FIC.
+  rewrite Heqfe in FIC.
+  destruct (busybits m z);auto.
 Qed.
 
 Lemma amFindKeyBound: forall m k s i, match (find_key m s k i) with
@@ -650,7 +611,7 @@ Lemma amFindKeyBound: forall m k s i, match (find_key m s k i) with
 Proof.
   intros; unfold find_key; apply amFindIfBound.
 Qed.
-  
+
 Lemma amPutContains: forall m k v, ~(full m) -> match (amPut m k v) with
                                                     |Some map => contains map k
                                                     |None => False
@@ -680,7 +641,7 @@ Proof.
 Qed.
 
 
-Lemma amFindRightKey: forall m k s i, match (find_key m s k i) with
+Lemma amFindKeyCorrect: forall m k s i, match (find_key m s k i) with
                                         |Some z => is_true (busybits m z) /\
                                                    keys m z = k
                                         |None => True
@@ -711,7 +672,7 @@ Lemma amFindExactKey: forall m k s x,
                         end.
 Proof.
   intros m k s x BOUND KEY BUSY UNIQUE.
-  assert (FRK := amFindRightKey m k s 99).
+  assert (FRK := amFindKeyCorrect m k s 99).
   destruct (find_key m s k 99) eqn: Heqfk.
   - specialize UNIQUE with z.
     destruct (Z.eq_dec z x).
@@ -814,7 +775,7 @@ Proof.
                       (busybits m k && (k2 =? keys m k))%bool) (loop k2) 99)
   with (find_key m (loop k2) k2 99);[|unfold find_key;tauto].
   destruct (find_key m (loop k2) k2 99) eqn: Heqfk;[|tauto].
-  pose (FRK:=amFindRightKey m k2 (loop k2) 99).
+  pose (FRK:=amFindKeyCorrect m k2 (loop k2) 99).
   rewrite Heqfk in FRK.
   destruct FRK as [BB EQ].
   rewrite <- PUT.
@@ -825,3 +786,145 @@ Proof.
   rewrite FEC in BB.
   discriminate BB.
 Qed.
+
+Lemma amPutMore: forall m k v, ~(full m) -> contains m k ->
+                                 match (amPut m k v) with
+                                     |Some map => ~(contains_single map k)
+                                     |None => False
+                                 end.
+Proof.
+  intros m k v NONFULL HAS.
+  assert (CAN := amCanPut m k v NONFULL).
+  destruct (amPut m k v) eqn:PUT';[|tauto].
+  unfold amPut in PUT'.
+  destruct (find_empty m (loop k) 99) eqn: FE;
+    [|symmetry in PUT';contradiction].
+  injection PUT' as PUT.
+  unfold contains in HAS.
+  unfold is_true in HAS.
+  decompose record HAS.
+  unfold contains_single.
+  intuition.
+  assert (FEB:=amFindEmptyBound m (loop k) 99).
+  rewrite FE in FEB.
+  assert (FEC:=amFindEmptyCorrect m (loop k) 99).
+  rewrite FE in FEC.
+  assert (keys a z = k). {
+    subst a.
+    simpl.
+    destruct (Z.eq_dec z z);tauto.
+  }
+  assert (keys a x = k). {
+    subst a;simpl.  
+    destruct (Z.eq_dec x z);tauto.
+  }
+  assert (busybits a z = true). {
+    subst a;simpl.
+    destruct (Z.eq_dec z z);tauto.
+  }
+  assert (busybits a x = true). {
+    subst a;simpl.
+    destruct (Z.eq_dec x z);tauto.
+  }
+  pose (H5 x z).
+  intuition.
+  subst z.
+  rewrite FEC in H0. discriminate H0.
+Qed.
+
+Lemma amPutContainsSingle: forall m k v, ~(full m) -> ~(contains m k) ->
+                                         match amPut m k v with
+                                           |Some map => contains_single map k
+                                           |None => False
+                                         end.
+Proof.
+  intros m k v NONFULL NOTHAS.
+  assert (CONT:=amPutContains m k v NONFULL).
+  assert (CAN:=amCanPut m k v NONFULL).
+  destruct (amPut m k v) eqn:PUT';[|tauto];unfold amPut in PUT'.
+  destruct (find_empty m (loop k) 99) eqn: FE;[|symmetry in PUT';contradiction].
+  injection PUT' as PUT;clear PUT'.
+  unfold contains_single.
+  split;[assumption|].
+  intros.
+  unfold contains in NOTHAS.
+  subst a. simpl in *.
+  destruct (Z.eq_dec x z).
+  - destruct (Z.eq_dec y z).
+    + omega. 
+    + apply not_ex_all_not with (n:=y) in NOTHAS.
+      contradiction NOTHAS;intuition.
+  - apply not_ex_all_not with (n:=x) in NOTHAS.
+    contradiction NOTHAS;intuition.
+Qed.
+
+Lemma amCanErase: forall m k, contains m k -> amErase m k <> None.
+Proof.                                                
+  intros m k CONT.
+  unfold amErase.
+  apply amContainsCanFindKey with (s:=(loop k)) in CONT.
+  destruct (find_key m (loop k) k 99);[discriminate|tauto].
+Qed.
+
+Lemma amEraseErase: forall m k, contains_single m k -> 
+                                match amErase m k with
+                                  |Some map => ~(contains map k)
+                                  |None => False
+                                end.
+Proof.
+  intros m k [CONT SINGLE].
+  apply amCanErase in CONT.
+  destruct (amErase m k) eqn:ERZ';[|tauto];unfold amErase in ERZ'.
+  assert (FKBOUND:=amFindKeyBound m k (loop k) 99).
+  assert (FKCORRECT:=amFindKeyCorrect m k (loop k) 99).
+  destruct (find_key m (loop k) k 99) eqn:FK;[|symmetry in ERZ';contradiction].
+  injection ERZ' as ERZ;clear ERZ'.
+  unfold contains.
+  apply all_not_not_ex; intro x.
+  subst a; simpl in *.
+  destruct (Z.eq_dec x z).
+  intuition.
+  contradict SINGLE.
+  intuition.
+Qed.
+
+Lemma amEraseNonFull: forall m k, match amErase m k with
+                                    |Some map => ~(full map)
+                                    |None => True
+                                  end.
+Proof.
+  intros.
+  destruct (amErase m k) eqn: ERZ';[|tauto].
+  unfold amErase in ERZ'.
+  assert (BND:=amFindKeyBound m k (loop k) 99).
+  destruct (find_key m (loop k) k 99) eqn:FK;[|discriminate ERZ'].
+  injection ERZ' as ERZ;clear ERZ'.
+  unfold full.
+  apply ex_not_not_all.
+  exists z.
+  subst a;simpl.
+  replace (loop z) with z;[|symmetry;apply loop_small;assumption].
+  destruct (Z.eq_dec z z);intuition.
+Qed.
+
+Lemma amGetNotContains: forall m k, amGet m k = None -> ~(contains m k).
+Proof.
+  intros.
+  contradict H.
+  apply amCanGet;assumption.
+Qed.
+
+Lemma amNotContainsGetInVain: forall m k, ~(contains m k) -> amGet m k = None.
+Proof.
+  intros.
+  destruct (amGet m k) eqn:GET';[|tauto];unfold amGet in GET'.
+  rename z into vz.
+  assert (CORR:=amFindKeyCorrect m k (loop k) 99).
+  assert (BND:=amFindKeyBound m k (loop k) 99).
+  destruct (find_key m (loop k) k 99);[|discriminate GET'].
+  contradiction H.
+  unfold contains.
+  exists z.
+  intuition.
+Qed.
+
