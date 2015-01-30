@@ -12,6 +12,7 @@ Definition ___builtin_clz : ident := 22%positive.
 Definition ___compcert_va_int64 : ident := 17%positive.
 Definition ___builtin_memcpy_aligned : ident := 8%positive.
 Definition ___builtin_subl : ident := 5%positive.
+Definition _main : ident := 50%positive.
 Definition _find_key : ident := 43%positive.
 Definition ___builtin_va_start : ident := 12%positive.
 Definition _value : ident := 47%positive.
@@ -28,7 +29,7 @@ Definition ___builtin_fmin : ident := 26%positive.
 Definition ___builtin_bswap : ident := 19%positive.
 Definition _bb : ident := 39%positive.
 Definition ___builtin_membar : ident := 11%positive.
-Definition _main : ident := 49%positive.
+Definition _erase : ident := 49%positive.
 Definition _i : ident := 37%positive.
 Definition ___builtin_addl : ident := 4%positive.
 Definition ___builtin_fmsub : ident := 28%positive.
@@ -51,12 +52,14 @@ Definition ___builtin_fnmsub : ident := 30%positive.
 Definition ___builtin_ctz : ident := 23%positive.
 Definition _put : ident := 48%positive.
 Definition ___builtin_bswap32 : ident := 20%positive.
-Definition _start' : ident := 54%positive.
-Definition _index' : ident := 50%positive.
-Definition _index'3 : ident := 57%positive.
-Definition _index'1 : ident := 52%positive.
-Definition _start'1 : ident := 56%positive.
-Definition _index'2 : ident := 55%positive.
+Definition _index'1 : ident := 53%positive.
+Definition _start'1 : ident := 57%positive.
+Definition _start'2 : ident := 59%positive.
+Definition _index'3 : ident := 58%positive.
+Definition _index'2 : ident := 56%positive.
+Definition _index'4 : ident := 60%positive.
+Definition _start' : ident := 55%positive.
+Definition _index' : ident := 51%positive.
 
 
 Definition f_loop := {|
@@ -80,7 +83,7 @@ Definition f_find_empty := {|
   fn_params := ((_busybits, (tptr tint)) :: (_start, tint) :: (_i, tint) ::
                 nil);
   fn_vars := nil;
-  fn_temps := ((_index, tint) :: (_bb, tint) :: (51%positive, tint) ::
+  fn_temps := ((_index, tint) :: (_bb, tint) :: (52%positive, tint) ::
                (_index', tint) :: nil);
   fn_body :=
 (Ssequence
@@ -107,7 +110,7 @@ Definition f_find_empty := {|
           (Sreturn (Some (Eunop Oneg (Econst_int (Int.repr 1) tint) tint)))
           Sskip)
         (Ssequence
-          (Scall (Some 51%positive)
+          (Scall (Some 52%positive)
             (Evar _find_empty (Tfunction
                                 (Tcons (tptr tint)
                                   (Tcons tint (Tcons tint Tnil))) tint
@@ -115,7 +118,7 @@ Definition f_find_empty := {|
             ((Etempvar _busybits (tptr tint)) :: (Etempvar _start tint) ::
              (Ebinop Osub (Etempvar _i tint) (Econst_int (Int.repr 1) tint)
                tint) :: nil))
-          (Sreturn (Some (Etempvar 51%positive tint))))))))
+          (Sreturn (Some (Etempvar 52%positive tint))))))))
 |}.
 
 Definition f_find_key := {|
@@ -125,7 +128,7 @@ Definition f_find_key := {|
                 (_start, tint) :: (_key, tint) :: (_i, tint) :: nil);
   fn_vars := nil;
   fn_temps := ((_index, tint) :: (_bb, tint) :: (_k, tint) ::
-               (53%positive, tint) :: (_index'1, tint) :: nil);
+               (54%positive, tint) :: (_index'1, tint) :: nil);
   fn_body :=
 (Ssequence
   (Ssequence
@@ -159,7 +162,7 @@ Definition f_find_key := {|
             (Sreturn (Some (Eunop Oneg (Econst_int (Int.repr 1) tint) tint)))
             Sskip)
           (Ssequence
-            (Scall (Some 53%positive)
+            (Scall (Some 54%positive)
               (Evar _find_key (Tfunction
                                 (Tcons (tptr tint)
                                   (Tcons (tptr tint)
@@ -171,7 +174,7 @@ Definition f_find_key := {|
                (Etempvar _key tint) ::
                (Ebinop Osub (Etempvar _i tint) (Econst_int (Int.repr 1) tint)
                  tint) :: nil))
-            (Sreturn (Some (Etempvar 53%positive tint)))))))))
+            (Sreturn (Some (Etempvar 54%positive tint)))))))))
 |}.
 
 Definition f_get := {|
@@ -266,6 +269,48 @@ Definition f_put := {|
                   (Etempvar _index tint) (tptr tint)) tint)
               (Etempvar _value tint))
             (Sreturn (Some (Econst_int (Int.repr 0) tint)))))))))
+|}.
+
+Definition f_erase := {|
+  fn_return := tint;
+  fn_callconv := cc_default;
+  fn_params := ((_busybits, (tptr tint)) :: (_keys, (tptr tint)) ::
+                (_key, tint) :: nil);
+  fn_vars := nil;
+  fn_temps := ((_start, tint) :: (_index, tint) :: (_index'4, tint) ::
+               (_start'2, tint) :: nil);
+  fn_body :=
+(Ssequence
+  (Ssequence
+    (Scall (Some _start'2)
+      (Evar _loop (Tfunction (Tcons tint Tnil) tint cc_default))
+      ((Etempvar _key tint) :: nil))
+    (Sset _start (Etempvar _start'2 tint)))
+  (Ssequence
+    (Ssequence
+      (Scall (Some _index'4)
+        (Evar _find_key (Tfunction
+                          (Tcons (tptr tint)
+                            (Tcons (tptr tint)
+                              (Tcons tint (Tcons tint (Tcons tint Tnil)))))
+                          tint cc_default))
+        ((Etempvar _busybits (tptr tint)) :: (Etempvar _keys (tptr tint)) ::
+         (Etempvar _start tint) :: (Etempvar _key tint) ::
+         (Econst_int (Int.repr 99) tint) :: nil))
+      (Sset _index (Etempvar _index'4 tint)))
+    (Ssequence
+      (Sifthenelse (Ebinop Oeq
+                     (Eunop Oneg (Econst_int (Int.repr 1) tint) tint)
+                     (Etempvar _index tint) tint)
+        (Sreturn (Some (Eunop Oneg (Econst_int (Int.repr 1) tint) tint)))
+        Sskip)
+      (Ssequence
+        (Sassign
+          (Ederef
+            (Ebinop Oadd (Etempvar _busybits (tptr tint))
+              (Etempvar _index tint) (tptr tint)) tint)
+          (Econst_int (Int.repr 0) tint))
+        (Sreturn (Some (Econst_int (Int.repr 0) tint)))))))
 |}.
 
 Definition prog : Clight.program := {|
@@ -410,7 +455,7 @@ prog_defs :=
      tvoid cc_default)) :: (_loop, Gfun(Internal f_loop)) ::
  (_find_empty, Gfun(Internal f_find_empty)) ::
  (_find_key, Gfun(Internal f_find_key)) :: (_get, Gfun(Internal f_get)) ::
- (_put, Gfun(Internal f_put)) :: nil);
+ (_put, Gfun(Internal f_put)) :: (_erase, Gfun(Internal f_erase)) :: nil);
 prog_main := _main
 |}.
 

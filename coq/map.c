@@ -68,3 +68,15 @@ int put(int* busybits, int* keys, int* values, int key, int value)
     return 0;
 }
 
+int erase(int* busybits, int* keys, int key)
+{
+    int start = loop(key);
+    int index = find_key(busybits, keys, start, key, 99);
+
+    if (-1 == index)
+    {
+        return -1;
+    }
+    busybits[index] = 0;
+    return 0;
+}
