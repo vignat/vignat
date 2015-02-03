@@ -907,24 +907,125 @@ Proof.
   destruct (Z.eq_dec z z);intuition.
 Qed.
 
-Lemma amGetNotContains: forall m k, amGet m k = None -> ~(contains m k).
+Lemma amNotContainsFindKeyFail: forall m k, ~(contains m k) <->
+                                            (find_key m (loop k) k 99) = None.
 Proof.
   intros.
-  contradict H.
-  apply amCanGet;assumption.
+  split;intro.
+  - assert (CORR:=amFindKeyCorrect m k (loop k) 99).
+    assert (BND:=amFindKeyBound m k (loop k) 99).
+    destruct (find_key m (loop k) k 99) eqn:FK;[|tauto].
+    contradiction H.
+    unfold contains.
+    exists z.
+    intuition.
+  - contradict H.
+    apply amContainsCanFindKey;assumption.
+Qed.
+ 
+Lemma amNotContainsNotGet: forall m k, ~(contains m k) <-> amGet m k = None.
+Proof.
+  intros.
+  unfold amGet.
+  rewrite amNotContainsFindKeyFail.
+  split;intro.
+  - rewrite H;tauto.
+  - destruct (find_key m (loop k) k 99);[discriminate H|tauto].
 Qed.
 
-Lemma amNotContainsGetInVain: forall m k, ~(contains m k) -> amGet m k = None.
+Lemma amNotContainsNotErase: forall m k, ~(contains m k) <->
+                                         amErase m k = None.
 Proof.
   intros.
-  destruct (amGet m k) eqn:GET';[|tauto];unfold amGet in GET'.
-  rename z into vz.
-  assert (CORR:=amFindKeyCorrect m k (loop k) 99).
-  assert (BND:=amFindKeyBound m k (loop k) 99).
-  destruct (find_key m (loop k) k 99);[|discriminate GET'].
-  contradiction H.
-  unfold contains.
-  exists z.
-  intuition.
+  unfold amErase.
+  rewrite amNotContainsFindKeyFail.
+  split;intro.
+  - rewrite H;tauto.
+  - destruct (find_key m (loop k) k 99);[discriminate H|tauto].
 Qed.
+
+Lemma amEraseOther: forall m k1 k2, k1 <> k2 ->
+                                    match amErase m k1 with
+                                      |Some map => amGet map k2 = amGet m k2
+                                      |None => True
+                                    end.
+Proof.
+  intros m k1 k2 NEQ.
+  destruct (amErase m k1) eqn:ERZ';[|tauto].
+  unfold amErase in ERZ'.
+  assert (CORR:=amFindKeyCorrect m k1 (loop k1) 99).
+  destruct (find_key m (loop k1) k1 99);[|discriminate ERZ'].
+  decompose [and] CORR.
+  injection ERZ' as ERZ;clear ERZ'.
+  unfold amGet.
+  unfold find_key.
+  assert (forall k, (busybits m k && (k2 =? keys m k)) = 
+                    (busybits a k && (k2 =? keys a k)))%bool. {
+    intro.
+    subst a; simpl.
+    destruct (Z.eq_dec k z);[|tauto].
+    subst k.
+    subst k1.
+    apply Z.eqb_neq in NEQ.
+    rewrite Z.eqb_sym in NEQ.
+    rewrite NEQ.
+    rewrite Bool.andb_false_r;simpl.
+    auto.
+  }
+  replace (fun k : Z => (busybits a k && (k2 =? keys a k))%bool)
+  with (fun k : Z => (busybits m k && (k2 =? keys m k))%bool).
+  - rewrite <- ERZ.
+    tauto.
+  - apply functional_extensionality;assumption.
+Qed.
+
+Definition nodups(map:ArrMapZ) :Prop :=
+  forall x y, 0 <= x < 100 -> 0 <= y < 100 -> busybits map x = true ->
+              busybits map y = true -> keys map x = keys map y -> x = y.
+
+(* todo: size *)
+
+Lemma put_nodups: forall m k v, nodups m -> amGet m k = None ->
+                                match amPut m k v with
+                                  |Some map => nodups map
+                                  |None => True
+                                end.
+Admitted.                                 
+
+Lemma erase_nodups: forall m k, nodups m -> match amErase m k with
+                                              |Some map => nodups map
+                                              |None => True
+                                            end.
+Admitted.
+
+Lemma get_put1: forall m k v, amGet m k = None ->
+                              match amPut m k v with
+                                |Some map => amGet map k = Some v
+                                |None => True
+                              end.
+Admitted.
+
+Lemma get_put2: forall m k1 k2 v, k1 <> k2 ->
+                                  match amPut m k1 v with
+                                    |Some map => amGet map k2 = amGet m k2
+                                    |None => True
+                                  end.
+Admitted.
+
+Lemma  get_erase1: forall m k, amGet m k <> None ->
+                               match amErase m k with
+                                 |Some map => amGet map k = None
+                                 |None => False
+                               end.
+Admitted.
+
+Lemma get_erase2: forall m k1 k2, k1 <> k2 -> nodups m ->
+                                  match amErase m k1 with
+                                    |Some map => amGet map k2 = amGet m k2
+                                    |None => True
+                                  end.
+Admitted.
+
+
+
 
