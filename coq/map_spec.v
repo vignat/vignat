@@ -206,7 +206,7 @@ Proof.
   destruct k.
   - exists 0;omega.
   - exists (-(Z.pos p/100)).
-    assert ((Z.pos p + 100 * - (Z.pos p / 100)) = 
+    assert ((Z.pos p + 100 * - (Z.pos p / 100)) =
              Z.pos p mod 100) as REWR.
     assert (Z.pos p = 100 * (Z.pos p / 100) + Z.pos p mod 100) as TMP.
     apply Z_div_mod_eq;omega.
@@ -230,7 +230,7 @@ Proof.
   rewrite loop_small.
   omega.
   omega.
-Qed.  
+Qed.
 
 Lemma amFindIfOnNext: forall cond k i, find_if cond k i <> None ->
                                        find_if cond k (S i) <> None.
@@ -242,7 +242,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma amFindIfOnAnyNext: 
+Lemma amFindIfOnAnyNext:
   forall c (k : Z) (i n : nat), find_if c k i <> None ->
                                 find_if c k (i + n) <> None.
 Proof.
@@ -256,7 +256,7 @@ Proof.
 Qed.
 
 Lemma amFindIfSameForEach100: forall cond k n (i:nat),
-                                find_if cond k i = 
+                                find_if cond k i =
                                 find_if cond (k + 100*n) i.
 Proof.
   intros.
@@ -327,7 +327,7 @@ Qed.
 
 Lemma amFindIf99orMore:
   forall cond k (n:nat), find_if cond k (99 + n) <> None ->
-                         find_if cond k 99 <> None \/ 
+                         find_if cond k 99 <> None \/
                          find_if cond k n <> None.
 Proof.
   intros.
@@ -363,7 +363,7 @@ Proof.
   intros.
   induction x.
   - auto.
-  - replace (99 * S x + n)%nat 
+  - replace (99 * S x + n)%nat
     with (99 + 99*x + n)%nat in H; [|omega].
     apply amFindIf99orMore with (n:=(99*x + n)%nat) in H.
     decompose sum H.
@@ -404,7 +404,7 @@ Proof.
   - tauto.
   - apply amFindIf99NoLess with r;[omega|assumption].
 Qed.
-    
+
 Lemma amFindIfStartingAnywhere:
   forall cond k x, 0 <= x -> find_if cond k 99 <> None ->
                    find_if cond (k - x) 99 <> None.
@@ -485,11 +485,11 @@ Proof.
   induction i.
   - destruct (cond (loop (1 + k + Z.of_nat 0))).
     + apply Loop_bound.
-    + tauto.    
+    + tauto.
   - rewrite <- find_if_equation in IHi.
     destruct (cond (loop (1 + k + Z.of_nat (S i)))).
     + apply Loop_bound.
-    + apply IHi.      
+    + apply IHi.
 Qed.
 
 Lemma amFindIfCorrect: forall cond s i, match (find_if cond s i) with
@@ -504,33 +504,7 @@ Proof.
   - rewrite <- find_if_equation in IHi.
     destruct (cond (loop (1 + s + Z.of_nat (S i)))) eqn: COND; auto.
 Qed.
-
-Lemma amNonFullCanFindEmpty: forall m k, ~(full m) -> find_empty m k 99 <> None.
-Proof.
-  intros.
-  unfold full in H.
-  apply not_forall_exists in H.
-  destruct H.
-  remember (loop x) as k0.
-  assert (0 <= k0 < 100) by (subst k0;apply Loop_bound).
-  unfold find_empty.
-  apply amWillFindIf with (x:=k0) (i:=99%nat).
-  apply amFindIfNotBlind.
-  - assumption.
-  - destruct (busybits m k0); auto.
-Qed.
-
-Lemma amCanPut: forall m k v, ~(full m) -> amPut m k v <> None.
-Proof.
-  intros.
-  unfold amPut.
-  apply amNonFullCanFindEmpty with (k:=(loop k)) in H.
-  destruct (find_empty m (loop k) 99).
-  - discriminate.
-  - tauto.
-Qed.
-
-Lemma isKeyEquivalence: forall m k key, 
+Lemma isKeyEquivalence: forall m k key,
                           (is_true (busybits m k) /\
                            keys m k = key) <->
                           is_true(andb (busybits m k)
@@ -553,31 +527,6 @@ Proof.
     rewrite BB.
     split;auto.
     symmetry;apply Z.eqb_eq;assumption.
-Qed.
-
-
-Lemma amContainsCanFindKey: forall m k s, contains m k ->
-                                          find_key m s k 99 <> None.
-Proof.
-  intros.
-  unfold contains in H.
-  destruct H.
-  destruct H as [BOUND COND].
-  unfold find_key.
-  apply amWillFindIf with (x:=x) (i:=99%nat).
-  apply amFindIfNotBlind.
-  - assumption.
-  - apply isKeyEquivalence;assumption.
-Qed.    
-
-Lemma amCanGet: forall m k, contains m k -> amGet m k <> None.
-Proof.
-  intros.
-  unfold amGet.
-  apply amContainsCanFindKey with (s:=loop k) in H.
-  destruct (find_key m (loop k) k 99).
-  - discriminate.
-  - assumption.
 Qed.
 
 Lemma amFindEmptyBound: forall m s i, match (find_empty m s i) with
@@ -612,13 +561,54 @@ Proof.
   intros; unfold find_key; apply amFindIfBound.
 Qed.
 
+Lemma amNonFullCanFindEmpty: forall m k, ~(full m) <-> find_empty m k 99 <> None.
+Proof.
+  split; intro.
+  - unfold full in H.
+    apply not_forall_exists in H.
+    destruct H.
+    remember (loop x) as k0.
+    assert (0 <= k0 < 100) by (subst k0;apply Loop_bound).
+    unfold find_empty.
+    apply amWillFindIf with (x:=k0) (i:=99%nat).
+    apply amFindIfNotBlind.
+    + assumption.
+    + destruct (busybits m k0); auto.
+  - unfold full.
+    assert (FEC:=amFindEmptyCorrect m k 99).
+    assert (FEB:=amFindEmptyBound m k 99).
+    destruct (find_empty m k 99) eqn:FE;[|tauto].
+    contradict FEC.
+    unfold is_true in FEC.
+    rewrite <- loop_small with z;[|omega].
+    rewrite FEC.
+    discriminate.
+Qed.
+
+Lemma amCanPut: forall m k v, ~(full m) <-> amPut m k v <> None.
+Proof.
+  split;intro.
+  - unfold amPut.
+    apply amNonFullCanFindEmpty with (k:=(loop k)) in H.
+    destruct (find_empty m (loop k) 99).
+    + discriminate.
+    + tauto.
+  - rewrite amNonFullCanFindEmpty.
+    unfold amPut in H.
+    instantiate (1:=(loop k)).
+    destruct (find_empty m (loop k) 99).
+    + discriminate.
+    + tauto.
+Qed.
+
+
 Lemma amPutContains: forall m k v, ~(full m) -> match (amPut m k v) with
                                                     |Some map => contains map k
                                                     |None => False
                                                 end.
 Proof.
   intros.
-  assert (H1 := amCanPut m k v H).
+  rewrite amCanPut in H.
   destruct (amPut m k v) eqn: PUT.
   - unfold contains.
     remember (find_empty m (loop k) 99) as found.
@@ -634,10 +624,10 @@ Proof.
         rewrite <- P.
         simpl.
         destruct (Z.eq_dec z z);auto;constructor;[auto|tauto].
-    + apply amNonFullCanFindEmpty with m (loop k) in H.
-      symmetry in Heqfound.
-      contradiction.
-  - tauto.
+    + unfold amPut in PUT.
+      rewrite <- Heqfound in PUT.
+      discriminate PUT.
+  - instantiate (1:=v) in H; instantiate (1:=k) in H; tauto.
 Qed.
 
 
@@ -657,6 +647,40 @@ Proof.
     rewrite Heqfk in FIC.
     apply isKeyEquivalence;assumption.
   - tauto.
+Qed.
+
+Lemma amContainsCanFindKey: forall m k s, contains m k <->
+                                          find_key m s k 99 <> None.
+Proof.
+  split;intro.
+  - unfold contains in H.
+    destruct H.
+    destruct H as [BOUND COND].
+    unfold find_key.
+    apply amWillFindIf with (x:=x) (i:=99%nat).
+    apply amFindIfNotBlind.
+    + assumption.
+    + apply isKeyEquivalence;assumption.
+  - assert (CORR:=amFindKeyCorrect m k s 99).
+    assert (BND:=amFindKeyBound m k s 99).
+    destruct (find_key m s k 99) eqn:FK;[|tauto].
+    unfold contains.
+    exists z;intuition.
+Qed.
+
+Lemma amCanGet: forall m k, contains m k <-> amGet m k <> None.
+Proof.
+  split;intros.
+  - unfold amGet.
+    apply amContainsCanFindKey with (s:=loop k) in H.
+    destruct (find_key m (loop k) k 99).
+    + discriminate.
+    + assumption.
+  - rewrite amContainsCanFindKey with (s:=(loop k)).
+    unfold amGet in H.
+    destruct (find_key m (loop k) k 99).
+    + discriminate.
+    + assumption.
 Qed.
 
 Lemma amFindExactKey: forall m k s x,
@@ -691,7 +715,8 @@ Proof.
     unfold amGet in CONT.
     rewrite Heqfk in CONT.
     tauto.
-Qed.  
+Qed.
+
 
 Theorem amGetPut1: forall m k v, ~(full m) ->
                                  ~(contains m k) ->
@@ -701,42 +726,41 @@ Theorem amGetPut1: forall m k v, ~(full m) ->
                                  end.
 Proof.
   intros m k v NONFULL ABSCENT.
-  assert (H1 := amCanPut m k v NONFULL).
+  rewrite amCanPut in NONFULL.
   destruct (amPut m k v) eqn: PUT'.
   - unfold amGet.
     unfold amPut in PUT'.
-    destruct (find_empty m (loop k) 99) eqn: FE.
-    + injection PUT' as PUT.
-      rename z into x.
-      rename a into map.
-      assert (FEB:=amFindEmptyBound m (loop k) 99).
-      rewrite FE in FEB.
-      assert (keys map x = k) as EQ. {
-        rewrite <- PUT.
-        simpl.
-        destruct (Z.eq_dec x x);[auto|tauto].
-      }
-      assert (is_true (busybits map x)) as BB. {
-        rewrite <- PUT;simpl;destruct (Z.eq_dec x x);[auto|tauto].
-      }
-      assert (forall y : Z,
-                y <> x ->
-                ~ (0 <= y < 100 /\ is_true (busybits map y) /\
-                   keys map y = k)) as UNIQUE. {
-        intros.
-        unfold contains in ABSCENT.
-        contradict ABSCENT.
-        exists y.
-        rewrite <- PUT in ABSCENT; simpl in ABSCENT.
-        destruct (Z.eq_dec y x);tauto.
-      }
-      assert (FEK:= amFindExactKey map k (loop k) x FEB EQ BB UNIQUE).
-      destruct (find_key map (loop k) k 99).
-      * rewrite <- PUT. simpl. rewrite FEK.
-        destruct (Z.eq_dec x x); tauto.
-      * tauto.
-    + symmetry in PUT'. contradiction.
-  - tauto.
+    destruct (find_empty m (loop k) 99) eqn: FE;[|discriminate].
+    injection PUT' as PUT.
+    rename z into x.
+    rename a into map.
+    assert (FEB:=amFindEmptyBound m (loop k) 99).
+    rewrite FE in FEB.
+    assert (keys map x = k) as EQ. {
+      rewrite <- PUT.
+      simpl.
+      destruct (Z.eq_dec x x);[auto|tauto].
+    }
+    assert (is_true (busybits map x)) as BB. {
+      rewrite <- PUT;simpl;destruct (Z.eq_dec x x);[auto|tauto].
+    }
+    assert (forall y : Z,
+              y <> x ->
+              ~ (0 <= y < 100 /\ is_true (busybits map y) /\
+                 keys map y = k)) as UNIQUE. {
+      intros.
+      unfold contains in ABSCENT.
+      contradict ABSCENT.
+      exists y.
+      rewrite <- PUT in ABSCENT; simpl in ABSCENT.
+      destruct (Z.eq_dec y x);tauto.
+    }
+    assert (FEK:= amFindExactKey map k (loop k) x FEB EQ BB UNIQUE).
+    destruct (find_key map (loop k) k 99).
+    * rewrite <- PUT. simpl. rewrite FEK.
+      destruct (Z.eq_dec x x); tauto.
+    * tauto.
+  - instantiate (1:=v) in NONFULL; instantiate (1:=k) in NONFULL; tauto.
 Qed.
 
 Theorem amGetPut2: forall m k1 k2 v, ~(full m) -> k1 <> k2 ->
@@ -746,7 +770,7 @@ Theorem amGetPut2: forall m k1 k2 v, ~(full m) -> k1 <> k2 ->
                                      end.
 Proof.
   intros m k1 k2 v NONFULL NEQ.
-  assert (H1 := amCanPut m k1 v NONFULL).
+  rewrite (amCanPut m k1 v) in NONFULL.
   destruct (amPut m k1 v) eqn: PUT';[|tauto].
   unfold amPut in PUT'.
   destruct (find_empty m (loop k1) 99) eqn: FE;
@@ -756,7 +780,7 @@ Proof.
   unfold amGet.
   assert (FEC:=amFindEmptyCorrect m (loop k1) 99).
   rewrite FE in FEC.
-  assert (forall k, ((busybits map k && (k2 =? keys map k)) = 
+  assert (forall k, ((busybits map k && (k2 =? keys map k)) =
                      (busybits m k && (k2 =? keys m k))))%bool as EQCOND. {
     intro.
     rewrite <- PUT.
@@ -794,7 +818,7 @@ Lemma amPutMore: forall m k v, ~(full m) -> contains m k ->
                                  end.
 Proof.
   intros m k v NONFULL HAS.
-  assert (CAN := amCanPut m k v NONFULL).
+  rewrite (amCanPut m k v) in NONFULL.
   destruct (amPut m k v) eqn:PUT';[|tauto].
   unfold amPut in PUT'.
   destruct (find_empty m (loop k) 99) eqn: FE;
@@ -815,7 +839,7 @@ Proof.
     destruct (Z.eq_dec z z);tauto.
   }
   assert (keys a x = k). {
-    subst a;simpl.  
+    subst a;simpl.
     destruct (Z.eq_dec x z);tauto.
   }
   assert (busybits a z = true). {
@@ -840,7 +864,7 @@ Lemma amPutContainsSingle: forall m k v, ~(full m) -> ~(contains m k) ->
 Proof.
   intros m k v NONFULL NOTHAS.
   assert (CONT:=amPutContains m k v NONFULL).
-  assert (CAN:=amCanPut m k v NONFULL).
+  rewrite (amCanPut m k v) in NONFULL.
   destruct (amPut m k v) eqn:PUT';[|tauto];unfold amPut in PUT'.
   destruct (find_empty m (loop k) 99) eqn: FE;[|symmetry in PUT';contradiction].
   injection PUT' as PUT;clear PUT'.
@@ -851,22 +875,25 @@ Proof.
   subst a. simpl in *.
   destruct (Z.eq_dec x z).
   - destruct (Z.eq_dec y z).
-    + omega. 
+    + omega.
     + apply not_ex_all_not with (n:=y) in NOTHAS.
       contradiction NOTHAS;intuition.
   - apply not_ex_all_not with (n:=x) in NOTHAS.
     contradiction NOTHAS;intuition.
 Qed.
 
-Lemma amCanErase: forall m k, contains m k -> amErase m k <> None.
-Proof.                                                
-  intros m k CONT.
-  unfold amErase.
-  apply amContainsCanFindKey with (s:=(loop k)) in CONT.
-  destruct (find_key m (loop k) k 99);[discriminate|tauto].
+Lemma amCanErase: forall m k, contains m k <-> amErase m k <> None.
+Proof.
+  split;intro.
+  - unfold amErase.
+    apply amContainsCanFindKey with (s:=(loop k)) in H.
+    destruct (find_key m (loop k) k 99);[discriminate|tauto].
+  - apply amContainsCanFindKey with (s:=(loop k)).
+    unfold amErase in H.
+    destruct (find_key m (loop k) k 99);[discriminate|tauto].
 Qed.
 
-Lemma amEraseErase: forall m k, contains_single m k -> 
+Lemma amEraseErase: forall m k, contains_single m k ->
                                 match amErase m k with
                                   |Some map => ~(contains map k)
                                   |None => False
@@ -922,7 +949,7 @@ Proof.
   - contradict H.
     apply amContainsCanFindKey;assumption.
 Qed.
- 
+
 Lemma amNotContainsNotGet: forall m k, ~(contains m k) <-> amGet m k = None.
 Proof.
   intros.
@@ -959,7 +986,7 @@ Proof.
   injection ERZ' as ERZ;clear ERZ'.
   unfold amGet.
   unfold find_key.
-  assert (forall k, (busybits m k && (k2 =? keys m k)) = 
+  assert (forall k, (busybits m k && (k2 =? keys m k)) =
                     (busybits a k && (k2 =? keys a k)))%bool. {
     intro.
     subst a; simpl.
@@ -990,27 +1017,80 @@ Lemma put_nodups: forall m k v, nodups m -> amGet m k = None ->
                                   |Some map => nodups map
                                   |None => True
                                 end.
-Admitted.                                 
+Proof.
+  intros m k v NODUPS GET.
+  rewrite <- amNotContainsNotGet in GET.
+  assert (FEC:=amFindEmptyCorrect m (loop k) 99).
+  destruct (amPut m k v) eqn:PUT';[|tauto];unfold amPut in PUT'.
+  destruct (find_empty m (loop k) 99) eqn: FE;[|discriminate PUT'].
+  injection PUT' as PUT;clear PUT'.
+  unfold nodups.
+  subst a;simpl.
+  intros.
+  destruct (Z.eq_dec x z), (Z.eq_dec y z).
+  - subst x y;tauto.
+  - contradict GET.
+    unfold contains.
+    exists y.
+    intuition.
+  - contradict GET.
+    unfold contains.
+    exists x.
+    intuition.
+  - apply NODUPS;intuition.
+Qed.
 
 Lemma erase_nodups: forall m k, nodups m -> match amErase m k with
                                               |Some map => nodups map
                                               |None => True
                                             end.
-Admitted.
+Proof.
+  intros m k NODUPS.
+  destruct (amErase m k) eqn:RZ';[|tauto];unfold amErase in RZ'.
+  destruct (find_key m (loop k) k 99) eqn: FE;[|discriminate RZ'].
+  injection RZ' as RZ;clear RZ'.
+  unfold nodups;subst a; simpl.
+  intros.
+  destruct (Z.eq_dec x z), (Z.eq_dec y z).
+  - subst x y;tauto.
+  - discriminate.
+  - discriminate.
+  - apply NODUPS;intuition.
+Qed.
 
 Lemma get_put1: forall m k v, amGet m k = None ->
                               match amPut m k v with
                                 |Some map => amGet map k = Some v
                                 |None => True
                               end.
-Admitted.
+Proof.
+  intros m k v GET.
+  destruct (amPut m k v) eqn:PUT';[|tauto].
+  assert (amPut m k v <> None) as NONFULL by
+                                   (rewrite PUT';discriminate).
+  rewrite <- amCanPut in NONFULL.
+  apply amGetPut1 with (k:=k) (v:=v) in NONFULL.
+  - rewrite PUT' in NONFULL.
+    assumption.
+  - apply amNotContainsNotGet;assumption.
+Qed.  
 
 Lemma get_put2: forall m k1 k2 v, k1 <> k2 ->
                                   match amPut m k1 v with
                                     |Some map => amGet map k2 = amGet m k2
                                     |None => True
                                   end.
-Admitted.
+Proof.
+  intros m k1 k2 v NEQ.
+  destruct (amPut m k1 v) eqn:PUT';[|tauto].
+  assert (amPut m k1 v <> None) as NONFULL by
+                                   (rewrite PUT';discriminate).
+  rewrite <- amCanPut in NONFULL.
+  apply amGetPut2 with m k1 k2 v in NONFULL.
+  - rewrite PUT' in NONFULL.
+    assumption.
+  - assumption.
+Qed.
 
 Lemma  get_erase1: forall m k, amGet m k <> None ->
                                match amErase m k with
@@ -1025,7 +1105,3 @@ Lemma get_erase2: forall m k1 k2, k1 <> k2 -> nodups m ->
                                     |None => True
                                   end.
 Admitted.
-
-
-
-
