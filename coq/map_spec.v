@@ -1092,16 +1092,55 @@ Proof.
   - assumption.
 Qed.
 
-Lemma  get_erase1: forall m k, amGet m k <> None ->
+Lemma  get_erase1: forall m k, amGet m k <> None -> nodups m ->
                                match amErase m k with
                                  |Some map => amGet map k = None
                                  |None => False
                                end.
-Admitted.
+Proof.
+  intros m k HAS NODUPS.
+  assert (contains_single m k) as HAS1.
+  { unfold contains_single.
+    split.
+    - apply amCanGet;assumption.
+    - intros.
+      unfold nodups in NODUPS.
+      apply NODUPS;intuition.
+  }
+  apply amEraseErase in HAS1.
+  destruct (amErase m k).
+  - apply amNotContainsNotGet;assumption.
+  - assumption.
+Qed.
 
-Lemma get_erase2: forall m k1 k2, k1 <> k2 -> nodups m ->
+Lemma get_erase2: forall m k1 k2, k1 <> k2 ->
                                   match amErase m k1 with
                                     |Some map => amGet map k2 = amGet m k2
                                     |None => True
                                   end.
-Admitted.
+Proof.
+  apply amEraseOther.
+Qed.
+
+Function amPartSize(m:ArrMapZ)(i:nat) : nat :=
+  match i with
+    |S p => ((if (busybits m (Z.of_nat p)) then 1 else 0) +
+            amPartSize m p)%nat
+    |O => O
+  end.
+
+Lemma fullsize: forall m i, (i < 100)%nat -> full m -> (amPartSize m i = i)%nat.
+Proof.
+  intros m i BND FULL.
+  induction i;unfold amPartSize.
+  - auto.
+  - fold amPartSize.
+    rewrite IHi;[|omega].
+    unfold full in FULL.
+    replace (Z.of_nat i) with (loop (Z.of_nat i));[|apply loop_small;omega].
+
+    specialize FULL with (Z.of_nat i).
+    unfold is_true in FULL.
+    rewrite FULL.
+    omega.
+Qed.
