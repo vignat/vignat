@@ -1129,7 +1129,7 @@ Function amPartSize(m:ArrMapZ)(i:nat) : nat :=
     |O => O
   end.
 
-Lemma fullsize: forall m i, (i < 100)%nat -> full m -> (amPartSize m i = i)%nat.
+Lemma fullsize: forall m i, (i <= 100)%nat -> full m -> (amPartSize m i = i)%nat.
 Proof.
   intros m i BND FULL.
   induction i;unfold amPartSize.
@@ -1144,3 +1144,112 @@ Proof.
     rewrite FULL.
     omega.
 Qed.
+
+Lemma size_less_linear: forall m i, (amPartSize m i <= i)%nat.
+Proof.
+  intros m i.
+  induction i;unfold amPartSize;fold amPartSize.
+  - auto.
+  - destruct (busybits m (Z.of_nat i));omega.
+Qed.
+
+Lemma size_less_linear_inc: forall m i1 i2, (amPartSize m i1 < i1)%nat ->
+                                            (amPartSize m (i1 + i2) < (i1 + i2))%nat.
+Proof.
+  intros.
+  induction i2.
+  - replace (i1 + 0)%nat with i1;omega.
+  - replace (i1 + S i2)%nat with (S (i1 + i2))%nat;[|omega].
+    unfold amPartSize;fold amPartSize.
+    destruct (busybits m (Z.of_nat (i1 + i2))).
+    + omega.
+    + omega.
+Qed.
+
+Lemma size_non_full: forall m, ~full m -> exists i, (amPartSize m i < i /\
+                                                     i <= 100)%nat.
+Proof.
+  intros m NONFULL.
+  unfold full in NONFULL.
+  unfold is_true in NONFULL.
+  apply not_all_ex_not in NONFULL.
+  decompose record NONFULL.
+  exists (S (Z.to_nat (loop x))).
+  assert (BOUNDZ:=(Loop_bound x)).
+  split.
+  - destruct (Z.to_nat (loop x)) eqn:Heqx.
+    + unfold amPartSize.
+      replace (loop x) with 0 in H.
+      simpl; destruct (busybits m 0);[tauto|omega].
+      SearchAbout BinInt.Z.to_nat.
+      apply Z2Nat.inj;[omega|omega|].
+      rewrite Heqx;auto.
+    + unfold amPartSize;fold amPartSize.
+      rewrite <- Heqx.
+      rewrite Z2Nat.id;[|omega].
+      destruct (busybits m (loop x)).
+      * tauto.
+      * assert (SLL:=size_less_linear m n).
+        destruct (busybits m (Z.of_nat n));omega.
+  - assert (Z.to_nat (loop x) < 100)%nat.
+    {
+      replace 100%nat with (Z.to_nat 100);[|auto].
+      rewrite <- Z2Nat.inj_lt;omega.
+    }
+    omega.
+Qed.
+
+Lemma size_non_full_100: forall m, ~full m -> (amPartSize m 100 < 100)%nat.
+Proof.
+  intros.
+  apply size_non_full in H.
+  decompose record H.
+  pose (y:= 100 - (Z.of_nat x)).
+  pose (i:= Z.to_nat y).
+  assert (100 = x + i)%nat as CENT.
+  {
+    subst i y.
+    rewrite <- Nat2Z.id with x.
+    replace 100%nat with (Z.to_nat 100);[|auto].
+    rewrite <- Z2Nat.inj_add.
+    - rewrite Nat2Z.id.
+      apply f_equal.
+      omega.
+    - omega.
+    - rewrite Nat2Z.id.
+      omega.
+  }
+  rewrite CENT.
+  apply size_less_linear_inc.
+  assumption.
+Qed.
+
+Lemma sizefull: forall m, (forall i, i <= 100 -> amPartSize m i = i)%nat -> full m.
+Proof.
+  intros.
+  apply NNPP.
+  contradict H.
+  apply size_non_full in H.
+  decompose record H.
+  intro SIZEID.
+  specialize SIZEID with x.
+  intuition.
+Qed.
+
+Lemma size100full: forall m, (amPartSize m 100 = 100)%nat -> full m.
+Proof.
+  intros.
+  intros.
+  apply NNPP.
+  contradict H.
+  apply size_non_full_100 in H.
+  omega.
+Qed.  
+
+Lemma full_size_100: forall m, full m <-> (amPartSize m 100 = 100)%nat.
+Proof.
+  split;intro.
+  - apply fullsize;[omega|assumption].
+  - apply size100full;assumption.
+Qed.
+
