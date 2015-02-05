@@ -1253,3 +1253,146 @@ Proof.
   - apply size100full;assumption.
 Qed.
 
+Lemma size_not_care: forall m1 m2 i,
+                       (forall j, 0 <= j < i ->
+                                  busybits m1 (Z.of_nat j) = 
+                                  busybits m2 (Z.of_nat j))%nat ->
+                       amPartSize m1 i = amPartSize m2 i.
+Proof.
+  intros.
+  induction i.
+  - auto.
+  - unfold amPartSize;fold amPartSize.
+    replace (busybits m2 (Z.of_nat i))
+    with (busybits m1 (Z.of_nat i));[|intuition].
+    replace (amPartSize m2 i)
+    with (amPartSize m1 i);[|apply IHi;intuition].
+    tauto.
+Qed.
+
+Lemma size_not_care_above:
+  forall m1 m2 i, (i <= 100)%nat ->
+    (forall j, i <= j <= 100 ->
+               busybits m1 (Z.of_nat j) =
+               busybits m2 (Z.of_nat j))%nat ->
+    (amPartSize m1 100 + amPartSize m2 i =
+     amPartSize m2 100 + amPartSize m1 i)%nat.
+Proof.
+  intros m1 m2 i BND J.
+  pose (y := (100 - i)%nat).
+  assert (i + y <= 100)%nat by (subst y;omega).
+  replace 100%nat with (i + y)%nat;[|subst y;omega].
+  induction y.
+  - replace (i + 0)%nat with i;omega.
+  - replace (i + S y)%nat with (S (i + y));[|omega].
+    unfold amPartSize;fold amPartSize.
+    replace (busybits m2 (Z.of_nat (i + y)))
+    with (busybits m1 (Z.of_nat (i + y)));[|apply J;omega].
+    destruct (busybits m1 (Z.of_nat (i + y)));lia.
+Qed.
+
+Lemma Z_lt_nat_le_100: forall z, 0 <= z < 100 -> (S (Z.to_nat z) <= 100)%nat.
+Proof.
+  intros.
+  apply gt_le_S;red.
+  rewrite Nat2Z.inj_lt.
+  rewrite Z2Nat.id;simpl;omega.
+Qed.  
+
+Lemma z_to_nat_and_back:forall z j, 0 <= z < 100 ->
+                                    (S (Z.to_nat z) <= j <= 100)%nat ->
+                                    z < (Z.of_nat j).
+Proof.
+  intros.
+  rewrite Z2Nat.inj_lt;[|omega|omega].
+  rewrite Nat2Z.id.
+  apply lt_S_n.
+  omega.
+Qed.
+
+Lemma size_put: forall m k v, match amPut m k v with
+                                    |Some map =>
+                                     amPartSize map 100 = S (amPartSize m 100)
+                                    |None => True
+                                  end.
+Proof.
+  intros.
+  destruct (amPut m k v) eqn:PUT';[|tauto];unfold amPut in PUT'.
+  assert (FEB:=amFindEmptyBound m (loop k) 99).
+  assert (FEC:=amFindEmptyCorrect m (loop k) 99).
+  destruct (find_empty m (loop k) 99) eqn: FE;[|discriminate PUT'].
+  injection PUT' as PUT;clear PUT'.
+  pose (x:=(S (Z.to_nat z))).
+  assert (amPartSize a 100 + amPartSize m x =
+          amPartSize m 100 + amPartSize a x)%nat.
+  {
+    apply size_not_care_above.
+    - subst x; apply Z_lt_nat_le_100;assumption.
+    - intros.
+      subst a;simpl.
+      destruct (Z.eq_dec (Z.of_nat j) z).
+      + apply z_to_nat_and_back with z j in FEB;[omega|assumption].
+      + tauto.
+  }
+  replace (amPartSize a x) with (S (amPartSize m x)) in H.
+  - omega.
+  - subst x.
+    unfold amPartSize; fold amPartSize.
+    replace (amPartSize a (Z.to_nat z))
+    with (amPartSize m (Z.to_nat z)).
+    + subst a;simpl.
+      rewrite Z2Nat.id;[|omega].
+      rewrite FEC.
+      destruct (Z.eq_dec z z);[omega|tauto].
+    + apply size_not_care.
+      intros.
+      subst a;simpl.
+      destruct (Z.eq_dec (Z.of_nat j) z).
+      * assert (j = Z.to_nat z) by (subst z; rewrite Nat2Z.id;tauto).
+        omega.
+      * tauto.
+Qed.
+
+Lemma size_erase: forall m k, match amErase m k with
+                                |Some map =>
+                                 S (amPartSize map 100) = amPartSize m 100
+                                |None => True
+                              end.
+Proof.
+  intros.
+  destruct (amErase m k) eqn:EZ';[|tauto];unfold amErase in EZ'.
+  assert (FKB:=amFindKeyBound m k (loop k) 99).
+  assert (FKC:=amFindKeyCorrect m k (loop k) 99).
+  destruct (find_key m (loop k) k 99) eqn: FK;[|discriminate EZ'].
+  injection EZ' as EZ;clear EZ'.
+  pose (x:=(S (Z.to_nat z))).
+  assert (amPartSize a 100 + amPartSize m x =
+          amPartSize m 100 + amPartSize a x)%nat.
+  {
+    apply size_not_care_above.
+    - subst x; apply Z_lt_nat_le_100;assumption.
+    - intros.
+      subst a;simpl.
+      destruct (Z.eq_dec (Z.of_nat j) z).
+      + apply z_to_nat_and_back with z j in FKB;[omega|assumption].
+      + tauto.
+  }
+  replace (amPartSize m x) with (S (amPartSize a x)) in H.
+  - omega.
+  - subst x.
+    unfold amPartSize; fold amPartSize.
+    replace (amPartSize a (Z.to_nat z))
+    with (amPartSize m (Z.to_nat z)).
+    + subst a;simpl.
+      rewrite Z2Nat.id;[|omega].
+      unfold is_true in FKC;decompose record FKC.
+      rewrite H0.
+      destruct (Z.eq_dec z z);[omega|tauto].
+    + apply size_not_care.
+      intros.
+      subst a;simpl.
+      destruct (Z.eq_dec (Z.of_nat j) z).
+      * assert (j = Z.to_nat z) by (subst z; rewrite Nat2Z.id;tauto).
+        omega.
+      * tauto.
+Qed.
