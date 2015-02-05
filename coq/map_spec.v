@@ -1129,7 +1129,9 @@ Function amPartSize(m:ArrMapZ)(i:nat) : nat :=
     |O => O
   end.
 
-Lemma fullsize: forall m i, (i <= 100)%nat -> full m -> (amPartSize m i = i)%nat.
+Function amSize(m:ArrMapZ) : nat := amPartSize m 100.
+
+Lemma fullpsize: forall m i, (i <= 100)%nat -> full m -> (amPartSize m i = i)%nat.
 Proof.
   intros m i BND FULL.
   induction i;unfold amPartSize.
@@ -1145,7 +1147,7 @@ Proof.
     omega.
 Qed.
 
-Lemma size_less_linear: forall m i, (amPartSize m i <= i)%nat.
+Lemma psize_less_linear: forall m i, (amPartSize m i <= i)%nat.
 Proof.
   intros m i.
   induction i;unfold amPartSize;fold amPartSize.
@@ -1153,7 +1155,7 @@ Proof.
   - destruct (busybits m (Z.of_nat i));omega.
 Qed.
 
-Lemma size_less_linear_inc: forall m i1 i2, (amPartSize m i1 < i1)%nat ->
+Lemma psize_less_linear_inc: forall m i1 i2, (amPartSize m i1 < i1)%nat ->
                                             (amPartSize m (i1 + i2) < (i1 + i2))%nat.
 Proof.
   intros.
@@ -1166,7 +1168,7 @@ Proof.
     + omega.
 Qed.
 
-Lemma size_non_full: forall m, ~full m -> exists i, (amPartSize m i < i /\
+Lemma psize_non_full: forall m, ~full m -> exists i, (amPartSize m i < i /\
                                                      i <= 100)%nat.
 Proof.
   intros m NONFULL.
@@ -1189,7 +1191,7 @@ Proof.
       rewrite Z2Nat.id;[|omega].
       destruct (busybits m (loop x)).
       * tauto.
-      * assert (SLL:=size_less_linear m n).
+      * assert (SLL:=psize_less_linear m n).
         destruct (busybits m (Z.of_nat n));omega.
   - assert (Z.to_nat (loop x) < 100)%nat.
     {
@@ -1199,10 +1201,10 @@ Proof.
     omega.
 Qed.
 
-Lemma size_non_full_100: forall m, ~full m -> (amPartSize m 100 < 100)%nat.
+Lemma psize_non_full_100: forall m, ~full m -> (amPartSize m 100 < 100)%nat.
 Proof.
   intros.
-  apply size_non_full in H.
+  apply psize_non_full in H.
   decompose record H.
   pose (y:= 100 - (Z.of_nat x)).
   pose (i:= Z.to_nat y).
@@ -1220,40 +1222,40 @@ Proof.
       omega.
   }
   rewrite CENT.
-  apply size_less_linear_inc.
+  apply psize_less_linear_inc.
   assumption.
 Qed.
 
-Lemma sizefull: forall m, (forall i, i <= 100 -> amPartSize m i = i)%nat -> full m.
+Lemma psizefull: forall m, (forall i, i <= 100 -> amPartSize m i = i)%nat -> full m.
 Proof.
   intros.
   apply NNPP.
   contradict H.
-  apply size_non_full in H.
+  apply psize_non_full in H.
   decompose record H.
   intro SIZEID.
   specialize SIZEID with x.
   intuition.
 Qed.
 
-Lemma size100full: forall m, (amPartSize m 100 = 100)%nat -> full m.
+Lemma psize100full: forall m, (amPartSize m 100 = 100)%nat -> full m.
 Proof.
   intros.
   intros.
   apply NNPP.
   contradict H.
-  apply size_non_full_100 in H.
+  apply psize_non_full_100 in H.
   omega.
 Qed.  
 
-Lemma full_size_100: forall m, full m <-> (amPartSize m 100 = 100)%nat.
+Lemma full_psize_100: forall m, full m <-> (amPartSize m 100 = 100)%nat.
 Proof.
   split;intro.
-  - apply fullsize;[omega|assumption].
-  - apply size100full;assumption.
+  - apply fullpsize;[omega|assumption].
+  - apply psize100full;assumption.
 Qed.
 
-Lemma size_not_care: forall m1 m2 i,
+Lemma psize_not_care: forall m1 m2 i,
                        (forall j, 0 <= j < i ->
                                   busybits m1 (Z.of_nat j) = 
                                   busybits m2 (Z.of_nat j))%nat ->
@@ -1270,7 +1272,7 @@ Proof.
     tauto.
 Qed.
 
-Lemma size_not_care_above:
+Lemma psize_not_care_above:
   forall m1 m2 i, (i <= 100)%nat ->
     (forall j, i <= j <= 100 ->
                busybits m1 (Z.of_nat j) =
@@ -1310,7 +1312,7 @@ Proof.
   omega.
 Qed.
 
-Lemma size_put: forall m k v, match amPut m k v with
+Lemma psize_put: forall m k v, match amPut m k v with
                                     |Some map =>
                                      amPartSize map 100 = S (amPartSize m 100)
                                     |None => True
@@ -1326,7 +1328,7 @@ Proof.
   assert (amPartSize a 100 + amPartSize m x =
           amPartSize m 100 + amPartSize a x)%nat.
   {
-    apply size_not_care_above.
+    apply psize_not_care_above.
     - subst x; apply Z_lt_nat_le_100;assumption.
     - intros.
       subst a;simpl.
@@ -1344,7 +1346,7 @@ Proof.
       rewrite Z2Nat.id;[|omega].
       rewrite FEC.
       destruct (Z.eq_dec z z);[omega|tauto].
-    + apply size_not_care.
+    + apply psize_not_care.
       intros.
       subst a;simpl.
       destruct (Z.eq_dec (Z.of_nat j) z).
@@ -1353,7 +1355,7 @@ Proof.
       * tauto.
 Qed.
 
-Lemma size_erase: forall m k, match amErase m k with
+Lemma psize_erase: forall m k, match amErase m k with
                                 |Some map =>
                                  S (amPartSize map 100) = amPartSize m 100
                                 |None => True
@@ -1369,7 +1371,7 @@ Proof.
   assert (amPartSize a 100 + amPartSize m x =
           amPartSize m 100 + amPartSize a x)%nat.
   {
-    apply size_not_care_above.
+    apply psize_not_care_above.
     - subst x; apply Z_lt_nat_le_100;assumption.
     - intros.
       subst a;simpl.
@@ -1388,11 +1390,44 @@ Proof.
       unfold is_true in FKC;decompose record FKC.
       rewrite H0.
       destruct (Z.eq_dec z z);[omega|tauto].
-    + apply size_not_care.
+    + apply psize_not_care.
       intros.
       subst a;simpl.
       destruct (Z.eq_dec (Z.of_nat j) z).
       * assert (j = Z.to_nat z) by (subst z; rewrite Nat2Z.id;tauto).
         omega.
       * tauto.
+Qed.
+
+
+Lemma full_size: forall m, full m <-> (amSize m = 100)%nat.
+Proof.
+  unfold amSize;apply full_psize_100.
+Qed.
+
+Lemma non_full_size: forall m, ~ full m <-> (amSize m < 100)%nat.
+Proof.
+  split;intro.
+  - apply psize_non_full_100;assumption.
+  - contradict H.
+    apply full_size in H.
+    omega.
+Qed.    
+
+Lemma size_put: forall m k v, match amPut m k v with
+                                    |Some map =>
+                                     amSize map = S (amSize m)
+                                    |None => True
+                                  end.
+Proof.
+  unfold amSize; apply psize_put.
+Qed.
+
+Lemma size_erase: forall m k, match amErase m k with
+                                |Some map =>
+                                 S (amSize map) = amSize m
+                                |None => True
+                              end.
+Proof.
+  unfold amSize; apply psize_erase.
 Qed.
