@@ -80,3 +80,24 @@ int erase(int* busybits, int* keys, int key)
     busybits[index] = 0;
     return 0;
 }
+
+int size_rec(int* busybits, int i)
+{
+    if (0 == i)
+    {
+        return 0;
+    }
+    int index = i - 1;
+    int bb = busybits[index];
+
+    if (1 == bb)
+    {
+        return 1 + size_rec(busybits, i - 1);
+    }
+    return size_rec(busybits, i - 1);
+}
+
+int size(int* busybits)
+{
+    return size_rec(busybits, 100);
+}
