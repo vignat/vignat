@@ -1,284 +1,15 @@
 Require Import floyd.proofauto.
 Require Import map.
 Require Import map_spec.
+Require Import map_impl_spec.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Psatz.
 
 Local Open Scope logic.
 Local Open Scope Z.
 
-(* Auxillary definitions *)
-Inductive repr : Z -> val -> Prop :=
-| mk_repr : forall z, Int.min_signed <= z <= Int.max_signed -> repr z (Vint (Int.repr z)).
-
-Inductive Nrepr : nat -> val -> Prop :=
-| mk_Nrepr : forall i:nat, (0 <= Z.of_nat i <= Int.max_signed) ->
-                           Nrepr i (Vint (Int.repr (Z.of_nat i))).
-
-(* Function specifications *)
-Definition loop_spec :=
-  DECLARE _loop
-    WITH sh : share, k : Z, vk : val
-    PRE [_k OF tint]
-        PROP (repr k vk)
-        LOCAL(`(eq vk) (eval_id _k))
-        SEP ()
-    POST [tint] local(`(eq (Vint (Int.repr (loop k)))) retval) && emp.
-
-Definition find_empty_spec :=
-  DECLARE _find_empty
-    WITH sh : share, m : ArrMapZ, start : Z, i : nat,
-         vbb : val, vstart : val, vi : val
-    PRE [_busybits OF (tptr tint), _start OF tint, _i OF tint]
-        PROP (0 <= start < 100;
-              repr start vstart; Nrepr i vi; isptr vbb;
-              (Z.of_nat i < 261905)(*my max recursion depth*))
-        LOCAL (`(eq vstart) (eval_id _start);
-               `(eq vi) (eval_id _i);
-               `(eq vbb) (eval_id _busybits))
-        SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits))
-    POST [tint]
-         PROP()
-         LOCAL (`(match (find_empty m start i) with
-                    |Some x => (eq (Vint (Int.repr x)))
-                    |None => (eq (Vint (Int.repr (-1))))
-                  end) retval)
-         SEP (`(array_at tint sh (fun x =>
-                                    (Vint (Int.repr (if (busybits m x)
-                                                     then 1
-                                                     else 0))))
-                         0 100 vbb)).
-
-Notation "'WITH'  x1 : t1 , x2 : t2 , x3 : t3 , x4 : t4 , x5 : t5 ,
-                  x6 : t6 , x7 : t7 , x8 : t8 , x9 : t9 , x10 : t10
-                  'PRE'  [ u , .. , v ] P 'POST' [ tz ] Q" :=
-     (mk_funspec ((cons u%formals .. (cons v%formals nil) ..), tz)
-                 (t1*t2*t3*t4*t5*t6*t7*t8*t9*t10)
-           (fun x => match x with (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) =>
-                                  P%logic end)
-           (fun x => match x with (x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) =>
-                                  Q%logic end))
-            (at level 200, x1 at level 0, x2 at level 0, x3 at level 0,
-                           x4 at level 0, x5 at level 0, x6 at level 0,
-                           x7 at level 0, x8 at level 0, x9 at level 0,
-                           x10 at level 0, P at level 100, Q at level 100).
-
-Notation "'WITH'  x1 : t1 , x2 : t2 , x3 : t3 , x4 : t4 , x5 : t5 ,
-                  x6 : t6 , x7 : t7 , x8 : t8 , x9 : t9
-                  'PRE'  [ u , .. , v ] P 'POST' [ tz ] Q" :=
-     (mk_funspec ((cons u%formals .. (cons v%formals nil) ..), tz)
-                 (t1*t2*t3*t4*t5*t6*t7*t8*t9)
-           (fun x => match x with (x1,x2,x3,x4,x5,x6,x7,x8,x9) =>
-                                  P%logic end)
-           (fun x => match x with (x1,x2,x3,x4,x5,x6,x7,x8,x9) =>
-                                  Q%logic end))
-            (at level 200, x1 at level 0, x2 at level 0, x3 at level 0,
-                           x4 at level 0, x5 at level 0, x6 at level 0,
-                           x7 at level 0, x8 at level 0, x9 at level 0,
-                           P at level 100, Q at level 100).
-
-Definition find_key_spec :=
-  DECLARE _find_key
-    WITH sh : share, m : ArrMapZ, start : Z, key : Z, i : nat,
-         vbb : val, vkeys : val, vstart : val, vkey : val, vi : val
-    PRE [_busybits OF (tptr tint), _keys OF (tptr tint),
-         _start OF tint, _key OF tint, _i OF tint]
-        PROP (0 <= start < 100;
-              repr start vstart;
-              repr key vkey; Nrepr i vi; isptr vbb; isptr vkeys;
-              (Z.of_nat i < 261905);(*my max recursion depth*)
-              (forall x, (Int.min_signed <= keys m x <= Int.max_signed)))
-        LOCAL (`(eq vstart) (eval_id _start);
-               `(eq vkey) (eval_id _key);
-               `(eq vi) (eval_id _i);
-               `(eq vbb) (eval_id _busybits);
-               `(eq vkeys) (eval_id _keys))
-        SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits);
-             `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                        0 100) (eval_id _keys))
-    POST [tint]
-         PROP()
-         LOCAL (`(match (find_key m start key i) with
-                    |Some x => (eq (Vint (Int.repr x)))
-                    |None => (eq (Vint (Int.repr (-1))))
-                  end) retval)
-         SEP (`(array_at tint sh (fun x =>
-                                    (Vint (Int.repr (if (busybits m x)
-                                                     then 1
-                                                     else 0))))
-                         0 100 vbb);
-              `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                         0 100 vkeys)).
-
-Definition get_spec :=
-  DECLARE _get
-    WITH sh : share, m : ArrMapZ, key : Z,
-         vbb : val, vkeys : val, vvals : val, vkey : val
-    PRE [_busybits OF (tptr tint), _keys OF (tptr tint),
-         _values OF (tptr tint), _key OF tint]
-         PROP (repr key vkey; isptr vbb; isptr vkeys; isptr vvals;
-              (forall x, (Int.min_signed <= keys m x <= Int.max_signed)))
-         LOCAL (`(eq vkey) (eval_id _key);
-                `(eq vbb) (eval_id _busybits);
-                `(eq vkeys) (eval_id _keys);
-                `(eq vvals) (eval_id _values))
-         SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits);
-             `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                        0 100) (eval_id _keys);
-             `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
-                        0 100) (eval_id _values))
-     POST [tint]
-          PROP()
-          LOCAL (`(match (amGet m key) with
-                    |Some x => (eq (Vint (Int.repr x)))
-                    |None => (eq (Vint (Int.repr (-1))))
-                  end) retval)
-          SEP (`(array_at tint sh (fun x =>
-                                     (Vint (Int.repr (if (busybits m x)
-                                                      then 1
-                                                      else 0))))
-                          0 100 vbb);
-               `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                          0 100 vkeys);
-               `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
-                          0 100 vvals)).
-
-Definition put_spec :=
-  DECLARE _put
-    WITH sh : share, m : ArrMapZ, key : Z, val : Z,
-         vbb : val, vkeys : val, vvals : val, vkey : val, vval : val
-    PRE [_busybits OF (tptr tint), _keys OF (tptr tint),
-         _values OF (tptr tint), _key OF tint, _value OF tint]
-        PROP (repr key vkey; repr val vval;
-              isptr vbb; isptr vkeys; isptr vvals;
-              writable_share sh)
-        LOCAL (`(eq vkey) (eval_id _key);
-               `(eq vval) (eval_id _value);
-               `(eq vbb) (eval_id _busybits);
-               `(eq vkeys) (eval_id _keys);
-               `(eq vvals) (eval_id _values))
-        SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits);
-             `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                        0 100) (eval_id _keys);
-             `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
-                        0 100) (eval_id _values))
-    POST [tint] (match (amPut m key val) with
-                   |Some ret => (`(array_at tint sh
-                                           (fun x => (Vint (Int.repr
-                                                              (if (busybits ret x)
-                                                               then 1 else 0))))
-                                           0 100 vbb) *
-                                 `(array_at tint sh
-                                           (fun x => (Vint (Int.repr (keys ret x))))
-                                           0 100 vkeys) *
-                                 `(array_at tint sh
-                                           (fun x => (Vint (Int.repr (values ret x))))
-                                           0 100 vvals))
-                   |None => (local (`(eq (Vint (Int.repr (-1)))) retval))
-                 end).
-
-Definition erase_spec :=
-  DECLARE _erase
-    WITH sh : share, m : ArrMapZ, key : Z,
-         vbb : val, vkeys : val, vkey : val
-    PRE [_busybits OF (tptr tint), _keys OF (tptr tint),
-         _key OF tint]
-        PROP (repr key vkey;
-              isptr vbb; isptr vkeys;
-              (forall x, (Int.min_signed <= keys m x <= Int.max_signed));
-              writable_share sh)
-        LOCAL (`(eq vkey) (eval_id _key);
-               `(eq vbb) (eval_id _busybits);
-               `(eq vkeys) (eval_id _keys))
-        SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits);
-             `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
-                        0 100) (eval_id _keys))
-    POST [tint] (match (amErase m key) with
-                   |Some ret => (`(array_at tint sh
-                                           (fun x => (Vint (Int.repr
-                                                              (if (busybits ret x)
-                                                               then 1 else 0))))
-                                           0 100 vbb) *
-                                 `(array_at tint sh
-                                           (fun x => (Vint (Int.repr (keys ret x))))
-                                           0 100 vkeys))
-                   |None => (local (`(eq (Vint (Int.repr (-1)))) retval))
-                 end).
-
-Definition size_rec_spec :=
-  DECLARE _size_rec
-    WITH sh : share, m : ArrMapZ, i : nat,
-         vbb : val, vi : val
-    PRE [_busybits OF (tptr tint), _i OF tint]
-        PROP ((Z.of_nat i <= 100);
-              Nrepr i vi; isptr vbb)
-        LOCAL (`(eq vi) (eval_id _i);
-               `(eq vbb) (eval_id _busybits))
-        SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits))
-    POST [tint]
-         PROP()
-         LOCAL (`(eq (Vint (Int.repr (Z.of_nat (amPartSize m i))))) retval)
-         SEP (`(array_at tint sh (fun x =>
-                                    (Vint (Int.repr (if (busybits m x)
-                                                     then 1
-                                                     else 0))))
-                         0 100 vbb)).
-
-Definition size_spec :=
-  DECLARE _size
-    WITH sh : share, m : ArrMapZ, vbb : val
-    PRE [_busybits OF (tptr tint)]
-        PROP (isptr vbb)
-        LOCAL (`(eq vbb) (eval_id _busybits))
-        SEP (`(array_at tint sh (fun x =>
-                                   (Vint (Int.repr (if (busybits m x)
-                                                    then 1
-                                                    else 0))))
-                        0 100) (eval_id _busybits))
-    POST [tint]
-         PROP()
-         LOCAL (`(eq (Vint (Int.repr (Z.of_nat (amSize m))))) retval)
-         SEP (`(array_at tint sh (fun x =>
-                                    (Vint (Int.repr (if (busybits m x)
-                                                     then 1
-                                                     else 0))))
-                         0 100 vbb)).
-          
-
-
-Definition Vprog : varspecs := nil.
-Definition Gprog : funspecs :=  loop_spec :: find_empty_spec :: find_key_spec
-                                          :: get_spec :: put_spec :: erase_spec
-                                          :: size_rec_spec :: size_spec :: nil.
-
-
 (* Helper tactics *)
 Ltac unfold_int_limits :=
-  
   unfold Int.min_signed, Int.max_signed, Int.half_modulus,
          Int.modulus, two_power_nat, Int.wordsize, Wordsize_32.wordsize,
          shift_nat, nat_iter;
@@ -294,19 +25,23 @@ Ltac unfold_int_limits :=
          end.
 
 Ltac unfold_to_bare_Z :=
-  unfold force_val, sem_mod, sem_add_default, sem_cast_neutral, sem_binarith;
-  unfold both_int, sem_cast_neutral, Int.mods, force_val; simpl;
-  repeat rewrite Int.signed_repr;
-  repeat rewrite add_repr;
-  repeat rewrite sub_repr;
-  repeat rewrite sem_add_pi_ptr;
-  repeat rewrite mul_repr;
-  simpl;
+  unfold force_val, sem_mod, sem_add_default,
+         sem_cast_neutral, sem_binarith in *;
+  unfold both_int, sem_cast_neutral, Int.mods, force_val in *; simpl;
   try (unfold_int_limits; simpl; omega);
   try tauto.
 
 Ltac auto_logic :=
-  repeat rewrite andb_false_r; repeat rewrite andb_false_l; simpl; auto.
+  match goal with
+    |[H:?x = false |-context[?x]] => rewrite H
+    |[H:?x = false, A:context[?x]|-_] => rewrite H in A
+    |[H:?x = true |-context[?x]] => rewrite H
+    |[H:?x = true, A:context[?x]|-_] => rewrite H in A
+    |[H:context[(?b && false)%bool]|-_] => rewrite andb_false_r in H
+    |[|-context[(?b && false)%bool]] => rewrite andb_false_r
+    |[H:context[(false && ?b)%bool]|-_] => rewrite andb_false_l in H
+    |[|-context[(false && ?b)%bool]] => rewrite andb_false_l
+  end.
 
 Ltac repr_bound k :=
   match goal with
@@ -315,93 +50,53 @@ Ltac repr_bound k :=
     |[H:repr k _ |-context[k <= Int.max_signed]] => inv H
   end.
 
-Ltac get_repr k :=
-    match goal with
-      |[H:repr k (Vint ?a) |-context[?a]] =>
-       let H' := fresh a "EQ" k in
-       assert (a = (Int.repr k)) as H' by (inv H;tauto)
-      |[H:repr k (Vint ?a),X:context[?a]|-_] =>
-       let H' := fresh a "EQ" k in
-       assert (a = (Int.repr k)) as H' by (inv H;tauto)
-      |[H:repr k ?a |-context[?a]] =>
-       let H' := fresh "EQ" k in
-       assert (a = (Vint (Int.repr k))) as H' by (inv H; tauto)
-      |[H:repr k ?a,X:context[?a]|-_] =>
-       let H' := fresh "EQ" k in
-       assert (a = (Vint (Int.repr k))) as H' by (inv H; tauto)
-      |[H1:repr k ?a, H2:?a = Vint ?b |-context[?b]] =>
-       let H' := fresh "EQ" k in
-       assert (a = (Vint (Int.repr k))) as H' by (inv H1; tauto);
-         let Hinj := fresh "EQ" H2 in
-         rewrite H' in H2; injection H2 as Hinj; symmetry in Hinj
-      |[H1:repr k ?a, H2:?a = Vint ?b,X:context[?b]|-_] =>
-       let H' := fresh "EQ" k in
-       assert (a = (Vint (Int.repr k))) as H' by (inv H1; tauto);
-         let Hinj := fresh "EQ" H2 in
-         rewrite H' in H2; injection H2 as Hinj; symmetry in Hinj
-      |[H1:Nrepr k ?a, H2:?a = Vint ?b|-context[?b]] =>
-       let H' := fresh "EQ" k in
-       assert (a = (Vint (Int.repr (Z.of_nat k)))) as H' by (inv H1; tauto);
-         let Hinj := fresh "EQ" H2 in
-         rewrite H' in H2; injection H2 as Hinj; symmetry in Hinj
-      |[H1:Nrepr k ?a, H2:?a = Vint ?b, X:context[?b]|-_] =>
-       let H' := fresh "EQ" k in
-       assert (a = (Vint (Int.repr (Z.of_nat k)))) as H' by (inv H1; tauto);
-         let Hinj := fresh "EQ" H2 in
-         rewrite H' in H2; injection H2 as Hinj; symmetry in Hinj
-      |[H:Nrepr k (Vint ?a),X:context[?a]|-_] =>
-       let H' := fresh H "EQ" k in
-       assert (a = (Int.repr (Z.of_nat k))) as H' by (inv H;tauto)
-    end;
-    match goal with
-      |[H:?a = (Int.repr k)|-context[Int.signed ?a]] =>
-       rewrite H; rewrite Int.signed_repr;[|repr_bound k]
-      |[H:?a = (Int.repr k),X:context[Int.signed ?a]|-_] =>
-       rewrite H in X; rewrite Int.signed_repr in X;[|repr_bound k]
-      |[H:?a = (Int.repr k)|-context[?a]] => rewrite H
-      |[H:?a = (Int.repr k),X:context[?a]|-_] => rewrite H in X
-      |[H:?a = (Vint (Int.repr k))|-context[?a]] => rewrite H
-      |[H:?a = (Vint (Int.repr k)),X:context[?a]|-_] => rewrite H in X
-      |[H:?a = (Int.repr Z.of_nat(k))|-context[Int.signed ?a]] =>
-       rewrite H; rewrite Int.signed_repr;[|repr_bound k]
-      |[H:?a = (Int.repr Z.of_nat(k)),X:context[Int.signed ?a]|-_] =>
-       rewrite H in X; rewrite Int.signed_repr in X;[|repr_bound k]
-      |[H:?a = (Int.repr (Z.of_nat k))|-context[?a]] => rewrite H
-      |[H:?a = (Int.repr (Z.of_nat k)),X:context[?a]|-_] => rewrite H in X
-      |[H:?a = (Vint (Int.repr (Z.of_nat k)))|-context[?a]] => rewrite H
-      |[H:?a = (Vint (Int.repr (Z.of_nat k))),X:context[?a]|-_] => rewrite H in X
-      |[H:k = ?a|-context[?a]]=>rewrite <- H
-      |[H:k = ?a,X:context[?a]|-_]=>rewrite <- H in X
-    end.
-
+Ltac does_not_have Z :=
+  match goal with
+    | _ : Z |- _ => fail 1
+    | |- _ => idtac
+  end.
 
 Ltac int_eq_spec :=
-     match goal with
-          |[H:Int.eq ?a ?b = true|-_] =>
-           let H' := fresh "EQSPEC" in
-           assert (H':=Int.eq_spec a b);
-             rewrite H in H'
-          |[H:Int.eq ?a ?b = false|-_] =>
-           let H' := fresh "EQSPEC" in
-           assert (H':=Int.eq_spec a b);
-             rewrite H in H'
-          end.
+  match goal with
+    |[H:Int.eq ?a ?b = true|-_] =>
+     does_not_have (a = b);
+       let H' := fresh "EQSPEC" in
+       assert (H':=Int.eq_spec a b);
+         rewrite H in H'
+    |[H:Int.eq ?a ?b = false|-_] =>
+     does_not_have (a <> b);
+       let H' := fresh "EQSPEC" in
+       assert (H':=Int.eq_spec a b);
+         rewrite H in H'
+  end.
 
 Ltac unfold_to_simpl :=
-        match goal with
-          |[H:context[force_val _] |-_] =>
-           unfold force_val in H; simpl in H
-          |[H:context[sem_sub_default _] |-_] =>
-           unfold sem_sub_default in H; simpl H
-        end.
+  match goal with
+    |[H:context[force_val _] |-_] =>
+     unfold force_val in H; simpl in H
+    |[H:context[sem_sub_default _] |-_] =>
+     unfold sem_sub_default in H; simpl H
+  end.
 
 Ltac int_arith :=
-    match goal with
-        |[|-context[Int.sub (Int.repr _) (Int.repr _)]] =>
-         rewrite sub_repr
-        |[H:context[Int.sub (Int.repr _) (Int.repr _)]|-_] =>
-         rewrite sub_repr in H
-    end.
+  match goal with
+    |[|-context[Int.sub (Int.repr _) (Int.repr _)]] =>
+     rewrite sub_repr
+    |[H:context[Int.sub (Int.repr _) (Int.repr _)]|-_] =>
+     rewrite sub_repr in H
+    |[|-context[Int.add (Int.repr _) (Int.repr _)]] =>
+     rewrite add_repr
+    |[H:context[Int.add (Int.repr _) (Int.repr _)]|-_] =>
+     rewrite add_repr in H
+    |[|-context[Int.mul (Int.repr _) (Int.repr _)]] =>
+     rewrite mul_repr
+    |[H:context[Int.mul (Int.repr _) (Int.repr _)]|-_] =>
+     rewrite mul_repr in H
+    |[|-context[sem_add_pi _ _ (Vint _)]] =>
+     rewrite sem_add_pi_ptr
+    |[H:context[sem_add_pi _ _ (Vint _)]|-_] =>
+     rewrite sem_add_pi_ptr in H
+  end.
 
 Ltac rebase_to_prev x:=
   let n := fresh "n" with
@@ -432,45 +127,32 @@ Ltac nat2z :=
      rewrite Nat2Z.inj_sub
     |[H:context[Z.of_nat(_ - _)]|-_] =>
      rewrite Nat2Z.inj_sub in H
+    |[|-context[_:nat = _:nat]] =>
+     rewrite <- Nat2Z.inj_iff
+    |[H:0 = Z.of_nat ?n|-_] =>
+     does_not_have (n = 0)%nat;
+       assert (n = 0)%nat by omega
+    |[H:Z.of_nat ?n = 0|-_] =>
+     does_not_have (n = 0)%nat;
+       assert (n = 0)%nat by omega
+    |[H:0 <> Z.of_nat ?n|-_] =>
+     does_not_have (n <> 0)%nat;
+       assert (n <> 0)%nat by omega
+    |[H:Z.of_nat ?n <> 0|-_] =>
+     does_not_have (n <> 0)%nat;
+       assert (n <> 0)%nat by omega
   end.
 
-Ltac eq_to_args :=
-        match goal with
-          |[H:Vint _ = Vint _ |- _] =>
-           let H' := fresh H "inj" in
-           injection H as H'
-          |[H:Int.repr ?a <> Int.repr ?b|-_] =>
-           let H':= fresh H "ns" in
-           assert (a <> b) as H' by
-                               (destruct (Z.eq_dec a b);
-                                [assert (Int.repr a = Int.repr b) by
-                                    (apply f_equal;tauto);tauto|
-                                 auto])
-          |[H:Int.repr ?a = Int.repr ?b|-_] =>
-           let H' := fresh H "inj" in
-           injection H as H'; rewrite Int.Z_mod_modulus_eq in H';
-           rewrite Z.mod_small in H'
-        end.
+Ltac solve_bound :=
+  unfold_int_limits;
+  match goal with
+    |[|-context[(if ?c then 1 else 0)]] =>
+     assert (0 <= (if c then 1 else 0) <= 1)
+       by (destruct c;omega)
+    |_ => idtac
+  end;
+  solve [auto|omega|simpl in *;omega].
 
-Ltac c_bool :=
-      match goal with
-        |[H:1<>(if ?c then 1 else 0)|-_] =>
-         let H' := fresh H "b" in
-         destruct c eqn: H';[tauto|]
-        |[H:1=(if ?c then 1 else 0)|-_] =>
-         let H' := fresh H "b" in
-         destruct c eqn: H';[|discriminate]
-      end.
-
-Ltac int_subst x :=
-    match goal with
-        |[H:Int.repr _ = x |-context[Int.signed x]] =>
-         subst x; rewrite Int.signed_repr
-        |[H1:Int.repr _ = x,H2:context[Int.signed x]|-_] =>
-         subst x; rewrite Int.signed_repr in H2
-    end.
-
-(* Auxillary lemmas *)
 Lemma f_notequal: forall (A B : Type) (f : A -> B) (x y : A), ~ f x = f y -> ~ x = y.
 Proof.
   pose proof f_equal as FEQ.
@@ -486,18 +168,6 @@ Proof.
   apply f_notequal with Z Int.intval. 
   simpl.
   omega.
-Qed.
-
-Lemma int_if_false: forall expr:bool,
-                      Int.eq (Int.repr 0)
-                             (Int.repr (if expr then 1 else 0)) = true ->
-                      expr = false.
-Proof.
-  intros.
-  destruct expr.
-  apply int_eq_e in H.
-  discriminate H.
-  tauto.
 Qed.
 
 Lemma int_modulus_eq: forall a b, Int.min_signed <= a <= Int.max_signed ->
@@ -544,38 +214,144 @@ Proof.
       rewrite Zmod_small;omega.
 Qed.
 
-Lemma Nrepr0_is_0 n i:
-  Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = true -> (0 = n)%nat.
-Proof.
-  inversion 1. subst. intro A.
-  symmetry in A. apply binop_lemmas.int_eq_true in A.
-  inv A.
-  rewrite Int.Z_mod_modulus_eq in H1.
-  rewrite <- Nat2Z.inj_iff.
-  rewrite <- Zmod_small with (x:=Z.of_nat n) (y:=Int.modulus).
-  simpl; assumption.
-  split.
-  - omega.
-  - inv H2.
-    unfold_int_limits.
-    simpl in H3.
-    omega.
-Qed.
+Ltac eq_to_args :=
+  match goal with
+    |[H:Int.neg (Int.repr 1) = Int.repr ?a|-_] =>
+     does_not_have (a = -1);
+     let H' := fresh H "inj" in
+     injection H as H';
+       replace 4294967295 with (Int.Z_mod_modulus (-1) ) in H';[|auto];
+       rewrite int_modulus_eq in H';[|solve_bound|solve_bound]
+    |[H:Vint (Int.repr ?a) = Vint (Int.neg (Int.repr 1))|-_] =>
+     does_not_have (a = -1);
+     let H' := fresh H "inj" in
+     injection H as H';
+       replace 4294967295 with (Int.Z_mod_modulus (-1) ) in H';[|auto];
+       rewrite int_modulus_eq in H';[|solve_bound|solve_bound]
+    |[H:Vint (Int.repr ?a) = Vint (Int.neg _)|-_] => fail 1
+    |[H:Vint ?a = Vint ?b |- _] =>
+     does_not_have (a = b);
+     let H' := fresh H "inj" in
+     injection H as H'
+    |[H:Int.repr ?a <> Int.repr ?b|-_] =>
+     does_not_have (a <> b);
+     let H':= fresh H "ns" in
+     assert (a <> b) as H' by
+                         (destruct (Z.eq_dec a b);
+                          [assert (Int.repr a = Int.repr b) by
+                              (apply f_equal;tauto);tauto|
+                           auto])
+    |[H:Int.repr ?a = Int.repr ?b|-_] =>
+     does_not_have (a = b);
+     let H' := fresh H "inj" in
+     injection H as H'; 
+       ((rewrite Int.Z_mod_modulus_eq in H';
+         rewrite Z.mod_small in H';[|solve_bound] )
+          || (rewrite int_modulus_eq in H';[|solve_bound|solve_bound]))
+    |[|-Int.repr ?a = Int.repr ?b] =>
+     apply f_equal
+  end.
 
+Ltac gr k :=
+  match goal with
+    |[H:repr k ?a |-_] =>
+     does_not_have (a = (Vint (Int.repr k)));
+       let H' := fresh "EQ" k with
+                 BND := fresh k "BND" in
+                         assert (a = (Vint (Int.repr k)))
+                       as H' by (inv H; tauto);
+                       assert (Int.min_signed <= k <= Int.max_signed)
+                          as BND by (repr_bound k)
+    |[H:Nrepr k ?a |-_] =>
+     does_not_have (a = (Vint (Int.repr (Z.of_nat k))));
+       let H' := fresh "EQ" k with
+                 BND := fresh k "BND" in
+                         assert (a = (Vint (Int.repr (Z.of_nat k))))
+                       as H' by (inv H; tauto);
+                       assert (0 <= Z.of_nat k <= Int.max_signed)
+                          as BND by (inv H; tauto)
+  end.
 
-Lemma Nrepr_neq_0 n i:
-  Nrepr n (Vint i) -> Int.eq (Int.repr 0) i = false -> (n <> 0)%nat.
-Proof.
-  inversion 1. subst. intro A.
-  SearchAbout Int.eq.
-  pose (B:=Int.eq_spec  (Int.repr 0) (Int.repr (Z.of_nat n))).
-  rewrite A in B.
-  destruct n.
-  simpl in B.
-  auto.
-  auto.
-Qed.
+Ltac unfold_if :=
+      match goal with
+        |[H:?x = (if ?c then ?x else ?y)|-_] =>
+         does_not_have (c = true);
+           let H' := fresh H "b" in
+           assert (c = true) as H' by (destruct c;auto)
+        |[H:?x <> (if ?c then ?x else ?y)|-_] =>
+         does_not_have (c = false);
+           let H' := fresh H "b" in
+           assert (c = false) as H' by (destruct c;auto)
+        |[H:?y = (if ?c then ?x else ?y)|-_] =>
+         does_not_have (c = false);
+           let H' := fresh H "b" in
+           assert (c = false) as H' by (destruct c;auto)
+        |[H:?y <> (if ?c then ?x else ?y)|-_] =>
+         does_not_have (c = true);
+           let H' := fresh H "b" in
+           assert (c = true) as H' by (destruct c;auto)
+      end.
 
+Ltac less_val :=
+  match goal with
+    |[x:val, H:?x = _|-_] => subst x
+    |[x:int, H:?x = _|-_] => subst x
+    |[x:val, H:_ = ?x|-_] => subst x
+    |[x:int, H:_ = ?x|-_] => subst x
+    |[x:Z, H:?x = 0|-_] => subst x
+    |[x:nat, H:?x = 0|-_] => subst x
+    |[H:eval_id ?x ?rho = _ |- context[eval_id ?x ?rho]] => rewrite H
+    |[H:_ = eval_id ?x ?rho |- context[eval_id ?x ?rho]] => rewrite <- H
+  end.
+
+Ltac get_all_reprs :=
+  repeat match goal with
+           |[H:repr ?a _|-_] => gr a
+           |[H:Nrepr ?a _|-_] => gr a
+         end.
+
+Ltac handle_signed :=
+  match goal with
+    |[H:context[Int.signed (Int.repr _)]|-_] =>
+     rewrite Int.signed_repr in H;[|solve_bound]
+    |[|-context[Int.signed (Int.repr _)]] =>
+     rewrite Int.signed_repr;[|solve_bound]
+  end.
+
+Ltac eqb_from_eq :=
+  match goal with
+    |[H:?a = ?b |-context[?a =? ?b]] =>
+     does_not_have (a =? b = true);
+     let H' := fresh H "b" in
+     assert (a =? b = true)
+       as H' by (apply Z.eqb_eq;auto)
+    |[H:?b = ?a |-context[?a =? ?b]] =>
+     does_not_have (a =? b = true);
+     let H' := fresh H "b" in
+     assert (a =? b = true)
+       as H' by (apply Z.eqb_eq;auto)
+    |[H:?a <> ?b |-context[?a =? ?b]] =>
+     does_not_have ((a =? b) = false);
+       let H' := fresh H "b" in
+       assert ((a =? b) = false)
+         as H' by (apply Z.eqb_neq;auto)
+    |[H:?b <> ?a |-context[?a =? ?b]] =>
+     does_not_have ((a =? b) = false);
+       let H' := fresh H "b" in
+       assert ((a =? b) = false)
+         as H' by (apply Z.eqb_neq;auto)
+    |[|-context[?a =? ?a]] => rewrite Z.eqb_refl
+  end.
+
+Ltac to_abstract :=
+  get_all_reprs;
+  unfold_to_bare_Z;
+  repeat (less_val || eq_to_args || int_arith || eqb_from_eq ||
+                   (handle_signed;repeat handle_signed) || int_eq_spec ||
+                   unfold_if || (auto_logic;repeat auto_logic) ||
+                   rewrite neq_100_mone || (progress simpl)).
+
+(* Auxillary lemmas *)
 Lemma rem_bound: forall a b, b > 0 -> -b < Z.rem a b < b.
 Proof.
   intros.
@@ -591,38 +367,19 @@ Proof.
     omega.
 Qed.
 
+(* Prohibit for simpl tactic to expand 1+x into an ugly match *)
+Arguments Z.add _ _ : simpl nomatch.
+
 (* Proofs for spec-body correspondence *)
 Lemma body_loop: semax_body Vprog Gprog f_loop loop_spec.
 Proof.
   start_function.
   name karg _k.
   forward.
-  entailer!.
-  - unfold_to_bare_Z.
-    rewrite neq_100_mone.
-    auto_logic.
-    rewrite neq_100_mone.
-    auto_logic.
-  - rewrite neq_100_mone.
-    auto_logic.
-  - unfold_to_bare_Z.
-    rewrite neq_100_mone.
-    auto_logic.
-    unfold_to_bare_Z.
-    auto_logic.
-  - unfold_to_bare_Z.
-    rewrite neq_100_mone.
-    auto_logic.
-    unfold_to_bare_Z.
-    auto_logic.
-    unfold loop.
-    get_repr k.
-    unfold_to_bare_Z.
-    + repr_bound k.
-    + assert (- (100) < Z.rem k 100 < 100)
-        by (apply rem_bound;omega).
-      unfold_to_bare_Z.
-    + repr_bound k.
+  unfold loop.
+  assert (- (100) < Z.rem k 100 < 100)
+    by (apply rem_bound;omega).
+  entailer!;to_abstract;tauto.
 Qed.
 
 Lemma body_find_empty: semax_body Vprog Gprog f_find_empty find_empty_spec.
@@ -633,25 +390,19 @@ Proof.
   name iarg _i.
   name indexloc _index.
   name bbloc _bb.
-  forward_call (sh,(start + Z.of_nat i + 1), (* loop(1 + start + i) *)
-                (Vint (Int.repr (start + Z.of_nat i + 1)))). {
+  forward_call (sh,(1 + start + Z.of_nat i), (* loop(1 + start + i) *)
+                (Vint (Int.repr (1 + start + Z.of_nat i)))). {
     entailer!. 
     - constructor.
-      unfold_to_bare_Z.
-    - get_repr start.
-      eq_to_args;subst sarg.
-      get_repr i.
-      replace (start + Z.of_nat i + 1) with (1 + start + Z.of_nat i);[|omega].
-      unfold_to_bare_Z.
+      to_abstract.
+    - to_abstract;tauto.
   }
   - auto with closed.
   - after_call.
     forward.
-    pose (Loop_bound (start + Z.of_nat i + 1)).
-    entailer!.
-    apply Loop_bound.
-    simpl;auto.
-    forward_if (PROP (busybits m (loop (start + Z.of_nat i + 1)) = true)
+    pose (Loop_bound (1 + start + Z.of_nat i)).
+    entailer!;[apply Loop_bound|simpl;auto].
+    forward_if (PROP (busybits m (loop (1 + start + Z.of_nat i)) = true)
                 LOCAL (`(eq vi) (eval_id _i);
                        `(eq vstart) (eval_id _start);
                        `(eq vbb) (eval_id _busybits))
@@ -660,24 +411,16 @@ Proof.
                                                      then 1
                                                      else 0))))
                          0 100 vbb))).
-    + pose (Loop_bound (start + Z.of_nat i + 1)).
+    + pose (Loop_bound (1 + start + Z.of_nat i)).
       forward. entailer!. rename H4 into BB.
       unfold find_empty.
       rewrite find_if_equation.
-      rewrite Int.signed_repr in BB;[|unfold_to_bare_Z].
-      apply int_if_false in BB.
-      replace (1 + start + Z.of_nat i) with (start + Z.of_nat i + 1);[|omega].
-      rewrite BB.
-      simpl;tauto.
+      to_abstract;tauto.
     + forward. entailer!. rename H4 into BB.
-      rewrite Int.signed_repr in BB.
-      * destruct ( busybits m (loop (start + Z.of_nat i + 1))).
-        tauto.
-        rewrite Int.eq_true in BB.
-        discriminate BB.
-      * pose (Loop_bound (start + Z.of_nat i + 1));unfold_to_bare_Z.
+      pose (Loop_bound (1 + start + Z.of_nat i)).
+      to_abstract;tauto.
     + forward_if (PROP((0 < i)%nat;
-                       busybits m (loop (start + Z.of_nat i + 1)) = true)
+                       busybits m (loop (1 + start + Z.of_nat i)) = true)
                   LOCAL(`(eq vi) (eval_id _i);
                         `(eq vstart) (eval_id _start);
                         `(eq vbb) (eval_id _busybits))
@@ -687,45 +430,31 @@ Proof.
                                                              else 0))))
                                  0 100 vbb))).
       * forward. entailer!. rename H4 into BB.
-        replace (start + Z.of_nat i + 1)
-        with (1 + start + Z.of_nat i) in BB;[|omega].
-        assert (0=i)%nat by (apply Nrepr0_is_0 with iarg;assumption).
-        subst i.
-        unfold find_empty.
-        rewrite find_if_equation.
-        rewrite BB.
-        auto_logic.
+        unfold find_empty; rewrite find_if_equation.
+        to_abstract;nat2z;to_abstract;tauto.
       * forward.
         entailer!.
-        assert (i<>0)%nat by (apply Nrepr_neq_0 with iarg;assumption).
-        omega.
+        to_abstract;omega.
       * forward_call(sh, m, start, (i - 1)%nat, vbb, vstart,
                      (Vint (Int.repr (Z.of_nat (i - 1))))). {
           entailer!. (* find_empty(busybits, start, i - 1) *)
-          - replace (Vint sarg) with (vstart);assumption.
+          - to_abstract;constructor;assumption.
           - constructor.
-            split.
-            omega.
-            nat2z;[|omega].
-            unfold_int_limits;simpl;omega.
+            nat2z;unfold_to_bare_Z.
           - nat2z;omega.
-          - get_repr i.
-            int_arith.
-            nat2z;[simpl;tauto|omega].
+          - to_abstract.
+            nat2z;simpl;omega.
         }
         after_call.
         forward.
-        entailer!. rename H5 into BB, H6 into FIN.
-        unfold find_empty.
+        entailer!. rename H6 into FIN.
+        unfold find_empty in *.
         rewrite find_if_equation.
-        replace (start + Z.of_nat i + 1) with (1 + start + Z.of_nat i) in BB;[|omega].
-        rewrite BB.
-        simpl.
-        destruct i;[omega|].
-        unfold find_empty in FIN.
-        replace (S i - 1)%nat with i in FIN;[|omega].
+        to_abstract.
+        rebase_to_prev i.
         assumption.
 Qed.
+
 
 Lemma body_find_key: semax_body Vprog Gprog f_find_key find_key_spec.
 Proof.
@@ -738,32 +467,22 @@ Proof.
   name indexloc _index.
   name bbloc _bb.
   name kloc _k.
-  forward_call (sh,(start + Z.of_nat i + 1), (* loop(1 + start + i) *)
-                (Vint (Int.repr (start + Z.of_nat i + 1)))). {
+  forward_call (sh,(1 + start + Z.of_nat i), (* loop(1 + start + i) *)
+                (Vint (Int.repr (1 + start + Z.of_nat i)))). {
     entailer!. 
-    - constructor.
-      unfold_to_bare_Z.
-    - get_repr start.
-      eq_to_args;subst sarg.
-      get_repr i.
-      replace (start + Z.of_nat i + 1)
-        with (1 + start + Z.of_nat i);[|omega].
-      unfold_to_bare_Z.
+    - constructor; to_abstract.
+    - to_abstract;tauto.
   }
   - auto with closed.
   - after_call.
     forward.
-    pose (Loop_bound (start + Z.of_nat i + 1)).
-    entailer!.
-    apply Loop_bound.
-    simpl;auto.
+    pose (Loop_bound (1 + start + Z.of_nat i)).
+    entailer!;[apply Loop_bound|simpl;auto].
     forward.
-    pose (Loop_bound (start + Z.of_nat i + 1)).
-    entailer!.
-    apply Loop_bound.
-    simpl;auto.
-    forward_if (PROP ((andb (busybits m (loop (start + Z.of_nat i + 1)))
-                            (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
+    pose (Loop_bound (1 + start + Z.of_nat i)).
+    entailer!;[apply Loop_bound|simpl;auto].
+    forward_if (PROP ((andb (busybits m (loop (1 + start + Z.of_nat i)))
+                            (Z.eqb key (keys m (loop (1 + start + Z.of_nat i))))) = false)
                 LOCAL (`(eq vi) (eval_id _i);
                        `(eq vstart) (eval_id _start);
                        `(eq vkey) (eval_id _key);
@@ -776,8 +495,8 @@ Proof.
                                0 100 vbb);
                     `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                0 100 vkeys))).
-    + forward_if (PROP ((andb (busybits m (loop (start + Z.of_nat i + 1)))
-                            (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
+    + forward_if (PROP ((andb (busybits m (loop (1 + start + Z.of_nat i)))
+                            (Z.eqb key (keys m (loop (1 + start + Z.of_nat i))))) = false)
                   LOCAL (`(eq vi) (eval_id _i);
                          `(eq vstart) (eval_id _start);
                          `(eq vkey) (eval_id _key);
@@ -791,48 +510,19 @@ Proof.
                       `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                  0 100 vkeys))).
       * forward. entailer!. rename H7 into KEQ, H8 into BB, H6 into KEYSBOUND.
-        pose (Loop_bound (start + Z.of_nat i + 1)).
-        rewrite Int.signed_repr in KEQ, BB;[|unfold_to_bare_Z|unfold_to_bare_Z].
+        pose (Loop_bound (1 + start + Z.of_nat i)).
         unfold find_key; rewrite find_if_equation.
-        assert ((key =? keys m (loop (start + Z.of_nat i + 1))) = true) as KK. {
-          apply int_eq_e in KEQ.
-          replace keyarg with (Int.repr key) in KEQ;[|(get_repr key;tauto)].
-          injection KEQ.
-          rewrite int_modulus_eq;[|apply KEYSBOUND|repr_bound key].
-          intro KEQK;rewrite KEQK.
-          apply Z.eqb_eq;tauto.
-        }
-        replace (1 + start + Z.of_nat i)
-        with (start + Z.of_nat i + 1);[|omega].
-        rewrite KK.
-        destruct (busybits m (loop (start + Z.of_nat i + 1)));[simpl;tauto|].
-        pose (EQSPEC:=Int.eq_spec (Int.repr 1) (Int.repr 0)).
-        rewrite BB in EQSPEC.
-        discriminate EQSPEC.
+        to_abstract. 
+        tauto.
       * forward. entailer!. rename H7 into KEQ.
-        pose (Loop_bound (start + Z.of_nat i + 1)).
-        rewrite Int.signed_repr in KEQ;[|unfold_to_bare_Z].
-        replace keyarg with (Int.repr key) in KEQ;[|get_repr key;tauto].
-        { destruct (Z.eq_dec key (keys m (loop (start + Z.of_nat i + 1)))).
-          - rewrite <- e in KEQ.
-            rewrite Int.eq_true in KEQ.
-            discriminate KEQ.
-          - replace (key =? keys m (loop (start + Z.of_nat i + 1)))
-            with false;[|symmetry; apply Z.eqb_neq;assumption].
-            auto_logic.
-        }
+        pose (Loop_bound (1 + start + Z.of_nat i)).
+        to_abstract;tauto.
     + forward. entailer!. rename H7 into BB.
-      pose (Loop_bound (start + Z.of_nat i + 1)).
-      rewrite Int.signed_repr in BB;[|unfold_to_bare_Z].
-      { replace (busybits m (loop (start + Z.of_nat i + 1))) with (false).
-        - simpl;tauto.
-        - destruct (busybits m (loop (start + Z.of_nat i + 1))).
-          + rewrite Int.eq_true in BB; discriminate BB.
-          + tauto.
-      }
+      pose (Loop_bound (1 + start + Z.of_nat i)).
+      to_abstract;tauto.
     + forward_if (PROP((0 < i)%nat;
-                       (andb (busybits m (loop (start + Z.of_nat i + 1)))
-                            (Z.eqb key (keys m (loop (start + Z.of_nat i + 1))))) = false)
+                       (andb (busybits m (loop (1 + start + Z.of_nat i)))
+                            (Z.eqb key (keys m (loop (1 + start + Z.of_nat i))))) = false)
                   LOCAL(`(eq vi) (eval_id _i);
                         `(eq vstart) (eval_id _start);
                         `(eq vkey) (eval_id _key);
@@ -847,46 +537,26 @@ Proof.
                                  0 100 vkeys))).
       * forward. entailer!. rename H7 into COND.
         unfold find_key; rewrite find_if_equation.
-        replace (1 + start + Z.of_nat i)
-        with (start + Z.of_nat i + 1);[|omega].
-        rewrite COND.
-        assert (0=i)%nat. {
-          apply Nrepr0_is_0 with iarg.
-          - assumption.
-          - rewrite Int.eq_sym;assumption.
-        }
-        subst i.
-        tauto.
+        to_abstract;nat2z;to_abstract;tauto.
       * forward. entailer!.
-        assert (i<>0)%nat. {
-          apply Nrepr_neq_0 with iarg.
-          - assumption.
-          - rewrite Int.eq_sym;assumption.
-        }
-        omega.
+        to_abstract.
+        nat2z;omega.
       * forward_call(sh, m, start, key, (i - 1)%nat, vbb, vkeys,
                      vstart, vkey, (Vint (Int.repr (Z.of_nat (i - 1))))). {
           entailer!. (* find_key(busybits, keys, start, key, i - 1) *)
-          - replace (Vint sarg) with (vstart);assumption.
-          - replace (Vint keyarg) with (vkey);assumption.
-          - constructor.
-            unfold_int_limits;simpl;lia.
-          - lia.
-          - get_repr i.
-            int_arith.
-            nat2z;auto.
+          - to_abstract. constructor. assumption.
+          - to_abstract. constructor;assumption.
+          - to_abstract. constructor. nat2z;solve_bound.
+          - nat2z;solve_bound.
+          - to_abstract. nat2z;auto.
         }
         after_call.
         forward.
         entailer!. rename H8 into COND, H9 into FIN.
-        unfold find_key.
+        unfold find_key in *.
         rewrite find_if_equation.
-        replace (start + Z.of_nat i + 1)
-        with (1 + start + Z.of_nat i) in COND;[|omega].
-        rewrite COND.
-        destruct i;[omega|].
-        unfold find_key in FIN.
-        replace (S i - 1)%nat with i in FIN;[|omega].
+        to_abstract.
+        rebase_to_prev i.
         assumption.
 Qed.
 
@@ -900,8 +570,8 @@ Proof.
   name startloc _start.
   name indexloc _index.
   forward_call(sh, key, vkey). {
-    entailer!.
-    rewrite <- H5;assumption.
+    entailer!. (* loop(key) *)
+    to_abstract;constructor;solve_bound.
   }
   auto with closed.
   after_call.
@@ -909,10 +579,9 @@ Proof.
                      Vint (Int.repr (loop key)), vkey, (Vint (Int.repr 99))). {
     pose (Loop_bound key).
     entailer!.
-    - constructor; unfold_to_bare_Z.
-    - rewrite <- H5;assumption.
-    - constructor.
-      unfold_int_limits;simpl;omega.
+    - constructor; solve_bound.
+    - to_abstract;constructor;solve_bound.
+    - constructor;solve_bound.
   }
   auto with closed.
   after_call.
@@ -935,54 +604,35 @@ Proof.
                       `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
                                  0 100 vvals))).
   - forward. entailer!. rename H4 into IEQ, H5 into FIN.
-    assert (indexloc = (Int.repr (-1))) as ILOC. {
-      apply int_eq_e in IEQ.
-      SearchAbout Int.neg.
-      replace (-1) with (- (1));[|omega].
-      rewrite <- Int.neg_repr.
-      symmetry;assumption.
-    }
-    rewrite ILOC in FIN.
     assert (BND:=amFindKeyBound m key (loop key) 99).
+    unfold amGet.
+    to_abstract.
     destruct (find_key m (loop key) key 99) eqn:FK.
-    + injection FIN as ZEQ.
-      replace 4294967295 with (Int.Z_mod_modulus (-1)) in ZEQ.
-      rewrite int_modulus_eq in ZEQ.
+    + to_abstract.
       omega.
-      unfold_to_bare_Z.
-      unfold_to_bare_Z.
-      rewrite Int.Z_mod_modulus_eq.
-      replace (-1 mod Int.modulus)
-      with ((-1 + 1*Int.modulus) mod Int.modulus);[|apply Z_mod_plus_full].
-      rewrite Zmod_small;unfold_to_bare_Z.
-    + unfold amGet.
-      rewrite FK.
-      auto.
+    + auto.
   - forward. entailer!. rename H4 into IEQ, H5 into FIN.
     + destruct (find_key m (loop key) key 99).
       * discriminate.
-      * replace (Int.neg (Int.repr 1)) with (Int.repr (-1)) in IEQ;[|auto].
-        injection FIN as FIN'.
-        rewrite FIN' in IEQ.
-        rewrite Int.eq_true in IEQ.
-        discriminate.
+      * to_abstract. auto.
     + destruct (find_key m (loop key) key 99);subst vindex;assumption.
   - forward. assert (BND:=amFindKeyBound m key (loop key) 99).
     entailer!. rename H4 into FK.
     + destruct (find_key m (loop key) key 99).
-      * rewrite Int.signed_repr;unfold_to_bare_Z.
+      * to_abstract; omega.
       * tauto.
     + destruct (find_key m (loop key) key 99).
-      * rewrite Int.signed_repr;unfold_to_bare_Z.
+      * to_abstract;omega.
       * tauto.
     + simpl;auto.
     + forward. entailer!. rename H4 into FK.
       unfold amGet.
       assert (BND:=amFindKeyBound m key (loop key) 99).
       destruct (find_key m (loop key) key 99).
-      * rewrite Int.signed_repr;[tauto|unfold_to_bare_Z].
+      * to_abstract;tauto.
       * tauto.
 Qed.
+
 
 Lemma body_put: semax_body Vprog Gprog f_put put_spec.
 Proof.
@@ -996,7 +646,7 @@ Proof.
   name indexloc _index.
   forward_call(sh, key, vkey). {
     entailer!.
-    rewrite <- H6;assumption.
+    to_abstract;constructor;solve_bound.
   }
   auto with closed.
   after_call.
@@ -1004,8 +654,8 @@ Proof.
                      Vint (Int.repr (loop key)), (Vint (Int.repr 99))). {
     pose (Loop_bound key).
     entailer!.
-    - constructor; unfold_to_bare_Z.
-    - constructor; unfold_to_bare_Z.
+    - constructor;solve_bound.
+    - constructor;solve_bound.
   }
   auto with closed.
   after_call.
@@ -1030,81 +680,40 @@ Proof.
                       `(array_at tint sh (fun x => (Vint (Int.repr (values m x))))
                                  0 100 vvals))).
   - forward. entailer!. rename H6 into IEQ, H7 into FIN.
-    assert (indexloc = (Int.repr (-1))) as ILOC. {
-      apply int_eq_e in IEQ.
-      SearchAbout Int.neg.
-      replace (-1) with (- (1));[|omega].
-      rewrite <- Int.neg_repr.
-      symmetry;assumption.
-    }
-    rewrite ILOC in FIN.
     assert (BND:=amFindEmptyBound m (loop key) 99).
-    destruct (find_empty m (loop key) 99) eqn:FK.
-    + injection FIN as ZEQ.
-      replace 4294967295 with (Int.Z_mod_modulus (-1)) in ZEQ.
-      rewrite int_modulus_eq in ZEQ.
+    to_abstract.
+    destruct (find_empty m (loop key) 99) eqn:FE.
+    + to_abstract.
       omega.
-      unfold_to_bare_Z.
-      unfold_to_bare_Z.
-      rewrite Int.Z_mod_modulus_eq.
-      replace (-1 mod Int.modulus)
-      with ((-1 + 1*Int.modulus) mod Int.modulus);[|apply Z_mod_plus_full].
-      rewrite Zmod_small;unfold_to_bare_Z.
     + unfold amPut.
-      rewrite FK.
+      rewrite FE.
       entailer.
   - forward. entailer!. rename H5 into IEQ, H6 into FIN.
     + destruct (find_empty m (loop key) 99).
       * discriminate.
-      * replace (Int.neg (Int.repr 1)) with (Int.repr (-1)) in IEQ;[|auto].
-        injection FIN as FIN'.
-        rewrite FIN' in IEQ.
-        rewrite Int.eq_true in IEQ.
-        discriminate.
+      * to_abstract.
+        auto.
     + destruct (find_empty m (loop key) 99);subst vindex;assumption.
   - forward. {
       instantiate (2:=force_signed_int(vindex)).
       instantiate (1:=Vint (Int.repr 1)). 
       assert (BND:=amFindEmptyBound m (loop key) 99).
       destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
-      entailer!.
-      * unfold_to_bare_Z.
-        rewrite <- H6.
-        rewrite sem_add_pi_ptr;[|assumption].
-        rewrite mul_repr.
-        tauto.
-      * unfold_to_bare_Z.
-      * unfold_to_bare_Z.
+      entailer!;to_abstract;auto;omega.
     }
     forward. {
       instantiate (2:=force_signed_int(vindex)).
       instantiate (1:=Vint (Int.repr key)).
       assert (BND:=amFindEmptyBound m (loop key) 99).
       destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
-      entailer!.
-      * unfold_to_bare_Z.
-        rewrite <- H6.
-        rewrite sem_add_pi_ptr;[|assumption].
-        rewrite mul_repr.
-        tauto.
-      * unfold_to_bare_Z.
-      * unfold_to_bare_Z.
-      * get_repr key;unfold_to_bare_Z.
+      entailer!;to_abstract;auto;omega.
     }
     forward. {
       instantiate (2:=force_signed_int(vindex)).
       instantiate (1:=Vint (Int.repr val)).
       assert (BND:=amFindEmptyBound m (loop key) 99).
       destruct (find_empty m (loop key) 99) eqn: FE;[|tauto].
-      entailer!.
-      * unfold_to_bare_Z.
-        rewrite <- H6.
-        rewrite sem_add_pi_ptr;[|assumption].
-        rewrite mul_repr.
-        tauto.
-      * unfold_to_bare_Z.
-      * unfold_to_bare_Z.
-      * get_repr val;unfold_to_bare_Z.
+      entailer!;to_abstract;auto;omega.
     }
     forward.
     assert (BND:=amFindEmptyBound m (loop key) 99).
@@ -1120,35 +729,22 @@ Proof.
             (fun x : Z =>
                Vint (Int.repr (if busybits ret x then 1 else 0)))) as BBEQ. {
       unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
-      unfold initial_world.EqDec_Z, zeq;
-      destruct (Z.eq_dec z x), (Z.eq_dec x z).
-      - tauto.
-      - subst z.
-        tauto.
-      - subst z;tauto.
-      - tauto.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z);to_abstract;tauto.
     }
     assert ((upd (fun x : Z => Vint (Int.repr (keys m x))) z
                  (Vint (Int.repr key))) = 
             (fun x : Z => Vint (Int.repr (keys ret x)))) as KEYSEQ. {
       unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
-      unfold initial_world.EqDec_Z, zeq;
-      destruct (Z.eq_dec z x), (Z.eq_dec x z).
-      - tauto.
-      - rewrite e in n;tauto.
-      - rewrite e in n;tauto.
-      - tauto.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z);to_abstract;tauto.
     }
     assert ((upd (fun x : Z => Vint (Int.repr (values m x))) z
                  (Vint (Int.repr val))) = 
             (fun x : Z => Vint (Int.repr (values ret x)))) as VALSEQ. {
       unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
-      unfold initial_world.EqDec_Z, zeq;
-      destruct (Z.eq_dec z x), (Z.eq_dec x z).
-      - tauto.
-      - rewrite e in n;tauto.
-      - rewrite e in n;tauto.
-      - tauto.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z);to_abstract;tauto.
     }
     unfold amPut.
     rewrite FE.
@@ -1156,7 +752,7 @@ Proof.
     rewrite <- BBEQ.
     rewrite <- KEYSEQ.
     rewrite <- VALSEQ.
-    rewrite Int.signed_repr;[|unfold_to_bare_Z].
+    to_abstract.
     entailer!.
 Qed.
 
@@ -1170,7 +766,7 @@ Proof.
   name indexloc _index.
   forward_call(sh, key, vkey). {
     entailer!.
-    rewrite <- H5;assumption.
+    to_abstract;constructor;solve_bound.
   }
   auto with closed.
   after_call.
@@ -1178,9 +774,9 @@ Proof.
                      Vint (Int.repr (loop key)), vkey, (Vint (Int.repr 99))). {
     pose (Loop_bound key).
     entailer!.
-    - constructor; unfold_to_bare_Z.
-    - rewrite <- H5;assumption.
-    - constructor; unfold_to_bare_Z.
+    - constructor;solve_bound.
+    - to_abstract;assumption. 
+    - constructor;solve_bound.
   }
   auto with closed.
   after_call.
@@ -1201,51 +797,23 @@ Proof.
                       `(array_at tint sh (fun x => (Vint (Int.repr (keys m x))))
                                  0 100 vkeys))).
   - forward. entailer!. rename H5 into IEQ, H6 into FIN.
-    assert (indexloc = (Int.repr (-1))) as ILOC. {
-      apply int_eq_e in IEQ.
-      SearchAbout Int.neg.
-      replace (-1) with (- (1));[|omega].
-      rewrite <- Int.neg_repr.
-      symmetry;assumption.
-    }
-    rewrite ILOC in FIN.
     assert (BND:=amFindKeyBound m key (loop key) 99).
     destruct (find_key m (loop key) key 99) eqn:FK.
-    + injection FIN as ZEQ.
-      replace 4294967295 with (Int.Z_mod_modulus (-1)) in ZEQ.
-      rewrite int_modulus_eq in ZEQ.
-      omega.
-      unfold_to_bare_Z.
-      unfold_to_bare_Z.
-      rewrite Int.Z_mod_modulus_eq.
-      replace (-1 mod Int.modulus)
-      with ((-1 + 1*Int.modulus) mod Int.modulus);[|apply Z_mod_plus_full].
-      rewrite Zmod_small;unfold_to_bare_Z.
+    + to_abstract;omega.
     + unfold amErase.
       rewrite FK.
       entailer.
   - forward. entailer!. rename H4 into IEQ, H5 into FIN.
     + destruct (find_key m (loop key) key 99).
       * discriminate.
-      * replace (Int.neg (Int.repr 1)) with (Int.repr (-1)) in IEQ;[|auto].
-        injection FIN as FIN'.
-        rewrite FIN' in IEQ.
-        rewrite Int.eq_true in IEQ.
-        discriminate.
+      * to_abstract; auto.
     + destruct (find_key m (loop key) key 99);subst vindex;assumption.
   - forward. {
       instantiate (2:=force_signed_int(vindex)).
       instantiate (1:=Vint (Int.repr 0)). 
       assert (BND:=amFindKeyBound m key (loop key) 99).
       destruct (find_key m (loop key) key 99) eqn: FE;[|tauto].
-      entailer!.
-      * unfold_to_bare_Z.
-        rewrite <- H5.
-        rewrite sem_add_pi_ptr;[|assumption].
-        rewrite mul_repr.
-        tauto.
-      * unfold_to_bare_Z.
-      * unfold_to_bare_Z.
+      entailer!;to_abstract;auto;omega.
     }
     forward.
     assert (BND:=amFindKeyBound m key (loop key) 99).
@@ -1261,18 +829,14 @@ Proof.
             (fun x : Z =>
                Vint (Int.repr (if busybits ret x then 1 else 0)))) as BBEQ. {
       unfold upd;unfold ret;apply functional_extensionality;intro;simpl.
-      unfold initial_world.EqDec_Z, zeq;
-      destruct (Z.eq_dec z x), (Z.eq_dec x z).
-      - tauto.
-      - subst z;tauto.
-      - subst z;tauto.
-      - tauto.
+      unfold initial_world.EqDec_Z, zeq.
+      destruct (Z.eq_dec z x), (Z.eq_dec x z);to_abstract;tauto.
     }
     unfold amErase.
     rewrite FE.
     subst ret.
     rewrite <- BBEQ.
-    rewrite Int.signed_repr;[|unfold_to_bare_Z].
+    to_abstract.
     entailer!.
 Qed.
 
@@ -1292,19 +856,12 @@ Proof.
                                                          else 0))))
                              0 100 vbb))).
   - forward. entailer!.
-    assert (0=i)%nat by (apply Nrepr0_is_0 with iarg;assumption).
-    subst i.
-    auto.
+    to_abstract;nat2z;to_abstract;tauto.
   - forward. entailer!.
-    assert (i<>0)%nat by (apply Nrepr_neq_0 with iarg;assumption).
-    omega.
+    to_abstract;nat2z;omega.
   - forward. forward.
-    rename H3 into INDX.
-    unfold_to_simpl.
-    eq_to_args.
-    get_repr i.
-    int_arith.
-    int_subst indexloc;[|unfold_to_bare_Z].
+    to_abstract.
+    simpl in H3;to_abstract.
     entailer!;[omega|simpl;tauto].
     forward_if (PROP (busybits m (Z.of_nat i - 1) = false;
                      (0 < i)%nat)
@@ -1319,62 +876,35 @@ Proof.
                     vbb, (Vint (Int.repr (Z.of_nat (i - 1))))). {
         entailer!.
         - lia.
-        - constructor.
-          unfold_int_limits;simpl;lia.
-        - get_repr i.
-          nat2z;[|omega].
-          unfold_to_bare_Z.
+        - constructor;nat2z;solve_bound.
+        - to_abstract;nat2z;solve_bound.
       }
       * after_call.
         forward. entailer!.
-        int_eq_spec.
-
-        assert (1 = (if busybits m (Int.signed indexloc) then 1 else 0)).
-        injection EQSPEC as AAA.
-        rewrite Int.Z_mod_modulus_eq in AAA.
-        rewrite Z.mod_small in AAA.
-        tauto.
-        destruct (busybits m (Int.signed indexloc));unfold_to_bare_Z.
-        eq_to_args;[|destruct (busybits m (Int.signed indexloc));
-                       unfold_to_bare_Z].
-        c_bool.
-        rename EQSPECinjb into BB.
-        unfold_to_simpl.
-        eq_to_args.
-        get_repr i.
-        int_arith.
-        int_subst indexloc;[|unfold_to_bare_Z].
+        to_abstract.
+        simpl in H4.
+        to_abstract.
         rebase_to_prev i.
         unfold amPartSize;fold amPartSize.
-        rewrite BB.
-        nat2z.
-        auto.
+        rewrite EQSPECinjb.
+        lia.
     + forward. entailer!.
-      int_eq_spec.
-      eq_to_args.
-      c_bool.
-      unfold_to_simpl.
-      eq_to_args.
-      get_repr i.
-      int_arith.
-      int_subst indexloc;[|unfold_to_bare_Z].
+      to_abstract.
+      simpl in H4.
+      to_abstract.
       tauto.
     + forward_call (sh,m, (i - 1)%nat, (* size_rec(busybits, i-1) *)
                     vbb, (Vint (Int.repr (Z.of_nat (i - 1))))). {
       entailer!.
       - lia.
-      - constructor.
-        unfold_int_limits;simpl;lia.
-      - get_repr i.
-        int_arith.
-        nat2z;auto.
+      - constructor;nat2z;solve_bound.
+      - to_abstract;nat2z;solve_bound.
       }
       after_call.
       forward. entailer!.
       rebase_to_prev i.
       unfold amPartSize; fold amPartSize.
-      rewrite H2.
-      auto.
+      to_abstract;tauto.
 Qed.
 
 Lemma body_size: semax_body Vprog Gprog f_size size_spec.
