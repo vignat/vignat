@@ -10,3 +10,8 @@ fullpage.sty
 *.vo
 *.glob
 *.cache
+bench/bench
+bench/data.c
+bench/operations.c
+bench/runs.txt
+bench/stats.sh

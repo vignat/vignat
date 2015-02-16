@@ -75,6 +75,16 @@ Function amErase (map : ArrMapZ) (key : Z) : option ArrMapZ :=
     |None => None
   end.
 
+Function amPartSize(m:ArrMapZ)(i:nat) : nat :=
+  match i with
+    |S p => ((if (busybits m (Z.of_nat p)) then 1 else 0) +
+            amPartSize m p)%nat
+    |O => O
+  end.
+
+Function amSize(m:ArrMapZ) : nat := amPartSize m 100.
+
+
 Definition full (m : ArrMapZ):Prop :=
   forall k, is_true (busybits m (loop k)).
 
@@ -88,9 +98,11 @@ Definition contains_single (m : ArrMapZ) (k : Z) :=
                               keys m x = k ->
                               keys m y = k ->
                               y = x.
-(*  exists x, 0 <= x < 100 /\ is_true (busybits m x) /\ keys m x = k /\
-            (forall y, is_true (busybits m y) -> keys m y = k -> y = x).
-*)
+
+Definition nodups(map:ArrMapZ) :Prop :=
+  forall x y, 0 <= x < 100 -> 0 <= y < 100 -> busybits map x = true ->
+              busybits map y = true -> keys map x = keys map y -> x = y.
+
 
 Lemma not_forall_exists: forall A, forall P:A->Prop,
                            ~ (forall x:A, P x) -> exists x:A, ~ P x.
@@ -1006,12 +1018,6 @@ Proof.
   - apply functional_extensionality;assumption.
 Qed.
 
-Definition nodups(map:ArrMapZ) :Prop :=
-  forall x y, 0 <= x < 100 -> 0 <= y < 100 -> busybits map x = true ->
-              busybits map y = true -> keys map x = keys map y -> x = y.
-
-(* todo: size *)
-
 Lemma put_nodups: forall m k v, nodups m -> amGet m k = None ->
                                 match amPut m k v with
                                   |Some map => nodups map
@@ -1121,15 +1127,6 @@ Lemma get_erase2: forall m k1 k2, k1 <> k2 ->
 Proof.
   apply amEraseOther.
 Qed.
-
-Function amPartSize(m:ArrMapZ)(i:nat) : nat :=
-  match i with
-    |S p => ((if (busybits m (Z.of_nat p)) then 1 else 0) +
-            amPartSize m p)%nat
-    |O => O
-  end.
-
-Function amSize(m:ArrMapZ) : nat := amPartSize m 100.
 
 Lemma fullpsize: forall m i, (i <= 100)%nat -> full m -> (amPartSize m i = i)%nat.
 Proof.
