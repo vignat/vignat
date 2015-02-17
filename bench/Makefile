@@ -4,6 +4,9 @@ run: bench
 report: report.tmpl stats.sh
 	. ./stats.sh; echo "$$(eval "echo \"$$(cat report.tmpl)\"")"
 
+export.csv: rexport.tmpl stats.sh
+	. ./stats.sh; echo "$$(eval "echo \"$$(cat rexport.tmpl)\"")" > export.csv
+
 stats.sh: runs.txt
 	awk '{ tot=0; sqtot=0; for (i=1; i<=NF; i++) {tot += $$i; sqtot += $$i*$$i;}; sigma = sqrt((sqtot - tot*tot/NF)/(NF-1)); printf "v%d=\"%6.1f\"\ne%d=\"%6.1f\"\n", NR, tot/NF, NR, sigma; }' runs.txt > stats.sh
 
@@ -24,3 +27,8 @@ operations.c: generate.el
 data.c: generate.el
 	rm -f data.c
 	emacs -Q -batch data.c -l generate.el --eval="(gen-key-set 50)" -f save-buffer
+
+rexport.tmpl:
+	rm -f rexport.tmpl
+	emacs -Q -batch rexport.tmpl -l generate.el --eval="(gen-key-set 50)" -f save-buffer
+

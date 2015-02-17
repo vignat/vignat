@@ -15,3 +15,5 @@ bench/data.c
 bench/operations.c
 bench/runs.txt
 bench/stats.sh
+bench/export.csv
+bench/rexport.tmpl
