@@ -1,6 +1,10 @@
 run: bench
 	./bench
 
+perfplot.png: export.csv draw.r
+	rm perfplot.png
+	Rscript draw.r
+
 report: report.tmpl stats.sh
 	. ./stats.sh; echo "$$(eval "echo \"$$(cat report.tmpl)\"")"
 
@@ -20,15 +24,15 @@ runs.txt: bench
 bench: engine.cpp ../coq/map.c data.c operations.c
 	g++ engine.cpp -std=c++11 -I/usr/include/glib-2.0 -I /usr/lib/x86_64-linux-gnu/glib-2.0/include -lglib-2.0 -L/lib/x86_64-linux-gnu/ -o bench
 
-operations.c: generate.el
+operations.c: generate.el Makefile
 	rm -f operations.c
-	emacs -Q -batch operations.c -l generate.el --eval="(gen-seq-matrix 5)" -f save-buffer
+	emacs -Q -batch operations.c -l generate.el --eval="(gen-seq-matrix 100)" -f save-buffer
 
-data.c: generate.el
+data.c: generate.el Makefile
 	rm -f data.c
-	emacs -Q -batch data.c -l generate.el --eval="(gen-key-set 50)" -f save-buffer
+	emacs -Q -batch data.c -l generate.el --eval="(gen-key-set 600)" -f save-buffer
 
-rexport.tmpl:
+rexport.tmpl: generate.el Makefile
 	rm -f rexport.tmpl
-	emacs -Q -batch rexport.tmpl -l generate.el --eval="(gen-key-set 50)" -f save-buffer
+	emacs -Q -batch rexport.tmpl -l generate.el --eval="(gen-csv-template)" -f save-buffer
 
