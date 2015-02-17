@@ -66,7 +66,7 @@
               
 
 (defun gen-key-set (n)
-  (insert "const int key_set[] = \n{")
+  (insert "int key_set[] = \n{")
   (while (> n 0)
     (setq n (1- n))
     (insert (number-to-string (- (random 2147483648) 1073741824)))
