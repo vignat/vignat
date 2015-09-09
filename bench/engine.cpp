@@ -66,7 +66,7 @@ void dump(map<string, long> results[][3][3])
 
 int main(int argc, char** argv)
 {
-    const int count = 1000;
+    const int count = 500;
 
     int keys[100];
     int busybits[100] = {};

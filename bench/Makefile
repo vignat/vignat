@@ -18,7 +18,7 @@ runs.txt: bench
 	rm -f runs.txt
 	rm -f tmp.txt
 	touch runs.txt
-	for i in `seq 1 10`; do	./bench o | paste runs.txt - > tmp.txt && cp tmp.txt runs.txt; done
+	for i in `seq 1 30`; do	./bench o | paste runs.txt - > tmp.txt && cp tmp.txt runs.txt; done
 	rm tmp.txt
 
 bench: engine.cpp ../coq/map.c data.c operations.c
@@ -26,7 +26,7 @@ bench: engine.cpp ../coq/map.c data.c operations.c
 
 operations.c: generate.el Makefile
 	rm -f operations.c
-	emacs -Q -batch operations.c -l generate.el --eval="(gen-seq-matrix 100)" -f save-buffer
+	emacs -Q -batch operations.c -l generate.el --eval="(gen-seq-matrix 300)" -f save-buffer
 
 data.c: generate.el Makefile
 	rm -f data.c
