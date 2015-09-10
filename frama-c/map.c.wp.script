@@ -125,4 +125,32 @@ Proof.
 (* auto with zarith. *)
 Qed.
 
+Goal typed_size_assert_2.
+Hint property,size.
+Proof.
+(* --------------------------------------
+  
+From 'typed_size_post': 
+(* auto with zarith. *)
+*)
+Qed.
+
+Goal typed_size_loop_inv_2_preserved.
+Hint preserved,size.
+Proof.
+(* auto with zarith. *)
+Qed.
+
+Goal typed_size_loop_inv_4_preserved.
+Hint preserved,size.
+Proof.
+(* auto with zarith. *)
+Qed.
+
+Goal typed_size_post.
+Hint default,property,size.
+Proof.
+(* auto with zarith. *)
+Qed.
+
 

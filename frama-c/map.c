@@ -227,7 +227,6 @@ int erase(int busybits[CAPACITY], int keys[CAPACITY], int key)
     return 0;
 }
 
-#if 0
 /*@ logic integer size_rec(int* busybits, integer capa) = 
   @   (capa <= 0) ? 0 :
   @   (busybits[capa-1] != 0) ? 1 + size_rec(busybits, capa - 1) :
@@ -236,22 +235,25 @@ int erase(int busybits[CAPACITY], int keys[CAPACITY], int key)
 
 /*@ requires \valid(busybits + {i | integer i; 0 <= i < CAPACITY});
   @ assigns \nothing;
-  @ ensures \result == size_rec(busybits, CAPACITY);
-  @ ensures 0 <= \result < CAPACITY;
+  @ ensures 0 <= \result <= CAPACITY;
 */
 int size(int busybits[CAPACITY]) {
+    int i = 0;
     int s = 0;
     /*@ loop invariant \valid(busybits + {i | integer i; 0 <= i < CAPACITY});
-      @ loop invariant s == size_rec(busybits, i);
-      @ loop assigns i;
+      @ loop invariant 0 <= i <= CAPACITY;
+      @ loop invariant 0 <= s <= i;
+      @ loop assigns i, s;
       @ loop variant (CAPACITY - i);
     */
-    for (int i = 0; i < CAPACITY; ++i) {
+    for (i = 0; i < CAPACITY; ++i) {
         int bb = busybits[i];
         if (1 == bb) {
             ++s;
         }
+        //@ assert(i < CAPACITY);
     }
+    //@ assert( i == CAPACITY);
+    //@ assert( s <= CAPACITY);
     return s;
 }
-#endif
