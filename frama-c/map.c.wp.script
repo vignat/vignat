@@ -43,8 +43,9 @@ Hint established,find_empty,non_full.
 Proof.
 Require Import Psatz.
 unfold P_full.
+intros y i t t1 t2 a.
+intros H H0 H1 H2 NONFULL.
 intros.
-rename H3 into NONFULL.
 apply Classical_Pred_Type.not_all_ex_not in NONFULL.
 destruct NONFULL as [x NONFULL].
 apply Classical_Prop.imply_to_and in NONFULL.
@@ -52,7 +53,6 @@ destruct NONFULL as [XL0 NONFULL].
 apply Classical_Prop.imply_to_and in NONFULL.
 destruct NONFULL as [XLIM NOTBUSY].
 apply Z.eq_dne in NOTBUSY.
-rename i into y.
 case (Z_lt_le_dec y x);intro IXI.
 - exists x.
   split;[auto|split];[auto with zarith|].
@@ -68,14 +68,13 @@ Goal typed_find_key_loop_inv_for_has_2_established.
 Hint established,find_key,has.
 Proof.
 Require Import Psatz.
+intros i y z.
 intros.
 rename H6 into HAS.
 unfold P_has_K in HAS.
 destruct HAS as [x HAS].
 destruct HAS.
 destruct H11.
-rename i into i'.
-rename i_1 into i.
 case (Z_lt_le_dec i x);intro IXI.
 - exists x.
   split;[auto|split];[auto with zarith|].
