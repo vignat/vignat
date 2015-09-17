@@ -204,6 +204,7 @@ int get(int busybits[CAPACITY], int keys[CAPACITY], int values[CAPACITY], int ke
   @   assumes !full(busybits);
   @   ensures has_KV(busybits, keys, values, key, value);
   @   ensures \result == 0;
+  @   ensures size_rec(\old(busybits), CAPACITY) + 1 == size_rec(busybits, CAPACITY);
   @ behavior full:
   @   assumes full(busybits);
   @   assigns \nothing;
@@ -218,6 +219,7 @@ int put(int busybits[CAPACITY], int keys[CAPACITY], int values[CAPACITY], int ke
     {
         return -1;
     }
+    //@ assert(busybits[index] == 0);
     busybits[index] = 1;
     //@ assert(busybits[index] != 0);
     keys    [index] = key;
