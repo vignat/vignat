@@ -4,6 +4,13 @@
 /*@ logic integer loop_l(integer k) = (k%CAPACITY + CAPACITY)%CAPACITY;
  */
 
+/*@ lemma loop_bijection: \forall integer k;
+  @   0 <= k < CAPACITY ==> loop_l(k) == k;
+*/
+/*@ lemma loop_injection: \forall integer k;
+  @   0 <= k ==> loop_l(k + CAPACITY) == loop_l(k);
+*/
+
 /*@ predicate full(int *busybits) = 
   @   \forall integer x; 0 <= x < CAPACITY ==> busybits[x] != 0;
 */
@@ -13,23 +20,49 @@
   @                                          busybits[x] == 0);
 */
 
+/*@ logic integer size_rec{L}(int* busybits, integer capa) = 
+  @   (capa == 0) ? 0 :
+  @   (busybits[capa-1] != 0) ? 1 + size_rec(busybits, capa - 1) :
+  @    size_rec(busybits, capa - 1);
+*/
+
+/*@ lemma size_rec_on_zero: \forall int* busybits, integer capa;
+  @   0 <= capa && busybits[capa] == 0 ==> 
+  @     size_rec(busybits, capa + 1) == size_rec(busybits, capa);
+  @
+  @ lemma size_rec_on_one: \forall int* busybits, integer capa;
+  @   0 <= capa && busybits[capa] != 0 ==>
+  @     size_rec(busybits, capa + 1) == 1 + size_rec(busybits, capa);
+*/
+
+/*@ lemma size_rec_bounds: \forall int* busybits, integer capa;
+  @   0 <= capa ==> 0 <= size_rec(busybits, capa) <= capa;
+*/
+
+/*@ logic boolean full_rec{L}(int *busybits, integer capa) = 
+  @  (capa == 0) ? \true :
+  @  (busybits[capa-1] != 0) ? full_rec(busybits, capa - 1) : \false;
+  @
+  @ lemma full_rec_full: \forall int* busybits;
+  @   full_rec(busybits, CAPACITY) <==> full(busybits);
+  @
+  @ lemma full_rec_size_rec: \forall int* busybits, integer capa;
+  @   capa >= 0 ==> (size_rec(busybits, capa) == capa <==> full_rec(busybits, capa));
+*/
+
+/*@ lemma size_rec_full: \forall int* busybits;
+  @   full(busybits) <==> size_rec(busybits, CAPACITY) == CAPACITY;
+*/
+
 /*@ assigns \nothing;
   @ ensures 0 <= \result < CAPACITY;
   @ ensures \result == loop_l(k);
-  @ ensures 0 <= k < CAPACITY ==> \result == k;
  */
 int loop (int k)
 {   
     //single "%" result ranges from -CAPACITY to CAPACITY.
     return (k%CAPACITY + CAPACITY)%CAPACITY;//ranges from 0 to CAPACITY.
 }
-
-/*@ lemma loop_bijection: \forall integer k;
-  @   0 <= k < CAPACITY ==> loop_l(k) == k;
-*/
-/*@ lemma loop_injection: \forall integer k;
-  @   0 <= k ==> loop_l(k + CAPACITY) == loop_l(k);
-*/
 
 /*@ requires 0 <= start < CAPACITY;
   @ requires \valid(busybits + {i | integer i; 0 <= i < CAPACITY});
@@ -108,7 +141,11 @@ int find_key (int busybits[CAPACITY], int keys[CAPACITY], int start, int key) {
             if (k == key) {
                 return index;
             }
+            //@ assert(keys[index] != key);
+            //@ assert(busybits[index] != 0);
         }
+        //@ assert(busybits[index] == 0 || \
+                   (busybits[index] != 0 && keys[index] != key));
     }
     return -1;
 }
@@ -227,15 +264,10 @@ int erase(int busybits[CAPACITY], int keys[CAPACITY], int key)
     return 0;
 }
 
-/*@ logic integer size_rec(int* busybits, integer capa) = 
-  @   (capa <= 0) ? 0 :
-  @   (busybits[capa-1] != 0) ? 1 + size_rec(busybits, capa - 1) :
-  @   size_rec(busybits, capa - 1);
-*/
-
 /*@ requires \valid(busybits + {i | integer i; 0 <= i < CAPACITY});
   @ assigns \nothing;
   @ ensures 0 <= \result <= CAPACITY;
+  @ ensures \result == size_rec{Here}(busybits, CAPACITY);
 */
 int size(int busybits[CAPACITY]) {
     int i = 0;
@@ -243,17 +275,29 @@ int size(int busybits[CAPACITY]) {
     /*@ loop invariant \valid(busybits + {i | integer i; 0 <= i < CAPACITY});
       @ loop invariant 0 <= i <= CAPACITY;
       @ loop invariant 0 <= s <= i;
+      @ loop invariant s == size_rec(busybits, i);
       @ loop assigns i, s;
       @ loop variant (CAPACITY - i);
     */
     for (i = 0; i < CAPACITY; ++i) {
+        //@ assert(s == size_rec(busybits, i));
         int bb = busybits[i];
-        if (1 == bb) {
+        if (bb != 0) {
+            //@ assert(s == size_rec(busybits, i));
+            //@ assert(busybits[i] != 0);
+            //@ assert(size_rec(busybits, i + 1) == 1 + size_rec(busybits, i));
             ++s;
+            //@ assert(s == size_rec(busybits, i + 1));
+        } else {
+            //@ assert(busybits[i] == 0);
+            //@ assert(size_rec(busybits, i + 1) == size_rec(busybits, i));
         }
+        //@ assert(s == size_rec(busybits, i + 1));
         //@ assert(i < CAPACITY);
     }
     //@ assert( i == CAPACITY);
     //@ assert( s <= CAPACITY);
     return s;
 }
+
+
