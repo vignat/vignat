@@ -668,3 +668,4 @@ int find_empty (int* busybits, int start)
     //@ destroy_nat_seq(olist);
     return -1;
 }
+
