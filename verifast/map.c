@@ -241,41 +241,6 @@ ensures true;
 @*/
 
 /*@
-  inductive busy_key = bkpair(int, int);
-  
-  fixpoint int bk_key(busy_key bk) {
-    switch(bk) {
-      case bkpair(bb, key): return key;
-    }
-  }
-  
-  fixpoint int bk_busybit(busy_key bk) {
-    switch(bk) {
-      case bkpair(bb, key): return bb;
-    }
-  }
-
-  predicate bkeys(list<busy_key> bks, list<int> bbs, list<int> ks) =
-    switch(bks) {
-      case nil: return bbs == nil &*& ks == nil;
-      case cons(bkh, bkt):
-        return bbs != nil &*& ks != nil &*&
-               bkh == bkpair(head(bbs), head(ks)) &*&
-               bkeys(bkt, tail(bbs), tail(ks));
-    };
-    
-  fixpoint bool has_key(list<busy_key> bks, int key) {
-    switch(bks) {
-      case nil: return false;
-      case cons(h, t):
-        return (bk_busybit(h) != 0 && bk_key(h) == key) || has_key(t, key);
-    }
-  }
-  
-  fixpoint bool not_a_valid_key(int key, busy_key bk) {
-    return bk_key(bk) != key || bk_busybit(bk) == 0;
-  }
-  
   lemma void length_0_nil<T>(list<T> lst)
   requires length(lst) == 0;
   ensures lst == nil;
@@ -452,7 +417,7 @@ ensures true;
   
   lemma void does_have_key(int i, int key, list<busy_key> bks)
   requires 0 <= i &*& i < length(bks) &*& bk_key(nth(i, bks)) == key &*& bk_busybit(nth(i, bks)) != 0;
-  ensures true == has_key(bks, key);
+  ensures true == bkhas_key(bks, key);
   {
     switch(bks) {
       case nil: return;
@@ -461,7 +426,7 @@ ensures true;
         } else {
           does_have_key(i - 1, key, t);
         }
-        assert(true == has_key(bks, key));
+        assert(true == bkhas_key(bks, key));
         return;
     }
   }
@@ -762,26 +727,73 @@ ensures nat_seq(nseq) &*& true == forall(arr, prop);
       }
   }
 }
+@*/
 
-
-lemma void forall_no_valid_key_has_no_key(list<busy_key> bks, int key)
-requires true == forall(bks, (not_a_valid_key)(key));
-ensures false == has_key(bks, key);
-{
-  switch(bks) {
-    case nil: return;
-    case cons(h, t):
-      forall_no_valid_key_has_no_key(t, key);
-      return;
+/*@
+  inductive busy_key = bkpair(int, int);
+  
+  fixpoint int bk_key(busy_key bk) {
+    switch(bk) {
+      case bkpair(bb, key): return key;
+    }
   }
-}
+  
+  fixpoint int bk_busybit(busy_key bk) {
+    switch(bk) {
+      case bkpair(bb, key): return bb;
+    }
+  }
+
+  predicate bkeys(list<busy_key> bks, list<int> bbs, list<int> ks) =
+    switch(bks) {
+      case nil: return bbs == nil &*& ks == nil;
+      case cons(bkh, bkt):
+        return bbs != nil &*& ks != nil &*&
+               bkh == bkpair(head(bbs), head(ks)) &*&
+               bkeys(bkt, tail(bbs), tail(ks));
+    };
+    
+  fixpoint bool bkhas_key(list<busy_key> bks, int key) {
+    switch(bks) {
+      case nil: return false;
+      case cons(h, t):
+        return (bk_busybit(h) != 0 && bk_key(h) == key) || bkhas_key(t, key);
+    }
+  }
+  
+  fixpoint bool not_a_valid_key(int key, busy_key bk) {
+    return bk_key(bk) != key || bk_busybit(bk) == 0;
+  }
+
+  lemma void forall_no_valid_key_has_no_key(list<busy_key> bks, int key)
+  requires true == forall(bks, (not_a_valid_key)(key));
+  ensures false == bkhas_key(bks, key);
+  {
+    switch(bks) {
+      case nil: return;
+      case cons(h, t):
+        forall_no_valid_key_has_no_key(t, key);
+        return;
+    }
+  }
+  
+  lemma void destroy_bkeys(list<busy_key> bks)
+  requires bkeys(bks, _, _);
+  ensures true;
+  {
+    open bkeys(bks, _, _);
+    switch(bks) {
+      case nil: return;
+      case cons(h, t): destroy_bkeys(t); return;
+    }
+  }
 
 @*/
 
 int find_key(int* busybits, int* keys, int start, int key)
      //@ requires 0 <= start &*& start < CAPACITY &*& ints(busybits, CAPACITY, ?bbs) &*& ints(keys, CAPACITY, ?ks) &*& bkeys(?bks, bbs, ks);
      //@ ensures ints(busybits, CAPACITY, bbs) &*& ints(keys, CAPACITY, ks) &*& bkeys(bks, bbs, ks) &*& \
-         (has_key(bks, key) ? bk_key(nth(result, bks)) == key &*& bk_busybit(nth(result, bks)) != 0 : result == -1);
+         (bkhas_key(bks, key) ? bk_key(nth(result, bks)) == key &*& bk_busybit(nth(result, bks)) != 0 &*& 0 <= result &*& result < CAPACITY : result == -1);
 {
   //@ bkeys_len_eq(bks, bbs, ks);
   //@ list<int> indices = nil;
@@ -842,7 +854,8 @@ ensures false == contains(bbs, 0);
 
 int find_empty (int* busybits, int start)
     //@ requires 0 <= start &*& start < CAPACITY &*& ints(busybits, CAPACITY, ?bbs);
-    //@ ensures ints(busybits, CAPACITY, bbs) &*& (contains(bbs, 0) ? nth(result, bbs) == 0 : result == -1);
+    //@ ensures ints(busybits, CAPACITY, bbs) &*& \
+        (contains(bbs, 0) ? nth(result, bbs) == 0 &*& 0 <= result &*& result < CAPACITY : result == -1);
   {
     //@ list<int> indices = nil;
     //@ list<int> ilist = nil;
@@ -882,4 +895,207 @@ int find_empty (int* busybits, int start)
     //@ destroy_nat_seq(olist);
     return -1;
 }
+
+/*@ 
+
+inductive record = rec_triple(int busybit, int key, int value);
+
+fixpoint int rec_bb(record r) {
+  switch(r) { case rec_triple(bb, k, v): return bb; }
+}
+
+fixpoint int rec_key(record r) {
+  switch(r) { case rec_triple(bb, k, v): return k; }
+}
+
+fixpoint int rec_val(record r) {
+  switch(r) { case rec_triple(bb, k, v): return v; }
+}
+
+fixpoint bool has_key(list<record> recs, int key) {
+  switch(recs) {
+    case nil: return false;
+    case cons(h, t):
+      return (rec_bb(h) != 0 && rec_key(h) == key) ? true : has_key(t, key);
+  }
+}
+
+fixpoint int get_val(list<record> recs, int key) {
+  switch(recs) {
+    case nil: return default_value<int>;
+    case cons(h, t):
+      return (rec_bb(h) != 0 && rec_key(h) == key) ? rec_val(h) : get_val(t, key);
+  }
+}
+
+fixpoint bool no_dubs(list<record> recs) {
+  switch(recs) {
+    case nil: return true;
+    case cons(h, t):
+      return (rec_bb(h) == 0 || !has_key(t, rec_key(h))) && no_dubs(t);
+  }
+}
+
+predicate records(list<int> bbs, list<int> ks, list<int> vals, list<record> recs) =
+  switch(recs) {
+    case nil: return bbs == nil &*& ks == nil &*& vals == nil;
+    case cons(rh, rt):
+      return bbs != nil &*& ks != nil &*& vals != nil &*&
+             rh == rec_triple(head(bbs), head(ks), head(vals)) &*&
+             records(tail(bbs), tail(ks), tail(vals), rt);
+  };
+
+predicate mapping(int* busybits, int* keys, int* values, list<record> recs) = 
+  ints(busybits, CAPACITY, ?bbs) &*& ints(keys, CAPACITY, ?ks) &*& ints(values, CAPACITY, ?vals) &*&
+  records(bbs, ks, vals, recs) &*& true == no_dubs(recs);
+
+lemma void records_same_length(list<int> bbs, list<int> ks, list<int> vals, list<record> recs)
+requires records(bbs, ks, vals, recs);
+ensures records(bbs, ks, vals, recs) &*& length(recs) == length(bbs) &*& length(recs) == length(ks) &*& length(recs) == length(vals);
+{
+  open records(bbs, ks, vals, recs);
+  switch(recs) {
+    case nil: break;
+    case cons(h, t):
+      cons_head_tail(bbs);
+      cons_head_tail(ks);
+      cons_head_tail(vals);
+      records_same_length(tail(bbs), tail(ks), tail(vals), t);
+      break;
+  }
+  close records(bbs, ks, vals, recs);
+}
+
+lemma list<busy_key> make_bkeys_from_recs(list<int> bbs, list<int> ks, list<int> vals, list<record> recs)
+requires records(bbs, ks, vals, recs);
+ensures records(bbs, ks, vals, recs) &*& bkeys(result, bbs, ks);
+{
+  switch(recs) {
+    case nil:
+      open records(bbs, ks, vals, recs);
+      close bkeys(nil, bbs, ks);
+      close records(bbs, ks, vals, recs);
+      return nil;
+    case cons(h, t):
+      open records(bbs, ks, vals, recs);
+      list<busy_key> bkt = make_bkeys_from_recs(tail(bbs), tail(ks), tail(vals), t);
+      list<busy_key> ret = cons(bkpair(head(bbs), head(ks)), bkt);
+      close bkeys(ret, bbs, ks);
+      close records(bbs, ks, vals, recs);
+      return ret;
+  }
+}
+
+
+lemma void nth_bbs_keys_vals_recs(int n, list<int> bbs, list<int> ks, list<int> vals, list<record> recs)
+requires records(bbs, ks, vals, recs) &*& 0 <= n &*& n < length(recs);
+ensures records(bbs, ks, vals, recs) &*& rec_key(nth(n, recs)) == nth(n, ks) &*&
+        rec_bb(nth(n, recs)) == nth(n, bbs) &*& rec_val(nth(n, recs)) == nth(n, vals);
+{
+  open records(bbs, ks, vals, recs);
+  switch(recs) {
+    case nil:
+      break;
+    case cons(h, t):
+      assert(ks != nil);
+      assert(bbs != nil);
+      assert(vals != nil);
+      if (n == 0) {
+        nth_0_head(ks);
+        nth_0_head(bbs);
+        nth_0_head(vals);
+      } else {
+        nth_bbs_keys_vals_recs(n - 1, tail(bbs), tail(ks), tail(vals), t);
+        nth_cons(n, tail(bbs), head(bbs));
+        nth_cons(n, tail(ks), head(ks));
+        nth_cons(n, tail(vals), head(vals));
+        nth_cons(n, t, h);
+        cons_head_tail(ks);
+        cons_head_tail(bbs);
+        cons_head_tail(vals);
+      }
+      break;
+  }
+  close records(bbs, ks, vals, recs);
+}
+  
+
+lemma void found_is_the_key_val(list<int> bbs, list<int> ks, list<int> vals, list<record> recs, int key, int index)
+requires records(bbs, ks, vals, recs) &*& nth(index, bbs) != 0 &*& nth(index, ks) == key &*& true == no_dubs(recs) &*& 0 <= index &*& index < length(recs);
+ensures records(bbs, ks, vals, recs) &*& true == has_key(recs, key) &*& get_val(recs, key) == nth(index, vals);
+{
+  open records(bbs, ks, vals, recs);
+  switch(recs) {
+    case nil: break;
+    case cons(h, t):
+      if (index == 0) {
+        nth_0_head(bbs);
+        nth_0_head(ks);
+        nth_0_head(vals);
+        assert(true == has_key(recs, key));
+      } else {
+        nth_cons(index, tail(bbs), head(bbs));
+        nth_cons(index, tail(ks), head(ks));
+        nth_cons(index, tail(vals), head(vals));
+        cons_head_tail(bbs);
+        cons_head_tail(ks);
+        cons_head_tail(vals);
+        found_is_the_key_val(tail(bbs), tail(ks), tail(vals), t, key, index - 1);
+      }
+      break;
+  }
+  close records(bbs, ks, vals, recs);
+}
+
+lemma void bkhas_key2has_key(list<record> recs, list<busy_key> bks, int key)
+requires bkeys(bks, ?bbs, ?ks) &*& records(bbs, ks, ?vals, recs);
+ensures bkeys(bks, bbs, ks) &*& records(bbs, ks, vals, recs) &*& has_key(recs, key) == bkhas_key(bks, key);
+{
+  open bkeys(bks, bbs, ks);
+  open records(bbs, ks, vals, recs);
+  switch(bks) {
+    case nil: break;
+    case cons(h, t):
+      if (bk_busybit(h) != 0 && bk_key(h) == key) {
+      } else {
+        cons_head_tail(recs);
+        bkhas_key2has_key(tail(recs), t, key);
+      }
+      break;
+  }
+  close records(bbs, ks, vals, recs);
+  close bkeys(bks, bbs, ks);
+}
+@*/
+
+int get(int* busybits, int* keys, int* values, int key)
+//@ requires mapping(busybits, keys, values, ?recs);
+//@ ensures mapping(busybits, keys, values, recs) &*& \
+            (has_key(recs, key) ? result == get_val(recs, key) : result == -1);
+{
+    //@ open mapping(busybits, keys, values, recs);
+    //@ assert records(?bbs, ?ks, ?vals, recs);
+    //@ list<busy_key> bks = make_bkeys_from_recs(bbs, ks, vals, recs);
+    int start = loop(key);
+    int index = find_key(busybits, keys, start, key);
+
+    if (-1 == index)
+    {   
+        //@ bkhas_key2has_key(recs, bks, key);
+        //@ assert(false == has_key(recs, key));
+        //@ close mapping(busybits, keys, values, recs);
+        //@ destroy_bkeys(bks);
+        return -1;
+    }
+    int val = values[index];
+    //@ records_same_length(bbs, ks, vals, recs);
+    //@ bkeys_len_eq(bks, bbs, ks);
+    //@ nth_bbs_keys_bkeys(index, bbs, ks, bks);
+    //@ found_is_the_key_val(bbs, ks, vals, recs, key, index);
+    //@ close mapping(busybits, keys, values, recs);
+    //@ destroy_bkeys(bks);
+    return val;
+}
+
+
 
