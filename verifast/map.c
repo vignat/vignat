@@ -1496,3 +1496,517 @@ int get(int* busybits, int* keys, int* values, int key)
     return val;
 }
 
+/*@
+
+fixpoint list<kvpair> kv_remove_key(list<kvpair> kvs, int key) {
+  switch(kvs) {
+    case nil: return nil;
+    case cons(h, t):
+      return kv_key(h) == key ? kv_remove_key(t, key) : cons(h, kv_remove_key(t, key));
+  }
+}
+
+lemma void kv_remove_key_preserves_has_not_key(list<kvpair> kvs, int key_rem, int key_abs)
+requires false == has_key(kvs, key_abs);
+ensures false == has_key(kv_remove_key(kvs, key_rem), key_abs);
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      kv_remove_key_preserves_has_not_key(t, key_rem, key_abs);
+      return;
+  }
+}
+
+lemma void kv_remove_key_preserves_rec_has_key(list<kvpair> kvs, int key_rem, int key)
+requires key_rem != key;
+ensures has_key(kv_remove_key(kvs, key_rem), key) == has_key(kvs, key);
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      kv_remove_key_preserves_rec_has_key(t, key_rem, key);
+      return;
+  }
+}
+
+lemma void kv_remove_key_preserves_no_dubs(list<kvpair> kvs, int key)
+requires true == kv_no_dubs(kvs);
+ensures true == kv_no_dubs(kv_remove_key(kvs, key));
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      kv_remove_key_preserves_no_dubs(t, key);
+      kv_remove_key_preserves_has_not_key(t, key, kv_key(h));
+      return;
+  }
+}
+
+lemma void kv_remove_key_preserves_kvs_contain_rec(list<kvpair> kvs, record rec, int key)
+requires true == kvs_contain_rec(kvs, rec) &*& (rec_bb(rec) == 0 || rec_key(rec) != key);
+ensures true == kvs_contain_rec(kv_remove_key(kvs, key), rec);
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      if (rec_bb(rec) != 0) {
+        if (kv_key(h) == rec_key(rec)) {
+        } else {
+          kv_remove_key_preserves_kvs_contain_rec(t, rec, key);
+        }
+      } else {
+        switch(kv_remove_key(kvs, key)) {
+          case nil:break;
+          case cons(rkh, rkt): break;
+        }
+      }
+      return;
+  }
+}
+
+lemma void kv_remove_key_preserves_rec2kv_inj(list<record> recs, list<kvpair> kvs, int key)
+requires true == forall(recs, (kvs_contain_rec)(kvs)) &*& false == rec_has_key(recs, key);
+ensures true == forall(recs, (kvs_contain_rec)(kv_remove_key(kvs, key)));
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (rec_bb(h) != 0 && rec_key(h) == key) {
+        assert(true == has_key(recs, key));
+      } else {
+        kv_remove_key_preserves_kvs_contain_rec(kvs, h, key);
+        kv_remove_key_preserves_rec2kv_inj(t, kvs, key);
+      }
+      return;
+  }
+}
+
+lemma void kv_remove_key_preserves_kv2rec_inj(list<kvpair> kvs, list<record> recs, int key)
+requires true == forall(kvs, (recs_contain_kv)(recs));
+ensures true == forall(kv_remove_key(kvs, key), (recs_contain_kv)(recs));
+{
+  switch(kvs){
+    case nil: return;
+    case cons(h, t):
+      kv_remove_key_preserves_kv2rec_inj(t, recs, key);
+      if (kv_key(h) == key) {
+      } else {
+      }
+      return;
+  }
+}
+
+lemma void kv_remove_key_removes_key(list<kvpair> kvs, int key)
+requires true;
+ensures false == has_key(kv_remove_key(kvs, key), key);
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      kv_remove_key_removes_key(t, key);
+      return;
+  }
+}
+
+lemma void rec_tail_contains_rest(list<kvpair> kvs, list<record> recs, record rec)
+requires true == forall(kvs, (recs_contain_kv)(cons(rec, recs))) &*& false == has_key(kvs, rec_key(rec));
+ensures true == forall(kvs, (recs_contain_kv)(recs));
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      if (kv_key(h) == rec_key(rec)) {
+      } else {
+        switch(cons(rec, recs)){
+          case nil: break;
+          case cons(rech, rect): break;
+        }
+        rec_tail_contains_rest(t, recs, rec);
+      }
+      return;
+  }
+}
+
+lemma void remove_first_key_preserves_mapping(list<kvpair> kvs, record rec, list<record> recs)
+requires recs_mapping(cons(rec, recs), kvs) &*& true == no_dubs(cons(rec, recs)) &*& rec_bb(rec) != 0;
+ensures recs_mapping(cons(rec, recs), kvs) &*& recs_mapping(recs, kv_remove_key(kvs, rec_key(rec)));
+{
+  open recs_mapping(cons(rec, recs), kvs);
+
+  kv_remove_key_preserves_no_dubs(kvs, rec_key(rec));
+  kv_remove_key_preserves_kv2rec_inj(kvs, cons(rec, recs), rec_key(rec));
+  kv_remove_key_removes_key(kvs, rec_key(rec));
+  rec_tail_contains_rest(kv_remove_key(kvs, rec_key(rec)), recs, rec);
+  kv_remove_key_preserves_rec2kv_inj(recs, kvs, rec_key(rec));
+
+  close recs_mapping(cons(rec, recs), kvs);
+  close recs_mapping(recs, kv_remove_key(kvs, rec_key(rec)));
+}
+
+lemma void kv_remove_key_not_increase_len(list<kvpair> kvs, int key)
+requires true;
+ensures length(kv_remove_key(kvs, key)) <= length(kvs);
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      kv_remove_key_not_increase_len(t, key);
+      return;
+  }
+}
+
+lemma void kv_remove_key_decreases_len(list<kvpair> kvs, int key)
+requires true == has_key(kvs, key);
+ensures length(kv_remove_key(kvs, key)) < length(kvs);
+{
+  switch(kvs) {
+    case nil:
+      assert(false == has_key(kvs, key));
+      return;
+    case cons(h, t):
+      if (kv_key(h) == key) {
+        kv_remove_key_not_increase_len(t, key);
+      } else {
+        kv_remove_key_decreases_len(t, key);
+      }
+      return;
+  }
+}
+
+lemma void kvs_contain_rec2has_key(list<kvpair> kvs, record rec)
+requires true == kvs_contain_rec(kvs, rec) &*& rec_bb(rec) != 0;
+ensures true == has_key(kvs, rec_key(rec));
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      if (kv_key(h) == rec_key(rec)) {
+      } else {
+        kvs_contain_rec2has_key(t, rec);
+      }
+      return;
+  }
+}
+
+lemma void small2contains_empty(list<int> bbs, list<kvpair> kvs)
+requires recs_mapping(?recs, kvs) &*& records(bbs, ?ks, ?vals, recs) &*& true == no_dubs(recs) &*& length(kvs) < length(bbs);
+ensures recs_mapping(recs, kvs) &*& records(bbs, ks, vals, recs) &*& true == contains(bbs, 0);
+{
+  switch(bbs) {
+    case nil:
+      length_nonnegative(kvs);
+      assert(0 < length(bbs));
+      return;
+    case cons(h, t):
+      if (h != 0) {
+        open records(bbs, ks, vals, recs);
+        open recs_mapping(recs, kvs);
+        assert(recs != nil);
+        assert(rec_bb(head(recs)) != 0);
+        kvs_contain_rec2has_key(kvs, head(recs));
+        kv_remove_key_decreases_len(kvs, rec_key(head(recs)));
+        close recs_mapping(recs, kvs);
+        remove_first_key_preserves_mapping(kvs, head(recs), tail(recs));
+        small2contains_empty(t, kv_remove_key(kvs, rec_key(head(recs))));
+        open recs_mapping(tail(recs), kv_remove_key(kvs, rec_key(head(recs))));
+        close records(bbs, ks, vals, recs);
+        return;
+      } else {
+        return;
+      }
+  }
+}
+
+lemma void kv_remove_key_abscent_id(list<kvpair> kvs, int key)
+requires false == has_key(kvs, key);
+ensures kvs == kv_remove_key(kvs, key);
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      assert(kv_key(h) != key);
+      kv_remove_key_abscent_id(t, key);
+      return;
+  }
+}
+
+lemma void kv_remove_key_decrements_len(list<kvpair> kvs, int key)
+requires true == kv_no_dubs(kvs);
+ensures length(kvs) <= length(kv_remove_key(kvs, key)) + 1;
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      if (kv_key(h) == key) {
+        assert(false == has_key(t, key));
+        kv_remove_key_abscent_id(t, key);
+        assert(length(t) == length(kv_remove_key(t, key)));
+        return;
+      } else {
+        kv_remove_key_decrements_len(t, key);
+        return;
+      }
+  }
+}
+
+lemma void remove_key_preserves_len(list<record> recs, int key)
+requires true;
+ensures length(remove_key(recs, key)) == length(recs);
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      remove_key_preserves_len(t, key);
+      return;
+  }
+}
+
+lemma void kv2rec_inj_null(list<kvpair> kvs)
+requires true == forall(kvs, (recs_contain_kv)(nil));
+ensures kvs == nil;
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t): return;
+  }
+}
+
+lemma void rec_tail_for_empty_head(record rec, list<record> recs, list<kvpair> kvs)
+requires true == forall(kvs, (recs_contain_kv)(cons(rec, recs))) &*& rec_bb(rec) == 0;
+ensures true == forall(kvs, (recs_contain_kv)(recs));
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      rec_tail_for_empty_head(rec, recs, t);
+      return;
+  }
+}
+
+lemma void kv2rec_inj_len_le(list<record> recs, list<kvpair> kvs)
+requires true == forall(kvs, (recs_contain_kv)(recs)) &*& true == kv_no_dubs(kvs);
+ensures length(kvs) <= length(recs);
+{
+  switch(recs) {
+    case nil: 
+      kv2rec_inj_null(kvs);
+      assert(kvs == nil);
+      return;
+    case cons(h, t):
+      if (rec_bb(h) != 0) {
+        kv_remove_key_preserves_kv2rec_inj(kvs, recs, rec_key(h));
+        kv_remove_key_removes_key(kvs, rec_key(h));
+        rec_tail_contains_rest(kv_remove_key(kvs, rec_key(h)), t, h);
+        kv_remove_key_preserves_no_dubs(kvs, rec_key(h));
+        kv2rec_inj_len_le(t, kv_remove_key(kvs, rec_key(h)));
+        kv_remove_key_decrements_len(kvs, rec_key(h));
+      } else {
+        rec_tail_for_empty_head(h, t, kvs);
+        kv2rec_inj_len_le(t, kvs);
+      }
+      return;
+  }
+}
+
+lemma void contains_empty2small(list<int> bbs, list<kvpair> kvs)
+requires recs_mapping(?recs, kvs) &*& records(bbs, ?ks, ?vals, recs) &*& true == no_dubs(recs) &*& true == contains(bbs, 0);
+ensures recs_mapping(recs, kvs) &*& records(bbs, ks, vals, recs) &*& length(kvs) < length(bbs);
+{
+  switch(bbs) {
+    case nil: return;
+    case cons(h, t):
+      records_same_length(bbs, ks, vals, recs);
+      assert(recs != nil);
+      cons_head_tail(recs);
+      open records(bbs, ks, vals, recs);
+      if (h != 0) {
+        assert(rec_bb(head(recs)) != 0);
+        remove_first_key_preserves_mapping(kvs, head(recs), tail(recs));
+        contains_empty2small(t, kv_remove_key(kvs, rec_key(head(recs))));
+        open recs_mapping(recs, kvs);
+        kv_remove_key_decrements_len(kvs, rec_key(head(recs)));
+        close recs_mapping(recs, kvs);
+        open recs_mapping(tail(recs), kv_remove_key(kvs, rec_key(head(recs))));
+      } else {
+        open recs_mapping(recs, kvs);
+        rec_tail_for_empty_head(head(recs), tail(recs), kvs);
+        kv2rec_inj_len_le(tail(recs), kvs);
+        assert(length(kvs) <= length(tail(recs)));
+        assert(length(recs) == length(bbs));
+        assert(length(kvs) < length(bbs));
+        close recs_mapping(recs, kvs);
+     }
+     close records(bbs, ks, vals, recs);
+     return;
+  }
+}
+
+lemma void full_size(list<int> bbs, list<kvpair> kvs)
+requires recs_mapping(?recs, kvs) &*& records(bbs, ?ks, ?vals, recs) &*& true == no_dubs(recs);
+ensures recs_mapping(recs, kvs) &*& records(bbs, ks, vals, recs) &*& contains(bbs, 0) == (length(kvs) < length(bbs));
+{
+  if (contains(bbs, 0)) {
+    contains_empty2small(bbs, kvs);
+  } else {
+    if (length(kvs) < length(bbs)) {
+      small2contains_empty(bbs, kvs);
+    } else {
+    }
+  }
+}
+
+lemma void add_key_value_preserve_has_not_key(list<record> recs, int abs_key, int index, int bb, int key, int val)
+requires false == rec_has_key(recs, abs_key) &*& abs_key != key;
+ensures false == rec_has_key(update(index, rec_triple(bb, key, val), recs), abs_key);
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        add_key_value_preserve_has_not_key(t, abs_key, index - 1, bb, key, val);
+      }
+      return;
+  }
+}
+
+lemma void add_key_value_preserve_no_dubs(list<record> recs, int index, int bb, int key, int val)
+requires true == no_dubs(recs) &*& false == rec_has_key(recs, key);
+ensures true == no_dubs(update(index, rec_triple(bb, key, val), recs));
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        if (rec_bb(h) != 0) {
+          add_key_value_preserve_has_not_key(t, rec_key(h), index - 1, bb, key, val);
+        } else {
+        }
+        add_key_value_preserve_no_dubs(t, index - 1, bb, key, val);
+      }
+      return;
+  }
+}
+
+lemma void update_tail_tail_update<T>(T lhead, list<T> ltail, int index, T val)
+requires index > 0;
+ensures tail(update(index, val, cons(lhead, ltail))) == update(index - 1, val, ltail);
+{
+  switch(ltail) {
+    case nil: return;
+    case cons(h, t):
+      if (index - 1 == 0) {
+      } else {
+        update_tail_tail_update(h, t, index - 1, val);
+        assert(update(index - 1, val, ltail) == cons(h, update(index - 2, val, t)));
+        assert(update(index, val, cons(lhead, ltail)) == cons(lhead, update(index - 1, val, ltail)));
+      }
+      return;
+  }
+}
+
+lemma void update_0_tail<T>(list<T> lst, T val)
+requires lst != nil;
+ensures tail(update(0, val, lst)) == tail(lst);
+{
+  switch(lst){
+    case nil: return;
+    case cons(h, t): return;
+  }
+}
+
+lemma void update_recs(list<int> bbs, list<int> ks, list<int> vals, list<record> recs, int index, int nbb, int nk, int nval)
+requires records(bbs, ks, vals, recs) &*& 0 <= index;
+ensures records(update(index, nbb, bbs), update(index, nk, ks), update(index, nval, vals), update(index, rec_triple(nbb, nk, nval), recs));
+{
+  open records(bbs, ks, vals, recs);
+  switch(recs) {
+    case nil: break;
+    case cons(h, t):
+      cons_head_tail(bbs);
+      cons_head_tail(ks);
+      cons_head_tail(vals);
+      if (index > 0) {
+        update_recs(tail(bbs), tail(ks), tail(vals), t, index - 1, nbb, nk, nval);
+        update_tail_tail_update(head(bbs), tail(bbs), index, nbb);
+        update_tail_tail_update(head(ks), tail(ks), index, nk);
+        update_tail_tail_update(head(vals), tail(vals), index, nval); 
+      } else {
+        assert(index == 0);
+        update_0_tail(bbs, nbb);
+        update_0_tail(ks, nk);
+        update_0_tail(vals, nval);
+      }
+      break;
+  }
+  close records(update(index, nbb, bbs), update(index, nk, ks), update(index, nval, vals), update(index, rec_triple(nbb, nk, nval), recs));
+}
+
+lemma void update_kv2rec_inj(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
+requires true == forall(kvs, (recs_contain_kv)(recs)) &*& 0 <= index &*& index < length(recs) &*& bb != 0 &*& rec_bb(nth(index, recs)) == 0;
+ensures true == forall(cons(kvpair_constr(key, val), kvs), (recs_contain_kv)(update(index, rec_triple(bb, key, val), recs)));
+{
+  assume(true == forall(kvs, (recs_contain_kv)(update(index, rec_triple(bb, key, val), recs))));
+  assume(true == recs_contain_kv(update(index, rec_triple(bb, key, val), recs), kvpair_constr(key, val)));
+}
+
+lemma void update_rec2kv_inj(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
+requires true == forall(recs, (kvs_contain_rec)(kvs)) &*& 0 <= index &*& index < length(recs);
+ensures true == forall(update(index, rec_triple(bb, key, val), recs), (kvs_contain_rec)(cons(kvpair_constr(key, val), kvs)));
+{
+  assume(false);
+}
+
+lemma void update_mapping(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
+requires recs_mapping(recs, kvs) &*& false == has_key(kvs, key) &*& 0 <= index &*& index < length(recs) &*& bb != 0 &*& rec_bb(nth(index, recs)) == 0 &*& true == no_dubs(recs);
+ensures recs_mapping(update(index, rec_triple(bb, key, val), recs), cons(kvpair_constr(key, val), kvs));
+{
+  open recs_mapping(recs, kvs);
+  
+  update_kv2rec_inj(recs, kvs, index, bb, key, val);
+  update_rec2kv_inj(recs, kvs, index, bb, key, val);
+
+  close recs_mapping(update(index, rec_triple(bb, key, val), recs), cons(kvpair_constr(key, val), kvs));
+}
+
+@*/
+
+int put(int* busybits, int* keys, int* values, int key, int value)
+//@ requires mapping(busybits, keys, values, ?kvs) &*& false == has_key(kvs, key);
+//@ ensures length(kvs) < CAPACITY ? mapping(busybits, keys, values, cons(kvpair_constr(key, value), kvs)) &*& result == 0 \
+                                   : mapping(busybits, keys, values, kvs) &*& result == -1;
+{
+    //@ open mapping(busybits, keys, values, kvs);
+    //@ open mapping_(busybits, keys, values, ?recs);
+    //@ assert records(?bbs, ?ks, ?vals, recs);
+    //@ full_size(bbs, kvs);
+    //@ records_same_length(bbs, ks, vals, recs);
+    int start = loop(key);
+    int index = find_empty(busybits, start);
+
+    if (-1 == index)
+    {
+        //@ assert(length(bbs) == CAPACITY);
+        //@ assert(CAPACITY <= length(kvs));
+        //@ close mapping_(busybits, keys, values, recs);
+        //@ close mapping(busybits, keys, values, kvs);
+        return -1;
+    }
+    //@ assert(length(recs) == CAPACITY);
+    //@ nth_bbs_keys_vals_recs(index, bbs, ks, vals, recs);
+    busybits[index] = 1;
+    keys[index] = key;
+    values[index] = value;
+    //@ update_recs(bbs, ks, vals, recs, index, 1, key, value);
+    //@ rec_has_key_eq_has_key(recs, kvs, key);
+    //@ update_mapping(recs, kvs, index, 1, key, value);
+    //@ add_key_value_preserve_no_dubs(recs, index, 1, key, value);
+    //@ assert(length(kvs) < CAPACITY);
+    //@ close mapping_(busybits, keys, values, update(index, rec_triple(1, key, value), recs));
+    //@ close mapping(busybits, keys, values, cons(kvpair_constr(key, value), kvs));
+    return 0;
+}
+
+
