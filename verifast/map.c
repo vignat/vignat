@@ -1944,23 +1944,96 @@ ensures records(update(index, nbb, bbs), update(index, nk, ks), update(index, nv
   close records(update(index, nbb, bbs), update(index, nk, ks), update(index, nval, vals), update(index, rec_triple(nbb, nk, nval), recs));
 }
 
+lemma void update_rec_preserves_recs_contain_kv(list<record> recs, kvpair kv, int index, int bb, int key, int val)
+requires true == recs_contain_kv(recs, kv) &*& 0 <= index &*& index < length(recs) &*& rec_bb(nth(index, recs)) == 0;
+ensures true == recs_contain_kv(update(index, rec_triple(bb, key, val), recs), kv);
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index > 0) {
+        if (rec_bb(h) != 0 && rec_key(h) == kv_key(kv) && rec_val(h) == kv_value(kv)) {
+        } else {
+          update_rec_preserves_recs_contain_kv(t, kv, index - 1, bb, key, val);
+          update_tail_tail_update(h, t, index, rec_triple(bb, key, val));
+        }
+      } else {
+        assert(rec_bb(h) == 0);
+        assert(true == recs_contain_kv(t, kv));
+        update_0_tail(recs, rec_triple(bb, key, val));
+      }
+      return;
+  }
+}
+
+lemma void update_rec_preserves_kv2rec_inj(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
+requires true == forall(kvs, (recs_contain_kv)(recs)) &*& 0 <= index &*& index < length(recs) &*& rec_bb(nth(index, recs)) == 0;
+ensures true == forall(kvs, (recs_contain_kv)(update(index, rec_triple(bb, key, val), recs)));
+{
+  switch(kvs) {
+    case nil: return;
+    case cons(h, t):
+      update_rec_preserves_recs_contain_kv(recs, h, index, bb, key, val);
+      update_rec_preserves_kv2rec_inj(recs, t, index, bb, key, val);
+      return;
+  }
+}
+
+lemma void update_rec_adds_key(list<record> recs, int index, int bb, int key, int val)
+requires 0 <= index &*& index < length(recs) &*& bb != 0;
+ensures true == recs_contain_kv(update(index, rec_triple(bb, key, val), recs), kvpair_constr(key, val));
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        update_rec_adds_key(t, index - 1, bb, key, val);
+        update_tail_tail_update(h, t, index, rec_triple(bb, key, val));
+      }
+      return;
+  }
+}
+
 lemma void update_kv2rec_inj(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
 requires true == forall(kvs, (recs_contain_kv)(recs)) &*& 0 <= index &*& index < length(recs) &*& bb != 0 &*& rec_bb(nth(index, recs)) == 0;
 ensures true == forall(cons(kvpair_constr(key, val), kvs), (recs_contain_kv)(update(index, rec_triple(bb, key, val), recs)));
 {
-  assume(true == forall(kvs, (recs_contain_kv)(update(index, rec_triple(bb, key, val), recs))));
-  assume(true == recs_contain_kv(update(index, rec_triple(bb, key, val), recs), kvpair_constr(key, val)));
+  update_rec_preserves_kv2rec_inj(recs, kvs, index, bb, key, val);
+  update_rec_adds_key(recs, index, bb, key, val);
+}
+
+lemma void kv_cons_preserves_rec2kv_inj(list<record> recs, list<kvpair> kvs, kvpair extra)
+requires true == forall(recs, (kvs_contain_rec)(kvs)) &*& false == rec_has_key(recs, kv_key(extra));
+ensures true == forall(recs, (kvs_contain_rec)(cons(extra, kvs)));
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      kv_cons_preserves_rec2kv_inj(t, kvs, extra);
+      return;
+  }
 }
 
 lemma void update_rec2kv_inj(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
-requires true == forall(recs, (kvs_contain_rec)(kvs)) &*& 0 <= index &*& index < length(recs);
+requires true == forall(recs, (kvs_contain_rec)(kvs)) &*& 0 <= index &*& index < length(recs) &*& false == rec_has_key(recs, key);
 ensures true == forall(update(index, rec_triple(bb, key, val), recs), (kvs_contain_rec)(cons(kvpair_constr(key, val), kvs)));
 {
-  assume(false);
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+        kv_cons_preserves_rec2kv_inj(t, kvs, kvpair_constr(key, val));
+      } else {
+        update_rec2kv_inj(t, kvs, index - 1, bb, key, val);
+        update_tail_tail_update(h, t, index, rec_triple(bb, key, val));
+      }
+      return;
+  }
 }
 
 lemma void update_mapping(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
-requires recs_mapping(recs, kvs) &*& false == has_key(kvs, key) &*& 0 <= index &*& index < length(recs) &*& bb != 0 &*& rec_bb(nth(index, recs)) == 0 &*& true == no_dubs(recs);
+requires recs_mapping(recs, kvs) &*& false == has_key(kvs, key) &*& 0 <= index &*& index < length(recs) &*& bb != 0 &*& rec_bb(nth(index, recs)) == 0 &*& true == no_dubs(recs) &*& false == rec_has_key(recs, key);
 ensures recs_mapping(update(index, rec_triple(bb, key, val), recs), cons(kvpair_constr(key, val), kvs));
 {
   open recs_mapping(recs, kvs);
