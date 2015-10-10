@@ -151,4 +151,18 @@ ensures tail(update(0, val, lst)) == tail(lst);
   }
 }
 
+lemma void update_id<T>(int index, list<T> lst)
+requires true;
+ensures lst == update(index, nth(index, lst), lst);
+{
+  switch(lst){
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        update_id(index - 1, t);
+      }
+      return;
+  }
+}
 #endif

@@ -1363,8 +1363,8 @@ ensures recs_mapping(recs, kvs) &*& records(bbs, ks, vals, recs) &*& contains(bb
   }
 }
 
-lemma void add_key_value_preserve_has_not_key(list<record> recs, int abs_key, int index, int bb, int key, int val)
-requires false == rec_has_key(recs, abs_key) &*& abs_key != key;
+lemma void update_key_value_preserve_has_not_key(list<record> recs, int abs_key, int index, int bb, int key, int val)
+requires false == rec_has_key(recs, abs_key) &*& (bb == 0 || abs_key != key);
 ensures false == rec_has_key(update(index, rec_triple(bb, key, val), recs), abs_key);
 {
   switch(recs) {
@@ -1372,7 +1372,7 @@ ensures false == rec_has_key(update(index, rec_triple(bb, key, val), recs), abs_
     case cons(h, t):
       if (index == 0) {
       } else {
-        add_key_value_preserve_has_not_key(t, abs_key, index - 1, bb, key, val);
+        update_key_value_preserve_has_not_key(t, abs_key, index - 1, bb, key, val);
       }
       return;
   }
@@ -1388,7 +1388,7 @@ ensures true == no_dubs(update(index, rec_triple(bb, key, val), recs));
       if (index == 0) {
       } else {
         if (rec_bb(h) != 0) {
-          add_key_value_preserve_has_not_key(t, rec_key(h), index - 1, bb, key, val);
+          update_key_value_preserve_has_not_key(t, rec_key(h), index - 1, bb, key, val);
         } else {
         }
         add_key_value_preserve_no_dubs(t, index - 1, bb, key, val);
@@ -1512,7 +1512,7 @@ ensures true == forall(update(index, rec_triple(bb, key, val), recs), (kvs_conta
   }
 }
 
-lemma void update_mapping(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
+lemma void insert_mapping(list<record> recs, list<kvpair> kvs, int index, int bb, int key, int val)
 requires recs_mapping(recs, kvs) &*& false == has_key(kvs, key) &*& 0 <= index &*& index < length(recs) &*& bb != 0 &*& rec_bb(nth(index, recs)) == 0 &*& true == no_dubs(recs) &*& false == rec_has_key(recs, key);
 ensures recs_mapping(update(index, rec_triple(bb, key, val), recs), cons(kvpair_constr(key, val), kvs));
 {
@@ -1554,7 +1554,7 @@ int put(int* busybits, int* keys, int* values, int key, int value)
     values[index] = value;
     //@ update_recs(bbs, ks, vals, recs, index, 1, key, value);
     //@ rec_has_key_eq_has_key(recs, kvs, key);
-    //@ update_mapping(recs, kvs, index, 1, key, value);
+    //@ insert_mapping(recs, kvs, index, 1, key, value);
     //@ add_key_value_preserve_no_dubs(recs, index, 1, key, value);
     //@ assert(length(kvs) < CAPACITY);
     //@ close mapping_(busybits, keys, values, update(index, rec_triple(1, key, value), recs));
@@ -1562,4 +1562,78 @@ int put(int* busybits, int* keys, int* values, int key, int value)
     return 0;
 }
 
+/*@
+fixpoint list<kvpair> rem_key(list<kvpair> kvs, int key) {
+  switch(kvs) {
+    case nil: return nil;
+    case cons(h, t):
+      return kv_key(h) == key ? rem_key(t, key) : cons(h, rem_key(t, key));
+  }
+}
 
+lemma void rem_key_value_preserve_no_dubs(list<record> recs, int index, int key, int val)
+requires true == no_dubs(recs);
+ensures true == no_dubs(update(index, rec_triple(0, key, val), recs));
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        if (rec_bb(h) != 0) {
+          update_key_value_preserve_has_not_key(t, rec_key(h), index - 1, 0, key, val);
+        } else {
+        }
+        rem_key_value_preserve_no_dubs(t, index - 1, key, val);
+      }
+      return;
+  }
+}
+
+lemma void remove_mapping(list<record> recs, list<kvpair> kvs, int index, int key, int val)
+requires recs_mapping(recs, kvs) &*& 0 <= index &*& index < length(recs) &*& rec_bb(nth(index, recs)) != 0 &*& true == no_dubs(recs);
+ensures recs_mapping(update(index, rec_triple(0, key, val), recs), rem_key(kvs, rec_key(nth(index, recs))));
+{
+  assume(false);
+}
+
+@*/
+
+int erase(int* busybits, int* keys, int key)
+//@ requires mapping(busybits, keys, ?values, ?kvs);
+//@ ensures has_key(kvs, key) ? mapping(busybits, keys, values, rem_key(kvs, key)) &*& result == 0 \
+    : mapping(busybits, keys, values, kvs) &*& result == -1;
+{
+    //@ open mapping(busybits, keys, values, kvs);
+    //@ open mapping_(busybits, keys, values, ?recs);
+    //@ assert records(?bbs, ?ks, ?vals, recs);
+    //@ list<busy_key> bks = make_bkeys_from_recs(bbs, ks, vals, recs);
+    int start = loop(key);
+    int index = find_key(busybits, keys, start, key);
+    //@ bkhas_key2rec_has_key(recs, bks, key);
+    //@ rec_has_key_eq_has_key(recs, kvs, key);
+    //@ records_same_length(bbs, ks, vals, recs);
+    //@ bkeys_len_eq(bks, bbs, ks);
+
+    if (-1 == index)
+    {
+        //@ assert(false == has_key(kvs, key));
+        //@ close mapping_(busybits, keys, values, recs);
+        //@ close mapping(busybits, keys, values, kvs);
+        //@ destroy_bkeys(bks);
+        return -1;
+    }
+    //@ assert(true == has_key(kvs, key));
+    busybits[index] = 0;
+    //@ update_id(index, ks);
+    //@ update_id(index, vals);
+    //@ nth_bbs_keys_vals_recs(index, bbs, ks, vals, recs);
+    //@ nth_bbs_keys_bkeys(index, bbs, ks, bks);
+    //@ update_recs(bbs, ks, vals, recs, index, 0, nth(index, ks), nth(index, vals));
+    //@ rem_key_value_preserve_no_dubs(recs, index, nth(index, ks), nth(index, vals));
+    //@ close mapping_(busybits, keys, values, update(index, rec_triple(0, nth(index, ks), nth(index, vals)), recs));
+    //@ remove_mapping(recs, kvs, index, nth(index, ks), nth(index, vals));
+    //@ close mapping(busybits, keys, values, rem_key(kvs, key));
+    //@ destroy_bkeys(bks);
+    return 0;
+}
