@@ -1,0 +1,141 @@
+#ifndef NAT_SEQ_H
+#define NAT_SEQ_H
+
+#include <listex.gh>
+
+predicate nat_seq(list<int> lst) =
+    lst == nil ? true :
+      head(lst) == 0 ? tail(lst) == nil :
+        tail(lst)!= nil &*& head(lst) == 1 + head(tail(lst)) &*& nat_seq(tail(lst));
+          
+lemma void nat_seq_head_len(list<int> lst)
+requires nat_seq(lst);
+ensures nat_seq(lst) &*& (lst == nil || (head(lst) + 1 == length(lst)));
+{
+    switch (lst) {
+    case nil:
+        return;
+    case cons(h, t):
+        open nat_seq(lst);
+        if (head(lst) == 0)
+        {
+            assert(tail(lst) == nil);
+            assert(length(lst) == 1);
+        }
+        else
+        {
+            nat_seq_head_len(t);
+            assert(t!=nil);
+            assert(head(lst) == 1 + head(tail(lst)));
+            assert(head(tail(lst)) + 1 == length(tail(lst)));
+            assert(length(lst) == 1 + length(tail(lst)));
+            assert(head(lst) + 1 == length(lst));
+        }
+        close nat_seq(lst);
+    };
+}
+      
+lemma void nat_seq_append_len(list<int> seq)
+requires nat_seq(seq);
+ensures nat_seq(cons(length(seq), seq));
+{
+    switch(seq) {
+    case nil:
+        open nat_seq(seq);
+        assert(length(seq) == 0);
+        close nat_seq(cons(length(seq), seq));
+        return;
+    case cons(h, t):
+        nat_seq_head_len(seq);
+        close nat_seq(cons(length(seq), seq));
+        return;
+    }
+}
+
+lemma void nat_seq_cont(list<int> seq, int x)
+requires nat_seq(seq) &*& 0 <= x &*& x < (length(seq));
+ensures nat_seq(seq) &*& true == contains(seq, x);
+{
+  switch(seq) {
+    case nil: return;
+    case cons(h, t):
+      nat_seq_head_len(seq);
+      open nat_seq(seq);
+      if (h == 0)
+      {
+        assert(length(seq) == 1);
+        assert(x == 0);
+        assert(x == head(seq));
+      }
+      else
+      {
+        if (h == x) {}
+        else
+        {
+          assert(x < h + 1);
+          assert(x != h);
+          assert(x < h);
+          assert(x < length(t));
+          nat_seq_cont(t, x);
+          assert(true == contains(t, x));
+        }
+      }
+      close nat_seq(seq);
+      assert(true == contains(seq, x));
+      return;
+  }   
+}
+
+lemma void nat_seq_ge_0(list<int> seq)
+requires nat_seq(seq) &*& seq != nil;
+ensures nat_seq(seq) &*& head(seq) >= 0 &*& seq != nil;
+{
+  switch(seq) {
+    case nil: return;
+    case cons(h, t):
+      length_nonnegative(t);
+      nat_seq_head_len(seq);
+      return;
+  }
+}
+
+lemma list<int> replicate_nat_seq(list<int> seq)
+requires nat_seq(seq);
+ensures nat_seq(seq) &*& nat_seq(result) &*& (seq == nil ? result == nil : result != nil &*& head(seq) == head(result)) &*&
+        length(result) == length(seq);
+{
+  switch(seq) {
+    case nil:
+      close nat_seq(nil);
+      return nil;
+    case cons(h, t):
+      open nat_seq(seq);
+      list<int> rt = nil;
+      if (h == 0) {
+        rt = cons(h, nil);
+        close nat_seq(rt);
+      }
+      else {
+        rt = replicate_nat_seq(t);
+        rt = cons(h, rt);
+        close nat_seq(rt);
+      }
+      close nat_seq(seq);
+      return rt;
+  }
+}
+
+lemma void destroy_nat_seq(list<int> nseq)
+requires nat_seq(nseq);
+ensures true;
+{
+  switch(nseq) {
+    case nil: open nat_seq(nseq); return;
+    case cons(h, t):
+      open nat_seq(nseq);
+      if (h != 0) destroy_nat_seq(t);
+      return;
+  }
+}
+
+#endif

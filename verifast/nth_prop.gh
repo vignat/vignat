@@ -1,0 +1,242 @@
+#ifndef NTH_PROP_H
+#define NTH_PROP_H
+
+#include "nat_seq.gh"
+#include "stdex.gh"
+
+fixpoint bool nthProp<T> (list<T> arr, fixpoint (T, bool) prop, int index) {
+  return prop(nth(index, arr));
+}
+
+fixpoint bool nthProp_or_outrange<T>(list<T> arr, fixpoint (T, bool) prop, int n) {
+  return n < 0 || length(arr) <= n || nthProp(arr, prop, n);
+}
+
+lemma void forall_nthProp2nthProp_or_outrange<T>(list<int> seq, list<T> arr, fixpoint (T, bool) prop)
+requires true == forall(seq, (nthProp)(arr, prop));
+ensures true == forall(seq, (nthProp_or_outrange)(arr, prop));
+{
+  switch(seq) {
+    case nil: return;
+    case cons(h, t):
+      assert(true == nthProp(arr, prop, h));
+      assert(true == nthProp_or_outrange(arr, prop, h));
+      forall_nthProp2nthProp_or_outrange(t, arr, prop);
+      return;
+  }
+}
+
+lemma void nat_seq_nthProp_or_outrange2nthProp<T>(list<int> nseq, list<T> arr, fixpoint (T, bool) prop)
+requires nat_seq(nseq) &*& true == forall(nseq, (nthProp_or_outrange)(arr, prop)) &*& length(nseq) <= length(arr);
+ensures nat_seq(nseq) &*& true == forall(nseq, (nthProp)(arr, prop));
+{
+  switch(nseq) {
+    case nil: return;
+    case cons(h, t):
+      nat_seq_ge_0(nseq);
+      assert(0 <= h);
+      nat_seq_head_len(nseq);
+      assert(h < length(arr));
+      assert(true == nthProp_or_outrange(arr, prop, h));
+      assert(true == nthProp(arr, prop, h));
+      open nat_seq(nseq);
+      if (h == 0) {
+        assert(t == nil);
+      } else {
+        nat_seq_nthProp_or_outrange2nthProp(t, arr, prop);
+      }
+      close nat_seq(nseq);
+  }
+}
+
+
+lemma void nat_take_subarr_nthProp_or_outrange<T>(list<int> nseq, list<T> arr, fixpoint (T, bool) prop)
+requires nat_seq(nseq) &*& true == forall(nseq, (nthProp_or_outrange)(arr, prop)) &*& length(arr) > 0;
+ensures nat_seq(nseq) &*& true == forall(nseq, (nthProp_or_outrange)(take(length(arr) - 1, arr), prop));
+{
+  switch(nseq) {
+    case nil: return;
+    case cons(h, t):
+      nat_seq_ge_0(nseq);
+      open nat_seq(nseq);
+      if (h == 0) {
+        assert(t == nil);
+        if (length(arr) == 1) {
+          assert(take(length(arr) - 1, arr) == nil);
+          assert(true == nthProp_or_outrange(take(length(arr) -1, arr), prop, h));
+        } else {
+          assert(length(arr) - 1 > 0);
+          assert(nth(h, take(length(arr) -1, arr)) == nth(h, arr));
+          assert(true == nthProp_or_outrange(take(length(arr) - 1, arr), prop, h));
+        }
+      } else {
+        if (h < length(arr) - 1) {
+          assert(nth(h, take(length(arr) - 1, arr)) == nth(h, arr));
+        } else {
+          assert(length(take(length(arr) - 1, arr)) <= h);
+        }
+        assert(true == nthProp_or_outrange(take(length(arr) - 1, arr), prop, h));
+        nat_take_subarr_nthProp_or_outrange(t, arr, prop);
+      }
+      close nat_seq(nseq);
+      return;
+  }
+}
+
+lemma void nthProp_or_outrange_on_empty<T>(list<int> nseq, list<T> arr, fixpoint (T, bool) prop)
+requires length(arr) == 0;
+ensures true == forall(nseq, (nthProp_or_outrange)(arr, prop));
+{
+  switch(nseq) {
+    case nil: return;
+    case cons(h, t):
+      assert(0 < h || h <= length(arr));
+      assert(true == nthProp_or_outrange(arr, prop, h));
+      nthProp_or_outrange_on_empty(t, arr, prop);
+      return;
+  }
+}
+
+lemma void nthProp_or_outrange_append1<T>(list<int> seq, list<T> arr, T x, fixpoint (T, bool) prop)
+requires true == forall(seq, (nthProp_or_outrange)(arr, prop)) &*& true == prop(x);
+ensures true == forall(seq, (nthProp_or_outrange)(append(arr, cons(x, nil)), prop));
+{
+  switch(seq) {
+    case nil: return;
+    case cons(h, t):
+      nthProp_or_outrange_append1(t, arr, x, prop);
+      if (h < 0) return;
+      else if (h > length(arr)) return;
+      else if (h == length(arr)) {
+        nth_len_append_cons(arr, x);
+        assert(nth(h, append(arr, cons(x, nil))) == x);
+        return;
+      } else {
+        assert(true == prop(nth(h, arr)));
+        nth_less_append_cons(h, arr, x);
+        assert(nth(h, append(arr, cons(x, nil))) == nth(h, arr));
+        return;
+      }
+  }
+}
+
+lemma void nat_subarr_nthProp_or_outrange<T>(list<int> nseq, list<T> arr, T arrhead, fixpoint (T, bool) prop)
+requires nat_seq(nseq) &*& true == forall(nseq, (nthProp_or_outrange)(cons(arrhead, arr), prop)) &*& length(arr) < length(nseq);
+ensures nat_seq(nseq) &*& true == forall(nseq, (nthProp_or_outrange)(arr, prop));
+{
+  switch(nseq) {
+    case nil: return;
+    case cons(h, t):
+      nat_seq_head_len(nseq);
+      open nat_seq(nseq);
+      if (h == 0) {
+        assert(length(nseq) == 1);
+        assert(length(arr) == 0);
+        length_0_nil(arr);
+        assert(arr == nil);
+      } else {
+        assert(true == forall(t, (nthProp_or_outrange)(cons(arrhead, arr), prop)));
+        nat_take_subarr_nthProp_or_outrange(t, cons(arrhead, arr), prop);
+        assert(length(arr) == length(cons(arrhead, arr)) - 1);
+        int ll = length(arr);
+        length_nonnegative(arr);
+        if (ll == 0) {
+          nthProp_or_outrange_on_empty(nseq, arr, prop);
+        } else {
+          cons_take_take_cons(arrhead, arr, ll - 1);
+          assert(cons(arrhead, take(ll - 1, arr)) == take(ll, cons(arrhead, arr)));
+          assert(cons(arrhead, take(length(arr) - 1, arr)) == take(length(cons(arrhead, arr)) - 1, cons(arrhead, arr)));
+          nat_subarr_nthProp_or_outrange(t, take(length(arr) - 1, arr), arrhead, prop);
+          assert(true == forall(t, (nthProp_or_outrange)(take(length(arr) - 1, arr), prop)));
+          assert(true == forall(t, (nthProp_or_outrange)(cons(arrhead, arr), prop)));
+          
+          close nat_seq(nseq);
+          nat_seq_cont(nseq, ll);
+          open nat_seq(nseq);
+          forall_mem(ll, nseq, (nthProp_or_outrange)(cons(arrhead, arr), prop));
+          assert(true == nthProp_or_outrange(cons(arrhead, arr), prop, ll));
+          assert(true == nthProp_or_outrange(arr, prop, ll - 1));
+          
+          nthProp_or_outrange_append1(t, take(ll - 1, arr), nth(ll - 1, arr), prop);
+          assert(true == forall(t, (nthProp_or_outrange)(append(take(ll - 1, arr), cons(nth(ll - 1, arr), nil)), prop)));
+          append_take_cons(arr);
+          assert(arr == append(take(ll - 1, arr), cons(nth(ll - 1, arr), nil)));
+          
+          assert(true == forall(t, (nthProp_or_outrange)(arr, prop)));
+          assert(h == length(nseq) - 1);
+          assert(length(arr) <= h);
+          assert(true == nthProp_or_outrange(arr, prop, h));
+        }
+      }
+      close nat_seq(nseq);
+      return;
+  }
+}
+
+
+lemma void nat_subseq_prop_subarr<T>(list<int> nseq, int shead, list<T> arr, T arrhead, fixpoint (T, bool) prop)
+requires nat_seq(cons(shead, nseq)) &*& true == forall(cons(shead, nseq), (nthProp)(cons(arrhead, arr), prop)) &*& length(nseq) == length(arr);
+ensures nat_seq(cons(shead, nseq)) &*& true == forall(nseq, (nthProp)(arr, prop));
+{
+  assert(true == forall(cons(shead, nseq), (nthProp)(cons(arrhead, arr), prop)));
+  forall_nthProp2nthProp_or_outrange(cons(shead, nseq), cons(arrhead, arr), prop);
+  assert(true == forall(cons(shead, nseq), (nthProp_or_outrange)(cons(arrhead, arr), prop)));
+  nat_subarr_nthProp_or_outrange(cons(shead, nseq), arr, arrhead, prop);
+  assert(true == forall(nseq, (nthProp_or_outrange)(arr, prop)));
+  open nat_seq(cons(shead, nseq));
+  if (shead == 0) {
+    assert(nseq == nil);
+  } else {
+    nat_seq_nthProp_or_outrange2nthProp(nseq, arr, prop);
+  }
+  close nat_seq(cons(shead, nseq));
+  assert(true == forall(nseq, (nthProp)(arr, prop)));
+}
+
+lemma void nat_seq_forall<T>(list<int> nseq, list<T> arr, fixpoint (T, bool) prop)
+requires nat_seq(nseq) &*& true == forall(nseq, (nthProp)(arr, prop)) &*& length(nseq) == length(arr);
+ensures nat_seq(nseq) &*& true == forall(arr, prop);
+{
+  switch(nseq) {
+    case nil:
+      assert(length(arr) == 0);
+      switch(arr) {
+        case nil:
+          return;
+        case cons(ah, at):
+          length_positive(at);
+          assert(length(arr) == length(at) + 1);
+          assert(length(arr) > 0);
+          return;
+      }
+    case cons(h, t) :
+      switch(arr) {
+        case nil:
+          return;
+        case cons(ah, at):
+          nat_seq_cont(nseq, 0);
+          forall_mem(0, nseq, (nthProp)(arr, prop));
+          assert(true == nthProp(arr, prop, 0));
+          assert(true == prop(nth(0, arr)));
+          assert(ah == nth(0, arr));
+          nat_subseq_prop_subarr(t, h, at, ah, prop);
+          assert(true == forall(t, (nthProp)(arr, prop)));
+          open nat_seq(nseq);
+          if (h == 0) {
+            assert(t == nil);
+            assert(length(arr) == 1);
+            assert(length(at) == 0);
+            length_0_nil(at);
+            assert(at == nil);
+          } else {
+            nat_seq_forall(t, at, prop);
+          }
+          assert(true == forall(at, prop));
+          close nat_seq(nseq);
+          return;
+      }
+  }
+}
+
+
+#endif
