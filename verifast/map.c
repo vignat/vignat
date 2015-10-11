@@ -1731,9 +1731,9 @@ ensures true == forall(kv_remove_key(kvs, rec_key(nth(index, recs))), (recs_cont
   switch(kvs) {
     case nil: return;
     case cons(h, t):
-      if (recs == nil) return;
-      cons_head_tail(recs);
       if (index == 0) {
+        if (recs == nil) return;
+        cons_head_tail(recs);
         kv_remove_key_preserves_kv2rec_inj(kvs, recs, rec_key(head(recs)));
         kv_remove_key_removes_key(kvs, rec_key(head(recs)));
         rec_tail_contains_rest(kv_remove_key(kvs, rec_key(head(recs))), tail(recs), head(recs));
@@ -1762,11 +1762,46 @@ ensures true == forall(kv_remove_key(kvs, rec_key(nth(index, recs))), (recs_cont
   }
 }
 
+lemma void rec_has_key_not_ith_key_matches_not(list<record> recs, int index, int key)
+requires false == rec_has_key(recs, key) &*& rec_bb(nth(index, recs)) != 0 &*& 0 <= index &*& index < length(recs);
+ensures rec_key(nth(index, recs)) != key;
+{
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        rec_has_key_not_ith_key_matches_not(t, index - 1, key);
+      }
+      return;
+  }
+}
+
 lemma void rem_rec_rec2kv_inj(list<record> recs, list<kvpair> kvs, int index, int key, int val)
 requires true == forall(recs, (kvs_contain_rec)(kvs)) &*& 0 <= index &*& index < length(recs) &*& rec_bb(nth(index, recs)) != 0 &*& true == no_dubs(recs);
 ensures true == forall(update(index, rec_triple(0, key, val), recs), (kvs_contain_rec)(kv_remove_key(kvs, rec_key(nth(index, recs)))));
 {
-  assume(false);
+  switch(recs) {
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+        kv_remove_key_preserves_rec2kv_inj(t, kvs, rec_key(h));
+        switch(kv_remove_key(kvs, rec_key(h))){
+          case nil: break;
+          case cons(kvh, kvt): break;
+        }
+        assert(true == kvs_contain_rec(kv_remove_key(kvs, rec_key(h)), rec_triple(0, key, val)));
+      } else {
+        rem_rec_rec2kv_inj(t, kvs, index - 1, key, val);
+        assert(true == kvs_contain_rec(kvs, h));
+        if (rec_bb(h) != 0) {
+          rec_has_key_not_ith_key_matches_not(t, index - 1, rec_key(h));
+        }
+        kv_remove_key_preserves_kvs_contain_rec(kvs, h, rec_key(nth(index, recs)));
+        assert(true == kvs_contain_rec(kv_remove_key(kvs, rec_key(nth(index, recs))), h));
+      }
+      return;
+  }
 }
 
 lemma void remove_mapping(list<record> recs, list<kvpair> kvs, int index, int key, int val)
