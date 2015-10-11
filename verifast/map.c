@@ -1129,13 +1129,13 @@ ensures false == has_key(kv_remove_key(kvs, key), key);
 }
 
 lemma void rec_tail_contains_rest(list<kvpair> kvs, list<record> recs, record rec)
-requires true == forall(kvs, (recs_contain_kv)(cons(rec, recs))) &*& false == has_key(kvs, rec_key(rec));
+requires true == forall(kvs, (recs_contain_kv)(cons(rec, recs))) &*& (false == has_key(kvs, rec_key(rec)) || rec_bb(rec) == 0);
 ensures true == forall(kvs, (recs_contain_kv)(recs));
 {
   switch(kvs) {
     case nil: return;
     case cons(h, t):
-      if (kv_key(h) == rec_key(rec)) {
+      if (rec_bb(rec) != 0 && kv_key(h) == rec_key(rec)) {
       } else {
         switch(cons(rec, recs)){
           case nil: break;
@@ -1856,4 +1856,115 @@ int erase(int* busybits, int* keys, int key)
     //@ close mapping(busybits, keys, values, kv_remove_key(kvs, key));
     //@ destroy_bkeys(bks);
     return 0;
+}
+
+/*@
+fixpoint int busy_len(list<int> bbs) {
+  switch(bbs) {
+    case nil: return 0;
+    case cons(h, t):
+      return (h != 0 ? 1 : 0) + busy_len(t);
+  }
+}
+
+lemma void busy_len_add_bit(list<int> bbs, int i, int s)
+requires s == busy_len(take(i, bbs)) &*& 0 <= i &*& i < length(bbs);
+ensures nth(i, bbs) != 0 ? s + 1 == busy_len(take(i + 1, bbs)) : s == busy_len(take(i + 1, bbs));
+{
+  switch(bbs) {
+    case nil: return;
+    case cons(h, t):
+      if (i == 0) {
+      } else {
+        if (h != 0) {
+          busy_len_add_bit(t, i - 1, s - 1);
+        } else {
+          busy_len_add_bit(t, i - 1, s);
+        }
+      }
+      return;
+  }
+}
+
+fixpoint int rec_busy_len(list<record> recs) {
+  switch(recs) {
+    case nil: return 0;
+    case cons(h, t):
+      return (rec_bb(h) != 0 ? 1 : 0) + rec_busy_len(t);
+  }
+}
+
+lemma void busy_len2rec_busy_len(list<int> bbs, list<record> recs)
+requires records(bbs, ?ks, ?vals, recs);
+ensures records(bbs, ks, vals, recs) &*& busy_len(bbs) == rec_busy_len(recs);
+{
+  open records(bbs, ks, vals, recs);
+  switch(recs) {
+    case nil: break;
+    case cons(h, t):
+      cons_head_tail(bbs);
+      busy_len2rec_busy_len(tail(bbs), t);
+      break;
+  }
+  close records(bbs, ks, vals, recs);
+}
+
+lemma void rec_busy_len_is_the_size(list<record> recs, list<kvpair> kvs)
+requires recs_mapping(recs, kvs) &*& true == no_dubs(recs);
+ensures recs_mapping(recs, kvs) &*& rec_busy_len(recs) == length(kvs);
+{
+  switch(recs) {
+    case nil:
+      open recs_mapping(recs, kvs);
+      close recs_mapping(recs, kvs);
+      kv2rec_inj_null(kvs);
+      break;
+    case cons(h, t):
+      open recs_mapping(recs, kvs);
+      close recs_mapping(recs, kvs);
+      if (rec_bb(h) != 0) {
+        remove_first_key_preserves_mapping(kvs, h, t);
+        kvs_contain_rec2has_key(kvs, h);
+        kv_remove_key_decreases_len(kvs, rec_key(h));
+        kv_remove_key_decrements_len(kvs, rec_key(h));
+        rec_busy_len_is_the_size(t, kv_remove_key(kvs, rec_key(h)));
+        open recs_mapping(t, kv_remove_key(kvs, rec_key(h)));
+      } else {
+        rec_tail_contains_rest(kvs, t, h);
+        close recs_mapping(t, kvs);
+        rec_busy_len_is_the_size(t, kvs);
+        open recs_mapping(t, kvs);
+      }
+      break;
+  }
+}
+
+@*/
+
+
+int size(int* busybits)
+//@ requires mapping(busybits, ?keys, ?values, ?kvs);
+//@ ensures mapping(busybits, keys, values, kvs) &*& result == length(kvs);
+{
+    int s = 0;
+    //@ open mapping(busybits, keys, values, kvs);
+    //@ open mapping_(busybits, keys, values, ?recs);
+    //@ assert records(?bbs, ?ks, ?vals, recs);
+    for (int i = 0; i < CAPACITY; ++i)
+        /*@ invariant s == busy_len(take(i, bbs)) &*& 0 <= i &*& i <= CAPACITY &*&
+          ints(busybits, CAPACITY, bbs) &*& records(bbs, ks, vals, recs) &*& s <= i; @*/
+    {
+        //@ busy_len_add_bit(bbs, i, s);
+        if (busybits[i] != 0)
+        {
+            ++s;
+        }
+    }
+    //@ assert(s == busy_len(bbs));
+    //@ busy_len2rec_busy_len(bbs, recs);
+    //@ assert(s == rec_busy_len(recs));
+    //@ rec_busy_len_is_the_size(recs, kvs);
+    //@ close mapping_(busybits, keys, values, recs);
+    //@ close mapping(busybits, keys, values, kvs);
+    return s;
 }
