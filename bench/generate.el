@@ -80,7 +80,7 @@
     (dolist (load '(5 50 95))
       (dolist (gpr '(0.03 1 30))
         (dolist (hitr '(5 50 95))
-          (dolist (type '("coq" "std" "glib"))
+          (dolist (type '("vst" "std" "glib"))
             (insert (number-to-string load)) (insert ",")
             (insert (number-to-string gpr)) (insert ",")
             (insert (number-to-string hitr)) (insert ",")

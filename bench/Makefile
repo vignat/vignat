@@ -21,7 +21,7 @@ runs.txt: bench
 	for i in `seq 1 30`; do	./bench o | paste runs.txt - > tmp.txt && cp tmp.txt runs.txt; done
 	rm tmp.txt
 
-bench: engine.cpp ../coq/map.c data.c operations.c
+bench: engine.cpp ../vst/map/map.c data.c operations.c
 	g++ engine.cpp -std=c++11 -I/usr/include/glib-2.0 -I /usr/lib/x86_64-linux-gnu/glib-2.0/include -lglib-2.0 -L/lib/x86_64-linux-gnu/ -o bench
 
 operations.c: generate.el Makefile

@@ -6,7 +6,7 @@
 #include <chrono>
 #include <iostream>
 #include <glib.h>
-#include "../coq/map.c"
+#include "../vst/map/map.c"
 
 #include "data.c"
 
@@ -46,7 +46,7 @@ void pretty_print(map<string, long> results[][3][3])
                 case 1: cout <<"hitrate 50% "; break;
                 case 2: cout <<"hitrate 95% "; break;
                 };
-                cout << " | c" <<setw(7) << results[l][g][h]["coq"]
+                cout << " | c" <<setw(7) << results[l][g][h]["vst"]
                      << " | s" <<setw(7) << results[l][g][h]["stl"]
                      << " | g" <<setw(7) << results[l][g][h]["glib"] <<endl;
             }
@@ -59,7 +59,7 @@ void dump(map<string, long> results[][3][3])
     for (int l = 0; l < 3; ++l)
         for (int g = 0; g < 3; ++g)
             for (int h = 0; h < 3; ++h)
-                cout << results[l][g][h]["coq"] <<"\n"
+                cout << results[l][g][h]["vst"] <<"\n"
                      << results[l][g][h]["stl"] <<"\n"
                      << results[l][g][h]["glib"] <<endl;
 }
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 #define START_MEASUREMENT     t = high_resolution_clock::now()
 
 
-#define NAME "coq"
+#define NAME "vst"
 #define PUT(k) (put(busybits, keys, values, k, 1))
 #define GET(k) (get(busybits, keys, values, k))
 #define ERASE(k) (erase(busybits, keys, k))
