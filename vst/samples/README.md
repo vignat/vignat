@@ -10,3 +10,4 @@
  * assoc.v - the automatic clightgen translation of assoc.c into Coq IR
  * assoc_spec.v - CoQ high level specification, middle level implementation and correspondence proof
  * verif\_assoc.v - VST specification and proof of equality of assoc.v and assoc_spec.v's middle level implementation
+ * intro.v - A couple of examples, demonstrating that `intro.` tactic can not be performed automatically by the `Proof.` command.
