@@ -44,6 +44,10 @@
 #include <cmdline_parse.h>
 #include <cmdline_parse_etheraddr.h>
 
+#define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
+
+#define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
+#define LOG_ADD(...) printf(__VA_ARGS__)
 
 #define MAX_PKT_BURST     32
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
@@ -118,6 +122,49 @@ static gboolean ext_key_equal(gconstpointer k1, gconstpointer k2) {
            key1->protocol == key2->protocol;
 }
 
+static void log_ip(uint32_t addr) {
+    LOG_ADD( "%d.%d.%d.%d", addr&0xff, (addr>>8)&0xff, (addr>>16)&0xff, (addr>>24)&0xff);
+}
+
+static void log_int_key(const struct int_key *key) {
+    LOG( "{int_src_port: %d; dst_port: %d;\n"
+            " int_src_ip: ",
+            key->int_src_port, key->dst_port);
+    log_ip(key->int_src_ip);
+    LOG_ADD( "; dst_ip: ");
+    log_ip(key->dst_ip);
+    LOG_ADD( "\n"
+            " int_device_id: %d; protocol: %d}\n",
+            key->int_device_id, key->protocol);
+}
+
+static void log_ext_key(const struct ext_key *key) {
+    LOG( "{ext_src_port: %d; dst_port: %d;\n"
+            " ext_src_ip: ",
+            key->ext_src_port, key->dst_port);
+    log_ip(key->ext_src_ip);
+    LOG_ADD( "; dst_ip: ");
+    log_ip(key->dst_ip);
+    LOG_ADD( "\n"
+            " ext_device_id: %d; protocol: %d}\n",
+            key->ext_device_id, key->protocol);
+}
+
+static void log_flow(const struct flow *f) {
+    LOG( "{int_src_port: %d; ext_src_port: %d;\n"
+            " dst_port: %d; int_src_ip: ",
+            f->int_src_port, f->ext_src_port, f->dst_port);
+    log_ip(f->int_src_ip);
+    LOG_ADD( ";\n ext_src_ip:");
+    log_ip(f->ext_src_ip);
+    LOG_ADD( "; dst_ip: ");
+    log_ip(f->dst_ip);
+    LOG_ADD( "\n"
+            " int_device_id: %d; ext_device_id: %d;\n"
+            " protocol: %d}\n",
+            f->int_device_id, f->ext_device_id, f->protocol);
+}
+
 #define MAX_FLOWS (1024)
 
 struct int_key* internal_keys = NULL;
@@ -171,12 +218,12 @@ static void add_flow(struct flow *f) {
 }
 
 static int allocate_flowtables(void) {
-    assert(internal_keys == NULL);
-    assert(external_keys == NULL);
-    assert(flows == NULL);
-    assert(int_flows == NULL);
-    assert(ext_flows == NULL);
-    assert(num_flows == 0);
+    //assert(internal_keys == NULL);
+    //assert(external_keys == NULL);
+    //assert(flows == NULL);
+    //assert(int_flows == NULL);
+    //assert(ext_flows == NULL);
+    //assert(num_flows == 0);
     if (NULL == (internal_keys = malloc(sizeof(struct int_key)*MAX_FLOWS)))
         return 0;
     if (NULL == (external_keys = malloc(sizeof(struct ext_key)*MAX_FLOWS)))
@@ -235,8 +282,6 @@ struct lcore_rx_queue {
 #define MAX_RX_QUEUE_PER_LCORE 16
 #define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
 #define MAX_RX_QUEUE_PER_PORT 128
-
-#define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
 #define MEMPOOL_CACHE_SIZE 256
 
@@ -416,7 +461,7 @@ uint16_t next_unused_external_port = 0;
 
 static struct ext_iface allocate_ext_iface(void) {
     return (struct ext_iface){
-        .ip = IPv4(192,168,2,11),
+        .ip = IPv4(11,2,168,192),
         .port = next_unused_external_port++,
         .device_id = wan_port_id
     };
@@ -440,8 +485,11 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
         ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
                                            sizeof(struct ether_hdr));
 
+        LOG( "forwarding and ipv4 packet on %d\n", portid);
+
         if (portid == wan_port_id) {
             //External port.
+            LOG( "port %d turns out to be external(%d)\n", portid, wan_port_id);
             struct ext_key key = {
                 .ext_src_port = get_dst_port(m), //intentionally swapped.
                 .dst_port = get_src_port(m),
@@ -450,12 +498,17 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                 .ext_device_id = portid,
                 .protocol = ipv4_hdr->next_proto_id
             };
+            LOG( "for key: ");
+            log_ext_key(&key);
             struct flow* f = get_flow_ext(&key);
             if (f == NULL) {
                 // Use did not ask for this packet.
+                LOG( "flow not found. dropping\n");
                 rte_pktmbuf_free(m);
                 return;
             } else {
+                LOG( "found flow:");
+                log_flow(f);
                 ipv4_hdr->dst_addr = f->int_src_ip;
                 set_dst_port(m, f->int_src_port);
                 //TODO: recalculate ip checksum.
@@ -463,6 +516,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             }
         } else {
             //Internal port.
+            LOG( "port %d turns out NOT to be external(%d)\n", portid, wan_port_id);
             struct int_key key = {
                 .int_src_port = get_src_port(m),
                 .dst_port = get_dst_port(m),
@@ -471,6 +525,8 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                 .int_device_id = portid,
                 .protocol = ipv4_hdr->next_proto_id
             };
+            LOG( "for key: ");
+            log_int_key(&key);
             struct flow* f = get_flow_int(&key);
             if (f == NULL) {
                 struct ext_iface alloc = allocate_ext_iface();
@@ -485,8 +541,11 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                     .protocol = ipv4_hdr->next_proto_id
                 };
                 f = &new_flow;
+                LOG( "adding flow: ");
                 add_flow(f);
             }
+            LOG( "forwarding to: ");
+            log_flow(f);
             ipv4_hdr->src_addr = f->ext_src_ip;
             set_src_port(m, f->ext_src_port);
             //TODO: recalculate ip checksum.
@@ -507,6 +566,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 
         send_single_packet(m, dst_device);
     } else {
+        LOG( "non ipv4 packet, discard");
         /* Free the mbuf that contains non-IPV4/IPV6 packet */
         rte_pktmbuf_free(m);
     }
@@ -531,17 +591,17 @@ main_loop(__attribute__((unused)) void *dummy)
     qconf = &lcore_conf[lcore_id];
 
     if (qconf->n_rx_queue == 0) {
-        RTE_LOG(INFO, NAT, "lcore %u has nothing to do\n", lcore_id);
+        LOG( "lcore %u has nothing to do\n", lcore_id);
         return 0;
     }
 
-    RTE_LOG(INFO, NAT, "entering main loop on lcore %u\n", lcore_id);
+    LOG( "entering main loop on lcore %u\n", lcore_id);
 
     for (i = 0; i < qconf->n_rx_queue; i++) {
 
         portid = qconf->rx_queue_list[i].port_id;
         queueid = qconf->rx_queue_list[i].queue_id;
-        RTE_LOG(INFO, NAT, " -- lcoreid=%u portid=%hhu rxqueueid=%hhu\n", lcore_id,
+        LOG( " -- lcoreid=%u portid=%hhu rxqueueid=%hhu\n", lcore_id,
             portid, queueid);
     }
 
