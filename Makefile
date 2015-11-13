@@ -39,13 +39,14 @@ RTE_TARGET ?= x86_64-native-linuxapp-gcc
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
-APP = l3fwd
+APP = nat
 
 # all source are stored in SRCS-y
 SRCS-y := main.c
 
-CFLAGS += -O3 $(USER_FLAGS)
+CFLAGS += -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include $(USER_FLAGS)
 CFLAGS += $(WERROR_FLAGS)
+LDFLAGS +=  -lglib-2.0
 
 # workaround for a gcc bug with noreturn attribute
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=12603

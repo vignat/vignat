@@ -8,6 +8,8 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <getopt.h>
+#include <glib.h>
+#include <assert.h>
 
 #include <rte_common.h>
 #include <rte_vect.h>
@@ -43,6 +45,16 @@
 #include <cmdline_parse_etheraddr.h>
 
 
+#define MAX_PKT_BURST     32
+#define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
+
+/*
+ * Try to avoid TX buffering if we have at least MAX_TX_BURST packets to send.
+ */
+#define	MAX_TX_BURST	(MAX_PKT_BURST / 2)
+
+#define NB_SOCKETS 8
+
 struct flow {
     uint16_t int_src_port;
     uint16_t ext_src_port;
@@ -53,6 +65,7 @@ struct flow {
     uint8_t int_device_id;
     uint8_t ext_device_id;
     uint8_t protocol;
+    //TODO: timeout for removal.
 };
 
 struct int_key {
@@ -73,6 +86,125 @@ struct ext_key {
     uint8_t protocol;
 };
 
+static guint int_key_hash(gconstpointer key) {
+    const struct int_key* arg = key;
+    return arg->int_src_port ^ arg->dst_port ^ arg->int_src_ip ^ arg->dst_ip;
+}
+
+static guint ext_key_hash(gconstpointer key) {
+    const struct ext_key* arg = key;
+    return arg->ext_src_port ^ arg->dst_port ^ arg->ext_src_ip ^ arg->dst_ip;
+}
+
+static gboolean int_key_equal(gconstpointer k1, gconstpointer k2) {
+    const struct int_key* key1 = k1,
+                        * key2 = k2;
+    return key1->int_src_port == key2->int_src_port &&
+           key1->dst_port == key2->dst_port &&
+           key1->int_src_ip == key2->int_src_ip &&
+           key1->dst_ip == key2->dst_ip &&
+           key1->int_device_id == key2->int_device_id &&
+           key1->protocol == key2->protocol;
+}
+
+static gboolean ext_key_equal(gconstpointer k1, gconstpointer k2) {
+    const struct ext_key* key1 = k1,
+                        * key2 = k2;
+    return key1->ext_src_port == key2->ext_src_port &&
+           key1->dst_port == key2->dst_port &&
+           key1->ext_src_ip == key2->ext_src_ip &&
+           key1->dst_ip == key2->dst_ip &&
+           key1->ext_device_id == key2->ext_device_id &&
+           key1->protocol == key2->protocol;
+}
+
+#define MAX_FLOWS (1024)
+
+struct int_key* internal_keys = NULL;
+struct ext_key* external_keys = NULL;
+struct flow* flows = NULL;
+GHashTable* ext_flows = NULL;
+GHashTable* int_flows = NULL;
+
+uint64_t num_flows = 0;
+
+
+static struct flow* get_flow_int(struct int_key* key) {
+    return g_hash_table_lookup(int_flows, key);
+}
+
+static struct flow* get_flow_ext(struct ext_key* key) {
+    return g_hash_table_lookup(ext_flows, key);
+}
+
+static inline void fill_int_key(struct flow *f, struct int_key *k) {
+    k->int_src_port = f->int_src_port;
+    k->dst_port = f->dst_port;
+    k->int_src_ip = f->int_src_ip;
+    k->dst_ip = f->dst_ip;
+    k->int_device_id = f->int_device_id;
+    k->protocol = f->protocol;
+}
+
+static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
+    k->ext_src_port = f->ext_src_port;
+    k->dst_port = f->dst_port;
+    k->ext_src_ip = f->ext_src_ip;
+    k->dst_ip = f->dst_ip;
+    k->ext_device_id = f->ext_device_id;
+    k->protocol = f->protocol;
+}
+
+//Warning: this is thread-unsafe, do not youse more than 1 lcore!
+static void add_flow(struct flow *f) {
+    flows[num_flows] = *f;
+    fill_int_key(f, &internal_keys[num_flows]);
+    fill_ext_key(f, &external_keys[num_flows]);
+
+    assert(get_flow_ext(&external_keys[num_flows]) == NULL);
+    assert(get_flow_int(&internal_keys[num_flows]) == NULL);
+
+    g_hash_table_insert(ext_flows, &external_keys[num_flows], &flows[num_flows]);
+    g_hash_table_insert(int_flows, &internal_keys[num_flows], &flows[num_flows]);
+
+    ++num_flows;
+}
+
+static int allocate_flowtables(void) {
+    assert(internal_keys == NULL);
+    assert(external_keys == NULL);
+    assert(flows == NULL);
+    assert(int_flows == NULL);
+    assert(ext_flows == NULL);
+    assert(num_flows == 0);
+    if (NULL == (internal_keys = malloc(sizeof(struct int_key)*MAX_FLOWS)))
+        return 0;
+    if (NULL == (external_keys = malloc(sizeof(struct ext_key)*MAX_FLOWS)))
+        return 0;
+    if (NULL == (flows = malloc(sizeof(struct flow)*MAX_FLOWS)))
+        return 0;
+
+    int_flows = g_hash_table_new(int_key_hash, int_key_equal);
+    ext_flows = g_hash_table_new(ext_key_hash, ext_key_equal);
+
+    num_flows = 0;
+    return 1;
+}
+/*
+static void free_flowtables(void) {
+    assert(internal_keys != NULL);
+    assert(external_keys != NULL);
+    assert(flows != NULL);
+    assert(int_flows != NULL);
+    assert(ext_flows != NULL);
+    g_hash_table_destroy(int_flows); int_flows = NULL;
+    g_hash_table_destroy(ext_flows); ext_flows = NULL;
+    free(internal_keys); internal_keys = NULL;
+    free(external_keys); external_keys = NULL;
+    free(flows); flows = NULL;
+    num_flows = 0;
+}
+*/
 /* ethernet addresses of ports */
 static uint64_t dest_eth_addr[RTE_MAX_ETHPORTS];
 static struct ether_addr ports_eth_addr[RTE_MAX_ETHPORTS];
@@ -81,6 +213,9 @@ static __m128i val_eth[RTE_MAX_ETHPORTS];
 
 /* replace first 12B of the ethernet header. */
 #define    MASK_ETH    0x3f
+
+/* The WAN port */
+static uint32_t wan_port_id = 0;
 
 /* mask of enabled ports */
 static uint32_t enabled_port_mask = 0;
@@ -101,6 +236,35 @@ struct lcore_rx_queue {
 #define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
 #define MAX_RX_QUEUE_PER_PORT 128
 
+#define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
+
+#define MEMPOOL_CACHE_SIZE 256
+
+/*
+ * This expression is used to calculate the number of mbufs needed depending on user input, taking
+ *  into account memory for rx and tx hardware rings, cache per lcore and mtable per port per lcore.
+ *  RTE_MAX is used to ensure that NB_MBUF never goes below a minimum value of 8192
+ */
+
+#define NB_MBUF RTE_MAX	(																	\
+				(nb_ports*nb_rx_queue*RTE_TEST_RX_DESC_DEFAULT +							\
+				nb_ports*nb_lcores*MAX_PKT_BURST +											\
+				nb_ports*n_tx_queue*RTE_TEST_TX_DESC_DEFAULT +								\
+				nb_lcores*MEMPOOL_CACHE_SIZE),												\
+				(unsigned)8192)
+
+/* Configure how many packets ahead to prefetch, when reading packets */
+#define PREFETCH_OFFSET	3
+
+/*
+ * Configurable number of RX/TX ring descriptors
+ */
+#define RTE_TEST_RX_DESC_DEFAULT 128
+#define RTE_TEST_TX_DESC_DEFAULT 512
+static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
+static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
+
+
 #define MAX_LCORE_PARAMS 1024
 struct lcore_params {
     uint8_t port_id;
@@ -108,17 +272,9 @@ struct lcore_params {
     uint8_t lcore_id;
 } __rte_cache_aligned;
 
-static struct lcore_params lcore_params_array[MAX_LCORE_PARAMS];
 static struct lcore_params lcore_params_array_default[] = {
-    {0, 0, 2},
-    {0, 1, 2},
-    {0, 2, 2},
-    {1, 0, 2},
-    {1, 1, 2},
-    {1, 2, 2},
-    {2, 0, 2},
-    {3, 0, 3},
-    {3, 1, 3},
+    {0, 0, 0},
+    {1, 0, 0},
 };
 
 static struct lcore_params * lcore_params = lcore_params_array_default;
@@ -204,40 +360,138 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
     return 0;
 }
 
-static inline void l3fwd_simple_forward(struct rte_mbuf *m, uint8_t portid,
-    struct lcore_conf *qconf)  __attribute__((unused));
+static uint16_t get_src_port(struct rte_mbuf *m) {
+    struct ipv4_hdr *ipv4_hdr = 
+        rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+                                sizeof(struct ether_hdr));
+    if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
+        ipv4_hdr->next_proto_id == IPPROTO_UDP) {
+        // TODO: check if this working
+        return *(uint16_t*)(ipv4_hdr + 1);
+    }
+    return 0;
+}
+
+static uint16_t get_dst_port(struct rte_mbuf *m) {
+    struct ipv4_hdr *ipv4_hdr = 
+        rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+                                sizeof(struct ether_hdr));
+    if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
+        ipv4_hdr->next_proto_id == IPPROTO_UDP) {
+        // TODO: check if this working
+        return *((uint16_t*)(ipv4_hdr + 1) + 1/*skip srcport*/);
+    }
+    return 0;
+}
+
+static void set_src_port(struct rte_mbuf *m, uint16_t port) {
+    struct ipv4_hdr *ipv4_hdr = 
+        rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+                                sizeof(struct ether_hdr));
+    if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
+        ipv4_hdr->next_proto_id == IPPROTO_UDP) {
+        // TODO: check if this working
+        *(uint16_t*)(ipv4_hdr + 1) = port;
+    }
+}
+
+static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
+    struct ipv4_hdr *ipv4_hdr = 
+        rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+                                sizeof(struct ether_hdr));
+    if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
+        ipv4_hdr->next_proto_id == IPPROTO_UDP) {
+        // TODO: check if this working
+        *((uint16_t*)(ipv4_hdr + 1) + 1) = port;
+    }
+}
+
+struct ext_iface {
+    uint32_t ip;
+    uint16_t port;
+    uint8_t device_id;
+};
+
+uint16_t next_unused_external_port = 0;
+
+static struct ext_iface allocate_ext_iface(void) {
+    return (struct ext_iface){
+        .ip = IPv4(192,168,2,11),
+        .port = next_unused_external_port++,
+        .device_id = wan_port_id
+    };
+}
 
 static inline __attribute__((always_inline)) void
-l3fwd_simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
+simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 {
     struct ether_hdr *eth_hdr;
     struct ipv4_hdr *ipv4_hdr;
-    uint8_t dst_port;
+    uint8_t dst_device;
+
+    (void)qconf;
 
     eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
-#ifdef RTE_NEXT_ABI
-    if (RTE_ETH_IS_IPV4_HDR(m->packet_type)) {
-#else
-    if (m->ol_flags & PKT_RX_IPV4_HDR) {
-#endif
+    if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
+        m->packet_type == 0) {
+        //TODO: determine the packet type when packet_type is 0(undefined).
         /* Handle IPv4 headers.*/
         ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
-                           sizeof(struct ether_hdr));
+                                           sizeof(struct ether_hdr));
 
-#ifdef DO_RFC_1812_CHECKS
-        /* Check to make sure the packet is valid (RFC1812) */
-        if (is_valid_ipv4_pkt(ipv4_hdr, m->pkt_len) < 0) {
-            rte_pktmbuf_free(m);
-            return;
+        if (portid == wan_port_id) {
+            //External port.
+            struct ext_key key = {
+                .ext_src_port = get_dst_port(m), //intentionally swapped.
+                .dst_port = get_src_port(m),
+                .ext_src_ip = ipv4_hdr->dst_addr, //Note, they are switched for
+                .dst_ip = ipv4_hdr->src_addr, // the backwards traffic
+                .ext_device_id = portid,
+                .protocol = ipv4_hdr->next_proto_id
+            };
+            struct flow* f = get_flow_ext(&key);
+            if (f == NULL) {
+                // Use did not ask for this packet.
+                rte_pktmbuf_free(m);
+                return;
+            } else {
+                ipv4_hdr->dst_addr = f->int_src_ip;
+                set_dst_port(m, f->int_src_port);
+                //TODO: recalculate ip checksum.
+                dst_device = f->int_device_id;
+            }
+        } else {
+            //Internal port.
+            struct int_key key = {
+                .int_src_port = get_src_port(m),
+                .dst_port = get_dst_port(m),
+                .int_src_ip = ipv4_hdr->src_addr,
+                .dst_ip = ipv4_hdr->dst_addr,
+                .int_device_id = portid,
+                .protocol = ipv4_hdr->next_proto_id
+            };
+            struct flow* f = get_flow_int(&key);
+            if (f == NULL) {
+                struct ext_iface alloc = allocate_ext_iface();
+                struct flow new_flow = {
+                    .int_src_port = get_src_port(m),
+                    .ext_src_port = alloc.port,
+                    .int_src_ip = ipv4_hdr->src_addr,
+                    .ext_src_ip = alloc.ip,
+                    .dst_ip = ipv4_hdr->dst_addr,
+                    .int_device_id = portid,
+                    .ext_device_id = alloc.device_id,
+                    .protocol = ipv4_hdr->next_proto_id
+                };
+                f = &new_flow;
+                add_flow(f);
+            }
+            ipv4_hdr->src_addr = f->ext_src_ip;
+            set_src_port(m, f->ext_src_port);
+            //TODO: recalculate ip checksum.
+            dst_device = f->ext_device_id;
         }
-#endif
-
-         dst_port = get_ipv4_dst_port(ipv4_hdr, portid,
-            qconf->ipv4_lookup_struct);
-        if (dst_port >= RTE_MAX_ETHPORTS ||
-                (enabled_port_mask & 1 << dst_port) == 0)
-            dst_port = portid;
 
 #ifdef DO_RFC_1812_CHECKS
         /* Update time to live and header checksum */
@@ -245,42 +499,17 @@ l3fwd_simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qcon
         ++(ipv4_hdr->hdr_checksum);
 #endif
         /* dst addr */
-        *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_port];
+        //TODO: how do you get eth addr by ip addr. need to implement LPM?
+        //*(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_port];
 
         /* src addr */
-        ether_addr_copy(&ports_eth_addr[dst_port], &eth_hdr->s_addr);
+        ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
 
-        send_single_packet(m, dst_port);
-#ifdef RTE_NEXT_ABI
-    } else if (RTE_ETH_IS_IPV6_HDR(m->packet_type)) {
-#else
+        send_single_packet(m, dst_device);
     } else {
-#endif
-        /* Handle IPv6 headers.*/
-        struct ipv6_hdr *ipv6_hdr;
-
-        ipv6_hdr = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr *,
-                           sizeof(struct ether_hdr));
-
-        dst_port = get_ipv6_dst_port(ipv6_hdr, portid, qconf->ipv6_lookup_struct);
-
-        if (dst_port >= RTE_MAX_ETHPORTS || (enabled_port_mask & 1 << dst_port) == 0)
-            dst_port = portid;
-
-        /* dst addr */
-        *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_port];
-
-        /* src addr */
-        ether_addr_copy(&ports_eth_addr[dst_port], &eth_hdr->s_addr);
-
-        send_single_packet(m, dst_port);
-#ifdef RTE_NEXT_ABI
-    } else
         /* Free the mbuf that contains non-IPV4/IPV6 packet */
         rte_pktmbuf_free(m);
-#else
     }
-#endif
 }
 
 /* main processing loop */
@@ -302,17 +531,17 @@ main_loop(__attribute__((unused)) void *dummy)
     qconf = &lcore_conf[lcore_id];
 
     if (qconf->n_rx_queue == 0) {
-        RTE_LOG(INFO, L3FWD, "lcore %u has nothing to do\n", lcore_id);
+        RTE_LOG(INFO, NAT, "lcore %u has nothing to do\n", lcore_id);
         return 0;
     }
 
-    RTE_LOG(INFO, L3FWD, "entering main loop on lcore %u\n", lcore_id);
+    RTE_LOG(INFO, NAT, "entering main loop on lcore %u\n", lcore_id);
 
     for (i = 0; i < qconf->n_rx_queue; i++) {
 
         portid = qconf->rx_queue_list[i].port_id;
         queueid = qconf->rx_queue_list[i].queue_id;
-        RTE_LOG(INFO, L3FWD, " -- lcoreid=%u portid=%hhu rxqueueid=%hhu\n", lcore_id,
+        RTE_LOG(INFO, NAT, " -- lcoreid=%u portid=%hhu rxqueueid=%hhu\n", lcore_id,
             portid, queueid);
     }
 
@@ -363,14 +592,12 @@ main_loop(__attribute__((unused)) void *dummy)
             for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
                 rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[
                         j + PREFETCH_OFFSET], void *));
-                l3fwd_simple_forward(pkts_burst[j], portid,
-                    qconf);
+                simple_forward(pkts_burst[j], portid, qconf);
             }
 
             /* Forward remaining prefetched packets */
             for (; j < nb_rx; j++) {
-                l3fwd_simple_forward(pkts_burst[j], portid,
-                    qconf);
+                simple_forward(pkts_burst[j], portid, qconf);
             }
 
         }
@@ -465,225 +692,69 @@ init_lcore_rx_queues(void)
 static void
 print_usage(const char *prgname)
 {
-    printf ("%s [EAL options] -- -p PORTMASK -P"
-        "  [--config (port,queue,lcore)[,(port,queue,lcore]]"
-        "  [--enable-jumbo [--max-pkt-len PKTLEN]]\n"
-        "  -p PORTMASK: hexadecimal bitmask of ports to configure\n"
-        "  -P : enable promiscuous mode\n"
-        "  --config (port,queue,lcore): rx queues configuration\n"
-        "  --eth-dest=X,MM:MM:MM:MM:MM:MM: optional, ethernet destination for port X\n"
-        "  --no-numa: optional, disable numa awareness\n"
-        "  --ipv6: optional, specify it if running ipv6 packets\n"
-        "  --enable-jumbo: enable jumbo frame"
-        " which max packet len is PKTLEN in decimal (64-9600)\n"
-        "  --hash-entry-num: specify the hash entry number in hexadecimal to be setup\n",
-        prgname);
+    printf ("%s [EAL options] -- -wan port_id"
+            "  -wan port_id: set the port port_id to be the external one.\n"
+            "NAT does not change the source address of the packets, coming "
+            "from the external port",
+            prgname);
 }
 
-static int parse_max_pkt_len(const char *pktlen)
-{
-    char *end = NULL;
-    unsigned long len;
-
-    /* parse decimal string */
-    len = strtoul(pktlen, &end, 10);
-    if ((pktlen[0] == '\0') || (end == NULL) || (*end != '\0'))
-        return -1;
-
-    if (len == 0)
-        return -1;
-
-    return len;
-}
-
-static int
+static uint32_t
 parse_portmask(const char *portmask)
 {
     char *end = NULL;
     unsigned long pm;
-
+    
     /* parse hexadecimal string */
     pm = strtoul(portmask, &end, 16);
     if ((portmask[0] == '\0') || (end == NULL) || (*end != '\0'))
-        return -1;
-
-    if (pm == 0)
-        return -1;
-
+        return 0;
+    
     return pm;
 }
 
-static int
-parse_config(const char *q_arg)
-{
-    char s[256];
-    const char *p, *p0 = q_arg;
-    char *end;
-    enum fieldnames {
-        FLD_PORT = 0,
-        FLD_QUEUE,
-        FLD_LCORE,
-        _NUM_FLD
-    };
-    unsigned long int_fld[_NUM_FLD];
-    char *str_fld[_NUM_FLD];
-    int i;
-    unsigned size;
-
-    nb_lcore_params = 0;
-
-    while ((p = strchr(p0,'(')) != NULL) {
-        ++p;
-        if((p0 = strchr(p,')')) == NULL)
-            return -1;
-
-        size = p0 - p;
-        if(size >= sizeof(s))
-            return -1;
-
-        snprintf(s, sizeof(s), "%.*s", size, p);
-        if (rte_strsplit(s, sizeof(s), str_fld, _NUM_FLD, ',') != _NUM_FLD)
-            return -1;
-        for (i = 0; i < _NUM_FLD; i++){
-            errno = 0;
-            int_fld[i] = strtoul(str_fld[i], &end, 0);
-            if (errno != 0 || end == str_fld[i] || int_fld[i] > 255)
-                return -1;
-        }
-        if (nb_lcore_params >= MAX_LCORE_PARAMS) {
-            printf("exceeded max number of lcore params: %hu\n",
-                nb_lcore_params);
-            return -1;
-        }
-        lcore_params_array[nb_lcore_params].port_id = (uint8_t)int_fld[FLD_PORT];
-        lcore_params_array[nb_lcore_params].queue_id = (uint8_t)int_fld[FLD_QUEUE];
-        lcore_params_array[nb_lcore_params].lcore_id = (uint8_t)int_fld[FLD_LCORE];
-        ++nb_lcore_params;
-    }
-    lcore_params = lcore_params_array;
-    return 0;
-}
-
-static void
-parse_eth_dest(const char *optarg)
-{
-    uint8_t portid;
-    char *port_end;
-    uint8_t c, *dest, peer_addr[6];
-
-    errno = 0;
-    portid = strtoul(optarg, &port_end, 10);
-    if (errno != 0 || port_end == optarg || *port_end++ != ',')
-        rte_exit(EXIT_FAILURE,
-        "Invalid eth-dest: %s", optarg);
-    if (portid >= RTE_MAX_ETHPORTS)
-        rte_exit(EXIT_FAILURE,
-        "eth-dest: port %d >= RTE_MAX_ETHPORTS(%d)\n",
-        portid, RTE_MAX_ETHPORTS);
-
-    if (cmdline_parse_etheraddr(NULL, port_end,
-        &peer_addr, sizeof(peer_addr)) < 0)
-        rte_exit(EXIT_FAILURE,
-        "Invalid ethernet address: %s\n",
-        port_end);
-    dest = (uint8_t *)&dest_eth_addr[portid];
-    for (c = 0; c < 6; c++)
-        dest[c] = peer_addr[c];
-    *(uint64_t *)(val_eth + portid) = dest_eth_addr[portid];
-}
-
-#define CMD_LINE_OPT_CONFIG "config"
-#define CMD_LINE_OPT_ETH_DEST "eth-dest"
-#define CMD_LINE_OPT_NO_NUMA "no-numa"
-#define CMD_LINE_OPT_IPV6 "ipv6"
-#define CMD_LINE_OPT_ENABLE_JUMBO "enable-jumbo"
-#define CMD_LINE_OPT_HASH_ENTRY_NUM "hash-entry-num"
+#define CMD_LINE_OPT_WAN_PORT "wan"
 
 /* Parse the argument given in the command line of the application */
 static int
-parse_args(int argc, char **argv)
+parse_args(int argc, char **argv, unsigned nb_ports)
 {
     int opt, ret;
     char **argvopt;
     int option_index;
     char *prgname = argv[0];
+    char *port_end;
     static struct option lgopts[] = {
-        {CMD_LINE_OPT_CONFIG, 1, 0, 0},
-        {CMD_LINE_OPT_ETH_DEST, 1, 0, 0},
-        {CMD_LINE_OPT_NO_NUMA, 0, 0, 0},
-        {CMD_LINE_OPT_IPV6, 0, 0, 0},
-        {CMD_LINE_OPT_ENABLE_JUMBO, 0, 0, 0},
-        {CMD_LINE_OPT_HASH_ENTRY_NUM, 1, 0, 0},
+        {CMD_LINE_OPT_WAN_PORT, 1, 0, 0},
         {NULL, 0, 0, 0}
     };
 
     argvopt = argv;
 
-    while ((opt = getopt_long(argc, argvopt, "p:P",
-                lgopts, &option_index)) != EOF) {
-
-        switch (opt) {
-        /* portmask */
-        case 'p':
+    if ((opt = getopt_long(argc, argvopt, "p:P",
+                           lgopts, &option_index)) != EOF) {
+        if (opt == 'p') {
             enabled_port_mask = parse_portmask(optarg);
             if (enabled_port_mask == 0) {
                 printf("invalid portmask\n");
                 print_usage(prgname);
                 return -1;
             }
-            break;
-        case 'P':
-            printf("Promiscuous mode selected\n");
-            promiscuous_on = 1;
-            break;
-
-        /* long options */
-        case 0:
-            if (!strncmp(lgopts[option_index].name, CMD_LINE_OPT_CONFIG,
-                sizeof (CMD_LINE_OPT_CONFIG))) {
-                ret = parse_config(optarg);
-                if (ret) {
-                    printf("invalid config\n");
-                    print_usage(prgname);
-                    return -1;
-                }
+        }
+        else if (0 == strncmp(lgopts[option_index].name, CMD_LINE_OPT_WAN_PORT,
+                              sizeof (CMD_LINE_OPT_WAN_PORT))) {
+            wan_port_id = strtoul(optarg, &port_end, 10);
+            if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
+                return -1;
+            if (wan_port_id >= nb_ports) {
+                printf("WAN port does not exist.");
+                return -1;
             }
-
-            if (!strncmp(lgopts[option_index].name, CMD_LINE_OPT_ETH_DEST,
-                sizeof(CMD_LINE_OPT_CONFIG))) {
-                    parse_eth_dest(optarg);
+            if ((enabled_port_mask & 1 << wan_port_id) == 0) {
+                printf("WAN port is not enabled");
+                return -1;
             }
-
-            if (!strncmp(lgopts[option_index].name, CMD_LINE_OPT_NO_NUMA,
-                sizeof(CMD_LINE_OPT_NO_NUMA))) {
-                printf("numa is disabled \n");
-                numa_on = 0;
-            }
-
-
-            if (!strncmp(lgopts[option_index].name, CMD_LINE_OPT_ENABLE_JUMBO,
-                sizeof (CMD_LINE_OPT_ENABLE_JUMBO))) {
-                struct option lenopts = {"max-pkt-len", required_argument, 0, 0};
-
-                printf("jumbo frame is enabled - disabling simple TX path\n");
-                port_conf.rxmode.jumbo_frame = 1;
-
-                /* if no max-pkt-len set, use the default value ETHER_MAX_LEN */
-                if (0 == getopt_long(argc, argvopt, "", &lenopts, &option_index)) {
-                    ret = parse_max_pkt_len(optarg);
-                    if ((ret < 64) || (ret > MAX_JUMBO_PKT_LEN)){
-                        printf("invalid packet length\n");
-                        print_usage(prgname);
-                        return -1;
-                    }
-                    port_conf.rxmode.max_rx_pkt_len = ret;
-                }
-                printf("set jumbo frame max packet length to %u\n",
-                        (unsigned int)port_conf.rxmode.max_rx_pkt_len);
-            }
-            break;
-
-        default:
+        } else {
             print_usage(prgname);
             return -1;
         }
@@ -708,7 +779,6 @@ print_ethaddr(const char *name, const struct ether_addr *eth_addr)
 static int
 init_mem(unsigned nb_mbuf)
 {
-    struct lcore_conf *qconf;
     int socketid;
     unsigned lcore_id;
     char s[64];
@@ -737,13 +807,10 @@ init_mem(unsigned nb_mbuf)
                         "Cannot init mbuf pool on socket %d\n", socketid);
             else
                 printf("Allocated mbuf pool on socket %d\n", socketid);
-
-            setup_hash(socketid);
         }
-        qconf = &lcore_conf[lcore_id];
-        qconf->ipv4_lookup_struct = ipv4_l3fwd_lookup_struct[socketid];
-        qconf->ipv6_lookup_struct = ipv6_l3fwd_lookup_struct[socketid];
     }
+
+    allocate_flowtables();
     return 0;
 }
 
@@ -828,10 +895,15 @@ main(int argc, char **argv)
         *(uint64_t *)(val_eth + portid) = dest_eth_addr[portid];
     }
 
+    // TODO: moved w.r.t l3fwd. see if this still works.
+    nb_ports = rte_eth_dev_count();
+    if (nb_ports > RTE_MAX_ETHPORTS)
+        nb_ports = RTE_MAX_ETHPORTS;
+
     /* parse application arguments (after the EAL ones) */
-    ret = parse_args(argc, argv);
+    ret = parse_args(argc, argv, nb_ports);
     if (ret < 0)
-        rte_exit(EXIT_FAILURE, "Invalid L3FWD parameters\n");
+        rte_exit(EXIT_FAILURE, "Invalid NAT parameters\n");
 
     if (check_lcore_params() < 0)
         rte_exit(EXIT_FAILURE, "check_lcore_params failed\n");
@@ -839,10 +911,6 @@ main(int argc, char **argv)
     ret = init_lcore_rx_queues();
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "init_lcore_rx_queues failed\n");
-
-    nb_ports = rte_eth_dev_count();
-    if (nb_ports > RTE_MAX_ETHPORTS)
-        nb_ports = RTE_MAX_ETHPORTS;
 
     if (check_port_config(nb_ports) < 0)
         rte_exit(EXIT_FAILURE, "check_port_config failed\n");
