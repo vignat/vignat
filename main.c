@@ -461,7 +461,7 @@ uint16_t next_unused_external_port = 0;
 
 static struct ext_iface allocate_ext_iface(void) {
     return (struct ext_iface){
-        .ip = IPv4(11,2,168,192),
+        .ip = IPv4(11,3,168,192),
         .port = next_unused_external_port++,
         .device_id = wan_port_id
     };
@@ -486,7 +486,22 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                                            sizeof(struct ether_hdr));
 
         LOG( "forwarding and ipv4 packet on %d\n", portid);
-
+        LOG( "eth_hdr size: %lu; ipv4 hdr size: %lu; data_offset %d:\n", sizeof(struct ether_hdr), sizeof(struct ipv4_hdr), m->data_off);
+        uint8_t *buf = (uint8_t*)(m->buf_addr) + m->data_off;
+        LOG("%02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x \n"
+            "%02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x "
+            "%02x %02x %02x %02x %02x %02x %02x %02x\n",
+            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+            buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15],
+            buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23],
+            buf[24], buf[25], buf[26], buf[27], buf[28], buf[29], buf[30], buf[31],
+            buf[32], buf[33], buf[34], buf[35], buf[36], buf[37], buf[38], buf[39],
+            buf[40], buf[41], buf[42], buf[43], buf[44], buf[45], buf[46], buf[47],
+            buf[48], buf[49], buf[50], buf[51], buf[52], buf[53], buf[54], buf[55]);
         if (portid == wan_port_id) {
             //External port.
             LOG( "port %d turns out to be external(%d)\n", portid, wan_port_id);
@@ -552,11 +567,23 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             dst_device = f->ext_device_id;
         }
 
-#ifdef DO_RFC_1812_CHECKS
-        /* Update time to live and header checksum */
-        --(ipv4_hdr->time_to_live);
-        ++(ipv4_hdr->hdr_checksum);
-#endif
+//#ifdef DO_RFC_1812_CHECKS
+//        /* Update time to live and header checksum */
+//        --(ipv4_hdr->time_to_live);
+//        ++(ipv4_hdr->hdr_checksum);
+//#endif
+        ipv4_hdr->hdr_checksum = 0;
+        if (ipv4_hdr->next_proto_id == IPPROTO_TCP) {
+            struct tcp_hdr * tcp_hdr = (struct tcp_hdr*)(ipv4_hdr + 1);
+            tcp_hdr->cksum = 0;
+            tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+
+        } else {
+           struct udp_hdr * udp_hdr = (struct udp_hdr*)(ipv4_hdr + 1);
+           udp_hdr->dgram_cksum = 0;
+           udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
+        }
+        ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
         /* dst addr */
         //TODO: how do you get eth addr by ip addr. need to implement LPM?
         //*(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_port];
@@ -803,6 +830,7 @@ parse_args(int argc, char **argv, unsigned nb_ports)
         }
         else if (0 == strncmp(lgopts[option_index].name, CMD_LINE_OPT_WAN_PORT,
                               sizeof (CMD_LINE_OPT_WAN_PORT))) {
+            printf("parsing wan port: %s\n", optarg);
             wan_port_id = strtoul(optarg, &port_end, 10);
             if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
                 return -1;
