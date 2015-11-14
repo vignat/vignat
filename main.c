@@ -572,6 +572,13 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 //        --(ipv4_hdr->time_to_live);
 //        ++(ipv4_hdr->hdr_checksum);
 //#endif
+        /* dst addr */
+        //TODO: how do you get eth addr by ip addr. need to implement LPM?
+        *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
+
+        /* src addr */
+        ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
+
         ipv4_hdr->hdr_checksum = 0;
         if (ipv4_hdr->next_proto_id == IPPROTO_TCP) {
             struct tcp_hdr * tcp_hdr = (struct tcp_hdr*)(ipv4_hdr + 1);
@@ -584,12 +591,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
            udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
         }
         ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
-        /* dst addr */
-        //TODO: how do you get eth addr by ip addr. need to implement LPM?
-        //*(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_port];
 
-        /* src addr */
-        ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
 
         send_single_packet(m, dst_device);
     } else {
@@ -818,7 +820,7 @@ parse_args(int argc, char **argv, unsigned nb_ports)
 
     argvopt = argv;
 
-    if ((opt = getopt_long(argc, argvopt, "p:P",
+    while ((opt = getopt_long(argc, argvopt, "p:P",
                            lgopts, &option_index)) != EOF) {
         if (opt == 'p') {
             enabled_port_mask = parse_portmask(optarg);
@@ -979,7 +981,7 @@ main(int argc, char **argv)
 
     /* pre-init dst MACs for all ports to 02:00:00:00:00:xx */
     for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
-        dest_eth_addr[portid] = ETHER_LOCAL_ADMIN_ADDR + ((uint64_t)portid << 40);
+        dest_eth_addr[portid] = 0xffffffffffff; //ETHER_LOCAL_ADMIN_ADDR + ((uint64_t)portid << 40);
         *(uint64_t *)(val_eth + portid) = dest_eth_addr[portid];
     }
 
