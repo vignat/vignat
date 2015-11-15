@@ -127,9 +127,10 @@ static void log_ip(uint32_t addr) {
 }
 
 static void log_int_key(const struct int_key *key) {
-    LOG( "{int_src_port: %d; dst_port: %d;\n"
+    LOG( "{int_src_port: %d(%d); dst_port: %d(%d);\n"
             " int_src_ip: ",
-            key->int_src_port, key->dst_port);
+            key->int_src_port, rte_be_to_cpu_16(key->int_src_port),
+            key->dst_port, rte_be_to_cpu_16(key->dst_port));
     log_ip(key->int_src_ip);
     LOG_ADD( "; dst_ip: ");
     log_ip(key->dst_ip);
@@ -139,9 +140,10 @@ static void log_int_key(const struct int_key *key) {
 }
 
 static void log_ext_key(const struct ext_key *key) {
-    LOG( "{ext_src_port: %d; dst_port: %d;\n"
+    LOG( "{ext_src_port: %d(%d); dst_port: %d(%d);\n"
             " ext_src_ip: ",
-            key->ext_src_port, key->dst_port);
+            key->ext_src_port, rte_be_to_cpu_16(key->ext_src_port),
+            key->dst_port, rte_be_to_cpu_16(key->dst_port));
     log_ip(key->ext_src_ip);
     LOG_ADD( "; dst_ip: ");
     log_ip(key->dst_ip);
@@ -151,9 +153,11 @@ static void log_ext_key(const struct ext_key *key) {
 }
 
 static void log_flow(const struct flow *f) {
-    LOG( "{int_src_port: %d; ext_src_port: %d;\n"
-            " dst_port: %d; int_src_ip: ",
-            f->int_src_port, f->ext_src_port, f->dst_port);
+    LOG( "{int_src_port: %d(%d); ext_src_port: %d(%d);\n"
+            " dst_port: %d(%d); int_src_ip: ",
+            f->int_src_port, rte_be_to_cpu_16(f->int_src_port),
+            f->ext_src_port, rte_be_to_cpu_16(f->ext_src_port),
+            f->dst_port, rte_be_to_cpu_16(f->dst_port));
     log_ip(f->int_src_ip);
     LOG_ADD( ";\n ext_src_ip:");
     log_ip(f->ext_src_ip);
@@ -177,6 +181,8 @@ uint64_t num_flows = 0;
 
 
 static struct flow* get_flow_int(struct int_key* key) {
+    LOG("look up for internal key key = \n");
+    log_int_key(key);
     return g_hash_table_lookup(int_flows, key);
 }
 
@@ -204,6 +210,8 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
 
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
 static void add_flow(struct flow *f) {
+    LOG("add_flow (f = \n");
+    log_flow(f);
     flows[num_flows] = *f;
     fill_int_key(f, &internal_keys[num_flows]);
     fill_ext_key(f, &external_keys[num_flows]);
@@ -457,7 +465,7 @@ struct ext_iface {
     uint8_t device_id;
 };
 
-uint16_t next_unused_external_port = 0;
+uint16_t next_unused_external_port = 2747;
 
 static struct ext_iface allocate_ext_iface(void) {
     return (struct ext_iface){
@@ -479,7 +487,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
     eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
     if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
-        m->packet_type == 0) {
+        (m->packet_type == 0 && eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
         //TODO: determine the packet type when packet_type is 0(undefined).
         /* Handle IPv4 headers.*/
         ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
@@ -548,6 +556,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                 struct flow new_flow = {
                     .int_src_port = get_src_port(m),
                     .ext_src_port = alloc.port,
+                    .dst_port = get_dst_port(m),
                     .int_src_ip = ipv4_hdr->src_addr,
                     .ext_src_ip = alloc.ip,
                     .dst_ip = ipv4_hdr->dst_addr,
