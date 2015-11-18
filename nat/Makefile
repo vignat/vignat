@@ -55,3 +55,8 @@ CFLAGS_main.o += -Wno-return-type
 endif
 
 include $(RTE_SDK)/mk/rte.extapp.mk
+
+verify:
+	clang-3.4 klee-verifiable.c rte_stubs.c -I ~/proj/klee/klee/include/ -c -g -emit-llvm
+	llvm-link rte_stubs.bc klee-verifiable.bc -o veri.bc
+	klee --libc=uclibc --posix-runtime veri.bc -p 0x3 --wan 1
