@@ -8,4 +8,5 @@ Here is a brief description of the contents of the project, which is essentially
 * dafny/ - an unfinished implementation of the same map in the Dafny framework.
 * frama-c/ - a Frama-C/WP partially-certified implementation.
 * verifast/ - A complete map implementation, certified with VeriFast.
+* nat/ - A sample DPDK nat-box implementation, as a use-case for a verified hash-map.
 
