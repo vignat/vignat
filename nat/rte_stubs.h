@@ -784,6 +784,26 @@ ether_format_addr(char *buf, uint16_t size,
 
 #define RTE_MAX_LCORE 128
 
+static inline unsigned
+rte_get_next_lcore(unsigned i, int skip_master, int wrap)
+{
+    i++;
+    if (wrap)
+        i %= RTE_MAX_LCORE;
+
+    while (i < RTE_MAX_LCORE) {
+        if (!rte_lcore_is_enabled(i) ||
+            (skip_master && (i == rte_get_master_lcore()))) {
+            i++;
+            if (wrap)
+                i %= RTE_MAX_LCORE;
+            continue;
+        }
+        break;
+    }
+    return i;
+}
+
 // Below goes gutted rte functions.
 
 
@@ -814,6 +834,6 @@ struct rte_mempool *
 rte_pktmbuf_pool_create(const char *name, unsigned n,
                         unsigned cache_size, uint16_t priv_size, uint16_t data_room_size,
                         int socket_id);
-unsigned rte_get_next_lcore(unsigned i, int skip_master, int wrap);
+unsigned rte_get_master_lcore();
 
 #endif //RTE_STUBS_H

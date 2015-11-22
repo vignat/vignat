@@ -175,7 +175,7 @@ rte_pktmbuf_pool_create(const char *name, unsigned n,
     return &default_pool;
 }
 
-unsigned rte_get_next_lcore(unsigned i, int skip_master, int wrap){
+unsigned rte_get_master_lcore(){
     return 0;
 }
 
