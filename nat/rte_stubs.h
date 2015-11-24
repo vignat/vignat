@@ -784,6 +784,9 @@ ether_format_addr(char *buf, uint16_t size,
 
 #define RTE_MAX_LCORE 128
 
+unsigned rte_get_master_lcore();
+int rte_lcore_is_enabled(unsigned lcore_id);
+
 static inline unsigned
 rte_get_next_lcore(unsigned i, int skip_master, int wrap)
 {

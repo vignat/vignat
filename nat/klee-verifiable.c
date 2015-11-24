@@ -173,6 +173,7 @@ static struct flow* get_flow_int(struct int_key* key) {
         like_hash.sample_ext_key.dst_ip = key->dst_ip;
         like_hash.sample_ext_key.protocol = key->protocol;
 
+	printf("HT entry is allocated on int\n");
         like_hash.initialized_sample = 1;
         return &like_hash.sample_flow;
     } else {
@@ -196,6 +197,8 @@ static struct flow* get_flow_ext(struct ext_key* key) {
         like_hash.sample_int_key.dst_port = key->dst_port;
         like_hash.sample_int_key.dst_ip = key->dst_ip;
         like_hash.sample_int_key.protocol = key->protocol;
+
+	printf("HT entry is allocated on ext\n");
         like_hash.initialized_sample = 1;
         return &like_hash.sample_flow;
     } else {
@@ -237,20 +240,21 @@ static void add_flow(struct flow *f) {
 
     like_hash.length++;
     like_hash.initialized_sample = 1;
+    printf("HT entry is allocated on explicit add\n");
 }
 
-static int allocate_flowtables(void) {
-    //assert(internal_keys == NULL);
-    //assert(external_keys == NULL);
-    //assert(flows == NULL);
-    //assert(int_flows == NULL);
-    //assert(ext_flows == NULL);
-    //assert(num_flows == 0);
-    klee_make_symbolic(&like_hash, sizeof(like_hash), "like_hash");
-    klee_assume(like_hash.sample_flow.int_device_id < RTE_MAX_ETHPORTS);
+static int allocate_flowtables(uint8_t nb_ports) {
+    klee_make_symbolic(&like_hash, sizeof(struct like_hash), "lalala");
+    klee_assume(like_hash.sample_flow.ext_src_port == like_hash.sample_ext_key.ext_src_port);
+    klee_assume(like_hash.sample_flow.ext_src_ip == like_hash.sample_ext_key.ext_src_ip);
+    klee_assume(like_hash.sample_flow.ext_device_id == like_hash.sample_ext_key.ext_device_id);
     klee_assume(like_hash.sample_flow.ext_device_id < RTE_MAX_ETHPORTS);
-    klee_assume(like_hash.sample_int_key.int_device_id < RTE_MAX_ETHPORTS);
-    klee_assume(like_hash.sample_ext_key.ext_device_id < RTE_MAX_ETHPORTS);
+    klee_assume(like_hash.sample_flow.int_src_port == like_hash.sample_int_key.int_src_port);
+    klee_assume(like_hash.sample_flow.int_src_ip == like_hash.sample_int_key.int_src_ip);
+    klee_assume(like_hash.sample_flow.int_device_id == like_hash.sample_int_key.int_device_id);
+    klee_assume(like_hash.sample_flow.int_device_id < RTE_MAX_ETHPORTS);
+    klee_assume(like_hash.sample_flow.int_device_id < nb_ports);
+    klee_assume(like_hash.sample_flow.ext_device_id < nb_ports);
     klee_assume(like_hash.initialized_sample == 0);
     klee_assume(like_hash.length < MAX_FLOWS);
     return 1;
@@ -400,6 +404,7 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
     lcore_id = rte_lcore_id();
 
     qconf = &lcore_conf[lcore_id];
+
     len = qconf->tx_mbufs[port].len;
     qconf->tx_mbufs[port].m_table[len] = m;
     len++;
@@ -481,7 +486,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 {
     struct ether_hdr *eth_hdr;
     struct ipv4_hdr *ipv4_hdr;
-    uint8_t dst_device;
+    uint8_t dst_device = 0;
 
     LOG("get here\n");
     (void)qconf;
@@ -576,6 +581,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             ipv4_hdr->src_addr = f->ext_src_ip;
             set_src_port(m, f->ext_src_port);
             //TODO: recalculate ip checksum.
+
             dst_device = f->ext_device_id;
         }
 
@@ -586,7 +592,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 //#endif
         /* dst addr */
         //TODO: how do you get eth addr by ip addr. need to implement LPM?
-        *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
+	*(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
 
         /* src addr */
         ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
@@ -678,14 +684,19 @@ main_loop(__attribute__((unused)) void *dummy)
         /*
          * Read packet from RX queues
          */
-        for (i = 0; i < qconf->n_rx_queue; ++i) {
+	klee_make_symbolic(&i, sizeof(int), "queue #: i");
+	klee_assume(i < qconf->n_rx_queue);
+	klee_assume(0 <= i);
+        //for (i = 0; i < qconf->n_rx_queue; ++i)
+	  {
             portid = qconf->rx_queue_list[i].port_id;
             queueid = qconf->rx_queue_list[i].queue_id;
             nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
                 MAX_PKT_BURST);
             LOG("received %d packets\n", nb_rx);
             if (nb_rx == 0)
-                continue;
+                ;
+	    else {
 
             LOG("prefetching\n");
 
@@ -708,6 +719,7 @@ main_loop(__attribute__((unused)) void *dummy)
             for (; j < nb_rx; j++) {
                 simple_forward(pkts_burst[j], portid, qconf);
             }
+	    }
 
         }
     }
@@ -888,7 +900,7 @@ print_ethaddr(const char *name, const struct ether_addr *eth_addr)
 }
 
 static int
-init_mem(unsigned nb_mbuf)
+init_mem(unsigned nb_mbuf, uint8_t nb_ports)
 {
     int socketid;
     unsigned lcore_id;
@@ -922,7 +934,7 @@ init_mem(unsigned nb_mbuf)
         }
     }
 
-    allocate_flowtables();
+    allocate_flowtables(nb_ports);
     LOG("memory initialized successfully\n");
     return 0;
 }
@@ -1031,7 +1043,7 @@ main(int argc, char **argv)
     nb_lcores = rte_lcore_count();
 
     /* init memory */
-    ret = init_mem(NB_MBUF);
+    ret = init_mem(NB_MBUF, nb_ports);
     if (ret < 0)
         rte_exit(EXIT_FAILURE, "init_mem failed\n");
 

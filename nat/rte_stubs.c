@@ -25,15 +25,14 @@ uint64_t rte_rdtsc(){
 }
 
 struct user_buf {
-    uint8_t some_data[100];
+    //uint8_t some_data[100];
     struct ether_hdr ether;
     struct ipv4_hdr ipv4;
     struct tcp_hdr tcp;
-} user_buf0, user_buf1;
+} user_buf;
 
-struct rte_mbuf incoming_package0, incoming_package1; //for two ports
-int incoming_package_allocated0 = 0,
-    incoming_package_allocated1 = 0;
+struct rte_mbuf incoming_package; //for two ports
+int incoming_package_allocated;
 
 uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
                           struct rte_mbuf** pkts_burst, int max_burst){
@@ -41,31 +40,20 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
     int receive_one;
     klee_make_symbolic(&receive_one, sizeof(int), "receive_one");
     if (receive_one) {
-        struct user_buf * user_buf;
         struct rte_mbuf * in_package;
-        if (portid == 0) {
-            klee_assert(!incoming_package_allocated0);
-            klee_make_symbolic(&incoming_package0, sizeof(struct rte_mbuf), "incoming_package0");
-            klee_make_symbolic(&user_buf0, sizeof(struct user_buf), "user_buf0");
-            in_package = &incoming_package0;
-            user_buf = &user_buf0;
-            incoming_package_allocated0 = 1;
-        } else {
-            klee_assert(!incoming_package_allocated1);
-            klee_make_symbolic(&incoming_package1, sizeof(struct rte_mbuf), "incoming_package1");
-            klee_make_symbolic(&user_buf1, sizeof(struct user_buf), "user_buf1");
-            in_package = &incoming_package1;
-            user_buf = &user_buf1;
-            incoming_package_allocated1 = 1;
-        }
-        in_package->buf_addr = user_buf;
-        in_package->data_off = 100;
+	klee_assert(!incoming_package_allocated);
+	klee_make_symbolic(&incoming_package, sizeof(struct rte_mbuf), "incoming_package0");
+	klee_make_symbolic(&user_buf, sizeof(struct user_buf), "user_buf0");
+	in_package = &incoming_package;
+	incoming_package_allocated = 1;
+        in_package->buf_addr = &user_buf;
+        in_package->data_off = 0;//100;
         in_package->userdata = NULL;
         in_package->pool = NULL;
         in_package->next = NULL;
         in_package->pkt_len = sizeof(struct user_buf);
         in_package->data_len = 0; // what is the right value???
-        user_buf->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+        user_buf.ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
         pkts_burst[0] = in_package;
         return 1;
     } else {
