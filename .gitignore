@@ -10,6 +10,7 @@ fullpage.sty
 *.vo
 *.glob
 *.cache
+*.bc
 bench/bench
 bench/data.c
 bench/operations.c
