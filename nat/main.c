@@ -4,50 +4,61 @@
 #include <inttypes.h>
 #include <sys/types.h>
 #include <string.h>
-#include <sys/queue.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <getopt.h>
-#include <glib.h>
 #include <assert.h>
 
-#include <rte_common.h>
-#include <rte_vect.h>
-#include <rte_byteorder.h>
-#include <rte_log.h>
-#include <rte_memory.h>
-#include <rte_memcpy.h>
-#include <rte_memzone.h>
-#include <rte_eal.h>
-#include <rte_per_lcore.h>
-#include <rte_launch.h>
-#include <rte_atomic.h>
-#include <rte_cycles.h>
-#include <rte_prefetch.h>
-#include <rte_lcore.h>
-#include <rte_per_lcore.h>
-#include <rte_branch_prediction.h>
-#include <rte_interrupts.h>
-#include <rte_pci.h>
-#include <rte_random.h>
-#include <rte_debug.h>
-#include <rte_ether.h>
-#include <rte_ethdev.h>
-#include <rte_ring.h>
-#include <rte_mempool.h>
-#include <rte_mbuf.h>
-#include <rte_ip.h>
-#include <rte_tcp.h>
-#include <rte_udp.h>
-#include <rte_string_fns.h>
+#ifdef KLEE_VERIFICATION
+#  include "rte_stubs.h"
+#  include <klee/klee.h>
+#else //KLEE_VERIFICATION
+#  include <sys/queue.h>
+#  include <rte_common.h>
+#  include <rte_vect.h>
+#  include <rte_byteorder.h>
+#  include <rte_log.h>
+#  include <rte_memory.h>
+#  include <rte_memcpy.h>
+#  include <rte_memzone.h>
+#  include <rte_eal.h>
+#  include <rte_per_lcore.h>
+#  include <rte_launch.h>
+#  include <rte_atomic.h>
+#  include <rte_cycles.h>
+#  include <rte_prefetch.h>
+#  include <rte_lcore.h>
+#  include <rte_per_lcore.h>
+#  include <rte_branch_prediction.h>
+#  include <rte_interrupts.h>
+#  include <rte_pci.h>
+#  include <rte_random.h>
+#  include <rte_debug.h>
+#  include <rte_ether.h>
+#  include <rte_ethdev.h>
+#  include <rte_ring.h>
+#  include <rte_mempool.h>
+#  include <rte_mbuf.h>
+#  include <rte_ip.h>
+#  include <rte_tcp.h>
+#  include <rte_udp.h>
+#  include <rte_string_fns.h>
 
-#include <cmdline_parse.h>
-#include <cmdline_parse_etheraddr.h>
+#  include <cmdline_parse.h>
+#  include <cmdline_parse_etheraddr.h>
+#endif //KLEE_VERIFICATION
+
+#include "flowtable.h"
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
-#define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
-#define LOG_ADD(...) printf(__VA_ARGS__)
+#ifdef KLEE_VERIFICATION
+#  define LOG(...) 
+#  define LOG_ADD(...)
+#else //KLEE_VERIFICATION
+#  define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
+#  define LOG_ADD(...) printf(__VA_ARGS__)
+#endif //KLEE_VERIFICATION
 
 #define MAX_PKT_BURST     32
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
@@ -59,207 +70,6 @@
 
 #define NB_SOCKETS 8
 
-struct flow {
-    uint16_t int_src_port;
-    uint16_t ext_src_port;
-    uint16_t dst_port;
-    uint32_t int_src_ip;
-    uint32_t ext_src_ip;
-    uint32_t dst_ip;
-    uint8_t int_device_id;
-    uint8_t ext_device_id;
-    uint8_t protocol;
-    //TODO: timeout for removal.
-};
-
-struct int_key {
-    uint16_t int_src_port;
-    uint16_t dst_port;
-    uint32_t int_src_ip;
-    uint32_t dst_ip;
-    uint8_t int_device_id;
-    uint8_t protocol;
-};
-
-struct ext_key {
-    uint16_t ext_src_port;
-    uint16_t dst_port;
-    uint32_t ext_src_ip;
-    uint32_t dst_ip;
-    uint8_t ext_device_id;
-    uint8_t protocol;
-};
-
-static guint int_key_hash(gconstpointer key) {
-    const struct int_key* arg = key;
-    return arg->int_src_port ^ arg->dst_port ^ arg->int_src_ip ^ arg->dst_ip;
-}
-
-static guint ext_key_hash(gconstpointer key) {
-    const struct ext_key* arg = key;
-    return arg->ext_src_port ^ arg->dst_port ^ arg->ext_src_ip ^ arg->dst_ip;
-}
-
-static gboolean int_key_equal(gconstpointer k1, gconstpointer k2) {
-    const struct int_key* key1 = k1,
-                        * key2 = k2;
-    return key1->int_src_port == key2->int_src_port &&
-           key1->dst_port == key2->dst_port &&
-           key1->int_src_ip == key2->int_src_ip &&
-           key1->dst_ip == key2->dst_ip &&
-           key1->int_device_id == key2->int_device_id &&
-           key1->protocol == key2->protocol;
-}
-
-static gboolean ext_key_equal(gconstpointer k1, gconstpointer k2) {
-    const struct ext_key* key1 = k1,
-                        * key2 = k2;
-    return key1->ext_src_port == key2->ext_src_port &&
-           key1->dst_port == key2->dst_port &&
-           key1->ext_src_ip == key2->ext_src_ip &&
-           key1->dst_ip == key2->dst_ip &&
-           key1->ext_device_id == key2->ext_device_id &&
-           key1->protocol == key2->protocol;
-}
-
-static void log_ip(uint32_t addr) {
-    LOG_ADD( "%d.%d.%d.%d", addr&0xff, (addr>>8)&0xff, (addr>>16)&0xff, (addr>>24)&0xff);
-}
-
-static void log_int_key(const struct int_key *key) {
-    LOG( "{int_src_port: %d(%d); dst_port: %d(%d);\n"
-            " int_src_ip: ",
-            key->int_src_port, rte_be_to_cpu_16(key->int_src_port),
-            key->dst_port, rte_be_to_cpu_16(key->dst_port));
-    log_ip(key->int_src_ip);
-    LOG_ADD( "; dst_ip: ");
-    log_ip(key->dst_ip);
-    LOG_ADD( "\n"
-            " int_device_id: %d; protocol: %d}\n",
-            key->int_device_id, key->protocol);
-}
-
-static void log_ext_key(const struct ext_key *key) {
-    LOG( "{ext_src_port: %d(%d); dst_port: %d(%d);\n"
-            " ext_src_ip: ",
-            key->ext_src_port, rte_be_to_cpu_16(key->ext_src_port),
-            key->dst_port, rte_be_to_cpu_16(key->dst_port));
-    log_ip(key->ext_src_ip);
-    LOG_ADD( "; dst_ip: ");
-    log_ip(key->dst_ip);
-    LOG_ADD( "\n"
-            " ext_device_id: %d; protocol: %d}\n",
-            key->ext_device_id, key->protocol);
-}
-
-static void log_flow(const struct flow *f) {
-    LOG( "{int_src_port: %d(%d); ext_src_port: %d(%d);\n"
-            " dst_port: %d(%d); int_src_ip: ",
-            f->int_src_port, rte_be_to_cpu_16(f->int_src_port),
-            f->ext_src_port, rte_be_to_cpu_16(f->ext_src_port),
-            f->dst_port, rte_be_to_cpu_16(f->dst_port));
-    log_ip(f->int_src_ip);
-    LOG_ADD( ";\n ext_src_ip:");
-    log_ip(f->ext_src_ip);
-    LOG_ADD( "; dst_ip: ");
-    log_ip(f->dst_ip);
-    LOG_ADD( "\n"
-            " int_device_id: %d; ext_device_id: %d;\n"
-            " protocol: %d}\n",
-            f->int_device_id, f->ext_device_id, f->protocol);
-}
-
-#define MAX_FLOWS (1024)
-
-struct int_key* internal_keys = NULL;
-struct ext_key* external_keys = NULL;
-struct flow* flows = NULL;
-GHashTable* ext_flows = NULL;
-GHashTable* int_flows = NULL;
-
-uint64_t num_flows = 0;
-
-
-static struct flow* get_flow_int(struct int_key* key) {
-    LOG("look up for internal key key = \n");
-    log_int_key(key);
-    return g_hash_table_lookup(int_flows, key);
-}
-
-static struct flow* get_flow_ext(struct ext_key* key) {
-    return g_hash_table_lookup(ext_flows, key);
-}
-
-static inline void fill_int_key(struct flow *f, struct int_key *k) {
-    k->int_src_port = f->int_src_port;
-    k->dst_port = f->dst_port;
-    k->int_src_ip = f->int_src_ip;
-    k->dst_ip = f->dst_ip;
-    k->int_device_id = f->int_device_id;
-    k->protocol = f->protocol;
-}
-
-static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
-    k->ext_src_port = f->ext_src_port;
-    k->dst_port = f->dst_port;
-    k->ext_src_ip = f->ext_src_ip;
-    k->dst_ip = f->dst_ip;
-    k->ext_device_id = f->ext_device_id;
-    k->protocol = f->protocol;
-}
-
-//Warning: this is thread-unsafe, do not youse more than 1 lcore!
-static void add_flow(struct flow *f) {
-    LOG("add_flow (f = \n");
-    log_flow(f);
-    flows[num_flows] = *f;
-    fill_int_key(f, &internal_keys[num_flows]);
-    fill_ext_key(f, &external_keys[num_flows]);
-
-    assert(get_flow_ext(&external_keys[num_flows]) == NULL);
-    assert(get_flow_int(&internal_keys[num_flows]) == NULL);
-
-    g_hash_table_insert(ext_flows, &external_keys[num_flows], &flows[num_flows]);
-    g_hash_table_insert(int_flows, &internal_keys[num_flows], &flows[num_flows]);
-
-    ++num_flows;
-}
-
-static int allocate_flowtables(void) {
-    //assert(internal_keys == NULL);
-    //assert(external_keys == NULL);
-    //assert(flows == NULL);
-    //assert(int_flows == NULL);
-    //assert(ext_flows == NULL);
-    //assert(num_flows == 0);
-    if (NULL == (internal_keys = malloc(sizeof(struct int_key)*MAX_FLOWS)))
-        return 0;
-    if (NULL == (external_keys = malloc(sizeof(struct ext_key)*MAX_FLOWS)))
-        return 0;
-    if (NULL == (flows = malloc(sizeof(struct flow)*MAX_FLOWS)))
-        return 0;
-
-    int_flows = g_hash_table_new(int_key_hash, int_key_equal);
-    ext_flows = g_hash_table_new(ext_key_hash, ext_key_equal);
-
-    num_flows = 0;
-    return 1;
-}
-/*
-static void free_flowtables(void) {
-    assert(internal_keys != NULL);
-    assert(external_keys != NULL);
-    assert(flows != NULL);
-    assert(int_flows != NULL);
-    assert(ext_flows != NULL);
-    g_hash_table_destroy(int_flows); int_flows = NULL;
-    g_hash_table_destroy(ext_flows); ext_flows = NULL;
-    free(internal_keys); internal_keys = NULL;
-    free(external_keys); external_keys = NULL;
-    free(flows); flows = NULL;
-    num_flows = 0;
-}
-*/
 /* ethernet addresses of ports */
 static uint64_t dest_eth_addr[RTE_MAX_ETHPORTS];
 static struct ether_addr ports_eth_addr[RTE_MAX_ETHPORTS];
@@ -299,12 +109,12 @@ struct lcore_rx_queue {
  *  RTE_MAX is used to ensure that NB_MBUF never goes below a minimum value of 8192
  */
 
-#define NB_MBUF RTE_MAX	(																	\
-				(nb_ports*nb_rx_queue*RTE_TEST_RX_DESC_DEFAULT +							\
-				nb_ports*nb_lcores*MAX_PKT_BURST +											\
-				nb_ports*n_tx_queue*RTE_TEST_TX_DESC_DEFAULT +								\
-				nb_lcores*MEMPOOL_CACHE_SIZE),												\
-				(unsigned)8192)
+#define NB_MBUF RTE_MAX	(                                               \
+                         (nb_ports*nb_rx_queues*RTE_TEST_RX_DESC_DEFAULT + \
+                          nb_ports*nb_lcores*MAX_PKT_BURST +            \
+                          nb_ports*n_tx_queue*RTE_TEST_TX_DESC_DEFAULT + \
+                          nb_lcores*MEMPOOL_CACHE_SIZE),                \
+                         (unsigned)8192)
 
 /* Configure how many packets ahead to prefetch, when reading packets */
 #define PREFETCH_OFFSET	3
@@ -419,7 +229,6 @@ static uint16_t get_src_port(struct rte_mbuf *m) {
                                 sizeof(struct ether_hdr));
     if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
         ipv4_hdr->next_proto_id == IPPROTO_UDP) {
-        // TODO: check if this working
         return *(uint16_t*)(ipv4_hdr + 1);
     }
     return 0;
@@ -431,7 +240,6 @@ static uint16_t get_dst_port(struct rte_mbuf *m) {
                                 sizeof(struct ether_hdr));
     if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
         ipv4_hdr->next_proto_id == IPPROTO_UDP) {
-        // TODO: check if this working
         return *((uint16_t*)(ipv4_hdr + 1) + 1/*skip srcport*/);
     }
     return 0;
@@ -443,7 +251,6 @@ static void set_src_port(struct rte_mbuf *m, uint16_t port) {
                                 sizeof(struct ether_hdr));
     if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
         ipv4_hdr->next_proto_id == IPPROTO_UDP) {
-        // TODO: check if this working
         *(uint16_t*)(ipv4_hdr + 1) = port;
     }
 }
@@ -454,7 +261,6 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
                                 sizeof(struct ether_hdr));
     if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
         ipv4_hdr->next_proto_id == IPPROTO_UDP) {
-        // TODO: check if this working
         *((uint16_t*)(ipv4_hdr + 1) + 1) = port;
     }
 }
@@ -495,21 +301,6 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 
         LOG( "forwarding and ipv4 packet on %d\n", portid);
         LOG( "eth_hdr size: %lu; ipv4 hdr size: %lu; data_offset %d:\n", sizeof(struct ether_hdr), sizeof(struct ipv4_hdr), m->data_off);
-        uint8_t *buf = (uint8_t*)(m->buf_addr) + m->data_off;
-        LOG("%02x %02x %02x %02x %02x %02x %02x %02x "
-            "%02x %02x %02x %02x %02x %02x %02x %02x "
-            "%02x %02x %02x %02x %02x %02x %02x %02x "
-            "%02x %02x %02x %02x %02x %02x %02x %02x \n"
-            "%02x %02x %02x %02x %02x %02x %02x %02x "
-            "%02x %02x %02x %02x %02x %02x %02x %02x "
-            "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
-            buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15],
-            buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23],
-            buf[24], buf[25], buf[26], buf[27], buf[28], buf[29], buf[30], buf[31],
-            buf[32], buf[33], buf[34], buf[35], buf[36], buf[37], buf[38], buf[39],
-            buf[40], buf[41], buf[42], buf[43], buf[44], buf[45], buf[46], buf[47],
-            buf[48], buf[49], buf[50], buf[51], buf[52], buf[53], buf[54], buf[55]);
         if (portid == wan_port_id) {
             //External port.
             LOG( "port %d turns out to be external(%d)\n", portid, wan_port_id);
@@ -643,7 +434,11 @@ main_loop(__attribute__((unused)) void *dummy)
             portid, queueid);
     }
 
-    while (1) {
+#ifdef KLEE_VERIFICATION
+#else //KLEE_VERIFICATION
+    while (1) 
+#endif //KLEE_VERIFICATION
+    {
 
         cur_tsc = rte_rdtsc();
 
@@ -672,34 +467,41 @@ main_loop(__attribute__((unused)) void *dummy)
         /*
          * Read packet from RX queues
          */
-        for (i = 0; i < qconf->n_rx_queue; ++i) {
+#ifdef KLEE_VERIFICATION
+        klee_make_symbolic(&i, sizeof(int), "queue #: i");
+        klee_assume(i < qconf->n_rx_queue);
+        klee_assume(0 <= i);
+#else //KLEE_VERIFICATION
+        for (i = 0; i < qconf->n_rx_queue; ++i)
+#endif //KLEE_VERIFICATION
+        {
             portid = qconf->rx_queue_list[i].port_id;
             queueid = qconf->rx_queue_list[i].queue_id;
             nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
                 MAX_PKT_BURST);
-            if (nb_rx == 0)
-                continue;
+            LOG("received %d packets\n", nb_rx);
+            if (nb_rx != 0) {
 
-            /* Prefetch first packets */
-            for (j = 0; j < PREFETCH_OFFSET && j < nb_rx; j++) {
-                rte_prefetch0(rte_pktmbuf_mtod(
-                        pkts_burst[j], void *));
+                /* Prefetch first packets */
+                for (j = 0; j < PREFETCH_OFFSET && j < nb_rx; j++) {
+                    rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[j], void *));
+                }
+
+                /* Prefetch and forward already prefetched packets */
+                for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
+                    rte_prefetch0(rte_pktmbuf_mtod
+                                  (pkts_burst[j + PREFETCH_OFFSET], void *));
+                    simple_forward(pkts_burst[j], portid, qconf);
+                }
+
+                /* Forward remaining prefetched packets */
+                for (; j < nb_rx; j++) {
+                    simple_forward(pkts_burst[j], portid, qconf);
+                }
             }
-
-            /* Prefetch and forward already prefetched packets */
-            for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
-                rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[
-                        j + PREFETCH_OFFSET], void *));
-                simple_forward(pkts_burst[j], portid, qconf);
-            }
-
-            /* Forward remaining prefetched packets */
-            for (; j < nb_rx; j++) {
-                simple_forward(pkts_burst[j], portid, qconf);
-            }
-
         }
     }
+    return 0;
 }
 
 static int
@@ -841,7 +643,7 @@ parse_args(int argc, char **argv, unsigned nb_ports)
         }
         else if (0 == strncmp(lgopts[option_index].name, CMD_LINE_OPT_WAN_PORT,
                               sizeof (CMD_LINE_OPT_WAN_PORT))) {
-            printf("parsing wan port: %s\n", optarg);
+            LOG("parsing wan port: %s\n", optarg);
             wan_port_id = strtoul(optarg, &port_end, 10);
             if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
                 return -1;
@@ -876,7 +678,7 @@ print_ethaddr(const char *name, const struct ether_addr *eth_addr)
 }
 
 static int
-init_mem(unsigned nb_mbuf)
+init_mem(unsigned nb_mbuf, uint8_t nb_ports)
 {
     int socketid;
     unsigned lcore_id;
@@ -895,6 +697,7 @@ init_mem(unsigned nb_mbuf)
             rte_exit(EXIT_FAILURE, "Socket %d of lcore %u is out of range %d\n",
                 socketid, lcore_id, NB_SOCKETS);
         }
+        LOG("sock check completed\n");
         if (pktmbuf_pool[socketid] == NULL) {
             snprintf(s, sizeof(s), "mbuf_pool_%d", socketid);
             pktmbuf_pool[socketid] =
@@ -909,7 +712,8 @@ init_mem(unsigned nb_mbuf)
         }
     }
 
-    allocate_flowtables();
+    allocate_flowtables(nb_ports);
+    LOG("memory initialized successfully\n");
     return 0;
 }
 
@@ -979,7 +783,7 @@ main(int argc, char **argv)
     uint16_t queueid;
     unsigned lcore_id;
     uint32_t n_tx_queue, nb_lcores;
-    uint8_t portid, nb_rx_queue, queue, socketid;
+    uint8_t portid, nb_rx_queues, queue, socketid;
 
     /* init EAL */
     ret = rte_eal_init(argc, argv);
@@ -1015,7 +819,8 @@ main(int argc, char **argv)
         rte_exit(EXIT_FAILURE, "check_port_config failed\n");
 
     nb_lcores = rte_lcore_count();
-
+    n_tx_queue = nb_lcores;
+    nb_rx_queues = 0;
     /* initialize all ports */
     for (portid = 0; portid < nb_ports; portid++) {
         /* skip ports that are not enabled */
@@ -1028,8 +833,9 @@ main(int argc, char **argv)
         printf("Initializing port %d ... ", portid );
         fflush(stdout);
 
-        nb_rx_queue = get_port_n_rx_queues(portid);
-        n_tx_queue = nb_lcores;
+        uint8_t nb_rx_queue = get_port_n_rx_queues(portid);
+        //VVV ??? this is a questionable aggregation. in l3fwd it is even worse
+        nb_rx_queues = RTE_MAX(nb_rx_queue, nb_rx_queues);
         if (n_tx_queue > MAX_TX_QUEUE_PER_PORT)
             n_tx_queue = MAX_TX_QUEUE_PER_PORT;
         printf("Creating queues: nb_rxq=%d nb_txq=%u... ",
@@ -1052,11 +858,6 @@ main(int argc, char **argv)
          */
         ether_addr_copy(&ports_eth_addr[portid],
             (struct ether_addr *)(val_eth + portid) + 1);
-
-        /* init memory */
-        ret = init_mem(NB_MBUF);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE, "init_mem failed\n");
 
         /* init one TX queue per couple (lcore,port) */
         queueid = 0;
@@ -1089,6 +890,11 @@ main(int argc, char **argv)
         printf("\n");
     }
 
+    /* init memory */
+    ret = init_mem(NB_MBUF, nb_ports);
+    if (ret < 0)
+        rte_exit(EXIT_FAILURE, "init_mem failed\n");
+    
     for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++) {
         if (rte_lcore_is_enabled(lcore_id) == 0)
             continue;

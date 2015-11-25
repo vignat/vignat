@@ -42,7 +42,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = nat
 
 # all source are stored in SRCS-y
-SRCS-y := main.c
+SRCS-y := main.c flowtable.c
 
 CFLAGS += -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include $(USER_FLAGS)
 CFLAGS += $(WERROR_FLAGS)
@@ -57,6 +57,6 @@ endif
 include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
-	clang-3.4 klee-verifiable.c rte_stubs.c -I ~/proj/klee/klee/include/ -c -g -emit-llvm
-	llvm-link rte_stubs.bc klee-verifiable.bc -o veri.bc
+	clang-3.4 -DKLEE_VERIFICATION main.c rte_stubs.c flowtable-stub.c -I ~/proj/klee/klee/include/ -c -g -emit-llvm
+	llvm-link rte_stubs.bc main.bc flowtable-stub.bc -o veri.bc
 	klee --libc=uclibc --posix-runtime veri.bc -p 0x3 --wan 1
