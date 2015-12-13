@@ -1,11 +1,11 @@
 # General Problem Statement
 
-The ultimate goal of the project is to build a network application development framework with the following features:
+The ultimate goal of the project is a network application development framework with the following features:
 - strong dependability guarantees
 - popularity in the networking community, meaning it should have
-  - C/C++ as a development language (may be restricted subset),
+  - C/C++ as a development language (or a restricted subset),
   - competitive performance and
-  - should not require any special knowledge from the verification domain.
+  - should not require from the developer any special knowledge from the verification domain.
 
 We envision the project outcome to consist of the following parts:
 - support library of verified common-use components, such as
@@ -19,21 +19,22 @@ It is worth to research the actual costomer preference list for those properties
 - *liveness*: each packet eventually gets to the processing pipeline
 - *response time*: the application processes a packet in a predefined number of clocks in any case
 - *isolation*: independent flows can not leak information to each other
+- *power consumption limit*: the app can not burn more than a given power budget in a time unit
 - high level *specifications refinement*: the application behaves according to the user-supplied specifications that describe it in a high level language.
 
 We hope that networking domain features alleviate the general verification complexity. Specifically, the features:
-- Modularisation with a natural interface: a packet. It decreases the verification problem size that positively affects the exponential-like complexity. It also allows to reuse results between different problems with shared parts.
+- Modularisation with a natural interface(packet/frame). It decreases the verification problem size that positively affects the exponential-like complexity. It also allows to reuse results between different problems with shared parts.
 - Limited loops. Most loops have statically-predictable fixed number of iterations and can be unrolled. Others are still limited in order to keep response time bounded.
 - Limited storage. Less variables - less the state-space that we need to reason about.
 - Prevalence of static allocation. We do not need to keep complex memory models for dynamic allocation schemes.
-- Short execution paths. Therefore amenable to e.g. abstract interpretation.
+- Short execution paths. Therefore amenable to expensive methods, like abstract interpretation.
 
 
 # First step: a verified hash-map
 
-Dynamic state forms an enormous input that influences the application behavior. We decided to start with encapsulating it into verified data structures following strict specifications. This allows to reason about unbounded data, and make use of its properties. We started with a hash-map as a popular data structure for network applications.
+Dynamic state forms an enormous input that influences the application behavior. We decided to start with encapsulating it into a set of verified data structures following strict specifications. This allows us to reason about unbounded data and make use of its properties. We started with a hash-map as a popular data structure for network applications.
 
-To simplify the verification we restricted key and value domains to simple 32 bit integer values and limited the total number of entries by a statically chosen number. We also use a trivial hash-function. Our hash table implementation features open addressing scheme because it involves only arithmetic operations and array indexing. All the mentioned simplifications allowed it to fit intu roughly 85 lines of C code with no dependencies.
+To simplify the verification we restricted key and value domains to simple 32 bit integer values and limited the total number of entries by a statically chosen number. We also use a trivial hash-function. Our hash table implementation features open addressing scheme. It involves only arithmetic operations and array indexing and avoids complex memory shapes. All the mentioned simplifications allowed it to fit into roughly 85 lines of C code with zero dependencies.
 
 ## Approaches Taken
 We tried to formally verify that our simple implementation conforms to a set natural properties defining a map (see the expiring_map document). In the search for the optimal approach, we tried 5 tool(chain)s:
@@ -59,13 +60,13 @@ The whole process took a couple of month due to the lack of experience of CoQ in
 
 With the verified map implementation, our next step is to plug it into a sample client application and see whether we can make use of its specification to prove some properties of the entire application. We choose a network address translation uint (NAT-box) for that purpose. It uses a hash table to store active flows.
 
-We aim to develop a still useful NAT-box that would have some strongly guaranteed properties. We start with crash freedom as the most desired property.
+We aim to develop a yet useful NAT-box that would have some strongly guaranteed properties. We start with crash freedom as probably the most desired property.
 
 We take [DPDK](http://dpdk.org/) - a promising platform for high-performance network application development - and hope to build our framework on top of it.
 
 ## Approach
 
-We start with **symbolic execution**(symbex) technology, given positive past experience. Our approach consists of the following parts:
+We start with **symbolic execution**(symbex) technology, given some positive past experience. Our approach consists of the following parts:
 * Transform some loops to simplify execution or finalize the execution paths. In particular:
   * cut the infinite event-processing loop to a single iteration. Use loop invariant to connect subsequent iteration for future induction reasoning
   * replace enumeration of the devices being polled by polling a single symbolic device.
@@ -74,5 +75,50 @@ We start with **symbolic execution**(symbex) technology, given positive past exp
 * Prove equivalence of this model an the real data structure specification for the given usage scenario.
 * Provide a symbex implementation of the DPDK API, that models all possible input events, e.g. it injects a symbolic package to the symbolic device receive queue.
 * Instrument the application code with bounds checks to assure memory safety during the symbex.
+
+
+# Possible methods
+Here we discuss verification methods that could potentially solve our problem.
+
+## Code generation
+
+Systems verified:
+ - seL4(micro kernel):
+  * certified logical implementation
+  * extracted Haskell code
+  * hand-writtern optimized C-code 
+ -  FSCQ(file system)
+  * certified Gallina implementation
+  * extracted Haskell code
+  * low-level driver
+
+Unfortunately, it seems to be applicable only to the whole-system design. At least it relies on a high-level language like Gallina(in CoQ), or Isabelle logic language.
+
+## Typed assembly language(TAL) with asserts
+
+Systems verified:
+ - Verve (OS); ironclad apps; ironfleet
+  * TAL checker
+  * Boogie
+  * Dafny
+
+Again uses high-level languages.
+
+## Symbolic verification + provided certified components
+
+
+## Manual formal verification
+
+E.g. with VST
+
+- Requires substential expertise from the developer.
+- Requires much a lot of human effort.
+
+## Automated formal verification
+
+E.g. with VeriFast.
+
+- Again requires expertise from the developer. (However, might be amenable to some heuristics)
+- Bigger TCB
 
 [1]: https://en.wikipedia.org/wiki/Predicate_transformer_semantics#Specification_statement_.28or_weakest-precondition_of_procedure_call.29
