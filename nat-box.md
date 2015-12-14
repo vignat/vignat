@@ -106,6 +106,49 @@ Again uses high-level languages.
 
 ## Symbolic verification + provided certified components
 
+### The symbolic index problem.
+
+Consider the wollowing extract:
+
+```C
+int arr[100];
+initialize(arr);
+int i = symbolic_int();
+assume(0 <= i && i < 100);
+arr[i] = arr[i] + 1;
+check(arr);
+```
+
+Depending on the symbex engine and contents of the `check` function, the execution may fork in different ways:
+ - (most likely) if the condition `check` is complex or the symbex engine follows the naive approach, it will fork 100 execution paths for all possible values of `i`
+ - if the condition `check` does not depend on the values stored in `arr`, `arr` is not used later on, and the symbex engine is lazy, it will ignore this part
+ - if the condition `check` is simple enough, e.g.:
+
+```C
+void initialize(int* arr) { for (int i = 0; i < 100; ++i) arr[i] = 0; }
+void check(int* arr) {
+    assert(arr[1] > arr[0]);
+}
+// no further references of arr.
+```
+
+   and the symbex engine has this specific optimization, it may fork just three execution paths: 
+   * `i == 0` (such that `arr[0]` is incremented),
+   * `i == 1` (such that `arr[1]` is incremented) and
+   * `i > 1` (that does not affect the `check` condition).
+  - and finally, if the symbex engine supports array(map) theory, in some cases it may conclude that the `arr[i]++` transformation does not change the `check` condition and avoid the fork completely. E.g.:
+
+```C
+void initialize(int* arr) { for (int i = 0; i < 100; ++i) arr[i] = 0; }
+void check(int* arr) {
+    for (int i = 0; i < 100; i += 2) assert(arr[i] >= 0);
+}
+// no further references of arr
+```
+
+    however it requires quite sophisticated analysis, which may be expensive on its own.
+
+The later two cases also require to ensure first, that the `arr` can not be referenced by some "unrelated" pointer later on.
 
 ## Manual formal verification
 
