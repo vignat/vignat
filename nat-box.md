@@ -148,7 +148,10 @@ Depending on the symbex engine and contents of the `check` function, the executi
 
   however it requires quite sophisticated analysis, which may be expensive on its own.
 
-The later two cases also require to ensure first, that the `arr` can not be referenced by some "unrelated" pointer later on.
+The later two cases also require to ensure first, that the `arr` can not be referenced by some "unrelated" pointer later on. The problem becomes disasterous with unbound symbolic pointers. Possible ways to tackle the path explosion:
+* modify code to circumvent such cases
+* add array(map) theory support to the engine, and profile the symbolic execution to make sure it can gracefully handle symbolic dereference as described above
+* wrap such code into separately verified datastructures and teach the engine work with the abstract specifications rather than raw memory layouts. 
 
 ## Manual formal verification
 
