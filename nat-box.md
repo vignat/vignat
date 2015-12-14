@@ -76,6 +76,30 @@ We start with **symbolic execution**(symbex) technology, given some positive pas
 * Provide a symbex implementation of the DPDK API, that models all possible input events, e.g. it injects a symbolic package to the symbolic device receive queue.
 * Instrument the application code with bounds checks to assure memory safety during the symbex.
 
+## Challenges
+
+The key design trade off in the problem is simplicity <-> dependability. We aim to provide stronger guarantees for the applications developed in the framework, but we also do not want to submerse the networking developer with verification effort. Apart from the key design challenge, we have met some technical ones inherent to the methodology chosen (some of the tool-specific issues are described above):
+
+* Symbolic index (see below)
+* Unstable memory layout and other environment properties that are difficult to model. C language makes it difficult to completely isolate the programm from the runtime environment. This includes also a time-dependent control flow. However, strict standard compliance may aleviate the memory layout dependence (expressed in pointer arithmetic/comparisons), should be easy to enforce statically, but may be hard to eradicate.
+* Models refinement. As indicated in the approach section, we use two different models of a map data structure:
+  * formally verified usable implementation and
+  * symbolic image, capable of handling a limited number of usage scenarios
+  
+  as well as two programs:
+  * the original one with an infinite event-handling loop and
+  * the modified one, with bounded control flow paths.
+  
+  For these models we need to prove the refinement property, i.e. that one is equivalent to another under reasonable conditions.
+* Tracking time. The NAT expires flows over time. Time concept requires special attention, and should be explicitly passed as an argument for API calls.
+* Need for a formal model of DPDK. DPDK has pretty scarce documentation and is under active development, so the ad-hoc model replacing the real low-level code also requires validation.
+* Generalization. How do we generalize the specific NAT case to an abstract network dataplane application.
+
+## Current implementation simplifications
+
+to be done
+
+
 
 # Possible methods
 Here we discuss verification methods that could potentially solve our problem.
