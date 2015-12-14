@@ -136,7 +136,7 @@ void check(int* arr) {
    * `i == 0` (such that `arr[0]` is incremented),
    * `i == 1` (such that `arr[1]` is incremented) and
    * `i > 1` (that does not affect the `check` condition).
-  - and finally, if the symbex engine supports array(map) theory, in some cases it may conclude that the `arr[i]++` transformation does not change the `check` condition and avoid the fork completely. E.g.:
+ - and finally, if the symbex engine supports array(map) theory, in some cases it may conclude that the `arr[i]++` transformation does not change the `check` condition and avoid the fork completely. E.g.:
 
 ```C
 void initialize(int* arr) { for (int i = 0; i < 100; ++i) arr[i] = 0; }
