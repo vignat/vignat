@@ -97,7 +97,11 @@ The key design trade off in the problem is simplicity <-> dependability. We aim 
 
 ## Current implementation simplifications
 
-to be done
+The partially-verified NAT-box aims to a single-threaded multiple-internal/single-external port dynamic polling mode network address translation unit that uses port number as a flow identifier. However in its present state it lacks the following features to be considered a practical implementation:
+* Flow expiration. Currently once added flow lives forewer leading to the flowtable overflow.
+* Available ports pool. In the present implementation for a new flow a new port always allocated. It is totally adequate the zero-deallocation policy, but when we fix the flow expiration bullet, the ports will become a scarce resource, and we will need a list data structure (which should not be difficult to verify, though), or something more efficient. For the more efficient appropriate datastructure one can consult the verified garbage collectors works.
+* Performance. The map, as well as the nat-box itself, is not optimized for performance, so it need some optimizations to keep up with the user expectations. Concurrency would be a nice thing to support, given that DPDK has it enabled by design. Benchmark is to be done.
+* L2 routing. The current implementation operates on L3, and does not implement ARP and uses a broad cast Ethernet address instead. Therefore receiving NICs usually drop such packets. As Ethernet configuration changes rarely, one possibility is to use a static preconfigured lookup table.
 
 
 
