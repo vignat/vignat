@@ -103,6 +103,12 @@ The partially-verified NAT-box aims to a single-threaded multiple-internal/singl
 * Performance. The map, as well as the nat-box itself, is not optimized for performance, so it need some optimizations to keep up with the user expectations. Concurrency would be a nice thing to support, given that DPDK has it enabled by design. Benchmark is to be done.
 * L2 routing. The current implementation operates on L3, and does not implement ARP and uses a broad cast Ethernet address instead. Therefore receiving NICs usually drop such packets. As Ethernet configuration changes rarely, one possibility is to use a static preconfigured lookup table.
 
+## The list of unsolved problems
+
+* Simplifications. While the NAT implementation bears the aforementioned simplifications, it is not usable.
+* Refinement between the symbolic map model and the proven map model.
+* Refinement between the symbolic DPDK model and the real DPDK behaviour.
+* Formalisation and justification of the required code transformations.
 
 
 # Possible methods
