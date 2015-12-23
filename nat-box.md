@@ -109,7 +109,8 @@ The partially-verified NAT-box aims to a single-threaded multiple-internal/singl
 * Refinement between the symbolic map model and the proven map model.
 * Refinement between the symbolic DPDK model and the real DPDK behaviour.
 * Formalisation and justification of the required code transformations.
-
+* As mentioned above the implementation currently does not use the verified map. One obstacle here is that the keys in that map are pinned to be 32-bit integers, and that is not enough to uniqly identify a flow. We need to generalize the verified map at least for greater keys.
+* Also the current verified map search is 'O(n)' for the abscent elements, which shoud be a common case for a NAT. A simple optimization could greatly reduce that search time, but it will require a reverification, because it changes the insertion, search and erase code and complicates the internal representation.
 
 # Possible methods
 Here we discuss verification methods that could potentially solve our problem.
