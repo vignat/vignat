@@ -46,6 +46,7 @@
 
 #  include <cmdline_parse.h>
 #  include <cmdline_parse_etheraddr.h>
+#  include <cmdline_parse_ipaddr.h>
 #endif //KLEE_VERIFICATION
 
 #include "flowtable.h"
@@ -74,13 +75,14 @@
 static uint64_t dest_eth_addr[RTE_MAX_ETHPORTS];
 static struct ether_addr ports_eth_addr[RTE_MAX_ETHPORTS];
 
-static __m128i val_eth[RTE_MAX_ETHPORTS];
-
 /* replace first 12B of the ethernet header. */
 #define    MASK_ETH    0x3f
 
 /* The WAN port */
 static uint32_t wan_port_id = 0;
+
+/* The NAT's external IP address. should be provided as a command line option */
+static uint32_t external_ip = IPv4(11,3,168,192);
 
 /* mask of enabled ports */
 static uint32_t enabled_port_mask = 0;
@@ -275,9 +277,9 @@ uint16_t next_unused_external_port = 2747;
 
 static struct ext_iface allocate_ext_iface(void) {
     return (struct ext_iface){
-        .ip = IPv4(11,3,168,192),
+        .ip = external_ip,
         .port = next_unused_external_port++,
-        .device_id = wan_port_id
+        .device_id = (uint8_t)wan_port_id
     };
 }
 
@@ -395,7 +397,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 
         send_single_packet(m, dst_device);
     } else {
-        LOG( "non ipv4 packet, discard");
+        LOG( "non ipv4 packet, discard\n");
         /* Free the mbuf that contains non-IPV4/IPV6 packet */
         rte_pktmbuf_free(m);
     }
@@ -613,7 +615,48 @@ parse_portmask(const char *portmask)
     return pm;
 }
 
+static void
+parse_eth_dest(const char *optarg)
+{
+    uint8_t portid;
+    char *port_end;
+    uint8_t c, *dest, peer_addr[6];
+
+    errno = 0;
+    portid = strtoul(optarg, &port_end, 10);
+    if (errno != 0 || port_end == optarg || *port_end++ != ',')
+        rte_exit(EXIT_FAILURE,
+                 "Invalid eth-dest: %s", optarg);
+    if (portid >= RTE_MAX_ETHPORTS)
+        rte_exit(EXIT_FAILURE,
+                 "eth-dest: port %d >= RTE_MAX_ETHPORTS(%d)\n",
+                 portid, RTE_MAX_ETHPORTS);
+    
+    if (cmdline_parse_etheraddr(NULL, port_end,
+                                &(peer_addr[0]), sizeof(peer_addr)) < 0) {
+        rte_exit(EXIT_FAILURE, "Invalid ethernet address: %s\n", port_end);
+    }
+    dest = (uint8_t *)&dest_eth_addr[portid];
+    for (c = 0; c < 6; c++)
+        dest[c] = peer_addr[c];
+}
+
+static void
+parse_external_addr(const char *optarg)
+{
+    struct cmdline_ipaddr res;
+    struct cmdline_token_ipaddr tk;
+    tk.ipaddr_data.flags = CMDLINE_IPADDR_V4;
+    if (cmdline_parse_ipaddr((cmdline_parse_token_hdr_t*)&tk, optarg, &res, sizeof(res)) < 0) {
+        rte_exit(EXIT_FAILURE, "Invalid external IP address: %s\n", optarg);
+    }
+    external_ip = res.addr.ipv4.s_addr;
+}
+
+
 #define CMD_LINE_OPT_WAN_PORT "wan"
+#define CMD_LINE_OPT_ETH_DEST "eth-dest"
+#define CMD_LINE_OPT_EXT_IP "extip"
 
 /* Parse the argument given in the command line of the application */
 static int
@@ -626,6 +669,8 @@ parse_args(int argc, char **argv, unsigned nb_ports)
     char *port_end;
     static struct option lgopts[] = {
         {CMD_LINE_OPT_WAN_PORT, 1, 0, 0},
+        {CMD_LINE_OPT_ETH_DEST, 1, 0, 0},
+        {CMD_LINE_OPT_EXT_IP, 1, 0, 0},
         {NULL, 0, 0, 0}
     };
 
@@ -655,6 +700,14 @@ parse_args(int argc, char **argv, unsigned nb_ports)
                 printf("WAN port is not enabled");
                 return -1;
             }
+        } else if (0 == strncmp(lgopts[option_index].name, CMD_LINE_OPT_ETH_DEST,
+                                sizeof(CMD_LINE_OPT_ETH_DEST))) {
+            LOG("parsing gateway MAC: %s\n", optarg);
+            parse_eth_dest(optarg);
+        } else if (0 == strncmp(lgopts[option_index].name, CMD_LINE_OPT_EXT_IP,
+                                sizeof(CMD_LINE_OPT_EXT_IP))) {
+            LOG("parsing IP adddres on the external interface: %s\n", optarg);
+            parse_external_addr(optarg);
         } else {
             print_usage(prgname);
             return -1;
@@ -792,10 +845,10 @@ main(int argc, char **argv)
     argc -= ret;
     argv += ret;
 
-    /* pre-init dst MACs for all ports to 02:00:00:00:00:xx */
+    /* pre-init dst MACs for all ports to the broad cast address. Normally
+     * it should be replaced by a nearest switch MAC via a command line option. */
     for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
-        dest_eth_addr[portid] = 0xffffffffffff; //ETHER_LOCAL_ADMIN_ADDR + ((uint64_t)portid << 40);
-        *(uint64_t *)(val_eth + portid) = dest_eth_addr[portid];
+        dest_eth_addr[portid] = 0xffffffffffff;
     }
 
     // TODO: moved w.r.t l3fwd. see if this still works.
@@ -852,12 +905,6 @@ main(int argc, char **argv)
         print_ethaddr("Destination:",
             (const struct ether_addr *)&dest_eth_addr[portid]);
         printf(", ");
-
-        /*
-         * prepare src MACs for each port.
-         */
-        ether_addr_copy(&ports_eth_addr[portid],
-            (struct ether_addr *)(val_eth + portid) + 1);
 
         /* init one TX queue per couple (lcore,port) */
         queueid = 0;
