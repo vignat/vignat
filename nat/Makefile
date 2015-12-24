@@ -42,7 +42,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = nat
 
 # all source are stored in SRCS-y
-SRCS-y := main.c flowtable.c containers/map.c
+SRCS-y := main.c flowtable.c flowmanager.c flow.c containers/map.c containers/double-chain.c
 
 CFLAGS += $(USER_FLAGS)
 CFLAGS += $(WERROR_FLAGS)

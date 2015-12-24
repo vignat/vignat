@@ -58,7 +58,7 @@ int find_empty (int* busybits, int start)
     return -1;
 }
 
-int get(int* busybits, void** keyps, int* k_hashes, int* values, void* keyp, int key_size)
+int get(int* busybits, void** keyps, int* k_hashes, int* values, void* keyp, int key_size, int* value)
 {
     int h = hash(keyp, key_size);
     int start = loop(h);
@@ -66,10 +66,10 @@ int get(int* busybits, void** keyps, int* k_hashes, int* values, void* keyp, int
 
     if (-1 == index)
     {   
-        return -1;
+        return 0;
     }
-    int val = values[index];
-    return val;
+    *value = values[index];
+    return 1;
 }
 
 int put(int* busybits, void** keyps, int* k_hashes, int* values, void* keyp, int key_size, int value)
@@ -80,13 +80,13 @@ int put(int* busybits, void** keyps, int* k_hashes, int* values, void* keyp, int
 
     if (-1 == index)
     {
-        return -1;
+        return 0;
     }
     busybits[index] = 1;
     keyps[index] = keyp;
     k_hashes[index] = h;
     values[index] = value;
-    return 0;
+    return 1;
 }
 
 int erase(int* busybits, void** keyps, int* k_hashes, void* keyp, int key_size)
@@ -97,10 +97,10 @@ int erase(int* busybits, void** keyps, int* k_hashes, void* keyp, int key_size)
 
     if (-1 == index)
     {
-        return -1;
+        return 0;
     }
     busybits[index] = 0;
-    return 0;
+    return 1;
 }
 
 int size(int* busybits)

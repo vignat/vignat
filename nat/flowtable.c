@@ -2,69 +2,19 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <rte_log.h>
-#include <rte_byteorder.h>
 
 #include "containers/map.h"
 #include "flowtable.h"
+
+#if MAX_FLOWS > MAP_CAPACITY
+#  error "The map static capacity is insufficient for this number of flows"
+#endif
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
 #define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
 #define LOG_ADD(...) printf(__VA_ARGS__)
 
-#if MAX_FLOWS > MAP_CAPACITY
-#error "The map static capacity is insufficient for this number of flows"
-#endif
-
-void log_ip(uint32_t addr) {
-    LOG_ADD( "%d.%d.%d.%d", addr&0xff, (addr>>8)&0xff, (addr>>16)&0xff, (addr>>24)&0xff);
-}
-
-void log_int_key(const struct int_key *key) {
-    LOG( "{int_src_port: %d(%d); dst_port: %d(%d);\n"
-            " int_src_ip: ",
-            key->int_src_port, rte_be_to_cpu_16(key->int_src_port),
-            key->dst_port, rte_be_to_cpu_16(key->dst_port));
-    log_ip(key->int_src_ip);
-    LOG_ADD( "; dst_ip: ");
-    log_ip(key->dst_ip);
-    LOG_ADD( "\n"
-            " int_device_id: %d; protocol: %d}\n",
-            key->int_device_id, key->protocol);
-}
-
-void log_ext_key(const struct ext_key *key) {
-    LOG( "{ext_src_port: %d(%d); dst_port: %d(%d);\n"
-            " ext_src_ip: ",
-            key->ext_src_port, rte_be_to_cpu_16(key->ext_src_port),
-            key->dst_port, rte_be_to_cpu_16(key->dst_port));
-    log_ip(key->ext_src_ip);
-    LOG_ADD( "; dst_ip: ");
-    log_ip(key->dst_ip);
-    LOG_ADD( "\n"
-            " ext_device_id: %d; protocol: %d}\n",
-            key->ext_device_id, key->protocol);
-}
-
-void log_flow(const struct flow *f) {
-    LOG( "{int_src_port: %d(%d); ext_src_port: %d(%d);\n"
-            " dst_port: %d(%d); int_src_ip: ",
-            f->int_src_port, rte_be_to_cpu_16(f->int_src_port),
-            f->ext_src_port, rte_be_to_cpu_16(f->ext_src_port),
-            f->dst_port, rte_be_to_cpu_16(f->dst_port));
-    log_ip(f->int_src_ip);
-    LOG_ADD( ";\n ext_src_ip:");
-    log_ip(f->ext_src_ip);
-    LOG_ADD( "; dst_ip: ");
-    log_ip(f->dst_ip);
-    LOG_ADD( "\n"
-            " int_device_id: %d; ext_device_id: %d;\n"
-            " protocol: %d}\n",
-            f->int_device_id, f->ext_device_id, f->protocol);
-}
-
-struct int_key* internal_keys = NULL;
-struct ext_key* external_keys = NULL;
 struct flow* flows = NULL;
 
 int* ext_bbs = NULL;
@@ -79,25 +29,32 @@ int* int_vals = NULL;
 
 uint64_t num_flows = 0;
 
+struct flow* get_flow(int index) {
+    return &flows[index];
+}
+
 struct flow* get_flow_int(struct int_key* key) {
     LOG("look up for internal key key = \n");
     log_int_key(key);
-    int index = get(int_bbs, int_keyps, int_khs, int_vals, key, sizeof(struct int_key));
-    if (index == -1) {
-        return NULL;
-    }
-    return &flows[index];
+    int index = -1;
+    int rez = get(int_bbs, int_keyps, int_khs, int_vals, key,
+                  sizeof(struct int_key), &index);
+    if (rez)
+        return get_flow(index);
+    return NULL;
 }
 
 struct flow* get_flow_ext(struct ext_key* key) {
     LOG("look up for external key key = \n");
     log_ext_key(key);
-    int index = get(ext_bbs, ext_keyps, ext_khs, ext_vals, key, sizeof(struct ext_key));
-    if (index == -1) {
-        return NULL;
-    }
-    return &flows[index];
+    int index = -1;
+    int rez = get(ext_bbs, ext_keyps, ext_khs, ext_vals, key,
+                  sizeof(struct ext_key), &index);
+    if (rez)
+        return get_flow(index);
+    return NULL;
 }
+
 
 static inline void fill_int_key(struct flow *f, struct int_key *k) {
     k->int_src_port = f->int_src_port;
@@ -118,28 +75,56 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
 }
 
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
-void add_flow(struct flow *f) {
+int add_flow(struct flow *f, int index) {
+    assert(0 <= index && index < MAX_FLOWS);
     LOG("add_flow (f = \n");
     log_flow(f);
-    flows[num_flows] = *f;
-    fill_int_key(f, &internal_keys[num_flows]);
-    fill_ext_key(f, &external_keys[num_flows]);
+    struct flow *new_flow = get_flow(index);
+    *new_flow = *f;
+    struct int_key* new_int_key = &new_flow->ik;
+    struct ext_key* new_ext_key = &new_flow->ek;
+    fill_int_key(f, new_int_key);
+    fill_ext_key(f, new_ext_key);
 
-    assert(get_flow_ext(&external_keys[num_flows]) == NULL);
-    assert(get_flow_int(&internal_keys[num_flows]) == NULL);
+    assert(get_flow_ext(new_ext_key) == NULL);
+    assert(get_flow_int(new_int_key) == NULL);
 
     int put_res = 
         put(ext_bbs, ext_keyps, ext_khs, ext_vals,
-            &external_keys[num_flows], sizeof(struct int_key),
-            num_flows);
-    assert(put_res != -1);
+            new_ext_key, sizeof(struct ext_key),
+            index);
+    if (0 == put_res) {
+        return 0;
+    }
     put_res =
         put(int_bbs, int_keyps, int_khs, int_vals,
-            &internal_keys[num_flows], sizeof(struct ext_key),
-            num_flows);
-    assert(put_res != -1);
+            new_int_key, sizeof(struct int_key),
+            index);
+    if (0 == put_res) {
+        int erase_res = 
+            erase(ext_bbs, ext_keyps, ext_khs,
+                  new_ext_key, sizeof(struct ext_key));
+        assert(1 == erase_res);
+        return 0;
+    }
 
     ++num_flows;
+    return 1;
+}
+
+int remove_flow(int index) {
+    assert(0 <= index && index < MAX_FLOWS);
+    struct flow* f = &flows[index];
+    int erase_res =
+        erase(ext_bbs, ext_keyps, ext_khs, &f->ek, sizeof(struct ext_key));
+    if (0 == erase_res)
+        return 0;
+    erase_res = 
+        erase(int_bbs, int_keyps, int_khs, &f->ik, sizeof(struct int_key));
+    if (0 == erase_res)
+        return 0;
+    --num_flows;
+    return 1;
 }
 
 int allocate_flowtables(uint8_t nb_ports) {
@@ -150,10 +135,10 @@ int allocate_flowtables(uint8_t nb_ports) {
     //assert(ext_flows == NULL);
     //assert(num_flows == 0);
     (void)nb_ports;
-    if (NULL == (internal_keys = malloc(sizeof(struct int_key)*MAX_FLOWS)))
-        return 0;
-    if (NULL == (external_keys = malloc(sizeof(struct ext_key)*MAX_FLOWS)))
-        return 0;
+    //if (NULL == (internal_keys = malloc(sizeof(struct int_key)*MAX_FLOWS)))
+    //    return 0;
+    //if (NULL == (external_keys = malloc(sizeof(struct ext_key)*MAX_FLOWS)))
+    //    return 0;
     if (NULL == (flows = malloc(sizeof(struct flow)*MAX_FLOWS)))
         return 0;
 
@@ -164,7 +149,7 @@ int allocate_flowtables(uint8_t nb_ports) {
         return 0;
     if (NULL == (ext_bbs = malloc(sizeof(int)*MAP_CAPACITY)))
         return 0;
-    if (NULL == (ext_vals = malloc(sizeof(int)*MAP_CAPACITY)))
+    if (NULL == (ext_vals = malloc(sizeof(void*)*MAP_CAPACITY)))
         return 0;
 
     // Allocate ext flows map
@@ -174,7 +159,7 @@ int allocate_flowtables(uint8_t nb_ports) {
         return 0;
     if (NULL == (int_bbs = malloc(sizeof(int)*MAP_CAPACITY)))
         return 0;
-    if (NULL == (int_vals = malloc(sizeof(int)*MAP_CAPACITY)))
+    if (NULL == (int_vals = malloc(sizeof(void*)*MAP_CAPACITY)))
         return 0;
 
     num_flows = 0;

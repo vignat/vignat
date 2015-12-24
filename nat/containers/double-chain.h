@@ -1,3 +1,5 @@
+#ifndef _DOUBLE_H_INCLUDED_
+#define _DOUBLE_H_INCLUDED_
 
 struct dchain_cell {
     int prev;
@@ -41,8 +43,12 @@ struct dchain_cell {
  * After initialization, any cell is allways on one and only one of these lists.
  */
 
+#define DCHAIN_RESERVED (2)
+
 void dchain_init(struct dchain_cell *cells, int index_range);
 int dchain_allocate_new_index(struct dchain_cell *cells, int *index);
 int dchain_free_index(struct dchain_cell *cells, int index);
 int dchain_get_oldest_index(struct dchain_cell *cells, int *index);
 int dchain_lift_index(struct dchain_cell *cells, int index);
+
+#endif //_DOUBLE_H_INCLUDED_

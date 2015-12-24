@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <assert.h>
+#include <time.h>
 
 #ifdef KLEE_VERIFICATION
 #  include "rte_stubs.h"
@@ -49,7 +50,7 @@
 #  include <cmdline_parse_ipaddr.h>
 #endif //KLEE_VERIFICATION
 
-#include "flowtable.h"
+#include "flowmanager.h"
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
@@ -75,19 +76,14 @@
 static uint64_t dest_eth_addr[RTE_MAX_ETHPORTS];
 static struct ether_addr ports_eth_addr[RTE_MAX_ETHPORTS];
 
-/* replace first 12B of the ethernet header. */
-#define    MASK_ETH    0x3f
-
 /* The WAN port */
-static uint32_t wan_port_id = 0;
+static uint8_t wan_port_id = 0;
 
 /* The NAT's external IP address. should be provided as a command line option */
 static uint32_t external_ip = IPv4(11,3,168,192);
 
 /* mask of enabled ports */
 static uint32_t enabled_port_mask = 0;
-static int promiscuous_on = 0; /**< Ports set in promiscuous mode off by default. */
-static int numa_on = 1; /**< NUMA is enabled by default. */
 
 struct mbuf_table {
     uint16_t len;
@@ -267,22 +263,6 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
     }
 }
 
-struct ext_iface {
-    uint32_t ip;
-    uint16_t port;
-    uint8_t device_id;
-};
-
-uint16_t next_unused_external_port = 2747;
-
-static struct ext_iface allocate_ext_iface(void) {
-    return (struct ext_iface){
-        .ip = external_ip,
-        .port = next_unused_external_port++,
-        .device_id = (uint8_t)wan_port_id
-    };
-}
-
 static inline __attribute__((always_inline)) void
 simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 {
@@ -295,14 +275,16 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
     eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
     if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
-        (m->packet_type == 0 && eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+        (m->packet_type == 0 && eth_hdr->ether_type ==
+                                rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
         //TODO: determine the packet type when packet_type is 0(undefined).
         /* Handle IPv4 headers.*/
         ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
                                            sizeof(struct ether_hdr));
 
         LOG( "forwarding and ipv4 packet on %d\n", portid);
-        LOG( "eth_hdr size: %lu; ipv4 hdr size: %lu; data_offset %d:\n", sizeof(struct ether_hdr), sizeof(struct ipv4_hdr), m->data_off);
+        LOG( "eth_hdr size: %lu; ipv4 hdr size: %lu; data_offset %d:\n",
+             sizeof(struct ether_hdr), sizeof(struct ipv4_hdr), m->data_off);
         if (portid == wan_port_id) {
             //External port.
             LOG( "port %d turns out to be external(%d)\n", portid, wan_port_id);
@@ -316,9 +298,9 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_ext_key(&key);
-            struct flow* f = get_flow_ext(&key);
+            struct flow* f = get_flow_by_ext_key(&key);
             if (f == NULL) {
-                // Use did not ask for this packet.
+                // User did not ask for this packet.
                 LOG( "flow not found. dropping\n");
                 rte_pktmbuf_free(m);
                 return;
@@ -327,7 +309,6 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                 log_flow(f);
                 ipv4_hdr->dst_addr = f->int_src_ip;
                 set_dst_port(m, f->int_src_port);
-                //TODO: recalculate ip checksum.
                 dst_device = f->int_device_id;
             }
         } else {
@@ -343,23 +324,22 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_int_key(&key);
-            struct flow* f = get_flow_int(&key);
+            struct flow* f = get_flow_by_int_key(&key);
             if (f == NULL) {
-                struct ext_iface alloc = allocate_ext_iface();
-                struct flow new_flow = {
-                    .int_src_port = get_src_port(m),
-                    .ext_src_port = alloc.port,
-                    .dst_port = get_dst_port(m),
-                    .int_src_ip = ipv4_hdr->src_addr,
-                    .ext_src_ip = alloc.ip,
-                    .dst_ip = ipv4_hdr->dst_addr,
-                    .int_device_id = portid,
-                    .ext_device_id = alloc.device_id,
-                    .protocol = ipv4_hdr->next_proto_id
-                };
-                f = &new_flow;
                 LOG( "adding flow: ");
-                add_flow(f);
+                if (!allocate_flow(&key, time(NULL))) {
+                    if (0 == expire_flows(time(NULL))) {
+                        LOG("No space for the flow, dropping.");
+                        rte_pktmbuf_free(m);
+                        return;
+                    } else {
+                        // A second try, after we expired some flows.
+                        if (!allocate_flow(&key, time(NULL))) {
+                            rte_exit(EXIT_FAILURE, "Can not allocate flow, "
+                                     "even after expiring some!\n");
+                        }
+                    }
+                }
             }
             LOG( "forwarding to: ");
             log_flow(f);
@@ -375,7 +355,6 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 //        ++(ipv4_hdr->hdr_checksum);
 //#endif
         /* dst addr */
-        //TODO: how do you get eth addr by ip addr. need to implement LPM?
         *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
 
         /* src addr */
@@ -441,6 +420,8 @@ main_loop(__attribute__((unused)) void *dummy)
     while (1) 
 #endif //KLEE_VERIFICATION
     {
+
+        expire_flows(time(NULL));
 
         cur_tsc = rte_rdtsc();
 
@@ -511,7 +492,6 @@ check_lcore_params(void)
 {
     uint8_t queue, lcore;
     uint16_t i;
-    int socketid;
 
     for (i = 0; i < nb_lcore_params; ++i) {
         queue = lcore_params[i].queue_id;
@@ -523,11 +503,6 @@ check_lcore_params(void)
         if (!rte_lcore_is_enabled(lcore)) {
             printf("error: lcore %hhu is not enabled in lcore mask\n", lcore);
             return -1;
-        }
-        if ((socketid = rte_lcore_to_socket_id(lcore) != 0) &&
-            (numa_on == 0)) {
-            printf("warning: lcore %hhu is on socket %d with numa off \n",
-                lcore, socketid);
         }
     }
     return 0;
@@ -689,7 +664,7 @@ parse_args(int argc, char **argv, unsigned nb_ports)
         else if (0 == strncmp(lgopts[option_index].name, CMD_LINE_OPT_WAN_PORT,
                               sizeof (CMD_LINE_OPT_WAN_PORT))) {
             LOG("parsing wan port: %s\n", optarg);
-            wan_port_id = strtoul(optarg, &port_end, 10);
+            wan_port_id = (uint8_t)strtoul(optarg, &port_end, 10);
             if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
                 return -1;
             if (wan_port_id >= nb_ports) {
@@ -741,10 +716,7 @@ init_mem(unsigned nb_mbuf, uint8_t nb_ports)
         if (rte_lcore_is_enabled(lcore_id) == 0)
             continue;
 
-        if (numa_on)
-            socketid = rte_lcore_to_socket_id(lcore_id);
-        else
-            socketid = 0;
+        socketid = rte_lcore_to_socket_id(lcore_id);
 
         if (socketid >= NB_SOCKETS) {
             rte_exit(EXIT_FAILURE, "Socket %d of lcore %u is out of range %d\n",
@@ -765,7 +737,7 @@ init_mem(unsigned nb_mbuf, uint8_t nb_ports)
         }
     }
 
-    allocate_flowtables(nb_ports);
+    allocate_flowmanager(nb_ports, 10/*seconds*/, 2747, external_ip, wan_port_id);
     LOG("memory initialized successfully\n");
     return 0;
 }
@@ -912,10 +884,7 @@ main(int argc, char **argv)
             if (rte_lcore_is_enabled(lcore_id) == 0)
                 continue;
 
-            if (numa_on)
-                socketid = (uint8_t)rte_lcore_to_socket_id(lcore_id);
-            else
-                socketid = 0;
+            socketid = (uint8_t)rte_lcore_to_socket_id(lcore_id);
 
             printf("txq=%u,%d,%d ", lcore_id, queueid, socketid);
             fflush(stdout);
@@ -953,10 +922,7 @@ main(int argc, char **argv)
             portid = qconf->rx_queue_list[queue].port_id;
             queueid = qconf->rx_queue_list[queue].queue_id;
 
-            if (numa_on)
-                socketid = (uint8_t)rte_lcore_to_socket_id(lcore_id);
-            else
-                socketid = 0;
+            socketid = (uint8_t)rte_lcore_to_socket_id(lcore_id);
 
             printf("rxq=%d,%d,%d ", portid, queueid, socketid);
             fflush(stdout);
@@ -983,15 +949,6 @@ main(int argc, char **argv)
         if (ret < 0)
             rte_exit(EXIT_FAILURE, "rte_eth_dev_start: err=%d, port=%d\n",
                 ret, portid);
-
-        /*
-         * If enabled, put device in promiscuous mode.
-         * This allows IO forwarding mode to forward packets
-         * to itself through 2 cross-connected  ports of the
-         * target machine.
-         */
-        if (promiscuous_on)
-            rte_eth_promiscuous_enable(portid);
     }
 
     check_all_ports_link_status((uint8_t)nb_ports, enabled_port_mask);
