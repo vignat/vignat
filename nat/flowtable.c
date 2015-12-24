@@ -1,10 +1,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <glib.h>
 #include <rte_log.h>
 #include <rte_byteorder.h>
 
+#include "containers/map.h"
 #include "flowtable.h"
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
@@ -12,38 +12,9 @@
 #define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
 #define LOG_ADD(...) printf(__VA_ARGS__)
 
-
-static guint int_key_hash(gconstpointer key) {
-    const struct int_key* arg = key;
-    return arg->int_src_port ^ arg->dst_port ^ arg->int_src_ip ^ arg->dst_ip;
-}
-
-static guint ext_key_hash(gconstpointer key) {
-    const struct ext_key* arg = key;
-    return arg->ext_src_port ^ arg->dst_port ^ arg->ext_src_ip ^ arg->dst_ip;
-}
-
-static gboolean int_key_equal(gconstpointer k1, gconstpointer k2) {
-    const struct int_key* key1 = k1,
-                        * key2 = k2;
-    return key1->int_src_port == key2->int_src_port &&
-           key1->dst_port == key2->dst_port &&
-           key1->int_src_ip == key2->int_src_ip &&
-           key1->dst_ip == key2->dst_ip &&
-           key1->int_device_id == key2->int_device_id &&
-           key1->protocol == key2->protocol;
-}
-
-static gboolean ext_key_equal(gconstpointer k1, gconstpointer k2) {
-    const struct ext_key* key1 = k1,
-                        * key2 = k2;
-    return key1->ext_src_port == key2->ext_src_port &&
-           key1->dst_port == key2->dst_port &&
-           key1->ext_src_ip == key2->ext_src_ip &&
-           key1->dst_ip == key2->dst_ip &&
-           key1->ext_device_id == key2->ext_device_id &&
-           key1->protocol == key2->protocol;
-}
+#if MAX_FLOWS > MAP_CAPACITY
+#error "The map static capacity is insufficient for this number of flows"
+#endif
 
 void log_ip(uint32_t addr) {
     LOG_ADD( "%d.%d.%d.%d", addr&0xff, (addr>>8)&0xff, (addr>>16)&0xff, (addr>>24)&0xff);
@@ -92,27 +63,40 @@ void log_flow(const struct flow *f) {
             f->int_device_id, f->ext_device_id, f->protocol);
 }
 
-#define MAX_FLOWS (1024)
-
 struct int_key* internal_keys = NULL;
 struct ext_key* external_keys = NULL;
 struct flow* flows = NULL;
-GHashTable* ext_flows = NULL;
-GHashTable* int_flows = NULL;
+
+int* ext_bbs = NULL;
+void** ext_keyps = NULL;
+int* ext_khs = NULL;
+int* ext_vals = NULL;
+
+int* int_bbs = NULL;
+void** int_keyps = NULL;
+int* int_khs = NULL;
+int* int_vals = NULL;
 
 uint64_t num_flows = 0;
-
 
 struct flow* get_flow_int(struct int_key* key) {
     LOG("look up for internal key key = \n");
     log_int_key(key);
-    return g_hash_table_lookup(int_flows, key);
+    int index = get(int_bbs, int_keyps, int_khs, int_vals, key, sizeof(struct int_key));
+    if (index == -1) {
+        return NULL;
+    }
+    return &flows[index];
 }
 
 struct flow* get_flow_ext(struct ext_key* key) {
     LOG("look up for external key key = \n");
     log_ext_key(key);
-    return g_hash_table_lookup(ext_flows, key);
+    int index = get(ext_bbs, ext_keyps, ext_khs, ext_vals, key, sizeof(struct ext_key));
+    if (index == -1) {
+        return NULL;
+    }
+    return &flows[index];
 }
 
 static inline void fill_int_key(struct flow *f, struct int_key *k) {
@@ -144,8 +128,16 @@ void add_flow(struct flow *f) {
     assert(get_flow_ext(&external_keys[num_flows]) == NULL);
     assert(get_flow_int(&internal_keys[num_flows]) == NULL);
 
-    g_hash_table_insert(ext_flows, &external_keys[num_flows], &flows[num_flows]);
-    g_hash_table_insert(int_flows, &internal_keys[num_flows], &flows[num_flows]);
+    int put_res = 
+        put(ext_bbs, ext_keyps, ext_khs, ext_vals,
+            &external_keys[num_flows], sizeof(struct int_key),
+            num_flows);
+    assert(put_res != -1);
+    put_res =
+        put(int_bbs, int_keyps, int_khs, int_vals,
+            &internal_keys[num_flows], sizeof(struct ext_key),
+            num_flows);
+    //assert(put_res != -1);
 
     ++num_flows;
 }
@@ -165,8 +157,25 @@ int allocate_flowtables(uint8_t nb_ports) {
     if (NULL == (flows = malloc(sizeof(struct flow)*MAX_FLOWS)))
         return 0;
 
-    int_flows = g_hash_table_new(int_key_hash, int_key_equal);
-    ext_flows = g_hash_table_new(ext_key_hash, ext_key_equal);
+    // Allocate int flows map
+    if (NULL == (ext_keyps = malloc(sizeof(void*)*MAP_CAPACITY)))
+        return 0;
+    if (NULL == (ext_khs = malloc(sizeof(int)*MAP_CAPACITY)))
+        return 0;
+    if (NULL == (ext_bbs = malloc(sizeof(int)*MAP_CAPACITY)))
+        return 0;
+    if (NULL == (ext_vals = malloc(sizeof(int)*MAP_CAPACITY)))
+        return 0;
+
+    // Allocate ext flows map
+    if (NULL == (int_keyps = malloc(sizeof(void*)*MAP_CAPACITY)))
+        return 0;
+    if (NULL == (int_khs = malloc(sizeof(int)*MAP_CAPACITY)))
+        return 0;
+    if (NULL == (int_bbs = malloc(sizeof(int)*MAP_CAPACITY)))
+        return 0;
+    if (NULL == (int_vals = malloc(sizeof(int)*MAP_CAPACITY)))
+        return 0;
 
     num_flows = 0;
     return 1;

@@ -100,6 +100,7 @@ The key design trade off in the problem is simplicity <-> dependability. We aim 
 The partially-verified NAT-box aims to a single-threaded multiple-internal/single-external port dynamic polling mode network address translation unit that uses port number as a flow identifier. However in its present state it lacks the following features to be considered a practical implementation:
 * Flow expiration. Currently once added flow lives forewer leading to the flowtable overflow.
 * Available ports pool. In the present implementation for a new flow a new port always allocated. It is totally adequate the zero-deallocation policy, but when we fix the flow expiration bullet, the ports will become a scarce resource, and we will need a list data structure (which should not be difficult to verify, though), or something more efficient. For the more efficient appropriate datastructure one can consult the verified garbage collectors works.
+* The same goes with the memory for stored flow-entries.
 * Performance. The map, as well as the nat-box itself, is not optimized for performance, so it need some optimizations to keep up with the user expectations. Concurrency would be a nice thing to support, given that DPDK has it enabled by design. Benchmark is to be done.
 * L2 routing. The current implementation operates on L3, and does not implement ARP and uses a broad cast Ethernet address instead. Therefore receiving NICs usually drop such packets. As Ethernet configuration changes rarely, one possibility is to use a static preconfigured lookup table.
 
@@ -110,7 +111,7 @@ The partially-verified NAT-box aims to a single-threaded multiple-internal/singl
 * Refinement between the symbolic DPDK model and the real DPDK behaviour.
 * Formalisation and justification of the required code transformations.
 * As mentioned above the implementation currently does not use the verified map. One obstacle here is that the keys in that map are pinned to be 32-bit integers, and that is not enough to uniqly identify a flow. We need to generalize the verified map at least for greater keys.
-* Also the current verified map search is 'O(n)' for the abscent elements, which shoud be a common case for a NAT. A simple optimization could greatly reduce that search time, but it will require a reverification, because it changes the insertion, search and erase code and complicates the internal representation.
+* The current verified map search is 'O(n)' for the abscent elements, which shoud be a common case for a NAT. A simple optimization could greatly reduce that search time, but it will require a reverification, because it changes the insertion, search and erase code and complicates the internal representation.
 
 # Possible methods
 Here we discuss verification methods that could potentially solve our problem.

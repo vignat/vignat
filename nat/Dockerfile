@@ -21,5 +21,6 @@ ENV RTE_SDK=/root/dpdk \
 LABEL RUN docker run -it --privileged 
 RUN mkdir /root/nat
 COPY *.h *.c Makefile /root/nat/
+COPY containers/ /root/nat/containers/
 WORKDIR /root/nat
 RUN make
