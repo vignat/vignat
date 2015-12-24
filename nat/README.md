@@ -6,6 +6,7 @@ Once you installed it, just try:
 
 ```sh
    $ sh test.sh
+```
 
 Although, it does not work yet, probably due to the [issue](http://stackoverflow.com/questions/34440097/why-do-ping-packets-not-reach-a-custom-gateway-in-docker) in the Docker networking.
 
@@ -13,3 +14,4 @@ To remove all the generated networks and containers, run
 
 ```sh
    $ sh cleanup.sh
+```

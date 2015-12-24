@@ -137,7 +137,7 @@ void add_flow(struct flow *f) {
         put(int_bbs, int_keyps, int_khs, int_vals,
             &internal_keys[num_flows], sizeof(struct ext_key),
             num_flows);
-    //assert(put_res != -1);
+    assert(put_res != -1);
 
     ++num_flows;
 }
