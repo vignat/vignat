@@ -298,7 +298,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_ext_key(&key);
-            struct flow* f = get_flow_by_ext_key(&key);
+            struct flow* f = get_flow_by_ext_key(&key, time(NULL));
             if (f == NULL) {
                 // User did not ask for this packet.
                 LOG( "flow not found. dropping\n");
@@ -324,7 +324,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_int_key(&key);
-            struct flow* f = get_flow_by_int_key(&key);
+            struct flow* f = get_flow_by_int_key(&key, time(NULL));
             if (f == NULL) {
                 LOG( "adding flow: ");
                 if (!allocate_flow(&key, time(NULL))) {

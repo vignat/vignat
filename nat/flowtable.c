@@ -33,26 +33,18 @@ struct flow* get_flow(int index) {
     return &flows[index];
 }
 
-struct flow* get_flow_int(struct int_key* key) {
+int get_flow_int(struct int_key* key, int* index) {
     LOG("look up for internal key key = \n");
     log_int_key(key);
-    int index = -1;
-    int rez = get(int_bbs, int_keyps, int_khs, int_vals, key,
-                  sizeof(struct int_key), &index);
-    if (rez)
-        return get_flow(index);
-    return NULL;
+    return get(int_bbs, int_keyps, int_khs, int_vals, key,
+               sizeof(struct int_key), index);
 }
 
-struct flow* get_flow_ext(struct ext_key* key) {
+int get_flow_ext(struct ext_key* key, int* index) {
     LOG("look up for external key key = \n");
     log_ext_key(key);
-    int index = -1;
-    int rez = get(ext_bbs, ext_keyps, ext_khs, ext_vals, key,
-                  sizeof(struct ext_key), &index);
-    if (rez)
-        return get_flow(index);
-    return NULL;
+    return get(ext_bbs, ext_keyps, ext_khs, ext_vals, key,
+               sizeof(struct ext_key), index);
 }
 
 
@@ -86,8 +78,8 @@ int add_flow(struct flow *f, int index) {
     fill_int_key(f, new_int_key);
     fill_ext_key(f, new_ext_key);
 
-    assert(get_flow_ext(new_ext_key) == NULL);
-    assert(get_flow_int(new_int_key) == NULL);
+    //assert(get_flow_ext(new_ext_key) == NULL);
+    //assert(get_flow_int(new_int_key) == NULL);
 
     int put_res = 
         put(ext_bbs, ext_keyps, ext_khs, ext_vals,
