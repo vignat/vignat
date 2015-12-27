@@ -57,6 +57,6 @@ endif
 include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
-	clang-3.4 -DKLEE_VERIFICATION main.c rte_stubs.c flowtable-stub.c -I ~/proj/klee/klee/include/ -c -g -emit-llvm
+	clang-3.4 -DKLEE_VERIFICATION main.c rte_stubs.c flowtable-stub.c flowmanager.c flow.c containers/double-chain-stub.c expirator-stub.c my-time-stub.c $(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c -I ~/proj/klee/klee/include/ -I $(RTE_SDK)/$(RTE_TARGET)/include -c -g -emit-llvm
 	llvm-link rte_stubs.bc main.bc flowtable-stub.bc -o veri.bc
 	klee --libc=uclibc --posix-runtime veri.bc -p 0x3 --wan 1

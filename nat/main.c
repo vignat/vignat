@@ -49,6 +49,10 @@
 #  include <cmdline_parse_ipaddr.h>
 #endif //KLEE_VERIFICATION
 
+#include <cmdline_parse.h>
+#include <cmdline_parse_etheraddr.h>
+#include <cmdline_parse_ipaddr.h>
+
 #include "flowmanager.h"
 #include "expirator.h"
 #include "my-time.h"

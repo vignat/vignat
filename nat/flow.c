@@ -3,10 +3,15 @@
 
 #include "flow.h"
 
+#ifdef KLEE_VERIFICATION
+#define LOG(...) 
+#define LOG_ADD(...)
+#else //KLEE_VERIFICATION
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
 #define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
 #define LOG_ADD(...) printf(__VA_ARGS__)
+#endif //KLEE_VERIFICATION
 
 void log_ip(uint32_t addr) {
     LOG_ADD( "%d.%d.%d.%d", addr&0xff, (addr>>8)&0xff, (addr>>16)&0xff, (addr>>24)&0xff);

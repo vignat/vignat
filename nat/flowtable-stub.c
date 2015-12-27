@@ -2,7 +2,7 @@
 #include <klee/klee.h>
 #include "flowtable.h"
 
-#deinfe LOG(...)
+#define LOG(...)
 
 struct like_hash {
     struct flow sample_flow;//Contains both keys.
@@ -33,14 +33,14 @@ int get_flow_int(struct int_key* key, int* index) {
 
 	LOG("HT entry is allocated on int\n");
         like_hash.sample_initialized = 1;
-        *index = allocated_index;
+        *index = like_hash.allocated_index;
         return 1;
     } else {
         return 0;
     }
 }
 
-int get_flow_ext(struct ext_key* key) {
+int get_flow_ext(struct ext_key* key, int* index) {
     //return g_hash_table_lookup(ext_flows, key);
     if (like_hash.has_next_key) {
         klee_assert(!like_hash.sample_initialized);
@@ -59,7 +59,7 @@ int get_flow_ext(struct ext_key* key) {
 
 	LOG("HT entry is allocated on ext\n");
         like_hash.sample_initialized = 1;
-        *index = allocated_index;
+        *index = like_hash.allocated_index;
         return 1;
     } else {
         return 0;
@@ -101,8 +101,8 @@ int add_flow(struct flow *f, int index) {
     like_hash.num_flows += 1;
 
     like_hash.sample_flow = *f;
-    fill_int_key(f, &like_hash.sample_int_key);
-    fill_ext_key(f, &like_hash.sample_ext_key);
+    fill_int_key(f, &like_hash.sample_flow.ik);
+    fill_ext_key(f, &like_hash.sample_flow.ek);
 
     like_hash.sample_initialized = 1;
     like_hash.allocated_index = index;
@@ -111,7 +111,7 @@ int add_flow(struct flow *f, int index) {
 }
 
 int remove_flow(int index) {
-    klee_assert(false); // This model does not support removal.
+    klee_assert(0); // This model does not support removal.
     return 1;
 }
 
@@ -127,7 +127,7 @@ int allocate_flowtables(uint8_t nb_ports) {
     klee_assume(like_hash.sample_flow.int_device_id < nb_ports);
     klee_assume(like_hash.sample_flow.ext_device_id < nb_ports);
     klee_assume(like_hash.sample_initialized == 0);
-    klee_assume(0 <= like_hash.num_flows)
+    klee_assume(0 <= like_hash.num_flows);
     klee_assume(like_hash.num_flows < MAX_FLOWS);
     klee_assume(0 <= like_hash.allocated_index);
     klee_assume(like_hash.allocated_index < MAX_FLOWS);
