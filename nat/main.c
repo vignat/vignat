@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <getopt.h>
 #include <assert.h>
-#include <time.h>
 
 #ifdef KLEE_VERIFICATION
 #  include "rte_stubs.h"
@@ -51,6 +50,8 @@
 #endif //KLEE_VERIFICATION
 
 #include "flowmanager.h"
+#include "expirator.h"
+#include "my-time.h"
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
@@ -298,7 +299,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_ext_key(&key);
-            struct flow* f = get_flow_by_ext_key(&key, time(NULL));
+            struct flow* f = get_flow_by_ext_key(&key, current_time());
             if (f == NULL) {
                 // User did not ask for this packet.
                 LOG( "flow not found. dropping\n");
@@ -324,17 +325,17 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_int_key(&key);
-            struct flow* f = get_flow_by_int_key(&key, time(NULL));
+            struct flow* f = get_flow_by_int_key(&key, current_time());
             if (f == NULL) {
                 LOG( "adding flow: ");
-                if (!allocate_flow(&key, time(NULL))) {
-                    if (0 == expire_flows(time(NULL))) {
+                if (!allocate_flow(&key, current_time())) {
+                    if (0 == expire_flows(current_time())) {
                         LOG("No space for the flow, dropping.");
                         rte_pktmbuf_free(m);
                         return;
                     } else {
                         // A second try, after we expired some flows.
-                        if (!allocate_flow(&key, time(NULL))) {
+                        if (!allocate_flow(&key, current_time())) {
                             rte_exit(EXIT_FAILURE, "Can not allocate flow, "
                                      "even after expiring some!\n");
                         }
@@ -421,7 +422,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #endif //KLEE_VERIFICATION
     {
 
-        expire_flows(time(NULL));
+        expire_flows(current_time());
 
         cur_tsc = rte_rdtsc();
 
@@ -737,7 +738,8 @@ init_mem(unsigned nb_mbuf, uint8_t nb_ports)
         }
     }
 
-    allocate_flowmanager(nb_ports, 10/*seconds*/, 2747, external_ip, wan_port_id);
+    allocate_flowmanager(nb_ports, 2747, external_ip, wan_port_id);
+    init_expirator(10/*seconds*/);
     LOG("memory initialized successfully\n");
     return 0;
 }

@@ -1,5 +1,6 @@
 #ifndef _FLOW_H_INCLUDED_
 #define _FLOW_H_INCLUDED_
+#include <stdint.h>
 
 struct int_key {
     uint16_t int_src_port;

@@ -3,7 +3,7 @@
 
 #include "flow.h"
 
-int allocate_flowmanager(uint8_t nb_ports, uint32_t expiration_time,
+int allocate_flowmanager(uint8_t nb_ports,
                          uint16_t starting_port, uint32_t ext_src_ip,
                          uint8_t ext_device_id);
 
