@@ -12,6 +12,7 @@
 #ifdef KLEE_VERIFICATION
 #  include "rte_stubs.h"
 #  include <klee/klee.h>
+#  include "my-time-stub-control.h"
 #else //KLEE_VERIFICATION
 #  include <sys/queue.h>
 #  include <rte_common.h>
@@ -852,6 +853,11 @@ main(int argc, char **argv)
     nb_lcores = rte_lcore_count();
     n_tx_queue = nb_lcores;
     nb_rx_queues = 0;
+
+#ifdef KLEE_VERIFICATION
+    start_time();
+#endif //KLEE_VERIFICATION
+
     /* initialize all ports */
     for (portid = 0; portid < nb_ports; portid++) {
         /* skip ports that are not enabled */

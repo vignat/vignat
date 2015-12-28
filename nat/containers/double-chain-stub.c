@@ -56,6 +56,5 @@ int dchain_rejuvenate_index(int index) {
 }
 
 void dchain_stub_allocate_some(void) {
-    klee_assert(out_of_space == 1);
     out_of_space = 0;
 }

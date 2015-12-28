@@ -673,7 +673,8 @@ struct rte_eth_conf {
 };
 
 #define MAX_PKT_BURST 32
-#define RTE_MAX_ETHPORTS 32
+//#define RTE_MAX_ETHPORTS 32
+#define RTE_MAX_ETHPORTS 2
 
 #define ETHER_TYPE_IPv4 0x0800 /**< IPv4 Protocol. */
 
