@@ -76,6 +76,10 @@ We start with **symbolic execution**(symbex) technology, given some positive pas
 * Provide a symbex implementation of the DPDK API, that models all possible input events, e.g. it injects a symbolic package to the symbolic device receive queue.
 * Instrument the application code with bounds checks to assure memory safety during the symbex.
 
+The symbolic model starts in a state that generalizes all possible states of the formal data structure, exectes transforming the state the same way the data structure would transform and therefore it ends up in a state that generalizes a subset of possible data structure states closing the loop. We do not need to synchronize the symbolic state with the possible states of the real implementation, because correctness of each function ensures it. Regarding additional control functions:
+* read-only functions should not do any harm
+* write functions need more thought. IMO, they can be invoked only from a higher-level model, and should represent the alterations made by it to the lower-level model in the modeled code. In other words, this "control" functions are to be called from a symbolic model of the function to represent and generalize a sequence of normal calls to the lower-level model.
+
 ## Challenges
 
 The key design trade off in the problem is simplicity <-> dependability. We aim to provide stronger guarantees for the applications developed in the framework, but we also do not want to submerse the networking developer with verification effort. Apart from the key design challenge, we have met some technical ones inherent to the methodology chosen (some of the tool-specific issues are described above):

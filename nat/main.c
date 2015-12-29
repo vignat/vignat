@@ -743,10 +743,15 @@ init_mem(unsigned nb_mbuf, uint8_t nb_ports)
         }
     }
 
-    allocate_flowmanager(nb_ports, 2747, external_ip, wan_port_id);
     init_expirator(10/*seconds*/);
-    LOG("memory initialized successfully\n");
-    return 0;
+    if (!allocate_flowmanager(nb_ports, 2747, external_ip, wan_port_id)) {
+        LOG("Failed to allocate flow manager.\n");
+        return -1;
+    }
+    else {
+        LOG("Memory initialized successfully.\n");
+        return 0;
+    }
 }
 
 /* Check the link status of all ports in up to 9s, and print them finally */
