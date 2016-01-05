@@ -143,16 +143,13 @@ struct List* push_front(struct List* l, int val) {
 
 /*@ requires \valid(l);
   @ requires correct_list(l);
-  @ requires \freeable{Here}(l);
   @ requires reachable(l, \null);
   @ frees l;
   @ ensures reachable(\result, \null);
   @ ensures length_l(\result) == length_l(l) - 1;
 */
 struct List* pop_front(struct List* l, int val) {
-//@ assert(\freeable{Here}(l));
     struct List* ret = l->next;
-//@ assert(\freeable{Here}(l));
     free(l);
     return ret;
 }
