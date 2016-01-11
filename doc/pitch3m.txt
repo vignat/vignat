@@ -1,15 +1,29 @@
 <import pitch1m.txt>
 
+<slide1>
+
 The low level high speed network functions are called dataplane. Coming from
 hardware cercuits historically they feature some design rules that help
 verification. The code is usually small and control path length is limited. It
 is modular with a well defined interface - a frame or a packet.
 
+<slide2>
+
 We follow a previous work that succeded in applying symbolic execution method to
 stateless dataplane modules, such as packet classifier, checker, ethernet
-encapsulation and decapsulation. Due to symbolic execution limitation it can not
+encapsulation and decapsulation.
+
+<slide2a>
+
+ Due to symbolic execution limitation it can not
 deal with a mutable state. And it is difficult to find a practical application
 that would not have it.
+
+<slide2b>
+
+We will focus on stateful modules.
+
+<slide3>
 
 In order to handle stateful modules, we plan to encapsulate the state into a set
 of common data structures. We then implement and certify them with a different
