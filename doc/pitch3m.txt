@@ -9,19 +9,21 @@ is modular with a well defined interface - a frame or a packet.
 
 <slide2>
 
+On this slide you see a typical dataplane architecture with different
+stateful and stateless modules.
+
 We follow a previous work that succeded in applying symbolic execution method to
-stateless dataplane modules, such as packet classifier, checker, ethernet
-encapsulation and decapsulation.
+stateless dataplane modules.
 
 <slide2a>
 
- Due to symbolic execution limitation it can not
-deal with a mutable state. And it is difficult to find a practical application
-that would not have it.
+Such modules as a packet classifier, a checker, an ethernet encapsulation and
+decapsulation. However, due to symbolic execution limitations it can not deal
+with a mutable state.
 
 <slide2b>
 
-We will focus on stateful modules.
+And it is difficult to find a practical application that would not have it.
 
 <slide3>
 
