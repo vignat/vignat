@@ -78,5 +78,5 @@ RUN mkdir /root/nat
 COPY *.h *.c Makefile /root/nat/
 COPY containers/ /root/nat/containers/
 WORKDIR /root/nat
-RUN make verify
+#RUN make verify
 
