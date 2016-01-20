@@ -27,23 +27,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ^^ last line to avoid the apparmor issue for running
 # libcrypto.so in --privileged
 
+# Create the main directory where all the work will take place
+RUN mkdir /work
 
 # Download and extract DPDK
-WORKDIR /root
+WORKDIR /work
 RUN wget http://dpdk.org/browse/dpdk/snapshot/dpdk-2.2.0.tar.gz -O dpdk.tar.gz && \
     tar xf dpdk.tar.gz && \
     mv dpdk-* dpdk && \
     rm dpdk.tar.gz
 
 # Build DPDK
-WORKDIR /root/dpdk
+WORKDIR /work/dpdk
 RUN sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp && \
     make config install -j4 T=x86_64-native-linuxapp-gcc
 
-ENV RTE_SDK=/root/dpdk \
+ENV RTE_SDK=/work/dpdk \
     RTE_TARGET=x86_64-native-linuxapp-gcc
 
-WORKDIR /root
+WORKDIR /work
 
 # Download and build STP
 RUN git clone https://github.com/stp/minisat.git && \
@@ -53,8 +55,8 @@ RUN git clone https://github.com/stp/minisat.git && \
     cd build && \
     cmake -DCMAKE_INSTALL_PREFIX=/usr/ ../ && \
     make -j8 install && \
-    mkdir /root/stp/build && \
-    cd /root/stp/build && \
+    mkdir /work/stp/build && \
+    cd /work/stp/build && \
     cmake -DBUILD_SHARED_LIBS:BOOL=OFF -DENABLE_PYTHON_INTERFACE:BOOL=OFF .. && \
     make -j8 install
 # RUN ulimit -s unlimited
@@ -68,15 +70,15 @@ RUN git clone https://github.com/klee/klee-uclibc.git && \
 # Download and build Klee
 RUN git clone https://github.com/necto/klee && \
     cd klee && \
-    ./configure --with-stp=/root/stp/build --with-uclibc=/root/klee-uclibc --enable-posix-runtime && \
+    ./configure --with-stp=/work/stp/build --with-uclibc=/work/klee-uclibc --enable-posix-runtime && \
     make -j8
 
-ENV PATH=/root/klee/Release+Asserts/bin:$PATH \
-    KLEE_INCLUDE=/root/klee/include
+ENV PATH=/work/klee/Release+Asserts/bin:$PATH \
+    KLEE_INCLUDE=/work/klee/include
 
-RUN mkdir /root/nat
-COPY *.h *.c Makefile /root/nat/
-COPY containers/ /root/nat/containers/
-WORKDIR /root/nat
+RUN mkdir /work/nat
+COPY *.h *.c Makefile /work/nat/
+COPY containers/ /work/nat/containers/
+WORKDIR /work/nat
 #RUN make verify
 
