@@ -36,29 +36,30 @@ int incoming_package_allocated;
 
 uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
                           struct rte_mbuf** pkts_burst, int max_burst){
-    klee_assert(portid < 2);
-    int receive_one;
-    klee_make_symbolic(&receive_one, sizeof(int), "receive_one");
-    if (receive_one) {
-        struct rte_mbuf * in_package;
-	klee_assert(!incoming_package_allocated);
-	klee_make_symbolic(&incoming_package, sizeof(struct rte_mbuf), "incoming_package0");
-	klee_make_symbolic(&user_buf, sizeof(struct user_buf), "user_buf0");
-	in_package = &incoming_package;
-	incoming_package_allocated = 1;
-        in_package->buf_addr = &user_buf;
-        in_package->data_off = 0;//100;
-        in_package->userdata = NULL;
-        in_package->pool = NULL;
-        in_package->next = NULL;
-        in_package->pkt_len = sizeof(struct user_buf);
-        in_package->data_len = 0; // what is the right value???
-        user_buf.ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
-        pkts_burst[0] = in_package;
-        return 1;
-    } else {
-        return 0;
-    }
+  klee_assert(portid < 2);
+  int receive_one;
+  klee_make_symbolic(&receive_one, sizeof(int), "receive_one");
+  if (receive_one) {
+    struct rte_mbuf * in_package;
+    klee_assert(!incoming_package_allocated);
+    klee_make_symbolic(&incoming_package, sizeof(struct rte_mbuf), "incoming_package0");
+    klee_make_symbolic(&user_buf, sizeof(struct user_buf), "user_buf0");
+    in_package = &incoming_package;
+    incoming_package_allocated = 1;
+    in_package->buf_addr = &user_buf;
+    in_package->data_off = 0;//100;
+    in_package->port = portid;
+    in_package->userdata = NULL;
+    in_package->pool = NULL;
+    in_package->next = NULL;
+    in_package->pkt_len = sizeof(struct user_buf);
+    in_package->data_len = 0; // what is the right value???
+    user_buf.ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+    pkts_burst[0] = in_package;
+    return 1;
+  } else {
+    return 0;
+  }
 }
 
 void rte_prefetch0(const volatile void *p){

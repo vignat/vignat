@@ -12,4 +12,7 @@ chown $USER_NAME:$GROUP_NAME /work
 echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 cd /work
-su -m $USER_NAME
+sed -ri "s|(ENV_PATH\s*PATH=).*|\1$PATH|" /etc/login.defs
+export HOME=/work
+su -m $USER_NAME -
+
