@@ -15,13 +15,14 @@
 #  error "The map static capacity is insufficient for this number of flows"
 #endif
 
-#ifndef RTE_LOG_LEVEL
-#  define RTE_LOG_LEVEL RTE_LOG_INFO
-#endif //RTE_LOG_LEVEL
-#define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
-
-#define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
-#define LOG_ADD(...) printf(__VA_ARGS__)
+#ifdef KLEE_VERIFICATION
+#  define LOG(...)
+#  define LOG_ADD(...)
+#else //KLEE_VERIFICATION
+#  define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
+#  define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
+#  define LOG_ADD(...) printf(__VA_ARGS__)
+#endif //KLEE_VERIFICATION
 
 struct flow* get_flow(int index) {
   return (struct flow*)dmap_get_value(index);

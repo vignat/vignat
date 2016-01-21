@@ -30,9 +30,12 @@ int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
     klee_assert(key_b_size < prealloc_size);
     klee_assert(value_size < prealloc_size);
 
-    klee_make_symbolic(key_a, key_a_size, "dmap_key_a");
-    klee_make_symbolic(key_b, key_b_size, "dmap_key_b");
-    klee_make_symbolic(value, value_size, "dmap_value");
+    //klee_make_symbolic(key_a, key_a_size, "dmap_key_a");
+    //klee_make_symbolic(key_b, key_b_size, "dmap_key_b");
+    //klee_make_symbolic(value, value_size, "dmap_value");
+    klee_make_symbolic(key_a, prealloc_size, "dmap_key_a");
+    klee_make_symbolic(key_b, prealloc_size, "dmap_key_b");
+    klee_make_symbolic(value, prealloc_size, "dmap_value");
 
     has_this_key = klee_int("dmap_has_this_key");
     entry_claimed = 0;
