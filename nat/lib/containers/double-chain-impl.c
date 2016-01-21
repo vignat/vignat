@@ -1,4 +1,4 @@
-#include "double-chain-imp.h"
+#include "double-chain-impl.h"
 
 enum {
     ALLOC_LIST_HEAD = 0,
@@ -7,7 +7,7 @@ enum {
 };
 
 
-void dchain_imp_init(struct dchain_cell *cells, int size) {
+void dchain_impl_init(struct dchain_cell *cells, int size) {
     cells[ALLOC_LIST_HEAD].prev = 0;
     cells[ALLOC_LIST_HEAD].next = 0;
     int i = INDEX_SHIFT;
@@ -22,7 +22,7 @@ void dchain_imp_init(struct dchain_cell *cells, int size) {
     cells[i].prev = cells[i].next;
 }
 
-int dchain_imp_allocate_new_index(struct dchain_cell *cells, int *index) {
+int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index) {
     /* No more empty cells. */
     if (cells[FREE_LIST_HEAD].next == FREE_LIST_HEAD)
         return 0;
@@ -40,7 +40,7 @@ int dchain_imp_allocate_new_index(struct dchain_cell *cells, int *index) {
     return 1;
 }
 
-int dchain_imp_free_index(struct dchain_cell *cells, int index) {
+int dchain_impl_free_index(struct dchain_cell *cells, int index) {
     int freed = index + INDEX_SHIFT;
     /* The index is already free. */
     if (cells[freed].next == cells[freed].prev)
@@ -57,7 +57,7 @@ int dchain_imp_free_index(struct dchain_cell *cells, int index) {
     return 1;
 }
 
-int dchain_imp_get_oldest_index(struct dchain_cell *cells, int *index) {
+int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index) {
     /* No allocated indexes. */
     if (cells[ALLOC_LIST_HEAD].next == cells[ALLOC_LIST_HEAD].prev)
         return 0;
@@ -65,7 +65,7 @@ int dchain_imp_get_oldest_index(struct dchain_cell *cells, int *index) {
     return 1;
 }
 
-int dchain_imp_rejuvenate_index(struct dchain_cell *cells, int index) {
+int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index) {
     int lifted = index + INDEX_SHIFT;
     /* The index is not allocated. */
     if (cells[lifted].next == cells[lifted].prev)

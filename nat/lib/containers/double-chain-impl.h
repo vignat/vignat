@@ -1,5 +1,5 @@
-#ifndef _DOUBLE_CHAIN_IMP_H_INCLUDED_
-#define _DOUBLE_CHAIN_IMP_H_INCLUDED_
+#ifndef _DOUBLE_CHAIN_IMPL_H_INCLUDED_
+#define _DOUBLE_CHAIN_IMPL_H_INCLUDED_
 
 struct dchain_cell {
     int prev;
@@ -45,10 +45,10 @@ struct dchain_cell {
 
 #define DCHAIN_RESERVED (2)
 
-void dchain_imp_init(struct dchain_cell *cells, int index_range);
-int dchain_imp_allocate_new_index(struct dchain_cell *cells, int *index);
-int dchain_imp_free_index(struct dchain_cell *cells, int index);
-int dchain_imp_get_oldest_index(struct dchain_cell *cells, int *index);
-int dchain_imp_rejuvenate_index(struct dchain_cell *cells, int index);
+void dchain_impl_init(struct dchain_cell *cells, int index_range);
+int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index);
+int dchain_impl_free_index(struct dchain_cell *cells, int index);
+int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index);
+int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index);
 
-#endif //_DOUBLE_CHAIN_IMP_H_INCLUDED_
+#endif //_DOUBLE_CHAIN_IMPL_H_INCLUDED_
