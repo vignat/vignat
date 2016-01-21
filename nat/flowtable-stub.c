@@ -114,7 +114,6 @@ int remove_flow(int index) {
 }
 
 int allocate_flowtables(uint8_t nb_ports) {
-    (void)nb_ports;
     successfully_allocated = klee_int("flowtables_successfully_allocated");
     if (successfully_allocated) {
         klee_make_symbolic(&like_hash, sizeof(struct like_hash), "like_hash");

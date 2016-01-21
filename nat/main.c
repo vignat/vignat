@@ -360,8 +360,18 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 //        --(ipv4_hdr->time_to_live);
 //        ++(ipv4_hdr->hdr_checksum);
 //#endif
+#ifdef KLEE_VERIFICATION
+        //A trivial reassignment to improve Klee preformance on symbolic
+        // indexing. Here I explicitly enumerate all possible values of
+        // dst_device (just two of them).
+        klee_assert(dst_device >= 0);
+        klee_assert(dst_device < RTE_MAX_ETHPORTS);
+        for (int pp = 0; pp < RTE_MAX_ETHPORTS; ++pp)
+          if (dst_device == pp) dst_device = pp;
+#endif //KLEE_VERIFICATION
         /* dst addr */
         *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
+
 
         /* src addr */
         ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
