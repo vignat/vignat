@@ -15,7 +15,9 @@
 #  error "The map static capacity is insufficient for this number of flows"
 #endif
 
-#define RTE_LOG_LEVEL RTE_LOG_INFO
+#ifndef RTE_LOG_LEVEL
+#  define RTE_LOG_LEVEL RTE_LOG_INFO
+#endif //RTE_LOG_LEVEL
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
 #define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
