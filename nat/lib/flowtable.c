@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include <rte_log.h>
 
-#include "containers/map.h"
+#include "containers/double-map.h"
 #include "flowtable.h"
 
-#if MAX_FLOWS > MAP_CAPACITY
+#if MAX_FLOWS > DMAP_CAPACITY
 #  error "The map static capacity is insufficient for this number of flows"
 #endif
 
@@ -15,38 +15,21 @@
 #define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
 #define LOG_ADD(...) printf(__VA_ARGS__)
 
-struct flow* flows = NULL;
-
-int* ext_bbs = NULL;
-void** ext_keyps = NULL;
-int* ext_khs = NULL;
-int* ext_vals = NULL;
-
-int* int_bbs = NULL;
-void** int_keyps = NULL;
-int* int_khs = NULL;
-int* int_vals = NULL;
-
-uint64_t num_flows = 0;
-
 struct flow* get_flow(int index) {
-    return &flows[index];
+  return (struct flow*)dmap_get_value(index);
 }
 
 int get_flow_int(struct int_key* key, int* index) {
     LOG("look up for internal key key = \n");
     log_int_key(key);
-    return get(int_bbs, int_keyps, int_khs, int_vals, key,
-               sizeof(struct int_key), index);
+    return dmap_get_a(key, index);
 }
 
 int get_flow_ext(struct ext_key* key, int* index) {
     LOG("look up for external key key = \n");
     log_ext_key(key);
-    return get(ext_bbs, ext_keyps, ext_khs, ext_vals, key,
-               sizeof(struct ext_key), index);
+    return dmap_get_b(key, index);
 }
-
 
 static inline void fill_int_key(struct flow *f, struct int_key *k) {
     k->int_src_port = f->int_src_port;
@@ -81,94 +64,18 @@ int add_flow(struct flow *f, int index) {
     //assert(get_flow_ext(new_ext_key) == NULL);
     //assert(get_flow_int(new_int_key) == NULL);
 
-    int put_res = 
-        put(ext_bbs, ext_keyps, ext_khs, ext_vals,
-            new_ext_key, sizeof(struct ext_key),
-            index);
-    if (0 == put_res) {
-        return 0;
-    }
-    put_res =
-        put(int_bbs, int_keyps, int_khs, int_vals,
-            new_int_key, sizeof(struct int_key),
-            index);
-    if (0 == put_res) {
-        int erase_res = 
-            erase(ext_bbs, ext_keyps, ext_khs,
-                  new_ext_key, sizeof(struct ext_key));
-        assert(1 == erase_res);
-        return 0;
-    }
-
-    ++num_flows;
-    return 1;
+    return dmap_put(new_int_key, new_ext_key, index);
 }
 
 int remove_flow(int index) {
     assert(0 <= index && index < MAX_FLOWS);
-    struct flow* f = &flows[index];
-    int erase_res =
-        erase(ext_bbs, ext_keyps, ext_khs, &f->ek, sizeof(struct ext_key));
-    if (0 == erase_res)
-        return 0;
-    erase_res = 
-        erase(int_bbs, int_keyps, int_khs, &f->ik, sizeof(struct int_key));
-    if (0 == erase_res)
-        return 0;
-    --num_flows;
-    return 1;
+    struct flow* f = get_flow(index);
+    return dmap_erase(&f->ik, &f->ek);
 }
 
 int allocate_flowtables(uint8_t nb_ports) {
-    //assert(internal_keys == NULL);
-    //assert(external_keys == NULL);
-    //assert(flows == NULL);
-    //assert(int_flows == NULL);
-    //assert(ext_flows == NULL);
-    //assert(num_flows == 0);
     (void)nb_ports;
-    //if (NULL == (internal_keys = malloc(sizeof(struct int_key)*MAX_FLOWS)))
-    //    return 0;
-    //if (NULL == (external_keys = malloc(sizeof(struct ext_key)*MAX_FLOWS)))
-    //    return 0;
-    if (NULL == (flows = malloc(sizeof(struct flow)*MAX_FLOWS)))
-        return 0;
-
-    // Allocate int flows map
-    if (NULL == (ext_keyps = malloc(sizeof(void*)*MAP_CAPACITY)))
-        return 0;
-    if (NULL == (ext_khs = malloc(sizeof(int)*MAP_CAPACITY)))
-        return 0;
-    if (NULL == (ext_bbs = malloc(sizeof(int)*MAP_CAPACITY)))
-        return 0;
-    if (NULL == (ext_vals = malloc(sizeof(void*)*MAP_CAPACITY)))
-        return 0;
-
-    // Allocate ext flows map
-    if (NULL == (int_keyps = malloc(sizeof(void*)*MAP_CAPACITY)))
-        return 0;
-    if (NULL == (int_khs = malloc(sizeof(int)*MAP_CAPACITY)))
-        return 0;
-    if (NULL == (int_bbs = malloc(sizeof(int)*MAP_CAPACITY)))
-        return 0;
-    if (NULL == (int_vals = malloc(sizeof(void*)*MAP_CAPACITY)))
-        return 0;
-
-    num_flows = 0;
-    return 1;
+    return dmap_allocate(sizeof(struct int_key), sizeof(struct ext_key),
+                         sizeof(struct flow));
 }
-/*
-static void free_flowtables(void) {
-    assert(internal_keys != NULL);
-    assert(external_keys != NULL);
-    assert(flows != NULL);
-    assert(int_flows != NULL);
-    assert(ext_flows != NULL);
-    g_hash_table_destroy(int_flows); int_flows = NULL;
-    g_hash_table_destroy(ext_flows); ext_flows = NULL;
-    free(internal_keys); internal_keys = NULL;
-    free(external_keys); external_keys = NULL;
-    free(flows); flows = NULL;
-    num_flows = 0;
-}
-*/
+
