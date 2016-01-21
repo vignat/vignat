@@ -10,9 +10,9 @@
 #include <assert.h>
 
 #ifdef KLEE_VERIFICATION
-#  include "rte_stubs.h"
+#  include "lib/stubs/rte_stubs.h"
 #  include <klee/klee.h>
-#  include "my-time-stub-control.h"
+#  include "lib/stubs/my-time-stub-control.h"
 #else //KLEE_VERIFICATION
 #  include <sys/queue.h>
 #  include <rte_common.h>
@@ -54,9 +54,9 @@
 #include <cmdline_parse_etheraddr.h>
 #include <cmdline_parse_ipaddr.h>
 
-#include "flowmanager.h"
-#include "expirator.h"
-#include "my-time.h"
+#include "lib/flowmanager.h"
+#include "lib/expirator.h"
+#include "lib/my-time.h"
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 

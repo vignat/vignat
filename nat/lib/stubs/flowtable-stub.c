@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <klee/klee.h>
-#include "flowtable.h"
+#include "lib/flowtable.h"
 #include "my-time-stub-control.h"
 
 #define LOG(...)
