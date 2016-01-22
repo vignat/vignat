@@ -19,11 +19,13 @@ int entry_claimed = 0;
 int allocated_index;
 entry_condition ent_cond = NULL;
 
-void dmap_set_entry_condition(entry_condition c) {
+void dmap_set_entry_condition_stub(entry_condition c) {
   ent_cond = c;
 }
+void dmap_set_entry_condition(entry_condition c)
+{dmap_set_entry_condition_stub(c);}
 
-int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
+int dmap_allocate_stub(int key_a_size, int key_b_size, int value_size) {
   allocation_succeeded = klee_int("dmap_allocation_succeeded");
   if (allocation_succeeded) {
     klee_assert(key_a_size < prealloc_size);
@@ -51,8 +53,10 @@ int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
   }
   return 0;
 }
+int dmap_allocate(int key_a_size, int key_b_size, int value_size)
+{return dmap_allocate_stub(key_a_size, key_b_size, value_size);}
 
-int dmap_get_a(void* key, int* index) {
+int dmap_get_a_stub(void* key, int* index) {
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
@@ -64,8 +68,10 @@ int dmap_get_a(void* key, int* index) {
   }
   return 0;
 }
+int dmap_get_a(void* key, int* index)
+{return dmap_get_a_stub(key, index);}
 
-int dmap_get_b(void* key, int* index) {
+int dmap_get_b_stub(void* key, int* index) {
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
@@ -77,8 +83,10 @@ int dmap_get_b(void* key, int* index) {
   }
   return 0;
 }
+int dmap_get_b(void* key, int* index)
+{return dmap_get_b_stub(key, index);}
 
-int dmap_put(void* key_a_, void* key_b_, int index) {
+int dmap_put_stub(void* key_a_, void* key_b_, int index) {
   // Can not ever fail, because index is guaranteed to point to the available
   // slot, therefore the map can not be full at this point.
   // Always returns 1.
@@ -95,14 +103,18 @@ int dmap_put(void* key_a_, void* key_b_, int index) {
   allocated_index = index;
   return 1;
 }
+int dmap_put(void* key_a_, void* key_b_, int index)
+{return dmap_put_stub(key_a_, key_b_, index);}
 
-int dmap_erase(void* key_a, void* key_b) {
+int dmap_erase_stub(void* key_a, void* key_b) {
   klee_assert(allocation_succeeded);
   klee_assert(0); //This model does not support erasure.
   return 0;
 }
+int dmap_erase(void* key_a, void* key_b)
+{return dmap_erase_stub(key_a, key_b);}
 
-void* dmap_get_value(int index) {
+void* dmap_get_value_stub(int index) {
   klee_assert(allocation_succeeded);
   if (entry_claimed) {
     klee_assert(index == allocated_index);
@@ -112,8 +124,12 @@ void* dmap_get_value(int index) {
   }
   return value;
 }
+void* dmap_get_value(int index)
+{return dmap_get_value_stub(index);}
 
-int dmap_size() {
+int dmap_size_stub(void) {
   klee_assert(0); //This model does not support size requests.
   return -1;
 }
+int dmap_size(void)
+{return dmap_size_stub();}
