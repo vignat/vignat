@@ -39,7 +39,7 @@ int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
 
     has_this_key = klee_int("dmap_has_this_key");
     entry_claimed = 0;
-    allocated_index = klee_int("dmap_claimed_index");
+    allocated_index = klee_int("dmap_allocated_index");
 
     key_a_size_g = key_a_size;
     key_b_size_g = key_b_size;
@@ -57,7 +57,7 @@ int dmap_get_a(void* key, int* index) {
   if (has_this_key) {
     klee_assert(!entry_claimed);
     memcpy(key_a, key, key_a_size_g);
-    klee_assume(ent_cond == NULL || ent_cond(key_a, key_b, value));
+    if (ent_cond) klee_assume(ent_cond(key_a, key_b, value));
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -70,7 +70,7 @@ int dmap_get_b(void* key, int* index) {
   if (has_this_key) {
     klee_assert(!entry_claimed);
     memcpy(key_b, key, key_b_size_g);
-    klee_assume(ent_cond == NULL || ent_cond(key_a, key_b, value));
+    if (ent_cond) klee_assume(ent_cond(key_a, key_b, value));
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
