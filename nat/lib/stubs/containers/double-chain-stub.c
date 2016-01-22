@@ -68,5 +68,5 @@ int dchain_rejuvenate_index(int index)
 void dchain_stub_allocate_some_stub(void) {
     out_of_space = 0;
 }
-void dchain_stub_allocate_some_stub(void)
-{dchain_stub_allocate_some_sutb();}
+void dchain_stub_allocate_some(void)
+{dchain_stub_allocate_some_stub();}
