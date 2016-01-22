@@ -83,7 +83,9 @@ int dmap_put(void* key_a_, void* key_b_, int index) {
   // slot, therefore the map can not be full at this point.
   // Always returns 1.
   klee_assert(allocation_succeeded);
-  klee_assert(!entry_claimed);
+  if (entry_claimed) {
+    klee_assert(allocated_index == index);
+  }
   memcpy(key_a, key_a_, key_a_size_g);
   memcpy(key_b, key_b_, key_b_size_g);
   // This must be handled bo the caller, since it his responsibility
@@ -102,8 +104,12 @@ int dmap_erase(void* key_a, void* key_b) {
 
 void* dmap_get_value(int index) {
   klee_assert(allocation_succeeded);
-  klee_assert(index == allocated_index);
-  klee_assert(entry_claimed);
+  if (entry_claimed) {
+    klee_assert(index == allocated_index);
+  } else {
+    allocated_index = index;
+    entry_claimed = 1;
+  }
   return value;
 }
 
