@@ -10,6 +10,7 @@
 #ifdef KLEE_VERIFICATION
 #  include "stubs/containers/double-map-stub-control.h"
 #  include "stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
+#  include "stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
 
 #if MAX_FLOWS > DMAP_CAPACITY
@@ -95,7 +96,7 @@ int flow_consistency(void* key_a, void* key_b, void* value) {
     ( int_key->dst_ip == flow->dst_ip ) &
     ( int_key->int_device_id == flow->int_device_id ) &
     ( int_key->protocol == flow->protocol ) &
-    
+
     ( int_key->int_src_port == flow->ik.int_src_port ) &
     ( int_key->dst_port == flow->ik.dst_port ) &
     ( int_key->int_src_ip == flow->ik.int_src_ip ) &
@@ -121,7 +122,8 @@ int flow_consistency(void* key_a, void* key_b, void* value) {
     ( 0 <= flow->int_device_id) &
           (flow->int_device_id < RTE_MAX_ETHPORTS) &
     ( 0 <= flow->ext_device_id) &
-          (flow->ext_device_id < RTE_MAX_ETHPORTS);
+          (flow->ext_device_id < RTE_MAX_ETHPORTS) &
+    ( flow->timestamp < get_start_time());
     //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
 }
 #endif //KLEE_VERIFICATION

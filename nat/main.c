@@ -333,14 +333,14 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             struct flow* f = get_flow_by_int_key(&key, current_time());
             if (f == NULL) {
                 LOG( "adding flow: ");
-                if (!allocate_flow(&key, current_time())) {
+                if (!allocate_flow(&key, current_time(), &f)) {
                     if (0 == expire_flows(current_time())) {
                         LOG("No space for the flow, dropping.");
                         rte_pktmbuf_free(m);
                         return;
                     } else {
                         // A second try, after we expired some flows.
-                        if (!allocate_flow(&key, current_time())) {
+                        if (!allocate_flow(&key, current_time(), &f)) {
                             rte_exit(EXIT_FAILURE, "Can not allocate flow, "
                                      "even after expiring some!\n");
                         }

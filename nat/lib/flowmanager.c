@@ -24,7 +24,7 @@ int allocate_flowmanager(uint8_t nb_ports,
     return 1;
 }
 
-int allocate_flow(struct int_key *k, uint32_t time) {
+int allocate_flow(struct int_key *k, uint32_t time, struct flow** out) {
     int index = -1;
     int alloc_rez = dchain_allocate_new_index(&index);
     if (0 == alloc_rez) return 0; //Out of resources.
@@ -41,7 +41,9 @@ int allocate_flow(struct int_key *k, uint32_t time) {
         .protocol = k->protocol,
         .timestamp = time
     };
-    return add_flow(&new_flow, index);
+    if (!add_flow(&new_flow, index)) return 0;
+    *out = get_flow(index);
+    return 1;
 }
 
 static
