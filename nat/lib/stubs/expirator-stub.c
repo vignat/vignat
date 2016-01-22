@@ -4,7 +4,7 @@
 
 void init_expirator_stub(uint32_t exp_time) {
 }
-void init_expirator(uint32_t exp_time) {init_expirator(exp_time);}
+void init_expirator(uint32_t exp_time) {init_expirator_stub(exp_time);}
 
 int expire_flows_stub(uint32_t time) {
     int nfreed = klee_int("number_of_freed_flows");
