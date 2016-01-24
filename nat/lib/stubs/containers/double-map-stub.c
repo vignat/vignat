@@ -19,11 +19,11 @@ int entry_claimed = 0;
 int allocated_index;
 entry_condition ent_cond = NULL;
 
-void dmap_set_entry_condition_control(entry_condition c) {
+void dmap_set_entry_condition_control_stub(entry_condition c) {
   ent_cond = c;
 }
 void dmap_set_entry_condition(entry_condition c)
-{dmap_set_entry_condition_control(c);}
+{dmap_set_entry_condition_control_stub(c);}
 
 int dmap_allocate_stub(int key_a_size, int key_b_size, int value_size) {
   allocation_succeeded = klee_int("dmap_allocation_succeeded");

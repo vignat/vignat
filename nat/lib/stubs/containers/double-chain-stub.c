@@ -65,8 +65,8 @@ int dchain_rejuvenate_index_stub(int index) {
 int dchain_rejuvenate_index(int index)
 {return dchain_rejuvenate_index_stub(index);}
 
-void dchain_stub_allocate_some_control(void) {
+void dchain_stub_allocate_some_internal(void) {
     out_of_space = 0;
 }
 void dchain_stub_allocate_some(void)
-{dchain_stub_allocate_some_control();}
+{dchain_stub_allocate_some_internal();}
