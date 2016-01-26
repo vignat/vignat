@@ -1,0 +1,10 @@
+#ifndef PREDICATES_GH_INCLUDED
+#define PREDICATES_GH_INCLUDED
+
+/* TODO: how do you include stdint.h here? */
+
+predicate last_time(unsigned int t) = true;
+
+predicate double_map_p(int map, int size_a, int size_b, int size_val) = true;
+
+#endif
