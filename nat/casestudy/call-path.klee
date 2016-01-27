@@ -1,0 +1,7 @@
+start_time_control_stub() -> []
+init_expirator_stub(10) -> []
+dmap_set_entry_condition_control_stub(42888624&flow_consistency) -> []
+dmap_allocate_stub(16,16,60) -> 1
+dchain_allocate_stub(1024) -> 1
+current_time_stub() -> (ReadLSB w32 0 next_time)
+expire_flows_stub((ReadLSB w32 0 next_time)) -> (ReadLSB w32 0 number_of_freed_flows)
