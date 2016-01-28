@@ -16,8 +16,7 @@ void to_verify(uint32_t arg1)
 {
   start_time();
   init_expirator(10);
-  entry_condition* cond = flow_consistency;
-  dmap_set_entry_condition(cond);
+  dmap_set_entry_condition(flow_consistency);
   
   int rez1 = dmap_allocate(16,16,60);
   int rez2 = dchain_allocate(1024);
