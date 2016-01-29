@@ -4,9 +4,10 @@
 //@ #include "lib/predicates.gh"
 
 int dchain_allocate(int index_range);
-//@ requires true;
-//@ ensures result == 0 ? true : result == 1 &*& \
+/*@ requires true;
+  @ ensures result == 0 ? true : result == 1 &*& \
             double_chain_p(?chain, index_range);
+            @*/
 
 int dchain_allocate_new_index(int *index);
 int dchain_free_index(int index);

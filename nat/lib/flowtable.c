@@ -26,20 +26,32 @@
 #  define LOG_ADD(...) printf(__VA_ARGS__)
 #endif //KLEE_VERIFICATION
 
+static struct flow* flow_ptr(boundptr p) {
+  return (struct flow*)p.ptr;
+}
+
+static boundptr int_key_p(struct int_key* p) {
+  return wrap_ptr((uint8_t*)p, sizeof(struct int_key));
+}
+
+static boundptr ext_key_p(struct ext_key* p) {
+  return wrap_ptr((uint8_t*)p, sizeof(struct ext_key));
+}
+
 struct flow* get_flow(int index) {
-  return (struct flow*)dmap_get_value(index);
+  return flow_ptr(dmap_get_value(index));
 }
 
 int get_flow_int(struct int_key* key, int* index) {
     LOG("look up for internal key key = \n");
     log_int_key(key);
-    return dmap_get_a(key, index);
+    return dmap_get_a(int_key_p(key), index);
 }
 
 int get_flow_ext(struct ext_key* key, int* index) {
     LOG("look up for external key key = \n");
     log_ext_key(key);
-    return dmap_get_b(key, index);
+    return dmap_get_b(ext_key_p(key), index);
 }
 
 static inline void fill_int_key(struct flow *f, struct int_key *k) {
@@ -75,13 +87,13 @@ int add_flow(struct flow *f, int index) {
     //assert(get_flow_ext(new_ext_key) == NULL);
     //assert(get_flow_int(new_int_key) == NULL);
 
-    return dmap_put(new_int_key, new_ext_key, index);
+    return dmap_put(int_key_p(new_int_key), ext_key_p(new_ext_key), index);
 }
 
 int remove_flow(int index) {
     assert(0 <= index && index < MAX_FLOWS);
     struct flow* f = get_flow(index);
-    return dmap_erase(&f->ik, &f->ek);
+    return dmap_erase(int_key_p(&f->ik), ext_key_p(&f->ek));
 }
 
 #ifdef KLEE_VERIFICATION
