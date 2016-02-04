@@ -6,12 +6,14 @@ uint32_t starting_time = 0;
 uint32_t last_time = 0;
 
 void start_time_control_stub(void) {
+    klee_trace_ret();
     starting_time = klee_int("starting_time");
     last_time = starting_time;
 }
 void start_time(void) {start_time_control_stub();}
 
 uint32_t current_time_stub(void) {
+    klee_trace_ret();
     uint32_t next_time = klee_int("next_time");
     klee_assume(last_time <= next_time);
     last_time = next_time;
