@@ -14,10 +14,10 @@ int loop(int k)
 //TODO: introduce the "chain continuation" bit to optimize search for abscent.
 
 static
-uint32_t hash(boundptr keyp)
+uint32_t hash(void* keyp, int key_size)
 {
-    uint32_t* slice = (uint32_t*)keyp.ptr;
-    int n = keyp.size*sizeof(uint8_t)/sizeof(uint32_t);
+    uint32_t* slice = (uint32_t*)keyp;
+    int n = key_size*sizeof(uint8_t)/sizeof(uint32_t);
     uint32_t rez = 0;
     for (--n; n >= 0; --n)
     {
@@ -28,7 +28,7 @@ uint32_t hash(boundptr keyp)
 
 static
 int find_key(int* busybits, void** keyps, int* k_hashes, int start,
-             boundptr keyp, int key_hash)
+             void* keyp, int key_size, int key_hash)
 {
     int i = 0;
     for (; i < MAP_CAPACITY; ++i)
@@ -37,7 +37,7 @@ int find_key(int* busybits, void** keyps, int* k_hashes, int start,
         int bb = busybits[index];
         int kh = k_hashes[index];
         void* kp = keyps[index];
-        if (bb != 0 && kh == key_hash && 0 == memcmp(kp, keyp.ptr, keyp.size)) {
+        if (bb != 0 && kh == key_hash && 0 == memcmp(kp, keyp, key_size)) {
             return index;
         }
     }
@@ -60,11 +60,11 @@ int find_empty (int* busybits, int start)
 }
 
 int get(int* busybits, void** keyps, int* k_hashes, int* values,
-        boundptr keyp, int* value)
+        void* keyp, int key_size, int* value)
 {
-    int h = hash(keyp);
+    int h = hash(keyp, key_size);
     int start = loop(h);
-    int index = find_key(busybits, keyps, k_hashes, start, keyp, h);
+    int index = find_key(busybits, keyps, k_hashes, start, keyp, key_size, h);
 
     if (-1 == index)
     {
@@ -75,9 +75,9 @@ int get(int* busybits, void** keyps, int* k_hashes, int* values,
 }
 
 int put(int* busybits, void** keyps, int* k_hashes, int* values,
-        boundptr keyp, int value)
+        void* keyp, int key_size, int value)
 {
-    int h = hash(keyp);
+    int h = hash(keyp, key_size);
     int start = loop(h);
     int index = find_empty(busybits, start);
 
@@ -86,17 +86,17 @@ int put(int* busybits, void** keyps, int* k_hashes, int* values,
         return 0;
     }
     busybits[index] = 1;
-    keyps[index] = keyp.ptr;
+    keyps[index] = keyp;
     k_hashes[index] = h;
     values[index] = value;
     return 1;
 }
 
-int erase(int* busybits, void** keyps, int* k_hashes, boundptr keyp)
+int erase(int* busybits, void** keyps, int* k_hashes, void* keyp, int key_size)
 {
-    int h = hash(keyp);
+    int h = hash(keyp, key_size);
     int start = loop(h);
-    int index = find_key(busybits, keyps, k_hashes, start, keyp, h);
+    int index = find_key(busybits, keyps, k_hashes, start, keyp, key_size, h);
 
     if (-1 == index)
     {

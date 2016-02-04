@@ -34,31 +34,31 @@ int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
   return 1;
 }
 
-int dmap_get_a(boundptr key, int* index) {
-  return dmap_impl_get(bbs_a, kps_a, khs_a, inds_a, key, index);
+int dmap_get_a(void* key, int* index) {
+  return dmap_impl_get(bbs_a, kps_a, khs_a, inds_a, key, key_a_size_g, index);
 }
 
-int dmap_get_b(boundptr key, int* index) {
-  return dmap_impl_get(bbs_b, kps_b, khs_b, inds_b, key, index);
+int dmap_get_b(void* key, int* index) {
+  return dmap_impl_get(bbs_b, kps_b, khs_b, inds_b, key, key_b_size_g, index);
 }
 
-int dmap_put(boundptr key_a, boundptr key_b, int index) {
-  int ret = dmap_impl_put(bbs_a, kps_a, khs_a, inds_a, key_a,
-                          bbs_b, kps_b, khs_b, inds_b, key_b,
+int dmap_put(void* key_a, void* key_b, int index) {
+  int ret = dmap_impl_put(bbs_a, kps_a, khs_a, inds_a, key_a, key_a_size_g,
+                          bbs_b, kps_b, khs_b, inds_b, key_b, key_b_size_g,
                           index);
   if (ret) ++n_vals;
   return ret;
 }
 
-int dmap_erase(boundptr key_a, boundptr key_b) {
-  int ret = dmap_impl_erase(bbs_a, kps_a, khs_a, key_a,
-                            bbs_b, kps_b, khs_b, key_b);
+int dmap_erase(void* key_a, void* key_b) {
+  int ret = dmap_impl_erase(bbs_a, kps_a, khs_a, key_a, key_a_size_g,
+                            bbs_b, kps_b, khs_b, key_b, key_b_size_g);
   if (ret) --n_vals;
   return ret;
 }
 
-boundptr dmap_get_value(int index) {
-  return wrap_ptr((uint8_t*)(values + index), value_size_g);
+void* dmap_get_value(int index) {
+  return (values + index);
 }
 
 int dmap_size(void) {

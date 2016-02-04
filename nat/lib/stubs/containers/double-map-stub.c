@@ -56,11 +56,11 @@ int dmap_allocate_stub(int key_a_size, int key_b_size, int value_size) {
 int dmap_allocate(int key_a_size, int key_b_size, int value_size)
 {return dmap_allocate_stub(key_a_size, key_b_size, value_size);}
 
-int dmap_get_a_stub(boundptr key, int* index) {
+int dmap_get_a_stub(void* key, int* index) {
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    memcpy(key_a, key.ptr, key_a_size_g);
+    memcpy(key_a, key, key_a_size_g);
     if (ent_cond) klee_assume(ent_cond(key_a, key_b, value));
     entry_claimed = 1;
     *index = allocated_index;
@@ -68,14 +68,14 @@ int dmap_get_a_stub(boundptr key, int* index) {
   }
   return 0;
 }
-int dmap_get_a(boundptr key, int* index)
+int dmap_get_a(void* key, int* index)
 {return dmap_get_a_stub(key, index);}
 
-int dmap_get_b_stub(boundptr key, int* index) {
+int dmap_get_b_stub(void* key, int* index) {
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    memcpy(key_b, key.ptr, key_b_size_g);
+    memcpy(key_b, key, key_b_size_g);
     if (ent_cond) klee_assume(ent_cond(key_a, key_b, value));
     entry_claimed = 1;
     *index = allocated_index;
@@ -83,10 +83,10 @@ int dmap_get_b_stub(boundptr key, int* index) {
   }
   return 0;
 }
-int dmap_get_b(boundptr key, int* index)
+int dmap_get_b(void* key, int* index)
 {return dmap_get_b_stub(key, index);}
 
-int dmap_put_stub(boundptr key_a_, boundptr key_b_, int index) {
+int dmap_put_stub(void* key_a_, void* key_b_, int index) {
   // Can not ever fail, because index is guaranteed to point to the available
   // slot, therefore the map can not be full at this point.
   // Always returns 1.
@@ -94,8 +94,8 @@ int dmap_put_stub(boundptr key_a_, boundptr key_b_, int index) {
   if (entry_claimed) {
     klee_assert(allocated_index == index);
   }
-  memcpy(key_a, key_a_.ptr, key_a_size_g);
-  memcpy(key_b, key_b_.ptr, key_b_size_g);
+  memcpy(key_a, key_a_, key_a_size_g);
+  memcpy(key_b, key_b_, key_b_size_g);
   // This must be handled bo the caller, since it his responsibility
   // to fulfill the value by the same index:
   //   klee_assume(ent_cond == NULL || ent_cond(key_a, key_b, value));
@@ -103,18 +103,18 @@ int dmap_put_stub(boundptr key_a_, boundptr key_b_, int index) {
   allocated_index = index;
   return 1;
 }
-int dmap_put(boundptr key_a_, boundptr key_b_, int index)
+int dmap_put(void* key_a_, void* key_b_, int index)
 {return dmap_put_stub(key_a_, key_b_, index);}
 
-int dmap_erase_stub(boundptr key_a, boundptr key_b) {
+int dmap_erase_stub(void* key_a, void* key_b) {
   klee_assert(allocation_succeeded);
   klee_assert(0); //This model does not support erasure.
   return 0;
 }
-int dmap_erase(boundptr key_a, boundptr key_b)
+int dmap_erase(void* key_a, void* key_b)
 {return dmap_erase_stub(key_a, key_b);}
 
-boundptr dmap_get_value_stub(int index) {
+void* dmap_get_value_stub(int index) {
   klee_assert(allocation_succeeded);
   if (entry_claimed) {
     klee_assert(index == allocated_index);
@@ -122,9 +122,9 @@ boundptr dmap_get_value_stub(int index) {
     allocated_index = index;
     entry_claimed = 1;
   }
-  return wrap_ptr(value, value_size_g);
+  return value;
 }
-boundptr dmap_get_value(int index)
+void* dmap_get_value(int index)
 {return dmap_get_value_stub(index);}
 
 int dmap_size_stub(void) {
