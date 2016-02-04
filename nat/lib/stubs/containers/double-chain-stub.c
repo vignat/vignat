@@ -12,7 +12,7 @@ int range = 0;
 int oldest_index = 0;
 int oldest_index_freed = 0;
 
-int dchain_allocate_stub(int index_range) {
+int dchain_allocate(int index_range) {
     klee_trace_ret();
     klee_trace_param_i32(index_range, "index_range");
     new_index = klee_int("new_index");
@@ -27,10 +27,8 @@ int dchain_allocate_stub(int index_range) {
     out_of_space = klee_int("out_of_space");
     return 1;
 }
-int dchain_allocate(int index_range)
-{return dchain_allocate_stub(index_range);}
 
-int dchain_allocate_new_index_stub(int *index) {
+int dchain_allocate_new_index(int *index) {
     klee_trace_ret();
     klee_trace_param_ptr(index, sizeof(int), "index");
     //TODO: add the out-of-space case
@@ -40,10 +38,8 @@ int dchain_allocate_new_index_stub(int *index) {
     allocated = 1;
     return 1;
 }
-int dchain_allocate_new_index(int *index)
-{return dchain_allocate_new_index_stub(index);}
 
-int dchain_free_index_stub(int index) {
+int dchain_free_index(int index) {
     klee_trace_ret();
     klee_trace_param_i32(index, "index");
     klee_assert(index == oldest_index);
@@ -52,10 +48,8 @@ int dchain_free_index_stub(int index) {
     oldest_index_freed = 1;
     return 1;
 }
-int dchain_free_index(int index)
-{return dchain_free_index_stub(index);}
 
-int dchain_get_oldest_index_stub(int *index) {
+int dchain_get_oldest_index(int *index) {
     klee_trace_ret();
     klee_trace_param_ptr(index, sizeof(int), "index");
     if (oldest_index_freed)
@@ -63,21 +57,18 @@ int dchain_get_oldest_index_stub(int *index) {
     *index = oldest_index;
     return 1;
 }
-int dchain_get_oldest_index(int *index)
-{return dchain_get_oldest_index_stub(index);}
 
-int dchain_rejuvenate_index_stub(int index) {
+int dchain_rejuvenate_index(int index) {
     klee_trace_ret();
     klee_trace_param_i32(index, "index");
     // Check if it is legible for rejuivenation?
     return 1;
 }
-int dchain_rejuvenate_index(int index)
-{return dchain_rejuvenate_index_stub(index);}
 
-void dchain_stub_allocate_some_internal(void) {
+void dchain_allocate_some_internal(void) {
     klee_trace_ret();
     out_of_space = 0;
 }
-void dchain_stub_allocate_some(void)
-{dchain_stub_allocate_some_internal();}
+void dchain_allocate_some(void) {
+  dchain_allocate_some_internal();
+}
