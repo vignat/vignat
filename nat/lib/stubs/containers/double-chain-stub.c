@@ -66,7 +66,7 @@ int dchain_rejuvenate_index(int index) {
 }
 
 void dchain_allocate_some_internal(void) {
-    klee_trace_ret();
+  //Do not trace internal stub control functions.
     out_of_space = 0;
 }
 void dchain_allocate_some(void) {
