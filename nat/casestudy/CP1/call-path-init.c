@@ -4,13 +4,16 @@
 #include "lib/stubs/containers/double-map-stub-control.h"
 #include "lib/containers/double-map.h"
 #include "lib/containers/double-chain.h"
+#include "lib/stubs/loop.h"
 
 int flow_consistency(void* a, void* b, void* v)
+//@ requires true;
+//@ ensures true;
 {
   return 1;
 }
 
-void to_verify(uint32_t arg1)
+void to_verify()
 //@ requires true;
 //@ ensures true;
 {
@@ -19,31 +22,11 @@ void to_verify(uint32_t arg1)
   dmap_set_entry_condition(flow_consistency);
   
   int rez1 = dmap_allocate(16,16,60);
+  //@ assume(rez1 == 1);
   int rez2 = dchain_allocate(1024);
-  uint32_t rez3 = current_time();
-  int rez4 = expire_flows(arg1);
-  
-  if (rez1) {
-    if (rez2) {
-      ;
-      //@ leak double_map_p(_,_,_,_);
-      //@ leak double_chain_p(_,_);
-      //@ leak last_time(_);
-    } else {
-      ;
-      //@ leak double_map_p(_,_,_,_);
-      //@ leak last_time(_);
-    }
-  } else {
-    if (rez2) {
-      ;
-      //@ leak double_chain_p(_,_);
-      //@ leak last_time(_);
-    } else {
-      ;
-      //@ leak last_time(_);
-    }
-  }
+  //@ assume(rez2 == 1);
+  //@ close evproc_loop_invariant();
+  loop_invariant_consume();
 }
 
 //rez1 == 1 && rez2 == 1 && \exists next_time: rez3 == next_time  && arg1 == rez3 ==>

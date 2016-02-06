@@ -1,7 +1,39 @@
-start_time_control_stub() -> []
-init_expirator_stub(10) -> []
-dmap_set_entry_condition_control_stub(42888624&flow_consistency) -> []
-dmap_allocate_stub(16,16,60) -> 1
-dchain_allocate_stub(1024) -> 1
-current_time_stub() -> (ReadLSB w32 0 next_time)
-expire_flows_stub((ReadLSB w32 0 next_time)) -> (ReadLSB w32 0 number_of_freed_flows)
+start_time() -> []
+init_expirator(exp_time:10) -> []
+dmap_set_entry_condition(c:29670672&flow_consistency) -> []
+dmap_allocate(key_a_size:16,key_b_size:16,value_size:60) -> 1
+dchain_allocate(index_range:1024) -> 1
+loop_invariant_consume() -> []
+loop_invariant_produce() -> []
+current_time() -> (ReadLSB w32 0 next_time)
+expire_flows(exp_time:(ReadLSB w32 0 next_time)) -> (ReadLSB w32 0 number_of_freed_flows)
+loop_enumeration_begin(cnt:(ReadLSB w32 0 queue #: i)) -> []
+loop_enumeration_end() -> []
+loop_invariant_consume() -> []
+loop_invariant_produce() -> []
+;;-- Constraints --
+(Eq 1
+     (ReadLSB w32 0 model_version))
+(Eq false
+     (Eq 0
+         (ReadLSB w32 0 dmap_allocation_succeeded)))
+(Sle 0
+      (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+      1024)
+(Sle 0
+      (ReadLSB w32 0 oldest_index))
+(Slt (ReadLSB w32 0 oldest_index)
+      1024)
+(Ule (ReadLSB w32 0 starting_time)
+      (ReadLSB w32 0 next_time))
+(Sle 0
+      (ReadLSB w32 0 number_of_freed_flows))
+(Slt 0
+      (ReadLSB w32 0 number_of_freed_flows))
+(Slt (ReadLSB w32 0 queue #: i)
+      2)
+(Sle 0
+      (ReadLSB w32 0 queue #: i))
+(Eq 0
+     (ReadLSB w32 0 receive_one))
