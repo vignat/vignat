@@ -13,6 +13,7 @@
 #  include "lib/stubs/rte_stubs.h"
 #  include <klee/klee.h>
 #  include "lib/stubs/my-time-stub-control.h"
+#  include "lib/stubs/loop.h"
 #else //KLEE_VERIFICATION
 #  include <sys/queue.h>
 #  include <rte_common.h>
@@ -432,6 +433,7 @@ main_loop(__attribute__((unused)) void *dummy)
     }
 
 #ifdef KLEE_VERIFICATION
+    loop_iteration_begin();
 #else //KLEE_VERIFICATION
     while (1) 
 #endif //KLEE_VERIFICATION
@@ -470,6 +472,7 @@ main_loop(__attribute__((unused)) void *dummy)
         klee_make_symbolic(&i, sizeof(int), "queue #: i");
         klee_assume(i < qconf->n_rx_queue);
         klee_assume(0 <= i);
+        loop_enumeration_begin(i);
 #else //KLEE_VERIFICATION
         for (i = 0; i < qconf->n_rx_queue; ++i)
 #endif //KLEE_VERIFICATION
@@ -499,7 +502,13 @@ main_loop(__attribute__((unused)) void *dummy)
                 }
             }
         }
+#ifdef KLEE_VERIFICATION
+        loop_enumeration_end();
+#endif//KLEE_VERIFICATION
     }
+#ifdef KLEE_VERIFICATION
+    loop_iteration_end();
+#endif//KLEE_VERIFICATION
     return 0;
 }
 

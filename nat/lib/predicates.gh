@@ -5,8 +5,23 @@
 
 predicate last_time(unsigned int t) = true;
 
-predicate double_map_p(int map, int size_a, int size_b, int size_val) = true;
+predicate double_map_p(void* map, int size_a, int size_b, int size_val) = true;
 
-predicate double_chain_p(int chain, int index_range) = true;
+predicate double_chain_p(void* chain, int index_range) = true;
+
+predicate evproc_loop_invariant() =
+          double_map_p(?map, ?size_a, ?size_b, ?size_val) &*&
+          double_chain_p(?chain, ?index_range) &*&
+          last_time(?t) &*&
+          index_range == 1024;
+          /* TODO: replace 1024 by the dmap_capacity */
+
+fixpoint bool dmap_has_a(void* map, void* key) { return true; }
+
+fixpoint bool dmap_has_b(void* map, void* key) { return true; }
+
+fixpoint int domap_get_a(void* map, void* key) { return 0; }
+
+fixpoint int domap_get_b(void* map, void* key) { return 0; }
 
 #endif
