@@ -31,7 +31,7 @@ void* dmap_get_value(int index);
 /*@ requires double_map_p(?map, ?key_a_size, ?key_b_size, ?value_size) &*&
              0 <= index &*& index < DMAP_CAPACITY; @*/
 /*@ ensures double_map_p(map, key_a_size, key_b_size, value_size) &*&
-            result != 0; @*/
+            result != 0 &*& domap_flow_at(map, index, result); @*/
 //^^^ TODO: add the user-defined predicate here somehow.
 int dmap_size(void);
 

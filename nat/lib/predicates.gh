@@ -16,6 +16,8 @@ predicate evproc_loop_invariant() =
           index_range == 1024;
           /* TODO: replace 1024 by the dmap_capacity */
 
+predicate domap_flow_at(void* map, int index, void* val) = true;
+
 fixpoint bool dmap_has_a(void* map, void* key) { return true; }
 
 fixpoint bool dmap_has_b(void* map, void* key) { return true; }
