@@ -17,11 +17,32 @@ int allocation_succeeded;
 int has_this_key;
 int entry_claimed = 0;
 int allocated_index;
+
 entry_condition* ent_cond = NULL;
+struct str_field_descr key_a_fields[prealloc_size],
+  key_b_fields[prealloc_size],
+  value_fields[prealloc_size];
+int key_a_field_count = 0,
+  key_b_field_count = 0,
+  value_field_count = 0;
 
 void dmap_set_entry_condition(entry_condition* c) {
   klee_trace_param_fptr(c, "c");
   ent_cond = c;
+}
+
+void dmap_set_layout(struct str_field_descr* key_a_field_, int key_a_count_,
+                     struct str_field_descr* key_b_field_, int key_b_count_,
+                     struct str_field_descr* value_field_, int value_count_) {
+  klee_assert(key_a_count_ < prealloc_size);
+  klee_assert(key_b_count_ < prealloc_size);
+  klee_assert(value_count_ < prealloc_size);
+  memcpy(key_a_fields, key_a_field_, sizeof(struct str_field_descr)*key_a_count_);
+  memcpy(key_b_fields, key_b_field_, sizeof(struct str_field_descr)*key_b_count_);
+  memcpy(value_fields, value_field_, sizeof(struct str_field_descr)*value_count_);
+  key_a_field_count = key_a_count_;
+  key_b_field_count = key_b_count_;
+  value_field_count = value_count_;
 }
 
 int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
@@ -62,6 +83,14 @@ int dmap_get_a(void* key, int* index) {
   klee_trace_ret();
   klee_trace_param_ptr(key, key_a_size_g, "key");
   klee_trace_param_ptr(index, sizeof(int), "index");
+  {
+    for (int i = 0; i < key_a_field_count; ++i) {
+      klee_trace_param_ptr_field(key,
+                                 key_a_fields[i].offset,
+                                 key_a_fields[i].width,
+                                 key_a_fields[i].name);
+    }
+  }
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
@@ -78,6 +107,14 @@ int dmap_get_b(void* key, int* index) {
   klee_trace_ret();
   klee_trace_param_ptr(key, key_b_size_g, "key");
   klee_trace_param_ptr(index, sizeof(int), "index");
+  {
+    for (int i = 0; i < key_b_field_count; ++i) {
+      klee_trace_param_ptr_field(key,
+                                 key_b_fields[i].offset,
+                                 key_b_fields[i].width,
+                                 key_b_fields[i].name);
+    }
+  }
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
@@ -95,6 +132,20 @@ int dmap_put(void* key_a_, void* key_b_, int index) {
   klee_trace_param_ptr(key_a_, key_a_size_g, "key_a_");
   klee_trace_param_ptr(key_b_, key_b_size_g, "key_b_");
   klee_trace_param_i32(index, "index");
+  {
+    for (int i = 0; i < key_a_field_count; ++i) {
+      klee_trace_param_ptr_field(key_a_,
+                                 key_a_fields[i].offset,
+                                 key_a_fields[i].width,
+                                 key_a_fields[i].name);
+    }
+    for (int i = 0; i < key_b_field_count; ++i) {
+      klee_trace_param_ptr_field(key_b_,
+                                 key_b_fields[i].offset,
+                                 key_b_fields[i].width,
+                                 key_b_fields[i].name);
+    }
+  }
   // Can not ever fail, because index is guaranteed to point to the available
   // slot, therefore the map can not be full at this point.
   // Always returns 1.
@@ -116,6 +167,20 @@ int dmap_erase(void* key_a, void* key_b) {
   klee_trace_ret();
   klee_trace_param_ptr(key_a, key_a_size_g, "key_a");
   klee_trace_param_ptr(key_b, key_b_size_g, "key_b");
+  {
+    for (int i = 0; i < key_a_field_count; ++i) {
+      klee_trace_param_ptr_field(key_a,
+                                 key_a_fields[i].offset,
+                                 key_a_fields[i].width,
+                                 key_a_fields[i].name);
+    }
+    for (int i = 0; i < key_b_field_count; ++i) {
+      klee_trace_param_ptr_field(key_b,
+                                 key_b_fields[i].offset,
+                                 key_b_fields[i].width,
+                                 key_b_fields[i].name);
+    }
+  }
   
   klee_assert(allocation_succeeded);
   klee_assert(0); //This model does not support erasure.
@@ -125,6 +190,13 @@ int dmap_erase(void* key_a, void* key_b) {
 void* dmap_get_value(int index) {
   klee_trace_ret_ptr(value_size_g);
   klee_trace_param_i32(index, "index");
+  {
+    for (int i = 0; i < value_field_count; ++i) {
+      klee_trace_ret_ptr_field(value_fields[i].offset,
+                               value_fields[i].width,
+                               value_fields[i].name);
+    }
+  }
   klee_assert(allocation_succeeded);
   if (entry_claimed) {
     klee_assert(index == allocated_index);
