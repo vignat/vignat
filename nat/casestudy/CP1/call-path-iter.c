@@ -15,9 +15,10 @@ void to_verify(uint32_t arg1)
   uint32_t rez1 = current_time();
   int rez2 = expire_flows(arg1);
   //@ assume(rez1 == arg1);
-  //@ leak double_chain_p(_,_);
-  //@ leak double_map_p(_, _, _, _);
-  //@ leak last_time(_);
+  //@ open double_chain_p(_,_);
+  //@ open double_map_p(_,_,_,_);
+  //@ open last_time(_);
+  ;
 }
 
 //rez1 == 1 && rez2 == 1 && \exists next_time: rez3 == next_time  && arg1 == rez3 ==>

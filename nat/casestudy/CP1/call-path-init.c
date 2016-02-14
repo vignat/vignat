@@ -6,20 +6,12 @@
 #include "lib/containers/double-chain.h"
 #include "lib/stubs/loop.h"
 
-int flow_consistency(void* a, void* b, void* v)
-//@ requires true;
-//@ ensures true;
-{
-  return 1;
-}
-
 void to_verify()
 //@ requires true;
 //@ ensures true;
 {
   start_time();
   init_expirator(10);
-  dmap_set_entry_condition(flow_consistency);
   
   int rez1 = dmap_allocate(16,16,60);
   //@ assume(rez1 == 1);
