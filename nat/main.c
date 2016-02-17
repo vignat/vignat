@@ -305,18 +305,19 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_ext_key(&key);
-            struct flow* f = get_flow_by_ext_key(&key, current_time());
-            if (f == NULL) {
-                // User did not ask for this packet.
-                LOG( "flow not found. dropping\n");
-                rte_pktmbuf_free(m);
-                return;
+            struct flow f;
+            int flow_exists = get_flow_by_ext_key(&key, current_time(), &f);
+            if (flow_exists) {
+              LOG( "found flow:");
+              log_flow(&f);
+              ipv4_hdr->dst_addr = f.int_src_ip;
+              set_dst_port(m, f.int_src_port);
+              dst_device = f.int_device_id;
             } else {
-                LOG( "found flow:");
-                log_flow(f);
-                ipv4_hdr->dst_addr = f->int_src_ip;
-                set_dst_port(m, f->int_src_port);
-                dst_device = f->int_device_id;
+              // User did not ask for this packet.
+              LOG( "flow not found. dropping\n");
+              rte_pktmbuf_free(m);
+              return;
             }
         } else {
             //Internal port.
@@ -331,8 +332,9 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
             };
             LOG( "for key: ");
             log_int_key(&key);
-            struct flow* f = get_flow_by_int_key(&key, current_time());
-            if (f == NULL) {
+            struct flow f;
+            int flow_exists = get_flow_by_int_key(&key, current_time(), &f);
+            if (!flow_exists) {
                 LOG( "adding flow: ");
                 if (!allocate_flow(&key, current_time(), &f)) {
                     if (0 == expire_flows(current_time())) {
@@ -349,11 +351,11 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
                 }
             }
             LOG( "forwarding to: ");
-            log_flow(f);
-            ipv4_hdr->src_addr = f->ext_src_ip;
-            set_src_port(m, f->ext_src_port);
+            log_flow(&f);
+            ipv4_hdr->src_addr = f.ext_src_ip;
+            set_src_port(m, f.ext_src_port);
             //TODO: recalculate ip checksum.
-            dst_device = f->ext_device_id;
+            dst_device = f.ext_device_id;
         }
 
 //#ifdef DO_RFC_1812_CHECKS

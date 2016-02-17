@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -26,12 +27,12 @@
 #  define LOG_ADD(...) printf(__VA_ARGS__)
 #endif //KLEE_VERIFICATION
 
-static struct flow* flow_ptr(void* p) {
-  return (struct flow*)p;
+void get_flow(int index, struct flow* flow_out) {
+  dmap_get_value(index, flow_out);
 }
 
-struct flow* get_flow(int index) {
-  return flow_ptr(dmap_get_value(index));
+void set_flow(int index, struct flow* fl) {
+  dmap_set_value(index, fl);
 }
 
 int get_flow_int(struct int_key* key, int* index) {
@@ -69,23 +70,19 @@ int add_flow(struct flow *f, int index) {
     assert(0 <= index && index < MAX_FLOWS);
     LOG("add_flow (f = \n");
     log_flow(f);
-    struct flow *new_flow = get_flow(index);
-    *new_flow = *f;
-    struct int_key* new_int_key = &new_flow->ik;
-    struct ext_key* new_ext_key = &new_flow->ek;
+    struct int_key* new_int_key = &f->ik;
+    struct ext_key* new_ext_key = &f->ek;
     fill_int_key(f, new_int_key);
     fill_ext_key(f, new_ext_key);
 
-    //assert(get_flow_ext(new_ext_key) == NULL);
-    //assert(get_flow_int(new_int_key) == NULL);
-
-    return dmap_put(new_int_key, new_ext_key, index);
+    return dmap_put(f, index);
 }
 
 int remove_flow(int index) {
     assert(0 <= index && index < MAX_FLOWS);
-    struct flow* f = get_flow(index);
-    return dmap_erase(&f->ik, &f->ek);
+    struct flow f;
+    get_flow(index, &f);
+    return dmap_erase(&f.ik, &f.ek);
 }
 
 #ifdef KLEE_VERIFICATION
@@ -173,7 +170,8 @@ int allocate_flowtables(uint8_t nb_ports) {
                     ext_key_descrs, sizeof(ext_key_descrs)/sizeof(struct str_field_descr),
                     flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr));
 #endif //KLEE_VERIFICATION
-    return dmap_allocate(sizeof(struct int_key), sizeof(struct ext_key),
+    return dmap_allocate(sizeof(struct int_key), offsetof(struct flow, ik),
+                         sizeof(struct ext_key), offsetof(struct flow, ek),
                          sizeof(struct flow));
 }
 

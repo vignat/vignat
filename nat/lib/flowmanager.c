@@ -24,7 +24,7 @@ int allocate_flowmanager(uint8_t nb_ports,
     return 1;
 }
 
-int allocate_flow(struct int_key *k, uint32_t time, struct flow** out) {
+int allocate_flow(struct int_key *k, uint32_t time, struct flow* out) {
     int index = -1;
     int alloc_rez = dchain_allocate_new_index(&index);
     if (0 == alloc_rez) return 0; //Out of resources.
@@ -42,29 +42,31 @@ int allocate_flow(struct int_key *k, uint32_t time, struct flow** out) {
         .timestamp = time
     };
     if (!add_flow(&new_flow, index)) return 0;
-    *out = get_flow(index);
+    get_flow(index, out);
     return 1;
 }
 
 static
-struct flow* get_and_rejuvenate(int index, uint32_t time) {
-    struct flow* ret = get_flow(index);
-    dchain_rejuvenate_index(index);
-    assert(time >= ret->timestamp);
-    ret->timestamp = time;
-    return ret;
+void get_and_rejuvenate(int index, uint32_t time, struct flow* flow_out) {
+  get_flow(index, flow_out);
+  dchain_rejuvenate_index(index);
+  assert(time >= flow_out->timestamp);
+  flow_out->timestamp = time;
+  set_flow(index, flow_out);
 }
 
-struct flow* get_flow_by_int_key(struct int_key* key, uint32_t time) {
-    int index = -1;
-    if (!get_flow_int(key, &index))
-        return NULL;
-    return get_and_rejuvenate(index, time);
+int get_flow_by_int_key(struct int_key* key, uint32_t time, struct flow* flow_out) {
+  int index = -1;
+  if (!get_flow_int(key, &index))
+    return 0;
+  get_and_rejuvenate(index, time, flow_out);
+  return 1;
 }
 
-struct flow* get_flow_by_ext_key(struct ext_key* key, uint32_t time) {
-    int index = -1;
-    if (!get_flow_ext(key, &index))
-        return NULL;
-    return get_and_rejuvenate(index, time);
+int get_flow_by_ext_key(struct ext_key* key, uint32_t time, struct flow* flow_out) {
+  int index = -1;
+  if (!get_flow_ext(key, &index))
+    return 0;
+  get_and_rejuvenate(index, time, flow_out);
+  return 1;
 }

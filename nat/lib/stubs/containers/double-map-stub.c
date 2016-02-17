@@ -7,11 +7,13 @@
 #define prealloc_size (256)
 
 int key_a_size_g = 0;
+int key_a_offset_g = 0;
 int key_b_size_g = 0;
+int key_b_offset_g = 0;
 int value_size_g = 0;
 
-uint8_t key_a[prealloc_size];
-uint8_t key_b[prealloc_size];
+//uint8_t key_a[prealloc_size];
+//uint8_t key_b[prealloc_size]; //no need for separate key storage
 uint8_t value[prealloc_size];
 int allocation_succeeded;
 int has_this_key;
@@ -45,10 +47,16 @@ void dmap_set_layout(struct str_field_descr* key_a_field_, int key_a_count_,
   value_field_count = value_count_;
 }
 
-int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
+int dmap_allocate(int key_a_size,
+                  int key_a_offset,
+                  int key_b_size,
+                  int key_b_offset,
+                  int value_size) {
   klee_trace_ret();
   klee_trace_param_i32(key_a_size, "key_a_size");
+  klee_trace_param_i32(key_a_offset, "key_a_offset");
   klee_trace_param_i32(key_b_size, "key_b_size");
+  klee_trace_param_i32(key_b_offset, "key_b_offset");
   klee_trace_param_i32(value_size, "value_size");
 
   allocation_succeeded = klee_int("dmap_allocation_succeeded");
@@ -56,12 +64,13 @@ int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
     klee_assert(key_a_size < prealloc_size);
     klee_assert(key_b_size < prealloc_size);
     klee_assert(value_size < prealloc_size);
+    klee_assert(key_a_offset + key_a_size < value_size);
+    klee_assert(key_b_offset + key_b_size < value_size);
 
-    //klee_make_symbolic(key_a, key_a_size, "dmap_key_a");
-    //klee_make_symbolic(key_b, key_b_size, "dmap_key_b");
-    //klee_make_symbolic(value, value_size, "dmap_value");
-    klee_make_symbolic(key_a, prealloc_size, "dmap_key_a");
-    klee_make_symbolic(key_b, prealloc_size, "dmap_key_b");
+    //No need to allocate keys separately, since we know that
+    //the keys are stored in the value
+    //-klee_make_symbolic(key_a, prealloc_size, "dmap_key_a");
+    //-klee_make_symbolic(key_b, prealloc_size, "dmap_key_b");
     klee_make_symbolic(value, prealloc_size, "dmap_value");
 
     has_this_key = klee_int("dmap_has_this_key");
@@ -69,7 +78,9 @@ int dmap_allocate(int key_a_size, int key_b_size, int value_size) {
     allocated_index = klee_int("dmap_allocated_index");
 
     key_a_size_g = key_a_size;
+    key_a_offset_g = key_a_offset;
     key_b_size_g = key_b_size;
+    key_b_offset_g = key_b_offset;
     value_size_g = value_size;
     // Do not assume the ent_cond here, because depending on what comes next,
     // we may change the key_a, key_b or value. we assume the condition after
@@ -94,8 +105,10 @@ int dmap_get_a(void* key, int* index) {
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    memcpy(key_a, key, key_a_size_g);
-    if (ent_cond) klee_assume(ent_cond(key_a, key_b, value));
+    memcpy(value + key_a_offset_g, key, key_a_size_g);
+    if (ent_cond)
+      klee_assume(ent_cond(value + key_a_offset_g,
+                           value + key_b_offset_g, value));
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -118,8 +131,9 @@ int dmap_get_b(void* key, int* index) {
   klee_assert(allocation_succeeded);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    memcpy(key_b, key, key_b_size_g);
-    if (ent_cond) klee_assume(ent_cond(key_a, key_b, value));
+    memcpy(value + key_b_offset_g, key, key_b_size_g);
+    if (ent_cond) klee_assume(ent_cond(value + key_a_offset_g,
+                                       value + key_b_offset_g, value));
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -127,23 +141,16 @@ int dmap_get_b(void* key, int* index) {
   return 0;
 }
 
-int dmap_put(void* key_a_, void* key_b_, int index) {
+int dmap_put(void* value_, int index) {
   klee_trace_ret();
-  klee_trace_param_ptr(key_a_, key_a_size_g, "key_a_");
-  klee_trace_param_ptr(key_b_, key_b_size_g, "key_b_");
+  klee_trace_param_ptr(value_, value_size_g, "value_");
   klee_trace_param_i32(index, "index");
   {
-    for (int i = 0; i < key_a_field_count; ++i) {
-      klee_trace_param_ptr_field(key_a_,
-                                 key_a_fields[i].offset,
-                                 key_a_fields[i].width,
-                                 key_a_fields[i].name);
-    }
-    for (int i = 0; i < key_b_field_count; ++i) {
-      klee_trace_param_ptr_field(key_b_,
-                                 key_b_fields[i].offset,
-                                 key_b_fields[i].width,
-                                 key_b_fields[i].name);
+    for (int i = 0; i < value_field_count; ++i) {
+      klee_trace_param_ptr_field(value_,
+                                 value_fields[i].offset,
+                                 value_fields[i].width,
+                                 value_fields[i].name);
     }
   }
   // Can not ever fail, because index is guaranteed to point to the available
@@ -153,9 +160,8 @@ int dmap_put(void* key_a_, void* key_b_, int index) {
   if (entry_claimed) {
     klee_assert(allocated_index == index);
   }
-  memcpy(key_a, key_a_, key_a_size_g);
-  memcpy(key_b, key_b_, key_b_size_g);
-  // This must be handled bo the caller, since it his responsibility
+  memcpy(value, value_, value_size_g);
+  // This must be handled by the caller, since it his responsibility
   // to fulfill the value by the same index:
   //   klee_assume(ent_cond == NULL || ent_cond(key_a, key_b, value));
   entry_claimed = 1;
@@ -187,14 +193,16 @@ int dmap_erase(void* key_a, void* key_b) {
   return 0;
 }
 
-void* dmap_get_value(int index) {
-  klee_trace_ret_ptr(value_size_g);
+void dmap_get_value(int index, void* value_out) {
+  klee_trace_ret();
   klee_trace_param_i32(index, "index");
+  klee_trace_param_ptr(value_out, value_size_g, "value_out");
   {
     for (int i = 0; i < value_field_count; ++i) {
-      klee_trace_ret_ptr_field(value_fields[i].offset,
-                               value_fields[i].width,
-                               value_fields[i].name);
+      klee_trace_param_ptr_field(value_out,
+                                 value_fields[i].offset,
+                                 value_fields[i].width,
+                                 value_fields[i].name);
     }
   }
   klee_assert(allocation_succeeded);
@@ -204,7 +212,25 @@ void* dmap_get_value(int index) {
     allocated_index = index;
     entry_claimed = 1;
   }
-  return value;
+  memcpy(value_out, value, value_size_g);
+}
+
+void dmap_set_value(int index, void* value_) {
+  klee_trace_ret();
+  klee_trace_param_i32(index, "index");
+  klee_trace_param_ptr(value_, value_size_g, "value_out");
+  {
+    for (int i = 0; i < value_field_count; ++i) {
+      klee_trace_param_ptr_field(value_,
+                                 value_fields[i].offset,
+                                 value_fields[i].width,
+                                 value_fields[i].name);
+    }
+  }
+  klee_assert(allocation_succeeded);
+  klee_assert(entry_claimed);//can set only the the value we got before.
+  klee_assert(index == allocated_index);
+  memcpy(value, value_, value_size_g);
 }
 
 int dmap_size(void) {

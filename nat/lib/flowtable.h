@@ -6,7 +6,8 @@
 //Warning: this is thread-unsafe, do not use with more than 1 lcore!
 int get_flow_int(struct int_key* key, int* index);
 int get_flow_ext(struct ext_key* key, int* index);
-struct flow* get_flow(int index);
+void get_flow(int index, struct flow* flow_out);
+void set_flow(int index, struct flow* flow);
 int add_flow(struct flow *f, int index);
 int remove_flow(int index);
 
