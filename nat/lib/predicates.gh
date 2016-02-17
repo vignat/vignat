@@ -5,12 +5,13 @@
 
 predicate last_time(unsigned int t) = true;
 
-predicate double_map_p(void* map, int size_a, int size_b, int size_val) = true;
+predicate double_map_p(void* map, int size_a, int offset_a,
+                       int size_b, int offset_b, int size_val) = true;
 
 predicate double_chain_p(void* chain, int index_range) = true;
 
 predicate evproc_loop_invariant() =
-          double_map_p(?map, ?size_a, ?size_b, ?size_val) &*&
+          double_map_p(?map, ?size_a, ?offset_a, ?size_b, ?offset_b, ?size_val) &*&
           double_chain_p(?chain, ?index_range) &*&
           last_time(?t) &*&
           index_range == 1024;
