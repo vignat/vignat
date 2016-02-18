@@ -1,0 +1,24 @@
+start_time() -> []
+init_expirator(exp_time:10) -> []
+dmap_set_entry_condition(c:39923008&flow_consistency) -> []
+dmap_allocate(key_a_size:16,key_a_offset:0,key_b_size:16,key_b_offset:16,value_size:60) -> 1
+dchain_allocate(index_range:1024) -> 1
+--- Constraints ---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+--- Alternatives ---
+(or 
+(and 
+loop_invariant_consume() -> []
+true)
+false)
