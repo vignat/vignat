@@ -17,6 +17,6 @@ int dchain_rejuvenate_index(int index);
 /*@ requires double_chain_p(?chain, ?index_range) &*&
              0 <= index &*& index < index_range; @*/
 /*@ ensures double_chain_p(chain, index_range) &*&
-            result == 0 ? true : result == 1; @*/
+            dchain_is_allocated(chain, index) ? result == 1 : result == 0; @*/
 
 #endif //_DOUBLE_CHAIN_H_INCLUDED_

@@ -10,10 +10,13 @@ predicate double_map_p(void* map, int size_a, int offset_a,
 
 predicate double_chain_p(void* chain, int index_range) = true;
 
+predicate dmap_dchain_coherent(void* map, void* chain) = true;
+
 predicate evproc_loop_invariant() =
           double_map_p(?map, ?size_a, ?offset_a, ?size_b, ?offset_b, ?size_val) &*&
           double_chain_p(?chain, ?index_range) &*&
           last_time(?t) &*&
+          dmap_dchain_coherent(map, chain) &*&
           index_range == 1024;
           /* TODO: replace 1024 by the dmap_capacity */
 
@@ -26,5 +29,11 @@ fixpoint bool dmap_has_b(void* map, void* key) { return true; }
 fixpoint int domap_get_a(void* map, void* key) { return 0; }
 
 fixpoint int domap_get_b(void* map, void* key) { return 0; }
+
+fixpoint bool dchain_is_allocated(void* dchain, int index);
+
+lemma void domap_gives_a_allocated(void* map, void* chain, void* key, int index);
+requires domap_get_a(map, key) == index &*& dmap_dchain_coherent(map, chain);
+ensures dmap_dchain_coherent(map, chain) &*& dchain_is_allocated(chain, index) == true;
 
 #endif

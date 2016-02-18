@@ -1,0 +1,123 @@
+start_time() -> []
+init_expirator(exp_time:10) -> []
+dmap_set_entry_condition(c:39923008&flow_consistency) -> []
+dmap_allocate(key_a_size:16,key_a_offset:0,key_b_size:16,key_b_offset:16,value_size:60) -> 1
+dchain_allocate(index_range:1024) -> 1
+loop_invariant_consume() -> []
+
+loop_invariant_produce() -> []
+current_time() -> (ReadLSB w32 0 next_time)
+expire_flows(exp_time:(ReadLSB w32 0 next_time)) -> (ReadLSB w32 0 number_of_freed_flows)
+loop_enumeration_begin(cnt:(ReadLSB w32 0 queue #: i)) -> []
+current_time() -> (ReadLSB w32 0 next_time_1)
+dmap_get_b(key:46805136&[(Concat w128 171
+ (Concat w120 171
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 29 user_buf0)
+ (Concat w88 (Read w8 28 user_buf0)
+ (Concat w80 (Read w8 27 user_buf0)
+ (Concat w72 (Read w8 26 user_buf0)
+ (Concat w64 (Read w8 33 user_buf0)
+ (Concat w56 (Read w8 32 user_buf0)
+ (Concat w48 (Read w8 31 user_buf0)
+ (Concat w40 (Read w8 30 user_buf0) (w32 0)))))))))))))->(Concat w128 171
+ (Concat w120 171
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 29 user_buf0)
+ (Concat w88 (Read w8 28 user_buf0)
+ (Concat w80 (Read w8 27 user_buf0)
+ (Concat w72 (Read w8 26 user_buf0)
+ (Concat w64 (Read w8 33 user_buf0)
+ (Concat w56 (Read w8 32 user_buf0)
+ (Concat w48 (Read w8 31 user_buf0)
+ (Concat w40 (Read w8 30 user_buf0) (w32 0)))))))))))))][ext_src_port:0->0][dst_port:0->0][ext_src_ip:(ReadLSB w32 30 user_buf0)->(ReadLSB w32 30 user_buf0)][dst_ip:(ReadLSB w32 26 user_buf0)->(ReadLSB w32 26 user_buf0)][ext_device_id:(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)->(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)][protocol:(Read w8 23 user_buf0)->(Read w8 23 user_buf0)],index:143466576&[4294967295->4294967295]) -> 0
+loop_enumeration_end() -> []
+--- Constraints ---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+(Ule (ReadLSB w32 0 starting_time)
+ (ReadLSB w32 0 next_time))
+---
+(Ule (ReadLSB w32 0 starting_time)
+ (ReadLSB w32 0 next_time))
+---
+(Sle 0
+ (ReadLSB w32 0 number_of_freed_flows))
+(Slt 0
+ (ReadLSB w32 0 number_of_freed_flows))
+---
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+---
+---
+---
+(Ule (ReadLSB w32 0 next_time)
+ (ReadLSB w32 0 next_time_1))
+---
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1))
+(Eq false
+ (Eq 6 (Read w8 23 user_buf0)))
+(Eq false
+ (Eq 17 (Read w8 23 user_buf0)))
+---
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1))
+(Eq false
+ (Eq 6 (Read w8 23 user_buf0)))
+(Eq false
+ (Eq 17 (Read w8 23 user_buf0)))
+---
+---
+---
+---
+---
+--- Alternatives ---
+(or 
+(and 
+loop_invariant_consume() -> []
+true)
+false)
