@@ -22,13 +22,13 @@ predicate evproc_loop_invariant() =
 
 predicate domap_flow_at(void* map, int index, void* val) = true;
 
-fixpoint bool dmap_has_a(void* map, void* key) { return true; }
+fixpoint bool dmap_has_a(void* map, void* key);
 
-fixpoint bool dmap_has_b(void* map, void* key) { return true; }
+fixpoint bool dmap_has_b(void* map, void* key);
 
-fixpoint int domap_get_a(void* map, void* key) { return 0; }
+fixpoint int domap_get_a(void* map, void* key);
 
-fixpoint int domap_get_b(void* map, void* key) { return 0; }
+fixpoint int domap_get_b(void* map, void* key);
 
 fixpoint bool dchain_is_allocated(void* dchain, int index);
 

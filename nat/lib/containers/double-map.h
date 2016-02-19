@@ -27,18 +27,24 @@ int dmap_get_a(void* key, int* index);
 /*@ ensures double_map_p(map, key_a_size, a_offset, key_b_size, b_offset, value_size) &*&
             result == 0 ? dmap_has_a(map, key) == false :
                           (dmap_has_a(map, key) == true &*&
-                           *index |-> ?i &*& i == domap_get_a(map, key) &*&
-                           0 <= i &*& i < DMAP_CAPACITY);
+                           *index |-> ?i &*& i == domap_get_a(map, key));
 @*/
 int dmap_get_b(void* key, int* index);
 /*@ requires double_map_p(?map, ?key_a_size, ?a_offset, ?key_b_size, ?b_offset, ?value_size); @*/
 /*@ ensures double_map_p(map, key_a_size, a_offset, key_b_size, b_offset, value_size) &*&
             result == 0 ? dmap_has_b(map, key) == false :
                           (dmap_has_b(map, key) == true &*&
-                          *index |-> ?i &*& i == domap_get_b(map, key) &*&
-                          0 <= i &*& i < DMAP_CAPACITY);
+                          *index |-> ?i &*& i == domap_get_b(map, key));
   @*/
 int dmap_put(void* value, int index);
+/*@ requires double_map_p(?map, ?key_a_size, ?a_offset, ?key_b_size, ?b_offset, ?value_size); @*/
+/*@ ensures double_map_p(map, key_a_size, a_offset, key_b_size, b_offset, value_size) &*&
+    result == 0 ? true :
+                  (dmap_has_b(map, value + b_offset) == true &*&
+                   dmap_has_a(map, value + a_offset) == true &*&
+                   index == domap_get_a(map, value + a_offset) &*&
+                   index == domap_get_b(map, value + b_offset));
+  @*/
 int dmap_erase(void* key_a, void* key_b);
 void dmap_get_value(int index, void* value_out);
 /*@ requires double_map_p(?map, ?key_a_size, ?a_offset, ?key_b_size, ?b_offset, ?value_size) &*&
