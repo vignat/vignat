@@ -14,9 +14,11 @@
 #  include "stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
 
+/*
 #if MAX_FLOWS > DMAP_CAPACITY
 #  error "The map static capacity is insufficient for this number of flows"
 #endif
+*/
 
 #ifdef KLEE_VERIFICATION
 #  define LOG(...)
@@ -162,6 +164,15 @@ struct str_field_descr flow_descrs[] = {
 
 #endif //KLEE_VERIFICATION
 
+static
+int int_key_eq(void* a, void* b) {
+  return memcmp(a, b, sizeof(struct int_key)) == 0;
+}
+static
+int ext_key_eq(void* a, void* b) {
+  return memcmp(a, b, sizeof(struct ext_key)) == 0;
+}
+
 int allocate_flowtables(uint8_t nb_ports) {
     (void)nb_ports;
 #ifdef KLEE_VERIFICATION
@@ -170,8 +181,10 @@ int allocate_flowtables(uint8_t nb_ports) {
                     ext_key_descrs, sizeof(ext_key_descrs)/sizeof(struct str_field_descr),
                     flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr));
 #endif //KLEE_VERIFICATION
-    return dmap_allocate(sizeof(struct int_key), offsetof(struct flow, ik),
-                         sizeof(struct ext_key), offsetof(struct flow, ek),
-                         sizeof(struct flow));
+    return dmap_allocate(sizeof(struct int_key),
+                         offsetof(struct flow, ik), int_key_eq,
+                         sizeof(struct ext_key),
+                         offsetof(struct flow, ek), ext_key_eq,
+                         sizeof(struct flow), MAX_FLOWS);
 }
 

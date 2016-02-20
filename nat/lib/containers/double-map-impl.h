@@ -1,19 +1,26 @@
 #ifndef _DOUBLE_MAP_IMPL_H_INCLUDED_
 #define _DOUBLE_MAP_IMPL_H_INCLUDED_
 
-#define DMAP_IMPL_CAPACITY (1024)
+#include "map.h"
 
+//#define DMAP_IMPL_CAPACITY (1024)
+
+void dmap_impl_init(int* bbs1, map_keys_equality* eq1,
+                    int* bbs2, map_keys_equality* eq2,
+                    int capacity);
 int dmap_impl_get(int* bbs, void** kps, int* khs, int* vals,
-                  void* keyp, int key_size, int* value);
+                  void* keyp, int hash, map_keys_equality* eq,
+                  int* value, int capacity);
 int dmap_impl_put(int* bbs1, void** kps1, int* khs1, int* vals1,
-                  void* keyp1, int key1_size,
+                  void* keyp1, int hash1,
                   int* bbs2, void** kps2, int* khs2, int* vals2,
-                  void* keyp2, int key2_size,
-                  int value);
+                  void* keyp2, int hash2,
+                  int value, int capacity);
 int dmap_impl_erase(int* bbs1, void** kps1, int* khs1,
-                    void* kp1, int k1_size,
+                    void* kp1, map_keys_equality* eq1, int hash1,
                     int* bbs2, void** kps2, int* khs2,
-                    void* kp2, int k2_size);
-int dmap_impl_size(int* bbs);
+                    void* kp2, map_keys_equality* eq2, int hash2,
+                    int capacity);
+int dmap_impl_size(int* bbs, int capacity);
 
 #endif // _DOUBLE_MAP_IMPL_H_INCLUDED_
