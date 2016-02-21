@@ -19,6 +19,7 @@ int allocation_succeeded;
 int has_this_key;
 int entry_claimed = 0;
 int allocated_index;
+struct DoubleMap* allocated_map_ptr;
 
 entry_condition* ent_cond = NULL;
 struct str_field_descr key_a_fields[prealloc_size],
@@ -49,18 +50,30 @@ void dmap_set_layout(struct str_field_descr* key_a_field_, int key_a_count_,
 
 int dmap_allocate(int key_a_size,
                   int key_a_offset,
+                  map_keys_equality eq_a,
                   int key_b_size,
                   int key_b_offset,
-                  int value_size) {
+                  map_keys_equality eq_b,
+                  int value_size,
+                  int capacity,
+                  struct DoubleMap** map_out) {
   klee_trace_ret();
   klee_trace_param_i32(key_a_size, "key_a_size");
   klee_trace_param_i32(key_a_offset, "key_a_offset");
+  klee_trace_param_fptr(eq_a, "eq_a");
   klee_trace_param_i32(key_b_size, "key_b_size");
   klee_trace_param_i32(key_b_offset, "key_b_offset");
+  klee_trace_param_fptr(eq_b, "eq_b");
   klee_trace_param_i32(value_size, "value_size");
+  klee_trace_param_i32(capacity, "capacity");
+  klee_trace_param_ptr(map_out, sizeof(struct DoubleMap*), "map_out");
 
   allocation_succeeded = klee_int("dmap_allocation_succeeded");
   if (allocation_succeeded) {
+    klee_make_symbolic(&allocated_map_ptr, sizeof(struct DoubleMap*),
+                       "allocated_map_do_not_dereference");
+    *map_out = allocated_map_ptr;
+
     klee_assert(key_a_size < prealloc_size);
     klee_assert(key_b_size < prealloc_size);
     klee_assert(value_size < prealloc_size);
@@ -90,8 +103,11 @@ int dmap_allocate(int key_a_size,
   return 0;
 }
 
-int dmap_get_a(void* key, int* index) {
+int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(key, key_a_size_g, "key");
   klee_trace_param_ptr(index, sizeof(int), "index");
   {
@@ -103,6 +119,7 @@ int dmap_get_a(void* key, int* index) {
     }
   }
   klee_assert(allocation_succeeded);
+  klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
     memcpy(value + key_a_offset_g, key, key_a_size_g);
@@ -116,8 +133,11 @@ int dmap_get_a(void* key, int* index) {
   return 0;
 }
 
-int dmap_get_b(void* key, int* index) {
+int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(key, key_b_size_g, "key");
   klee_trace_param_ptr(index, sizeof(int), "index");
   {
@@ -129,6 +149,7 @@ int dmap_get_b(void* key, int* index) {
     }
   }
   klee_assert(allocation_succeeded);
+  klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
     memcpy(value + key_b_offset_g, key, key_b_size_g);
@@ -141,8 +162,11 @@ int dmap_get_b(void* key, int* index) {
   return 0;
 }
 
-int dmap_put(void* value_, int index) {
+int dmap_put(struct DoubleMap* map, void* value_, int index) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(value_, value_size_g, "value_");
   klee_trace_param_i32(index, "index");
   {
@@ -157,6 +181,7 @@ int dmap_put(void* value_, int index) {
   // slot, therefore the map can not be full at this point.
   // Always returns 1.
   klee_assert(allocation_succeeded);
+  klee_assert(map == allocated_map_ptr);
   if (entry_claimed) {
     klee_assert(allocated_index == index);
   }
@@ -169,8 +194,11 @@ int dmap_put(void* value_, int index) {
   return 1;
 }
 
-int dmap_erase(void* key_a, void* key_b) {
+int dmap_erase(struct DoubleMap* map, void* key_a, void* key_b) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(key_a, key_a_size_g, "key_a");
   klee_trace_param_ptr(key_b, key_b_size_g, "key_b");
   {
@@ -189,12 +217,16 @@ int dmap_erase(void* key_a, void* key_b) {
   }
   
   klee_assert(allocation_succeeded);
+  klee_assert(map == allocated_map_ptr);
   klee_assert(0); //This model does not support erasure.
   return 0;
 }
 
-void dmap_get_value(int index, void* value_out) {
+void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_i32(index, "index");
   klee_trace_param_ptr(value_out, value_size_g, "value_out");
   {
@@ -206,6 +238,7 @@ void dmap_get_value(int index, void* value_out) {
     }
   }
   klee_assert(allocation_succeeded);
+  klee_assert(map == allocated_map_ptr);
   if (entry_claimed) {
     klee_assert(index == allocated_index);
   } else {
@@ -215,8 +248,11 @@ void dmap_get_value(int index, void* value_out) {
   memcpy(value_out, value, value_size_g);
 }
 
-void dmap_set_value(int index, void* value_) {
+void dmap_set_value(struct DoubleMap* map, int index, void* value_) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_i32(index, "index");
   klee_trace_param_ptr(value_, value_size_g, "value_out");
   {
@@ -228,13 +264,17 @@ void dmap_set_value(int index, void* value_) {
     }
   }
   klee_assert(allocation_succeeded);
+  klee_assert(map == allocated_map_ptr);
   klee_assert(entry_claimed);//can set only the the value we got before.
   klee_assert(index == allocated_index);
   memcpy(value, value_, value_size_g);
 }
 
-int dmap_size(void) {
+int dmap_size(struct DoubleMap* map) {
   klee_trace_ret();
+  //To avoid symbolic-pointer-dereference,
+  // consciously trace "map" as a simple value.
+  klee_trace_param_i32((uint32_t)map, "map");
   klee_assert(0); //This model does not support size requests.
   return -1;
 }

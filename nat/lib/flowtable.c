@@ -29,24 +29,26 @@
 #  define LOG_ADD(...) printf(__VA_ARGS__)
 #endif //KLEE_VERIFICATION
 
+struct DoubleMap *flow_map;
+
 void get_flow(int index, struct flow* flow_out) {
-  dmap_get_value(index, flow_out);
+  dmap_get_value(flow_map, index, flow_out);
 }
 
 void set_flow(int index, struct flow* fl) {
-  dmap_set_value(index, fl);
+  dmap_set_value(flow_map, index, fl);
 }
 
 int get_flow_int(struct int_key* key, int* index) {
     LOG("look up for internal key key = \n");
     log_int_key(key);
-    return dmap_get_a(key, index);
+    return dmap_get_a(flow_map, key, index);
 }
 
 int get_flow_ext(struct ext_key* key, int* index) {
     LOG("look up for external key key = \n");
     log_ext_key(key);
-    return dmap_get_b(key, index);
+    return dmap_get_b(flow_map, key, index);
 }
 
 static inline void fill_int_key(struct flow *f, struct int_key *k) {
@@ -77,14 +79,14 @@ int add_flow(struct flow *f, int index) {
     fill_int_key(f, new_int_key);
     fill_ext_key(f, new_ext_key);
 
-    return dmap_put(f, index);
+    return dmap_put(flow_map, f, index);
 }
 
 int remove_flow(int index) {
     assert(0 <= index && index < MAX_FLOWS);
     struct flow f;
     get_flow(index, &f);
-    return dmap_erase(&f.ik, &f.ek);
+    return dmap_erase(flow_map, &f.ik, &f.ek);
 }
 
 #ifdef KLEE_VERIFICATION
@@ -185,6 +187,7 @@ int allocate_flowtables(uint8_t nb_ports) {
                          offsetof(struct flow, ik), int_key_eq,
                          sizeof(struct ext_key),
                          offsetof(struct flow, ek), ext_key_eq,
-                         sizeof(struct flow), MAX_FLOWS);
+                         sizeof(struct flow), MAX_FLOWS,
+                         &flow_map);
 }
 
