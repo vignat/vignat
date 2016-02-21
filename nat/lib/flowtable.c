@@ -35,8 +35,8 @@ void get_flow(int index, struct flow* flow_out) {
   dmap_get_value(flow_map, index, flow_out);
 }
 
-void set_flow(int index, struct flow* fl) {
-  dmap_set_value(flow_map, index, fl);
+struct DoubleMap *get_flow_table(void) {
+  return flow_map;
 }
 
 int get_flow_int(struct int_key* key, int* index) {
@@ -82,13 +82,6 @@ int add_flow(struct flow *f, int index) {
     return dmap_put(flow_map, f, index);
 }
 
-int remove_flow(int index) {
-    assert(0 <= index && index < MAX_FLOWS);
-    struct flow f;
-    get_flow(index, &f);
-    return dmap_erase(flow_map, &f.ik, &f.ek);
-}
-
 #ifdef KLEE_VERIFICATION
 int flow_consistency(void* key_a, void* key_b, void* value) {
   struct int_key* int_key = key_a;
@@ -128,8 +121,7 @@ int flow_consistency(void* key_a, void* key_b, void* value) {
     ( 0 <= flow->int_device_id) &
           (flow->int_device_id < RTE_MAX_ETHPORTS) &
     ( 0 <= flow->ext_device_id) &
-          (flow->ext_device_id < RTE_MAX_ETHPORTS) &
-    ( flow->timestamp < get_start_time());
+          (flow->ext_device_id < RTE_MAX_ETHPORTS);
     //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
 }
 
@@ -161,7 +153,6 @@ struct str_field_descr flow_descrs[] = {
   {offsetof(struct flow, int_device_id), sizeof(uint8_t), "int_device_id"},
   {offsetof(struct flow, ext_device_id), sizeof(uint8_t), "ext_device_id"},
   {offsetof(struct flow, protocol), sizeof(uint8_t), "protocol"},
-  {offsetof(struct flow, timestamp), sizeof(uint32_t), "timestamp"},
 };
 
 #endif //KLEE_VERIFICATION

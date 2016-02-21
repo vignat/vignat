@@ -60,13 +60,12 @@ int dmap_put(struct DoubleMap* map, void* value, int index);
    (result == 0 &*&
     double_map_p(map));
   @*/
-int dmap_erase(struct DoubleMap* map, void* key_a, void* key_b);
+int dmap_erase(struct DoubleMap* map, int index);
 void dmap_get_value(struct DoubleMap* map, int index, void* value_out);
 /*@ requires double_map_p(?map) &*&
              0 <= index &*& index < DMAP_CAPACITY; @*/
 /*@ ensures double_map_p(map) &*&
             value_out != 0 &*& domap_flow_at(map, index, value_out); @*/
-void dmap_set_value(struct DoubleMap* map, int index, void* value);
 //^^^ TODO: add the user-defined predicate here somehow.
 int dmap_size(struct DoubleMap* map);
 

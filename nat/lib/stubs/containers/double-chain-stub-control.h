@@ -1,3 +1,3 @@
 
 
-void dchain_allocate_some(void);
+void dchain_allocate_some(struct DoubleChain* chain);

@@ -33,7 +33,6 @@ struct flow {
     uint8_t int_device_id;
     uint8_t ext_device_id;
     uint8_t protocol;
-    uint32_t timestamp;//seconds
 };
 
 void log_ip(uint32_t addr);
@@ -102,54 +101,50 @@ void log_flow(const struct flow *f);
     kp->protocol |-> ext_k_get_prtc(k);
 
   inductive flw = flwc(int_k, ext_k, int, int, int,
-                       int, int, int, int, int, int, int);
+                       int, int, int, int, int, int);
   fixpoint int_k flw_get_ik(flw f) {
   switch(f) {case flwc(ret, x1, x2, x3, x4, x5,
-                       x6, x7, x8, x9, x10, x11): return ret;}
+                       x6, x7, x8, x9, x10): return ret;}
   }
   fixpoint ext_k flw_get_ek(flw f) {
   switch(f) {case flwc(x1, ret, x2, x3, x4, x5,
-                       x6, x7, x8, x9, x10, x11): return ret;}
+                       x6, x7, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_isp(flw f) {
   switch(f) {case flwc(x1, x2, ret, x3, x4, x5,
-                       x6, x7, x8, x9, x10, x11): return ret;}
+                       x6, x7, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_esp(flw f) {
   switch(f) {case flwc(x1, x2, x3, ret, x4, x5,
-                       x6, x7, x8, x9, x10, x11): return ret;}
+                       x6, x7, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_dp(flw f) {
   switch(f) {case flwc(x1, x4, x2, x3, ret, x5,
-                       x6, x7, x8, x9, x10, x11): return ret;}
+                       x6, x7, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_isip(flw f) {
   switch(f) {case flwc(x1, x5, x2, x3, x4, ret,
-                       x6, x7, x8, x9, x10, x11): return ret;}
+                       x6, x7, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_esip(flw f) {
   switch(f) {case flwc(x1, x6, x2, x3, x4, x5,
-                       ret, x7, x8, x9, x10, x11): return ret;}
+                       ret, x7, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_dip(flw f) {
   switch(f) {case flwc(x1, x7, x2, x3, x4, x5,
-                       x6, ret, x8, x9, x10, x11): return ret;}
+                       x6, ret, x8, x9, x10): return ret;}
   }
   fixpoint int flw_get_idid(flw f) {
   switch(f) {case flwc(x1, x8, x2, x3, x4, x5,
-                       x6, x7, ret, x9, x10, x11): return ret;}
+                       x6, x7, ret, x9, x10): return ret;}
   }
   fixpoint int flw_get_edid(flw f) {
   switch(f) {case flwc(x1, x9, x2, x3, x4, x5,
-                       x6, x7, x8, ret, x10, x11): return ret;}
+                       x6, x7, x8, ret, x10): return ret;}
   }
   fixpoint int flw_get_prtc(flw f) {
   switch(f) {case flwc(x1, x10, x2, x3, x4, x5,
-                       x6, x7, x8, x9, ret, x11): return ret;}
-  }
-  fixpoint int flw_get_tstmp(flw f) {
-  switch(f) {case flwc(x1, x11, x2, x3, x4, x5,
-                       x6, x7, x8, x9, x10, ret): return ret;}
+                       x6, x7, x8, x9, ret): return ret;}
   }
   predicate flw_p(struct flow* fp, flw f) =
     int_k_p(&fp->ik, flw_get_ik(f)) &*&
@@ -162,8 +157,7 @@ void log_flow(const struct flow *f);
     fp->dst_ip |-> flw_get_dip(f) &*&
     fp->int_device_id |-> flw_get_idid(f) &*&
     fp->ext_device_id |-> flw_get_edid(f) &*&
-    fp->protocol |-> flw_get_prtc(f) &*&
-    fp->timestamp |-> flw_get_tstmp(f);
+    fp->protocol |-> flw_get_prtc(f);
   @*/
 
 

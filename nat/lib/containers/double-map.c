@@ -53,8 +53,8 @@ int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
                   int key_b_size, int key_b_offset, map_keys_equality* eq_b,
                   int value_size, int capacity,
                   struct DoubleMap** map_out) {
+  if (NULL == (*map_out = malloc(sizeof(struct DoubleMap)))) return 0;
 
-  *map_out = malloc(sizeof(struct DoubleMap));
   (**map_out).key_a_size = key_a_size;
   (**map_out).key_a_offset = key_a_offset;
   (**map_out).eq_a = eq_a;
@@ -97,7 +97,7 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
 int dmap_put(struct DoubleMap* map, void* value, int index) {
   void* key_a = (uint8_t*)value + map->key_a_offset;
   void* key_b = (uint8_t*)value + map->key_b_offset;
-  memcpy(map->values + index, value, map->value_size);
+  memcpy(map->values + index*map->value_size, value, map->value_size);
   int ret = dmap_impl_put(map->bbs_a, map->kps_a, map->khs_a,
                           map->inds_a, key_a,
                           hash(key_a, map->key_a_size),
@@ -109,7 +109,9 @@ int dmap_put(struct DoubleMap* map, void* value, int index) {
   return ret;
 }
 
-int dmap_erase(struct DoubleMap* map, void* key_a, void* key_b) {
+int dmap_erase(struct DoubleMap* map, int index) {
+  void* key_a = map->values + index*map->value_size + map->key_a_offset;
+  void* key_b = map->values + index*map->value_size + map->key_b_offset;
   int ret = dmap_impl_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
                             map->eq_a, hash(key_a, map->key_a_size),
                             map->bbs_b, map->kps_b, map->khs_b, key_b,
@@ -120,11 +122,7 @@ int dmap_erase(struct DoubleMap* map, void* key_a, void* key_b) {
 }
 
 void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
-  memcpy(value_out, map->values + index, map->value_size);
-}
-
-void dmap_set_value(struct DoubleMap* map, int index, void* value) {
-  memcpy(map->values + index, value, map->value_size);
+  memcpy(value_out, map->values + index*map->value_size, map->value_size);
 }
 
 int dmap_size(struct DoubleMap* map) {

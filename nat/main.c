@@ -764,8 +764,8 @@ init_mem(unsigned nb_mbuf, uint8_t nb_ports)
         }
     }
 
-    init_expirator(10/*seconds*/);
-    if (!allocate_flowmanager(nb_ports, 2747, external_ip, wan_port_id)) {
+    if (!allocate_flowmanager(nb_ports, 2747, external_ip,
+                              wan_port_id, 10/*seconds*/)) {
         LOG("Failed to allocate flow manager.\n");
         return -1;
     }

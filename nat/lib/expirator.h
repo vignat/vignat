@@ -1,14 +1,10 @@
 #ifndef _EXPIRATOR_H_INCLUDED_
 #define _EXPIRATOR_H_INCLUDED_
 
-#include "flow.h"
+#include "containers/double-chain.h"
+#include "containers/double-map.h"
 
-void init_expirator(uint32_t expiration_time/*seconds*/);
-//@ requires true;
-//@ ensures true;
-
-int expire_flows(uint32_t time);
-//@ requires true;
-//@ ensures 0 <= result;
+int expire_items(struct DoubleChain* chain, struct DoubleMap* map,
+                 uint32_t time);
 
 #endif //_EXPIRATOR_H_INCLUDED_

@@ -194,28 +194,13 @@ int dmap_put(struct DoubleMap* map, void* value_, int index) {
   return 1;
 }
 
-int dmap_erase(struct DoubleMap* map, void* key_a, void* key_b) {
+int dmap_erase(struct DoubleMap* map, int index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_ptr(key_a, key_a_size_g, "key_a");
-  klee_trace_param_ptr(key_b, key_b_size_g, "key_b");
-  {
-    for (int i = 0; i < key_a_field_count; ++i) {
-      klee_trace_param_ptr_field(key_a,
-                                 key_a_fields[i].offset,
-                                 key_a_fields[i].width,
-                                 key_a_fields[i].name);
-    }
-    for (int i = 0; i < key_b_field_count; ++i) {
-      klee_trace_param_ptr_field(key_b,
-                                 key_b_fields[i].offset,
-                                 key_b_fields[i].width,
-                                 key_b_fields[i].name);
-    }
-  }
-  
+  klee_trace_param_i32(index, "index");
+
   klee_assert(allocation_succeeded);
   klee_assert(map == allocated_map_ptr);
   klee_assert(0); //This model does not support erasure.
@@ -246,28 +231,6 @@ void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
     entry_claimed = 1;
   }
   memcpy(value_out, value, value_size_g);
-}
-
-void dmap_set_value(struct DoubleMap* map, int index, void* value_) {
-  klee_trace_ret();
-  //To avoid symbolic-pointer-dereference,
-  // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_i32(index, "index");
-  klee_trace_param_ptr(value_, value_size_g, "value_out");
-  {
-    for (int i = 0; i < value_field_count; ++i) {
-      klee_trace_param_ptr_field(value_,
-                                 value_fields[i].offset,
-                                 value_fields[i].width,
-                                 value_fields[i].name);
-    }
-  }
-  klee_assert(allocation_succeeded);
-  klee_assert(map == allocated_map_ptr);
-  klee_assert(entry_claimed);//can set only the the value we got before.
-  klee_assert(index == allocated_index);
-  memcpy(value, value_, value_size_g);
 }
 
 int dmap_size(struct DoubleMap* map) {

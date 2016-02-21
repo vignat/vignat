@@ -4,71 +4,87 @@
 
 // TODO: double check that this model is enough for the NAT scenario
 
-int out_of_space = 0;
-int new_index = 0;
-int allocated = 0;
-int range = 0;
+int is_dchain_allocated;
+int out_of_space;
+int new_index;
+int is_index_allocated;
 
-int oldest_index = 0;
-int oldest_index_freed = 0;
+struct DoubleChain* allocated_chain;
 
-int dchain_allocate(int index_range) {
+int dchain_allocate(int index_range, struct DoubleChain** chain_out) {
     klee_trace_ret();
     klee_trace_param_i32(index_range, "index_range");
-    new_index = klee_int("new_index");
-    oldest_index = klee_int("oldest_index");
-    klee_assume(0 <= new_index);
-    klee_assume(new_index < index_range);
-    klee_assume(0 <= oldest_index);
-    klee_assume(oldest_index < index_range);
-    range = index_range;
-    allocated = 0;
-    oldest_index_freed = klee_int("oldest_index_freed");
-    out_of_space = klee_int("out_of_space");
-    return 1;
+    klee_trace_param_ptr(chain_out, sizeof(struct DoubleChain*), "chain_out");
+
+    is_dchain_allocated = klee_int("is_dchain_allocated");
+
+    if (is_dchain_allocated) {
+      klee_make_symbolic(&allocated_chain, sizeof(struct DoubleChain*),
+                         "allocated_chain_do_not_dereference");
+      *chain_out = allocated_chain;
+      new_index = klee_int("new_index");
+      klee_assume(0 <= new_index);
+      klee_assume(new_index < index_range);
+      is_index_allocated = 0;
+      out_of_space = klee_int("out_of_space");
+      return 1;
+    } else {
+      return 0;
+    }
 }
 
-int dchain_allocate_new_index(int *index) {
+int dchain_allocate_new_index(struct DoubleChain* chain, int *index_out,
+                              uint32_t time) {
     klee_trace_ret();
-    klee_trace_param_ptr(index, sizeof(int), "index");
-    //TODO: add the out-of-space case
+    //Deliberately trace this pointer as an integer to avoid
+    // dereference.
+    klee_trace_param_i32((uint32_t)chain, "chain");
+    klee_trace_param_ptr(index_out, sizeof(int), "index_out");
+    klee_trace_param_i32(time, "time");
+
+    klee_assert(is_dchain_allocated);
+    klee_assert(chain == allocated_chain);
     if (out_of_space) return 0;
-    klee_assert(!allocated);
-    *index = new_index;
-    allocated = 1;
+    klee_assert(!is_index_allocated);
+    *index_out = new_index;
+    is_index_allocated = 1;
     return 1;
 }
 
-int dchain_free_index(int index) {
+int dchain_rejuvenate_index(struct DoubleChain* chain, int index,
+                            uint32_t time) {
     klee_trace_ret();
+    //Deliberately trace this pointer as an integer to avoid
+    // dereference.
+    klee_trace_param_i32((uint32_t)chain, "chain");
     klee_trace_param_i32(index, "index");
-    klee_assert(index == oldest_index);
-    if (oldest_index_freed)
-        return 0;
-    oldest_index_freed = 1;
+
+    klee_assert(is_dchain_allocated);
+    klee_assert(chain == allocated_chain);
+    // TODO: Check if it is legible for rejuivenation?
     return 1;
 }
 
-int dchain_get_oldest_index(int *index) {
-    klee_trace_ret();
-    klee_trace_param_ptr(index, sizeof(int), "index");
-    if (oldest_index_freed)
-        return 0;
-    *index = oldest_index;
-    return 1;
+int dchain_expire_one_index(struct DoubleChain* chain,
+                            int* index_out, uint32_t time) {
+  klee_trace_ret();
+  //Deliberately trace this pointer as an integer to avoid
+  // dereference.
+  klee_trace_param_i32((uint32_t)chain, "chain");
+  klee_trace_param_ptr(index_out, sizeof(int), "index_out");
+  klee_trace_param_i32(time, "time");
+
+  klee_assert(is_dchain_allocated);
+  klee_assert(chain == allocated_chain);
+  klee_assert(0 && "not supported in this model");
+  return 0;
 }
 
-int dchain_rejuvenate_index(int index) {
-    klee_trace_ret();
-    klee_trace_param_i32(index, "index");
-    // Check if it is legible for rejuivenation?
-    return 1;
-}
-
-void dchain_allocate_some_internal(void) {
+void dchain_allocate_some(struct DoubleChain* chain) {
+  //Do not trace. this function is internal for the Expirator model.
+  klee_assert(is_dchain_allocated);
+  klee_assert(chain == allocated_chain);
+  klee_assert(is_index_allocated == 0);
   //Do not trace internal stub control functions.
-    out_of_space = 0;
-}
-void dchain_allocate_some(void) {
-  dchain_allocate_some_internal();
+  out_of_space = 0;
 }

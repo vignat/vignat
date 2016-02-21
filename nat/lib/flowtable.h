@@ -13,5 +13,8 @@ int remove_flow(int index);
 
 int allocate_flowtables(uint8_t nb_ports);
 
+struct DoubleMap;
+struct DoubleMap* get_flow_table(void);
+
 
 #endif //_FLOWTABLE_H_INCLUDED_
