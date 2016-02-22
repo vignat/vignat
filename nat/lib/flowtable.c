@@ -10,7 +10,6 @@
 
 #ifdef KLEE_VERIFICATION
 #  include "stubs/containers/double-map-stub-control.h"
-#  include "stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
 #  include "stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
 
@@ -83,48 +82,6 @@ int add_flow(struct flow *f, int index) {
 }
 
 #ifdef KLEE_VERIFICATION
-int flow_consistency(void* key_a, void* key_b, void* value) {
-  struct int_key* int_key = key_a;
-  struct ext_key* ext_key = key_b;
-  struct flow* flow = value;
-  return
-#if 0 //Semantic - inessential for the crash-freedom.
-    ( int_key->int_src_port == flow->int_src_port ) &
-    ( int_key->dst_port == flow->dst_port ) &
-    ( int_key->int_src_ip == flow->int_src_ip ) &
-    ( int_key->dst_ip == flow->dst_ip ) &
-    ( int_key->int_device_id == flow->int_device_id ) &
-    ( int_key->protocol == flow->protocol ) &
-
-    ( int_key->int_src_port == flow->ik.int_src_port ) &
-    ( int_key->dst_port == flow->ik.dst_port ) &
-    ( int_key->int_src_ip == flow->ik.int_src_ip ) &
-    ( int_key->dst_ip == flow->ik.dst_ip ) &
-    ( int_key->int_device_id == flow->ik.int_device_id ) &
-    ( int_key->protocol == flow->ik.protocol ) &
-
-    //(0 == memcmp(int_key, &flow->ik, sizeof(struct int_key))) &
-    ( ext_key->ext_src_port == flow->ext_src_port ) &
-    ( ext_key->dst_port == flow->dst_port ) &
-    ( ext_key->ext_src_ip == flow->ext_src_ip ) &
-    ( ext_key->dst_ip == flow->dst_ip ) &
-    ( ext_key->ext_device_id == flow->ext_device_id ) &
-    ( ext_key->protocol == flow->protocol ) &
-
-    ( ext_key->ext_src_port == flow->ek.ext_src_port ) &
-    ( ext_key->dst_port == flow->ek.dst_port ) &
-    ( ext_key->ext_src_ip == flow->ek.ext_src_ip ) &
-    ( ext_key->dst_ip == flow->ek.dst_ip ) &
-    ( ext_key->ext_device_id == flow->ek.ext_device_id ) &
-    ( ext_key->protocol == flow->ek.protocol ) &
-#endif//0 -- inessential for crash freedom part.
-    ( 0 <= flow->int_device_id) &
-          (flow->int_device_id < RTE_MAX_ETHPORTS) &
-    ( 0 <= flow->ext_device_id) &
-          (flow->ext_device_id < RTE_MAX_ETHPORTS);
-    //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
-}
-
 struct str_field_descr int_key_descrs[] = {
   {offsetof(struct int_key, int_src_port), sizeof(uint16_t), "int_src_port"},
   {offsetof(struct int_key, dst_port), sizeof(uint16_t), "dst_port"},
@@ -169,7 +126,6 @@ int ext_key_eq(void* a, void* b) {
 int allocate_flowtables(uint8_t nb_ports) {
     (void)nb_ports;
 #ifdef KLEE_VERIFICATION
-    dmap_set_entry_condition(flow_consistency);
     dmap_set_layout(int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),
                     ext_key_descrs, sizeof(ext_key_descrs)/sizeof(struct str_field_descr),
                     flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr));

@@ -7,6 +7,11 @@
 #include "flowmanager.h"
 #include "expirator.h"
 
+#ifdef KLEE_VERIFICATION
+#  include "stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
+#  include "stubs/containers/double-map-stub-control.h" //<- for set entry cond
+#endif //KLEE_VERIFICATION
+
 
 uint16_t starting_port = 0;
 uint32_t ext_src_ip = 0;
@@ -14,11 +19,60 @@ uint8_t ext_device_id = 0;
 uint32_t expiration_time = 0; /*seconds*/
 struct DoubleChain* chain;
 
+#ifdef KLEE_VERIFICATION
+int flow_consistency(void* key_a, void* key_b, int index, void* value) {
+  struct int_key* int_key = key_a;
+  struct ext_key* ext_key = key_b;
+  struct flow* flow = value;
+  return
+#if 0 //Semantic - inessential for the crash-freedom.
+    ( int_key->int_src_port == flow->int_src_port ) &
+    ( int_key->dst_port == flow->dst_port ) &
+    ( int_key->int_src_ip == flow->int_src_ip ) &
+    ( int_key->dst_ip == flow->dst_ip ) &
+    ( int_key->int_device_id == flow->int_device_id ) &
+    ( int_key->protocol == flow->protocol ) &
+
+    ( int_key->int_src_port == flow->ik.int_src_port ) &
+    ( int_key->dst_port == flow->ik.dst_port ) &
+    ( int_key->int_src_ip == flow->ik.int_src_ip ) &
+    ( int_key->dst_ip == flow->ik.dst_ip ) &
+    ( int_key->int_device_id == flow->ik.int_device_id ) &
+    ( int_key->protocol == flow->ik.protocol ) &
+
+    //(0 == memcmp(int_key, &flow->ik, sizeof(struct int_key))) &
+    ( ext_key->ext_src_port == flow->ext_src_port ) &
+    ( ext_key->dst_port == flow->dst_port ) &
+    ( ext_key->ext_src_ip == flow->ext_src_ip ) &
+    ( ext_key->dst_ip == flow->dst_ip ) &
+    ( ext_key->ext_device_id == flow->ext_device_id ) &
+    ( ext_key->protocol == flow->protocol ) &
+
+    ( ext_key->ext_src_port == flow->ek.ext_src_port ) &
+    ( ext_key->dst_port == flow->ek.dst_port ) &
+    ( ext_key->ext_src_ip == flow->ek.ext_src_ip ) &
+    ( ext_key->dst_ip == flow->ek.dst_ip ) &
+    ( ext_key->ext_device_id == flow->ek.ext_device_id ) &
+    ( ext_key->protocol == flow->ek.protocol ) &
+#endif//0 -- inessential for crash freedom part.
+    ( 0 <= flow->int_device_id) &
+          (flow->int_device_id < RTE_MAX_ETHPORTS) &
+    ( 0 <= flow->ext_device_id) &
+          (flow->ext_device_id < RTE_MAX_ETHPORTS) &
+    ( ext_key->ext_src_port == starting_port + index) &
+    ( flow->ext_src_port == starting_port + index ) &
+    ( flow->ek.ext_src_port == starting_port + index );
+    //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
+}
+#endif//KLEE_VERIFICATION
 
 int allocate_flowmanager(uint8_t nb_ports,
                          uint16_t _starting_port, uint32_t _ext_src_ip,
                          uint8_t _ext_device_id,
                          uint32_t _expiration_time) {
+#ifdef KLEE_VERIFICATION
+    dmap_set_entry_condition(flow_consistency);
+#endif//KLEE_VERIFICATION
     if (0 == allocate_flowtables(nb_ports))
         return 0;
     starting_port = _starting_port;

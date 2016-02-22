@@ -125,7 +125,8 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
     memcpy(value + key_a_offset_g, key, key_a_size_g);
     if (ent_cond)
       klee_assume(ent_cond(value + key_a_offset_g,
-                           value + key_b_offset_g, value));
+                           value + key_b_offset_g,
+                           allocated_index, value));
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -154,7 +155,8 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
     klee_assert(!entry_claimed);
     memcpy(value + key_b_offset_g, key, key_b_size_g);
     if (ent_cond) klee_assume(ent_cond(value + key_a_offset_g,
-                                       value + key_b_offset_g, value));
+                                       value + key_b_offset_g,
+                                       allocated_index, value));
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -186,9 +188,12 @@ int dmap_put(struct DoubleMap* map, void* value_, int index) {
     klee_assert(allocated_index == index);
   }
   memcpy(value, value_, value_size_g);
-  // This must be handled by the caller, since it his responsibility
+  // This must be provided by the caller, since it his responsibility
   // to fulfill the value by the same index:
-  //   klee_assume(ent_cond == NULL || ent_cond(key_a, key_b, value));
+  klee_assert(ent_cond == NULL || ent_cond(value + key_a_offset_g,
+                                           value + key_b_offset_g,
+                                           index,
+                                           value));
   entry_claimed = 1;
   allocated_index = index;
   return 1;
