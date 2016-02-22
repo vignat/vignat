@@ -1,3 +1,3 @@
 
 
-void dchain_allocate_some(struct DoubleChain* chain);
+void dchain_make_space(struct DoubleChain* chain);

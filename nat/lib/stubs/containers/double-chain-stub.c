@@ -80,7 +80,7 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   return 0;
 }
 
-void dchain_allocate_some(struct DoubleChain* chain) {
+void dchain_make_space(struct DoubleChain* chain) {
   //Do not trace. this function is internal for the Expirator model.
   klee_assert(is_dchain_allocated);
   klee_assert(chain == allocated_chain);
