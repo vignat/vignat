@@ -6,28 +6,58 @@
 //@ #include "lib/predicates.gh"
 
 struct DoubleChain;
+/*@
+  inductive dchain = dchain;
+
+  predicate double_chainp(dchain ch, int index_range,
+                          struct DoubleChain* cp) = true;
+
+  fixpoint dchain empty_dchain_fp();
+
+  fixpoint bool dchain_out_of_space_fp(dchain ch);
+
+  fixpoint int dchain_get_next_index(dchain ch);
+  fixpoint dchain dchain_take_next_index(dchain ch);
+
+  fixpoint dchain dchain_rejuvenate_fp(dchain ch, int index, uint32_t time);
+  fixpoint bool dchain_allocated_index_fp(dchain ch, int index);
+
+  fixpoint bool dchain_is_empty_fp(dchain ch);
+  fixpoint int dchain_get_oldest_index_fp(dchain ch);
+  fixpoint uint32_t dchain_get_oldest_time_fp(dchain ch);
+  fixpoint dchain dchain_remove_index_fp(dchain ch, int index);
+  @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
 /*@ requires true; @*/
 /*@ ensures result == 0 ? true :
-            (result == 1 &*&
-             double_chain_p(?chain, index_range));
+            (result == 1 &*& *chain_out |-> ?chp &*&
+             double_chainp(empty_dchain_fp(), index_range, chp));
             @*/
 
 int dchain_allocate_new_index(struct DoubleChain* chain,
                               int* index_out, uint32_t time);
-/*@ requires double_chain_p(?chain, ?index_range) &*& *index |-> ?i; @*/
-/*@ ensures double_chain_p(chain, index_range) &*&
-            result == 0 ? *index |-> i :
-                          (*index |-> ?j &*& 0 <= j &*& j <= index_range &*&
-                           dchain_is_allocated(chain, j) == true); @*/
+/*@ requires double_chainp(?ch, ?index_range, chain) &*& *index_out |-> ?i; @*/
+/*@ ensures dchain_out_of_space_fp(ch) ?
+            (result == 0 &*& *index_out |-> i &*&
+             double_chainp(ch, index_range, chain)) :
+            (result == 1 &*& *index_out |-> ?io &*&
+             io == dchain_get_next_index_fp(ch) &*&
+             0 <= io &*& io < index_range &*&
+             double_chainp(dchain_take_next_index(ch), index_range, chain)); @*/
+
 int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time);
-/*@ requires double_chain_p(?chain, ?index_range) &*&
+/*@ requires double_chainp(?ch, ?index_range, chain) &*&
              0 <= index &*& index < index_range; @*/
-/*@ ensures double_chain_p(chain, index_range) &*&
-            dchain_is_allocated(chain, index) ? result == 1 : result == 0; @*/
+/*@ ensures double_chainp(ch, index_range, chain) &*&
+            dchain_allocated_index_fp(ch, index) ?
+            (result == 1 &*&
+             double_chainp(dchain_rejuvenate_fp(ch, index, time)), index_range, chain) :
+            (result == 0 &*&
+             double_chainp(ch, index, chain)); @*/
 int dchain_expire_one_index(struct DoubleChain* chain,
                             int* index_out, uint32_t time);
+//^^^ Never call this funciton in this application -  no contract here.
 
 #endif //_DOUBLE_CHAIN_H_INCLUDED_
