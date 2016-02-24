@@ -1,3 +1,4 @@
+#include <string.h>
 #include <rte_log.h>
 #include <rte_byteorder.h>
 
