@@ -55,6 +55,7 @@ int dmap_allocate/*@ <K1,K2> @*/
              [_]is_map_keys_equality<K1>(eq_a, ?keyp1) &*&
              [_]is_map_keys_equality<K2>(eq_b, ?keyp2) &*&
              pred_arg3<void*,K1,K2>(?valp) &*&
+             pointer(map_out, _) &*&
              0 < key_a_size &*& 0 < key_b_size &*& 0 < value_size; @*/
 /*@ ensures result == 0 ? true : (*map_out |-> ?mapp &*&
                                   dmappingp<K1,K2>(empty_dmap_fp(), keyp1,

@@ -1,13 +1,8 @@
 start_time() -> []
-init_expirator(exp_time:10) -> []
-dmap_set_entry_condition(c:39923008&flow_consistency) -> []
-dmap_allocate(key_a_size:16,key_a_offset:0,key_b_size:16,key_b_offset:16,value_size:60) -> 1
-dchain_allocate(index_range:1024) -> 1
+dmap_set_entry_condition(c:36583696&flow_consistency) -> []
+dmap_allocate(key_a_size:16,key_a_offset:0,eq_a:36583312&int_key_eq,key_b_size:16,key_b_offset:16,eq_b:36583504&ext_key_eq,value_size:56,capacity:1024,map_out:56846272&[0->(ReadLSB w64 0 allocated_map_do_not_dereference)]) -> 1
+dchain_allocate(index_range:1024,chain_out:52049344&[0->(ReadLSB w64 0 allocated_chain_do_not_dereference)]) -> 1
 --- Constraints ---
----
----
----
----
 ---
 ---
 ---
