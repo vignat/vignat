@@ -42,6 +42,7 @@ void log_flow(const struct flow *f);
 
 #define MAX_FLOWS (1024)
 
+
 /*@
   inductive int_k = ikc(int, int, int, int, int, int);
   fixpoint int int_k_get_isp(int_k k) {
@@ -160,5 +161,11 @@ void log_flow(const struct flow *f);
     fp->protocol |-> flw_get_prtc(f);
   @*/
 
+int int_key_eq(void* a, void* b);
+//@ requires int_k_p(a, ?ak) &*& int_k_p(b, ?bk);
+//@ ensures int_k_p(a, ak) &*& int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+int ext_key_eq(void* a, void* b);
+//@ requires ext_k_p(a, ?ak) &*& ext_k_p(b, ?bk);
+//@ ensures ext_k_p(a, ak) &*& ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
 
 #endif //_FLOW_H_INCLUDED_

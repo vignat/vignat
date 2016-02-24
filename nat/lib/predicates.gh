@@ -5,49 +5,5 @@
 
 predicate last_time(unsigned int t) = true;
 
-predicate double_map_p(void* map) = true;
-
-predicate double_chain_p(void* chain) = true;
-
-predicate dmap_dchain_coherent(void* map, void* chain) = true;
-
-fixpoint int dochain_index_range(void* chain);
-
-predicate evproc_loop_invariant() =
-          double_map_p(?map) &*&
-          double_chain_p(?chain) &*&
-          last_time(?t) &*&
-          dmap_dchain_coherent(map, chain) &*&
-          dochain_index_range(chain) == 1024;
-          /* TODO: replace 1024 by the dmap_capacity */
-
-predicate domap_flow_at(void* map, int index, void* val) = true;
-
-fixpoint bool domap_has_a(void* map, void* key);
-
-fixpoint bool domap_has_b(void* map, void* key);
-
-fixpoint int domap_get_a(void* map, void* key);
-
-fixpoint int domap_get_b(void* map, void* key);
-
-fixpoint int domap_get_a_offset(void* map);
-fixpoint int domap_get_b_offset(void* map);
-
-fixpoint bool dchain_is_allocated(void* dchain, int index);
-
-fixpoint int domap_size(void* map);
-
-fixpoint int dochain_size(void* dchain);
-
-fixpoint void* domap_put(void* map, void* value, int index);
-
-lemma void domap_gives_a_allocated(void* map, void* chain, void* key, int index);
-requires domap_get_a(map, key) == index &*& dmap_dchain_coherent(map, chain);
-ensures dmap_dchain_coherent(map, chain) &*& dchain_is_allocated(chain, index) == true;
-
-lemma void domap_dchain_size(void* map, void* chain);
-requires dmap_dchain_coherent(map, chain);
-ensures dmap_dchain_coherent(map, chain) &*& domap_size(map) == dochain_size(chain);
 
 #endif

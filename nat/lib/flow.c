@@ -59,3 +59,11 @@ void log_flow(const struct flow *f) {
             " protocol: %d}\n",
             f->int_device_id, f->ext_device_id, f->protocol);
 }
+
+int int_key_eq(void* a, void* b) {
+  return memcmp(a, b, sizeof(struct int_key)) == 0;
+}
+
+int ext_key_eq(void* a, void* b) {
+  return memcmp(a, b, sizeof(struct ext_key)) == 0;
+}

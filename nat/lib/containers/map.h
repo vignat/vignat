@@ -5,7 +5,7 @@
 
 typedef int map_keys_equality/*@<K>(predicate (void*, K) keyp) @*/(void* k1, void* k2);
 //@ requires keyp(k1, ?kk1) &*& keyp(k2, ?kk2);
-//@ ensures keyp(k1, ?kk1) &*& keyp(k2, ?kk2) &*& kk1 == kk2;
+//@ ensures keyp(k1, kk1) &*& keyp(k2, kk2) &*& (0 == result ? (kk1 != kk2) : (kk1 == kk2));
 
 /**
  * Values and keys are void*, and the actual keys and values should be managed

@@ -114,15 +114,6 @@ struct str_field_descr flow_descrs[] = {
 
 #endif //KLEE_VERIFICATION
 
-static
-int int_key_eq(void* a, void* b) {
-  return memcmp(a, b, sizeof(struct int_key)) == 0;
-}
-static
-int ext_key_eq(void* a, void* b) {
-  return memcmp(a, b, sizeof(struct ext_key)) == 0;
-}
-
 int allocate_flowtables(uint8_t nb_ports) {
     (void)nb_ports;
 #ifdef KLEE_VERIFICATION

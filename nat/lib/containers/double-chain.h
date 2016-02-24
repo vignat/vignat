@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-//@ #include "lib/predicates.gh"
-
 struct DoubleChain;
 /*@
   inductive dchain = dchain;
@@ -16,8 +14,8 @@ struct DoubleChain;
 
   fixpoint bool dchain_out_of_space_fp(dchain ch);
 
-  fixpoint int dchain_get_next_index(dchain ch);
-  fixpoint dchain dchain_take_next_index(dchain ch);
+  fixpoint int dchain_get_next_index_fp(dchain ch);
+  fixpoint dchain dchain_take_next_index_fp(dchain ch);
 
   fixpoint dchain dchain_rejuvenate_fp(dchain ch, int index, uint32_t time);
   fixpoint bool dchain_allocated_index_fp(dchain ch, int index);
@@ -44,7 +42,7 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
             (result == 1 &*& *index_out |-> ?io &*&
              io == dchain_get_next_index_fp(ch) &*&
              0 <= io &*& io < index_range &*&
-             double_chainp(dchain_take_next_index(ch), index_range, chain)); @*/
+             double_chainp(dchain_take_next_index_fp(ch), index_range, chain)); @*/
 
 int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time);
@@ -53,7 +51,7 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
 /*@ ensures double_chainp(ch, index_range, chain) &*&
             dchain_allocated_index_fp(ch, index) ?
             (result == 1 &*&
-             double_chainp(dchain_rejuvenate_fp(ch, index, time)), index_range, chain) :
+             double_chainp(dchain_rejuvenate_fp(ch, index, time), index_range, chain)) :
             (result == 0 &*&
              double_chainp(ch, index, chain)); @*/
 int dchain_expire_one_index(struct DoubleChain* chain,
