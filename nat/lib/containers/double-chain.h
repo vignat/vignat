@@ -48,8 +48,7 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time);
 /*@ requires double_chainp(?ch, ?index_range, chain) &*&
              0 <= index &*& index < index_range; @*/
-/*@ ensures double_chainp(ch, index_range, chain) &*&
-            dchain_allocated_index_fp(ch, index) ?
+/*@ ensures dchain_allocated_index_fp(ch, index) ?
             (result == 1 &*&
              double_chainp(dchain_rejuvenate_fp(ch, index, time), index_range, chain)) :
             (result == 0 &*&

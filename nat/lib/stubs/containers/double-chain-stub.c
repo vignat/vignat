@@ -58,6 +58,7 @@ int dchain_rejuvenate_index(struct DoubleChain* chain, int index,
     // dereference.
     klee_trace_param_i32((uint32_t)chain, "chain");
     klee_trace_param_i32(index, "index");
+    klee_trace_param_i32(time, "time");
 
     klee_assert(is_dchain_allocated);
     klee_assert(chain == allocated_chain);

@@ -159,6 +159,8 @@ void log_flow(const struct flow *f);
     fp->int_device_id |-> flw_get_idid(f) &*&
     fp->ext_device_id |-> flw_get_edid(f) &*&
     fp->protocol |-> flw_get_prtc(f);
+
+  predicate flow_p(void* p, int_k ik, ext_k ek) = true;
   @*/
 
 int int_key_eq(void* a, void* b);

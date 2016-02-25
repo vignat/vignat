@@ -39,6 +39,18 @@ struct DoubleMap;
   fixpoint int dmap_size_fp<t1,t2>(dmap<t1,t2> m);
   fixpoint bool dmap_index_used_fp<t1,t2>(dmap<t1,t2> m, int index);
 
+  lemma void dmap_get_k1_limits<t1,t2>(dmap<t1,t2> m, t1 k1);
+  requires dmappingp<t1,t2>(m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
+           dmap_has_k1_fp<t1,t2>(m, k1) == true;
+  ensures dmappingp<t1,t2>(m, kp1, kp2, vp, cap, mp) &*&
+          0 <= dmap_get_k1_fp<t1,t2>(m, k1) &*&
+          dmap_get_k1_fp<t1,t2>(m, k1) < cap;
+
+  lemma void dmap_get_k1_gives_used<t1,t2>(dmap<t1,t2> m, t1 k1);
+  requires dmappingp<t1,t2>(m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
+           dmap_has_k1_fp<t1,t2>(m, k1) == true;
+  ensures dmappingp<t1,t2>(m, kp1, kp2, vp, cap, mp) &*&
+          dmap_index_used_fp(m, dmap_get_k1_fp(m, k1)) == true;
   @*/
 
 /*@ predicate pred_arg3<t1,t2,t3>(predicate (t1,t2,t3) p) = true;
@@ -69,8 +81,8 @@ int dmap_get_a/*@ <K1,K2> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ ensures dmappingp<K1,K2>(m, kp1, kp2, vp, cap, map) &*&
             kp1(key, k1) &*&
             (dmap_has_k1_fp(m, k1) ?
-             (result == 0 &*& *index |-> dmap_get_k1_fp(m, k1)) :
-             (result == 1 &*& *index |-> i)); @*/
+             (result == 1 &*& *index |-> dmap_get_k1_fp(m, k1)) :
+             (result == 0 &*& *index |-> i)); @*/
 int dmap_get_b/*@ <K1,K2> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ requires dmappingp<K1,K2>(?m, ?kp1, ?kp2, ?vp, ?cap, map) &*&
              kp2(key, ?k2) &*&
@@ -78,8 +90,8 @@ int dmap_get_b/*@ <K1,K2> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ ensures dmappingp<K1,K2>(m, kp1, kp2, vp, cap, map) &*&
             kp2(key, k2) &*&
             (dmap_has_k2_fp(m, k2) ?
-             (result == 0 &*& *index |-> dmap_get_k2_fp(m, k2)) :
-             (result == 1 &*& *index |-> i)); @*/
+             (result == 1 &*& *index |-> dmap_get_k2_fp(m, k2)) :
+             (result == 0 &*& *index |-> i)); @*/
 int dmap_put/*@ <K1,K2> @*/(struct DoubleMap* map, void* value, int index);
 /*@ requires dmappingp<K1,K2>(?m, ?kp1, ?kp2, ?vp, ?cap, map) &*& vp(value, ?k1, ?k2) &*&
              false == dmap_has_k1_fp(m, k1) &*&
