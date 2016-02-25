@@ -435,7 +435,7 @@ main_loop(__attribute__((unused)) void *dummy)
     }
 
 #ifdef KLEE_VERIFICATION
-    loop_iteration_begin();
+    loop_iteration_begin(get_dmap_pp(), get_dchain_pp());
 #else //KLEE_VERIFICATION
     while (1) 
 #endif //KLEE_VERIFICATION
@@ -509,7 +509,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #endif//KLEE_VERIFICATION
     }
 #ifdef KLEE_VERIFICATION
-    loop_iteration_end();
+    loop_iteration_end(get_dmap_pp(), get_dchain_pp());
 #endif//KLEE_VERIFICATION
     return 0;
 }

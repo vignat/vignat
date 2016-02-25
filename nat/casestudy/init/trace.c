@@ -38,6 +38,6 @@ void to_verify()
   //@ assume(rez2 == 1);
   // arg2 gets a special value.
   //@ close dmap_dchain_coherent(empty_dmap_fp(), empty_dchain_fp());
-  //@ close evproc_loop_invariant();
-  loop_invariant_consume();
+  //@ close evproc_loop_invariant(arg1, arg2);
+  loop_invariant_consume(&arg1, &arg2);
 }

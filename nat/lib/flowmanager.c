@@ -64,6 +64,11 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value) {
     ( flow->ek.ext_src_port == starting_port + index );
     //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
 }
+
+struct DoubleChain** get_dchain_pp(void) {
+  return &chain;
+}
+
 #endif//KLEE_VERIFICATION
 
 int allocate_flowmanager(uint8_t nb_ports,

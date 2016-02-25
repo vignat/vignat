@@ -112,6 +112,10 @@ struct str_field_descr flow_descrs[] = {
   {offsetof(struct flow, protocol), sizeof(uint8_t), "protocol"},
 };
 
+struct DoubleMap **get_dmap_pp(void) {
+  return &flow_map;
+}
+
 #endif //KLEE_VERIFICATION
 
 int allocate_flowtables(uint8_t nb_ports) {

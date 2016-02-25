@@ -16,5 +16,8 @@ int allocate_flowtables(uint8_t nb_ports);
 struct DoubleMap;
 struct DoubleMap* get_flow_table(void);
 
+#ifdef KLEE_VERIFICATION
+struct DoubleMap **get_dmap_pp(void);
+#endif //KLEE_VERIFICATION
 
 #endif //_FLOWTABLE_H_INCLUDED_
