@@ -10,14 +10,13 @@ void to_verify()
 //@ requires true;
 //@ ensures true;
 {
-  int next_time, next_time_1;
-  int number_of_freed_flows;
-  uint32_t arg1;
+  struct DoubleMap* arg1;
+  struct DoubleChain* arg2;
+  uint32_t next_time, next_time_1;
   uint32_t user_buf030;
   uint32_t user_buf026;//TODO: maker sure these "sub-arrays" do not intersect.
   uint8_t user_buf023;
   int queue_num_i;
-  int arg2 = queue_num_i;
   uint8_t val;
   //@ assume(0 <= queue_num_i);
   //@ assume(queue_num_i < 2);
@@ -31,19 +30,20 @@ void to_verify()
   ek1.dst_ip = user_buf026;
   ek1.ext_device_id = val;//Generalized the symbolic indexing result.
   ek1.protocol = user_buf023;
-  loop_invariant_produce();
-  //@ open evproc_loop_invariant();
+
+  loop_invariant_produce(&arg1, &arg2);
+  //@ open evproc_loop_invariant(?mp, ?chp);
   uint32_t rez1 = current_time();
   //@ assume(rez1 == next_time);
-  int rez2 = expire_flows(arg1);
-  //@ assume(rez2 == number_of_freed_flows);
-  loop_enumeration_begin(arg2);
-  uint32_t rez3 = current_time();
-  //@ assume(rez3 == next_time_1);
-  int rez4 = dmap_get_b(arg3, &arg4);
-  //@ assume(rez4 == 0);
+  loop_enumeration_begin(queue_num_i);
+  uint32_t rez2 = current_time();
+  //@ assume(rez2 == next_time_1);
+  //@ close (ext_k_p(&ek1, ekc(0, 0, user_buf030, user_buf026, val, user_buf023)));
+  int rez3 = dmap_get_b(arg1, arg3, &arg4);
+  //@ assume(rez3 == 0);
   //@ assume(arg4 == -1);
   loop_enumeration_end();
-  //@ close evproc_loop_invariant();
-  loop_invariant_consume();
+  //@ close evproc_loop_invariant(mp, chp);
+  loop_invariant_consume(&arg1, &arg2);
+  //@ open ext_k_p(_,_);
 }

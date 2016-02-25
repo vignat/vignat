@@ -67,6 +67,7 @@ int dmap_get_a/*@ <K1,K2> @*/(struct DoubleMap* map, void* key, int* index);
              kp1(key, ?k1) &*&
              *index |-> ?i; @*/
 /*@ ensures dmappingp<K1,K2>(m, kp1, kp2, vp, cap, map) &*&
+            kp1(key, k1) &*&
             (dmap_has_k1_fp(m, k1) ?
              (result == 0 &*& *index |-> dmap_get_k1_fp(m, k1)) :
              (result == 1 &*& *index |-> i)); @*/
@@ -75,6 +76,7 @@ int dmap_get_b/*@ <K1,K2> @*/(struct DoubleMap* map, void* key, int* index);
              kp2(key, ?k2) &*&
              *index |-> ?i; @*/
 /*@ ensures dmappingp<K1,K2>(m, kp1, kp2, vp, cap, map) &*&
+            kp2(key, k2) &*&
             (dmap_has_k2_fp(m, k2) ?
              (result == 0 &*& *index |-> dmap_get_k2_fp(m, k2)) :
              (result == 1 &*& *index |-> i)); @*/

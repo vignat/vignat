@@ -14,7 +14,7 @@ predicate dmap_dchain_coherent(dmap<int_k,ext_k> m, dchain ch) = true;
 fixpoint int dochain_index_range(dchain ch);
 
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp) =
-          dmappingp<int_k,ext_k>(?m, _, _, _,
+          dmappingp<int_k,ext_k>(?m, int_k_p, ext_k_p, _,
                                  ?capacity, mp) &*&
           double_chainp(?ch, ?index_range, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
