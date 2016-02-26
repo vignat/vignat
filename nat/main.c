@@ -273,90 +273,93 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
 static inline __attribute__((always_inline)) void
 simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 {
-    struct ether_hdr *eth_hdr;
-    struct ipv4_hdr *ipv4_hdr;
-    uint8_t dst_device;
+  struct ether_hdr *eth_hdr;
+  struct ipv4_hdr *ipv4_hdr;
+  uint8_t dst_device;
 
-    (void)qconf;
+  (void)qconf;
 
-    eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
+  eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
-    if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
-        (m->packet_type == 0 && eth_hdr->ether_type ==
-                                rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
-        //TODO: determine the packet type when packet_type is 0(undefined).
-        /* Handle IPv4 headers.*/
-        ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
-                                           sizeof(struct ether_hdr));
+  if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
+      (m->packet_type == 0 &&
+       eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+    //TODO: determine the packet type when packet_type is 0(undefined).
+    /* Handle IPv4 headers.*/
+    ipv4_hdr = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+                                       sizeof(struct ether_hdr));
+    // Need ports for normal operation. Restricted only to TCP/UDP for now.
+    if (ipv4_hdr->next_proto_id == IPPROTO_TCP ||
+        ipv4_hdr->next_proto_id == IPPROTO_UDP) {
 
-        LOG( "forwarding and ipv4 packet on %d\n", portid);
-        LOG( "eth_hdr size: %lu; ipv4 hdr size: %lu; data_offset %d:\n",
-             sizeof(struct ether_hdr), sizeof(struct ipv4_hdr), m->data_off);
-        if (portid == wan_port_id) {
-            //External port.
-            LOG( "port %d turns out to be external(%d)\n", portid, wan_port_id);
-            struct ext_key key = {
-                .ext_src_port = get_dst_port(m), //intentionally swapped.
-                .dst_port = get_src_port(m),
-                .ext_src_ip = ipv4_hdr->dst_addr, //Note, they are switched for
-                .dst_ip = ipv4_hdr->src_addr, // the backwards traffic
-                .ext_device_id = portid,
-                .protocol = ipv4_hdr->next_proto_id
-            };
-            LOG( "for key: ");
-            log_ext_key(&key);
-            struct flow f;
-            int flow_exists = get_flow_by_ext_key(&key, current_time(), &f);
-            if (flow_exists) {
-              LOG( "found flow:");
-              log_flow(&f);
-              ipv4_hdr->dst_addr = f.int_src_ip;
-              set_dst_port(m, f.int_src_port);
-              dst_device = f.int_device_id;
-            } else {
-              // User did not ask for this packet.
-              LOG( "flow not found. dropping\n");
+      LOG( "forwarding and ipv4 packet on %d\n", portid);
+      LOG( "eth_hdr size: %lu; ipv4 hdr size: %lu; data_offset %d:\n",
+           sizeof(struct ether_hdr), sizeof(struct ipv4_hdr), m->data_off);
+      if (portid == wan_port_id) {
+        //External port.
+        LOG( "port %d turns out to be external(%d)\n", portid, wan_port_id);
+        struct ext_key key = {
+          .ext_src_port = get_dst_port(m), //intentionally swapped.
+          .dst_port = get_src_port(m),
+          .ext_src_ip = ipv4_hdr->dst_addr, //Note, they are switched for
+          .dst_ip = ipv4_hdr->src_addr, // the backwards traffic
+          .ext_device_id = portid,
+          .protocol = ipv4_hdr->next_proto_id
+        };
+        LOG( "for key: ");
+        log_ext_key(&key);
+        struct flow f;
+        int flow_exists = get_flow_by_ext_key(&key, current_time(), &f);
+        if (flow_exists) {
+          LOG( "found flow:");
+          log_flow(&f);
+          ipv4_hdr->dst_addr = f.int_src_ip;
+          set_dst_port(m, f.int_src_port);
+          dst_device = f.int_device_id;
+        } else {
+          // User did not ask for this packet.
+          LOG( "flow not found. dropping\n");
+          rte_pktmbuf_free(m);
+          return;
+        }
+      } else {
+        //Internal port.
+        LOG( "port %d turns out NOT to be external(%d)\n", portid, wan_port_id);
+        struct int_key key = {
+          .int_src_port = get_src_port(m),
+          .dst_port = get_dst_port(m),
+          .int_src_ip = ipv4_hdr->src_addr,
+          .dst_ip = ipv4_hdr->dst_addr,
+          .int_device_id = portid,
+          .protocol = ipv4_hdr->next_proto_id
+        };
+        LOG( "for key: ");
+        log_int_key(&key);
+        struct flow f;
+        int flow_exists = get_flow_by_int_key(&key, current_time(), &f);
+        if (!flow_exists) {
+          LOG( "adding flow: ");
+          if (!allocate_flow(&key, current_time(), &f)) {
+            if (0 == expire_flows(current_time())) {
+              LOG("No space for the flow, dropping.");
               rte_pktmbuf_free(m);
               return;
+            } else {
+              // A second try, after we expired some flows.
+              if (!allocate_flow(&key, current_time(), &f)) {
+                rte_exit(EXIT_FAILURE, "Can not allocate flow, "
+                         "even after expiring some!\n");
+              }
             }
-        } else {
-            //Internal port.
-            LOG( "port %d turns out NOT to be external(%d)\n", portid, wan_port_id);
-            struct int_key key = {
-                .int_src_port = get_src_port(m),
-                .dst_port = get_dst_port(m),
-                .int_src_ip = ipv4_hdr->src_addr,
-                .dst_ip = ipv4_hdr->dst_addr,
-                .int_device_id = portid,
-                .protocol = ipv4_hdr->next_proto_id
-            };
-            LOG( "for key: ");
-            log_int_key(&key);
-            struct flow f;
-            int flow_exists = get_flow_by_int_key(&key, current_time(), &f);
-            if (!flow_exists) {
-                LOG( "adding flow: ");
-                if (!allocate_flow(&key, current_time(), &f)) {
-                    if (0 == expire_flows(current_time())) {
-                        LOG("No space for the flow, dropping.");
-                        rte_pktmbuf_free(m);
-                        return;
-                    } else {
-                        // A second try, after we expired some flows.
-                        if (!allocate_flow(&key, current_time(), &f)) {
-                            rte_exit(EXIT_FAILURE, "Can not allocate flow, "
-                                     "even after expiring some!\n");
-                        }
-                    }
-                }
-            }
-            LOG( "forwarding to: ");
-            log_flow(&f);
-            ipv4_hdr->src_addr = f.ext_src_ip;
-            set_src_port(m, f.ext_src_port);
-            //TODO: recalculate ip checksum.
-            dst_device = f.ext_device_id;
+          }
         }
+        LOG( "forwarding to: ");
+        log_flow(&f);
+        ipv4_hdr->src_addr = f.ext_src_ip;
+        set_src_port(m, f.ext_src_port);
+        //TODO: recalculate ip checksum.
+        dst_device = f.ext_device_id;
+      }
 
 //#ifdef DO_RFC_1812_CHECKS
 //        /* Update time to live and header checksum */
@@ -364,41 +367,45 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 //        ++(ipv4_hdr->hdr_checksum);
 //#endif
 #ifdef KLEE_VERIFICATION
-        //A trivial reassignment to improve Klee preformance on symbolic
-        // indexing. Here I explicitly enumerate all possible values of
-        // dst_device (just two of them).
-        klee_assert(dst_device >= 0);
-        klee_assert(dst_device < RTE_MAX_ETHPORTS);
-        for (int pp = 0; pp < RTE_MAX_ETHPORTS; ++pp)
-          if (dst_device == pp) dst_device = pp;
+      //A trivial reassignment to improve Klee preformance on symbolic
+      // indexing. Here I explicitly enumerate all possible values of
+      // dst_device (just two of them).
+      klee_assert(dst_device >= 0);
+      klee_assert(dst_device < RTE_MAX_ETHPORTS);
+      for (int pp = 0; pp < RTE_MAX_ETHPORTS; ++pp)
+        if (dst_device == pp) dst_device = pp;
 #endif //KLEE_VERIFICATION
-        /* dst addr */
-        *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
+      /* dst addr */
+      *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
 
 
-        /* src addr */
-        ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
+      /* src addr */
+      ether_addr_copy(&ports_eth_addr[dst_device], &eth_hdr->s_addr);
 
-        ipv4_hdr->hdr_checksum = 0;
-        if (ipv4_hdr->next_proto_id == IPPROTO_TCP) {
-            struct tcp_hdr * tcp_hdr = (struct tcp_hdr*)(ipv4_hdr + 1);
-            tcp_hdr->cksum = 0;
-            tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+      ipv4_hdr->hdr_checksum = 0;
+      if (ipv4_hdr->next_proto_id == IPPROTO_TCP) {
+        struct tcp_hdr * tcp_hdr = (struct tcp_hdr*)(ipv4_hdr + 1);
+        tcp_hdr->cksum = 0;
+        tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, tcp_hdr);
+      } else {
+        struct udp_hdr * udp_hdr = (struct udp_hdr*)(ipv4_hdr + 1);
+        udp_hdr->dgram_cksum = 0;
+        udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
+      }
+      ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
 
-        } else {
-           struct udp_hdr * udp_hdr = (struct udp_hdr*)(ipv4_hdr + 1);
-           udp_hdr->dgram_cksum = 0;
-           udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_hdr, udp_hdr);
-        }
-        ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
 
-
-        send_single_packet(m, dst_device);
+      send_single_packet(m, dst_device);
     } else {
-        LOG( "non ipv4 packet, discard\n");
-        /* Free the mbuf that contains non-IPV4/IPV6 packet */
-        rte_pktmbuf_free(m);
+      LOG( "Non TCP, nor UDP packet, dsicard \n");
+      /* Free the mbuf that contains no TCP, nor UDP datagramm */
+      rte_pktmbuf_free(m);
     }
+  } else {
+    LOG( "non ipv4 packet, discard\n");
+    /* Free the mbuf that contains non-IPV4/IPV6 packet */
+    rte_pktmbuf_free(m);
+  }
 }
 
 /* main processing loop */

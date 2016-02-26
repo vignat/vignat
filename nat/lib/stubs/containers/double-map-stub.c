@@ -90,6 +90,9 @@ int dmap_allocate(int key_a_size,
     entry_claimed = 0;
     allocated_index = klee_int("dmap_allocated_index");
 
+    klee_assume(0 <= allocated_index);
+    klee_assume(allocated_index < capacity);
+
     key_a_size_g = key_a_size;
     key_a_offset_g = key_a_offset;
     key_b_size_g = key_b_size;
