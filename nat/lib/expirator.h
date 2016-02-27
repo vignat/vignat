@@ -9,8 +9,10 @@ int expire_items/*@<K1,K2> @*/(struct DoubleChain* chain,
                               uint32_t time);
 /*@ requires dmappingp<K1,K2>(?m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
              double_chainp(?ch, ?ir, ?chp); @*/
-/*@ ensures dmappingp<K1,K2>(m, kp1, kp2, vp, cap, mp) &*&
-            double_chainp(ch, ir, chp) &*& result >= 0; @*/
+/*@ ensures dmappingp<K1,K2>(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time)),
+                             kp1, kp2, vp, cap, mp) &*&
+            double_chainp(dchain_expire_old_indexes_fp(ch, time), ir, chp) &*&
+            result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 //^^^ TODO: also ensures that all the items left are newer than "time";
 
 #endif //_EXPIRATOR_H_INCLUDED_

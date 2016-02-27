@@ -27,7 +27,7 @@ void to_verify()
     @*/
     
   //@ close exists<pair<int_k, ext_k> >(pair(ikc(0,0,0,0,0,0), ekc(0,0,0,0,0,0)));
-  //@ close pred_arg3(flow_p);
+  //@ close pred_arg4(flow_p);
   int rez1 = dmap_allocate(16, 0, int_key_eq, 16, 16, ext_key_eq, 56, 1024, &arg1);
   // arg1 gets a special value.
   //@ assume(rez1 == 1);

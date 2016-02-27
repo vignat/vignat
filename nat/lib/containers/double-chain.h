@@ -24,6 +24,13 @@ struct DoubleChain;
   fixpoint int dchain_get_oldest_index_fp(dchain ch);
   fixpoint uint32_t dchain_get_oldest_time_fp(dchain ch);
   fixpoint dchain dchain_remove_index_fp(dchain ch, int index);
+
+  fixpoint dchain dchain_expire_old_indexes_fp(dchain ch, uint32_t time);
+  fixpoint list<int> dchain_get_expired_indexes_fp(dchain ch, uint32_t time);
+
+  lemma void dchain_next_index_not_allocated(dchain ch);
+  requires true;
+  ensures false == dchain_allocated_index_fp(ch, dchain_get_next_index_fp(ch));
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);

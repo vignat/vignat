@@ -1,0 +1,472 @@
+start_time() -> []
+dmap_set_entry_condition(c:41098080&flow_consistency) -> []
+dmap_allocate(key_a_size:16,key_a_offset:0,eq_a:41141040&int_key_eq,key_b_size:16,key_b_offset:16,eq_b:41141424&ext_key_eq,value_size:56,capacity:1024,map_out:61382608&[0->(ReadLSB w64 0 allocated_map_do_not_dereference)]) -> 1
+dchain_allocate(index_range:1024,chain_out:50106848&[0->(ReadLSB w64 0 allocated_chain_do_not_dereference)]) -> 1
+loop_invariant_consume(m:61382608&[(ReadLSB w64 0 allocated_map_do_not_dereference)->(ReadLSB w64 0 allocated_map_do_not_dereference)],ch:50106848&[(ReadLSB w64 0 allocated_chain_do_not_dereference)->(ReadLSB w64 0 allocated_chain_do_not_dereference)]) -> []
+
+loop_invariant_produce(m:61382608&[(ReadLSB w64 0 allocated_map_do_not_dereference)->(ReadLSB w64 0 allocated_map_do_not_dereference)],ch:50106848&[(ReadLSB w64 0 allocated_chain_do_not_dereference)->(ReadLSB w64 0 allocated_chain_do_not_dereference)]) -> []
+current_time() -> (ReadLSB w32 0 next_time)
+loop_enumeration_begin(cnt:(ReadLSB w32 0 queue #: i)) -> []
+current_time() -> (ReadLSB w32 0 next_time_1)
+dmap_get_a(map:(ReadLSB w32 0 allocated_map_do_not_dereference),key:48086896&[(Concat w128 171
+ (Concat w120 171
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 (Read w8 29 user_buf0)
+ (Concat w56 (Read w8 28 user_buf0)
+ (Concat w48 (Read w8 27 user_buf0)
+ (Concat w40 (Read w8 26 user_buf0)
+ (ReadLSB w32 34 user_buf0)))))))))))))->(Concat w128 171
+ (Concat w120 171
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 (Read w8 29 user_buf0)
+ (Concat w56 (Read w8 28 user_buf0)
+ (Concat w48 (Read w8 27 user_buf0)
+ (Concat w40 (Read w8 26 user_buf0)
+ (ReadLSB w32 34 user_buf0)))))))))))))][int_src_port:(ReadLSB w16 34 user_buf0)->(ReadLSB w16 34 user_buf0)][dst_port:(ReadLSB w16 36 user_buf0)->(ReadLSB w16 36 user_buf0)][int_src_ip:(ReadLSB w32 26 user_buf0)->(ReadLSB w32 26 user_buf0)][dst_ip:(ReadLSB w32 30 user_buf0)->(ReadLSB w32 30 user_buf0)][int_device_id:(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)->(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)][protocol:(Read w8 23 user_buf0)->(Read w8 23 user_buf0)],index:144619792&[4294967295->4294967295]) -> 0
+current_time() -> (ReadLSB w32 0 next_time_2)
+dchain_allocate_new_index(chain:(ReadLSB w32 0 allocated_chain_do_not_dereference),index_out:144483344&[4294967295->4294967295],time:(ReadLSB w32 0 next_time_2)) -> 0
+current_time() -> (ReadLSB w32 0 next_time_3)
+expire_items(chain:(ReadLSB w32 0 allocated_chain_do_not_dereference),map:(ReadLSB w32 0 allocated_map_do_not_dereference),exp_time:(Add w32 4294967286
+ (ReadLSB w32 0 next_time_3))) -> (ReadLSB w32 0 number_of_freed_flows)
+current_time() -> (ReadLSB w32 0 next_time_4)
+dchain_allocate_new_index(chain:(ReadLSB w32 0 allocated_chain_do_not_dereference),index_out:145767280&[4294967295->(ReadLSB w32 0 new_index)],time:(ReadLSB w32 0 next_time_4)) -> 1
+dmap_put(map:(ReadLSB w32 0 allocated_map_do_not_dereference),value_:146038672&[(Concat w448 171
+ (Concat w440 N0:(Read w8 23 user_buf0)
+ (Concat w432 1
+ (Concat w424 N1:(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w416 N2:(Read w8 33 user_buf0)
+ (Concat w408 N3:(Read w8 32 user_buf0)
+ (Concat w400 N4:(Read w8 31 user_buf0)
+ (Concat w392 N5:(Read w8 30 user_buf0)
+ (Concat w384 11
+ (Concat w376 3
+ (Concat w368 168
+ (Concat w360 192
+ (Concat w352 N6:(Read w8 29 user_buf0)
+ (Concat w344 N7:(Read w8 28 user_buf0)
+ (Concat w336 N8:(Read w8 27 user_buf0)
+ (Concat w328 N9:(Read w8 26 user_buf0)
+ (Concat w320 171
+ (Concat w312 171
+ (Concat w304 N10:(Read w8 37 user_buf0)
+ (Concat w296 N11:(Read w8 36 user_buf0)
+ (Concat w288 N12:(Extract w8 8 N13:(Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index))))
+ (Concat w280 N14:(Extract w8 0 N13)
+ (Concat w272 N15:(Read w8 35 user_buf0)
+ (Concat w264 N16:(Read w8 34 user_buf0)
+ (Concat w256 0
+ (Concat w248 0
+ (Concat w240 N0
+ (Concat w232 1
+ (Concat w224 N2
+ (Concat w216 N3
+ (Concat w208 N4
+ (Concat w200 N5
+ (Concat w192 11
+ (Concat w184 3
+ (Concat w176 168
+ (Concat w168 192
+ (Concat w160 N10
+ (Concat w152 N11
+ (Concat w144 N12
+ (Concat w136 N14
+ (Concat w128 0
+ (Concat w120 0
+ (Concat w112 N0
+ (Concat w104 N1
+ (Concat w96 N2
+ (Concat w88 N3
+ (Concat w80 N4
+ (Concat w72 N5
+ (Concat w64 N6
+ (Concat w56 N7
+ (Concat w48 N8
+ (Concat w40 N9
+ (ReadLSB w32 34 user_buf0)))))))))))))))))))))))))))))))))))))))))))))))))))))->(Concat w448 171
+ (Concat w440 N0:(Read w8 23 user_buf0)
+ (Concat w432 1
+ (Concat w424 N1:(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w416 N2:(Read w8 33 user_buf0)
+ (Concat w408 N3:(Read w8 32 user_buf0)
+ (Concat w400 N4:(Read w8 31 user_buf0)
+ (Concat w392 N5:(Read w8 30 user_buf0)
+ (Concat w384 11
+ (Concat w376 3
+ (Concat w368 168
+ (Concat w360 192
+ (Concat w352 N6:(Read w8 29 user_buf0)
+ (Concat w344 N7:(Read w8 28 user_buf0)
+ (Concat w336 N8:(Read w8 27 user_buf0)
+ (Concat w328 N9:(Read w8 26 user_buf0)
+ (Concat w320 171
+ (Concat w312 171
+ (Concat w304 N10:(Read w8 37 user_buf0)
+ (Concat w296 N11:(Read w8 36 user_buf0)
+ (Concat w288 N12:(Extract w8 8 N13:(Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index))))
+ (Concat w280 N14:(Extract w8 0 N13)
+ (Concat w272 N15:(Read w8 35 user_buf0)
+ (Concat w264 N16:(Read w8 34 user_buf0)
+ (Concat w256 0
+ (Concat w248 0
+ (Concat w240 N0
+ (Concat w232 1
+ (Concat w224 N2
+ (Concat w216 N3
+ (Concat w208 N4
+ (Concat w200 N5
+ (Concat w192 11
+ (Concat w184 3
+ (Concat w176 168
+ (Concat w168 192
+ (Concat w160 N10
+ (Concat w152 N11
+ (Concat w144 N12
+ (Concat w136 N14
+ (Concat w128 0
+ (Concat w120 0
+ (Concat w112 N0
+ (Concat w104 N1
+ (Concat w96 N2
+ (Concat w88 N3
+ (Concat w80 N4
+ (Concat w72 N5
+ (Concat w64 N6
+ (Concat w56 N7
+ (Concat w48 N8
+ (Concat w40 N9
+ (ReadLSB w32 34 user_buf0)))))))))))))))))))))))))))))))))))))))))))))))))))))][ik:(Concat w128 0
+ (Concat w120 0
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 (Read w8 29 user_buf0)
+ (Concat w56 (Read w8 28 user_buf0)
+ (Concat w48 (Read w8 27 user_buf0)
+ (Concat w40 (Read w8 26 user_buf0)
+ (ReadLSB w32 34 user_buf0)))))))))))))->(Concat w128 0
+ (Concat w120 0
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 (Read w8 29 user_buf0)
+ (Concat w56 (Read w8 28 user_buf0)
+ (Concat w48 (Read w8 27 user_buf0)
+ (Concat w40 (Read w8 26 user_buf0)
+ (ReadLSB w32 34 user_buf0)))))))))))))][ek:(Concat w128 0
+ (Concat w120 0
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 1
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 11
+ (Concat w56 3
+ (Concat w48 168
+ (Concat w40 192
+ (Concat w32 (Read w8 37 user_buf0)
+ (Concat w24 (Read w8 36 user_buf0)
+ (Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index)))))))))))))))))->(Concat w128 0
+ (Concat w120 0
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 1
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 11
+ (Concat w56 3
+ (Concat w48 168
+ (Concat w40 192
+ (Concat w32 (Read w8 37 user_buf0)
+ (Concat w24 (Read w8 36 user_buf0)
+ (Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index)))))))))))))))))][int_src_port:(ReadLSB w16 34 user_buf0)->(ReadLSB w16 34 user_buf0)][ext_src_port:(Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index)))->(Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index)))][dst_port:(ReadLSB w16 36 user_buf0)->(ReadLSB w16 36 user_buf0)][int_src_ip:(ReadLSB w32 26 user_buf0)->(ReadLSB w32 26 user_buf0)][ext_src_ip:184789184->184789184][dst_ip:(ReadLSB w32 30 user_buf0)->(ReadLSB w32 30 user_buf0)][int_device_id:(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)->(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)][ext_device_id:1->1][protocol:(Read w8 23 user_buf0)->(Read w8 23 user_buf0)],index:(ReadLSB w32 0 new_index)) -> 1
+--- Constraints ---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+(Ule (ReadLSB w32 0 starting_time)
+ (ReadLSB w32 0 next_time))
+---
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+---
+---
+---
+(Ule (ReadLSB w32 0 next_time)
+ (ReadLSB w32 0 next_time_1))
+---
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 6 (Read w8 23 user_buf0))
+(Eq false
+ (Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)))
+---
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 6 (Read w8 23 user_buf0))
+(Eq false
+ (Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)))
+---
+---
+(Ule (ReadLSB w32 0 next_time_1)
+ (ReadLSB w32 0 next_time_2))
+---
+(Ule (ReadLSB w32 0 next_time_1)
+ (ReadLSB w32 0 next_time_2))
+---
+---
+---
+(Ule (ReadLSB w32 0 next_time_2)
+ (ReadLSB w32 0 next_time_3))
+---
+(Ule (ReadLSB w32 0 next_time_2)
+ (ReadLSB w32 0 next_time_3))
+(Eq false
+ (Ult (ReadLSB w32 0 next_time_3)
+ 10))
+---
+(Sle 0
+ (ReadLSB w32 0 number_of_freed_flows))
+(Slt 0
+ (ReadLSB w32 0 number_of_freed_flows))
+---
+---
+(Ule (ReadLSB w32 0 next_time_3)
+ (ReadLSB w32 0 next_time_4))
+---
+(Ule (ReadLSB w32 0 next_time_3)
+ (ReadLSB w32 0 next_time_4))
+---
+(Sle 0
+ (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+ 1024)
+---
+(Sle 0
+ (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+ 1024)
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 6 (Read w8 23 user_buf0))
+(Eq false
+ (Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)))
+(Sle 0
+ (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+ 1024)
+---
+(Sle 0
+ (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+ 1024)
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 6 (Read w8 23 user_buf0))
+(Eq false
+ (Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)))
+---
+--- Alternatives ---
+(or 
+(and 
+dmap_get_value(map:(ReadLSB w32 0 allocated_map_do_not_dereference),index:(ReadLSB w32 0 new_index),value_out:61466896&[487409497468818738368370082936661864213618324225613287482881662979958110852513901524622234008053214552511338018319672261311438739188651->(Concat w448 171
+ (Concat w440 N0:(Read w8 23 user_buf0)
+ (Concat w432 1
+ (Concat w424 N1:(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w416 N2:(Read w8 33 user_buf0)
+ (Concat w408 N3:(Read w8 32 user_buf0)
+ (Concat w400 N4:(Read w8 31 user_buf0)
+ (Concat w392 N5:(Read w8 30 user_buf0)
+ (Concat w384 11
+ (Concat w376 3
+ (Concat w368 168
+ (Concat w360 192
+ (Concat w352 N6:(Read w8 29 user_buf0)
+ (Concat w344 N7:(Read w8 28 user_buf0)
+ (Concat w336 N8:(Read w8 27 user_buf0)
+ (Concat w328 N9:(Read w8 26 user_buf0)
+ (Concat w320 171
+ (Concat w312 171
+ (Concat w304 N10:(Read w8 37 user_buf0)
+ (Concat w296 N11:(Read w8 36 user_buf0)
+ (Concat w288 N12:(Extract w8 8 N13:(Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index))))
+ (Concat w280 N14:(Extract w8 0 N13)
+ (Concat w272 N15:(Read w8 35 user_buf0)
+ (Concat w264 N16:(Read w8 34 user_buf0)
+ (Concat w256 0
+ (Concat w248 0
+ (Concat w240 N0
+ (Concat w232 1
+ (Concat w224 N2
+ (Concat w216 N3
+ (Concat w208 N4
+ (Concat w200 N5
+ (Concat w192 11
+ (Concat w184 3
+ (Concat w176 168
+ (Concat w168 192
+ (Concat w160 N10
+ (Concat w152 N11
+ (Concat w144 N12
+ (Concat w136 N14
+ (Concat w128 0
+ (Concat w120 0
+ (Concat w112 N0
+ (Concat w104 N1
+ (Concat w96 N2
+ (Concat w88 N3
+ (Concat w80 N4
+ (Concat w72 N5
+ (Concat w64 N6
+ (Concat w56 N7
+ (Concat w48 N8
+ (Concat w40 N9
+ (ReadLSB w32 34 user_buf0)))))))))))))))))))))))))))))))))))))))))))))))))))))][ik:228189351935217557851910030866009271211->(Concat w128 0
+ (Concat w120 0
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 (Read w8 29 user_buf0)
+ (Concat w56 (Read w8 28 user_buf0)
+ (Concat w48 (Read w8 27 user_buf0)
+ (Concat w40 (Read w8 26 user_buf0)
+ (ReadLSB w32 34 user_buf0)))))))))))))][ek:228189351935217557851910030866009271211->(Concat w128 0
+ (Concat w120 0
+ (Concat w112 (Read w8 23 user_buf0)
+ (Concat w104 1
+ (Concat w96 (Read w8 33 user_buf0)
+ (Concat w88 (Read w8 32 user_buf0)
+ (Concat w80 (Read w8 31 user_buf0)
+ (Concat w72 (Read w8 30 user_buf0)
+ (Concat w64 11
+ (Concat w56 3
+ (Concat w48 168
+ (Concat w40 192
+ (Concat w32 (Read w8 37 user_buf0)
+ (Concat w24 (Read w8 36 user_buf0)
+ (Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index)))))))))))))))))][int_src_port:43947->(ReadLSB w16 34 user_buf0)][ext_src_port:43947->(Extract w16 0 (Add w32 2747
+ (ReadLSB w32 0 new_index)))][dst_port:43947->(ReadLSB w16 36 user_buf0)][int_src_ip:2880154539->(ReadLSB w32 26 user_buf0)][ext_src_ip:2880154539->184789184][dst_ip:2880154539->(ReadLSB w32 30 user_buf0)][int_device_id:171->(Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)][ext_device_id:171->1][protocol:171->(Read w8 23 user_buf0)]) -> []
+(Sle 0
+ (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+ 1024)
+(Sle 0
+ (ReadLSB w32 0 new_index))
+(Slt (ReadLSB w32 0 new_index)
+ 1024)
+(Slt (ReadLSB w32 0 queue #: i)
+ 2)
+(Sle 0
+ (ReadLSB w32 0 queue #: i))
+(Eq 6 (Read w8 23 user_buf0))
+(Eq false
+ (Eq 1
+ (Read w8 (Extract w32 0 (Add w64 64
+ (Mul w64 64
+ (SExt w64 (ReadLSB w32 0 queue #: i)))))
+ const_arr1)))
+true)
+false)
