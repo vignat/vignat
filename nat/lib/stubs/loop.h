@@ -13,18 +13,21 @@ predicate dmap_dchain_coherent(dmap<int_k,ext_k> m, dchain ch) = true;
 
 fixpoint int dochain_index_range(dchain ch);
 
+predicate nat_flow_p(void* p, int_k ik, ext_k ek, int index) =
+   flow_p(p, ik, ek, index) &*& ext_k_get_esp(ek) == 2747 + index;
+
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp) =
-          dmappingp<int_k,ext_k>(?m, int_k_p, ext_k_p, flow_p,
+          dmappingp<int_k,ext_k>(?m, int_k_p, ext_k_p, nat_flow_p,
                                  ?capacity, mp) &*&
           double_chainp(?ch, ?index_range, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
           last_time(?t) &*&
           index_range == capacity;
 
-lemma void coherent_dmap_returns_allocated(dmap<int_k,ext_k> m, dchain ch, int_k ik);
-requires dmap_dchain_coherent(m, ch);
+lemma void coherent_dmap_used_dchain_allocated(dmap<int_k,ext_k> m, dchain ch, int idx);
+requires dmap_dchain_coherent(m, ch) &*& dmap_index_used_fp(m, idx) == true;
 ensures dmap_dchain_coherent(m, ch) &*&
-        dchain_allocated_index_fp(ch, dmap_get_k1_fp(m, ik)) == true;
+        dchain_allocated_index_fp(ch, idx) == true;
 
 lemma void expire_preserves_coherent(dmap<int_k,ext_k> m, dchain ch, uint32_t time);
 requires dmap_dchain_coherent(m, ch);

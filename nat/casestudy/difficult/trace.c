@@ -115,14 +115,40 @@ void to_verify()
   /*@ close flow_p(arg8, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
                    ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
                    new_index);
-                   @*/
+    @*/
+  /*@ close nat_flow_p
+            (arg8, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+             ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
+             new_index);
+    @*/
   /*@ dmap_erase_all_has_trans(m, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
                                dchain_get_expired_indexes_fp(ch, next_time_3 - 10));
     @*/
   //@ dchain_next_index_not_allocated(ch2);
+  /*@
+    if (dmap_has_k2_fp(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023))) {
+       int index = dmap_get_k2_fp(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
+       dmap_get_k2_gives_used(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
+       void* value = dmap_get_val_fp(m2, index);
+       dmap_get_value_valp(m2, index);
+       dmap_get_by_k2_invertible(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
+       open nat_flow_p(value, _, _, index);
+
+       assert(index == new_index);
+       assert(true == dmap_index_used_fp(m2, new_index));
+       coherent_dmap_used_dchain_allocated(m2, ch2, new_index);
+       assert(true == dchain_allocated_index_fp(ch2, new_index));
+       assert(false);
+    }
+    @*/
+  /*@
+    if (dmap_index_used_fp(m2, new_index)) {
+       coherent_dmap_used_dchain_allocated(m2, ch2, new_index);
+    }
+    @*/
   int rez11 = dmap_put(map, arg8, new_index);
   //@ assume(rez11 == 1);
-  dmap_get_value(map, new_index, arg10);
+  dmap_get_value(map, new_index, arg11);
   //TODO: assert(arg11->ik... == ...);
   //TODO: assert(arg11->ek... == ...);
   // domap_put_get(map, )

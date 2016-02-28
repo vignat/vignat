@@ -40,6 +40,9 @@ struct DoubleMap;
   fixpoint int dmap_size_fp<t1,t2>(dmap<t1,t2> m);
   fixpoint bool dmap_index_used_fp<t1,t2>(dmap<t1,t2> m, int index);
 
+  fixpoint t1 dmap_get_k1_by_idx_fp<t1,t2>(dmap<t1,t2> m, int index);
+  fixpoint t2 dmap_get_k2_by_idx_fp<t1,t2>(dmap<t1,t2> m, int index);
+
   lemma void dmap_get_k1_limits<t1,t2>(dmap<t1,t2> m, t1 k1);
   requires dmappingp<t1,t2>(m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
            dmap_has_k1_fp<t1,t2>(m, k1) == true;
@@ -53,9 +56,30 @@ struct DoubleMap;
   ensures dmappingp<t1,t2>(m, kp1, kp2, vp, cap, mp) &*&
           dmap_index_used_fp(m, dmap_get_k1_fp(m, k1)) == true;
 
+  lemma void dmap_get_k2_gives_used<t1,t2>(dmap<t1,t2> m, t2 k2);
+  requires dmappingp<t1,t2>(m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
+          dmap_has_k2_fp<t1,t2>(m, k2) == true;
+  ensures dmappingp<t1,t2>(m, kp1, kp2, vp, cap, mp) &*&
+          dmap_index_used_fp(m, dmap_get_k2_fp(m, k2)) == true;
+
   lemma void dmap_erase_all_has_trans<t1,t2>(dmap<t1,t2> m, t1 k1, list<int> idx);
   requires false == dmap_has_k1_fp(m, k1);
   ensures false == dmap_has_k1_fp(dmap_erase_all_fp(m, idx), k1);
+
+  lemma void dmap_get_value_valp<t1,t2>(dmap<t1,t2> m, int idx);
+  requires dmappingp<t1,t2>(m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
+           dmap_index_used_fp(m, idx) == true;
+  ensures dmappingp<t1,t2>(m, kp1, kp2, vp, cap, mp) &*&
+          vp(dmap_get_val_fp(m, idx),
+             dmap_get_k1_by_idx_fp(m, idx),
+             dmap_get_k2_by_idx_fp(m, idx),
+             idx);
+
+  lemma void dmap_get_by_k2_invertible<t1,t2>(dmap<t1,t2> m, t2 k2);
+  requires dmappingp<t1,t2>(m, ?kp1, ?kp2, ?vp, ?cap, ?mp) &*&
+           dmap_has_k2_fp(m, k2) == true;
+  ensures dmappingp<t1,t2>(m, kp1, kp2, vp, cap, mp) &*&
+          k2 == dmap_get_k2_by_idx_fp(m, dmap_get_k2_fp(m, k2));
   @*/
 
 /*@ predicate pred_arg4<t1,t2,t3,t4>(predicate (t1,t2,t3,t4) p) = true;
@@ -100,6 +124,7 @@ int dmap_get_b/*@ <K1,K2> @*/(struct DoubleMap* map, void* key, int* index);
 int dmap_put/*@ <K1,K2> @*/(struct DoubleMap* map, void* value, int index);
 /*@ requires dmappingp<K1,K2>(?m, ?kp1, ?kp2, ?vp, ?cap, map) &*&
              vp(value, ?k1, ?k2, index) &*&
+             false == dmap_index_used_fp(m, index) &*&
              false == dmap_has_k1_fp(m, k1) &*&
              false == dmap_has_k2_fp(m, k2); @*/
 /*@ ensures (dmap_size_fp(m) < cap ?
@@ -113,9 +138,9 @@ void dmap_get_value/*@ <K1,K2> @*/(struct DoubleMap* map, int index, void* value
 /*@ requires dmappingp<K1,K2>(?m, ?kp1, ?kp2, ?vp, ?cap, map); @*/ //Should also require memory access here
 /*@ ensures dmappingp<K1,K2>(m, kp1, kp2, vp, cap, map) &*&
             dmap_index_used_fp(m, index) ?
-            (vp(value_out, ?k1, ?k2, index) &*&
-             dmap_get_k1_fp(m, k1) == index &*&
-             dmap_get_k2_fp(m, k2) == index) :
+            (vp(value_out,
+                dmap_get_k1_by_idx_fp(m, index),
+                dmap_get_k2_by_idx_fp(m, index), index)) :
             true; @*/
 
 int dmap_erase(struct DoubleMap* map, int index);
