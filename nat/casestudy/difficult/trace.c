@@ -151,14 +151,23 @@ void to_verify()
   /*@
     if (dmap_index_used_fp(m2, new_index)) {
        coherent_dmap_used_dchain_allocated(m2, ch2, new_index);
+       assert(false);
     }
     @*/
   int rez11 = dmap_put(map, arg8, new_index);
   //@ assume(rez11 == 1);
+  /*@ dmap_put_get(m2, flwc(ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+                            ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
+                            user_buf034, tmp1, user_buf036, user_buf026,
+                            184789184, user_buf030, val, 1, user_buf023),
+                   ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+                   ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
+                   new_index);
+    @*/
   dmap_get_value(map, new_index, arg11);
   //TODO: assert(arg11->ik... == ...);
   //TODO: assert(arg11->ek... == ...);
-  // domap_put_get(map, )
+  //@ open flw_p(arg11, _);
   //@ assert(arg11->int_src_port == 0);
   //@ assert(arg11->ext_src_port == 2747 + new_index);
   //@ assert(arg11->dst_port == 0);

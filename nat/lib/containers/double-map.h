@@ -90,6 +90,7 @@ struct DoubleMap;
                               ?kp1, ?kp2, ?vp, ?recp, ?cap, ?mp);
   ensures dmappingp<t1,t2,vt>(dmap_put_fp(m, k1, k2, index, v),
                              kp1, kp2, vp, recp, cap, mp) &*&
+          dmap_index_used_fp(dmap_put_fp(m, k1, k2, index, v), index) == true &*&
           v == dmap_get_val_fp(dmap_put_fp(m, k1, k2, index, v), index) &*&
           k1 == dmap_get_k1_by_idx_fp(dmap_put_fp(m, k1, k2, index, v), index) &*&
           k2 == dmap_get_k2_by_idx_fp(dmap_put_fp(m, k1, k2, index, v), index);
@@ -150,15 +151,14 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index);
               dmappingp<K1,K2,V>(m, kp1, kp2, vp, rp, cap, map))) &*&
             vp(value, v) &*& rp(k1, k2, v, index);@*/
 void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index, void* value_out);
-/*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?vp, ?rp, ?cap, map); @*/ //Should also require memory access here
+/*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?vp, ?rp, ?cap, map) &*&
+             dmap_index_used_fp(m, index) == true; @*/ //Should also require memory access here
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, vp, rp, cap, map) &*&
-            dmap_index_used_fp(m, index) ?
-            (vp(value_out, dmap_get_val_fp(m, index)) &*&
-             rp(dmap_get_k1_by_idx_fp(m, index),
-                dmap_get_k2_by_idx_fp(m, index),
-                dmap_get_val_fp(m, index),
-                index)) :
-            true; @*/
+            vp(value_out, dmap_get_val_fp(m, index)) &*&
+            rp(dmap_get_k1_by_idx_fp(m, index),
+               dmap_get_k2_by_idx_fp(m, index),
+               dmap_get_val_fp(m, index),
+               index); @*/
 
 int dmap_erase(struct DoubleMap* map, int index);
 //^^^ never called, no contract for you.
