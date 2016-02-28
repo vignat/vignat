@@ -68,7 +68,7 @@ void to_verify()
   int rez4 = dmap_get_a(arg1, arg5, &arg6);
   //@ assume(rez4 == 1);
   //@ assume(arg6 == dmap_allocated_index);
-  //@ assert dmappingp<int_k,ext_k>(?map, ?kp1, ?kp2, ?vp, ?cap, mp);
+  //@ assert dmappingp<int_k,ext_k,flw>(?map, ?kp1, ?kp2, ?vp, ?rp, ?cap, mp);
   //@ dmap_get_k1_gives_used(map, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023));
   dmap_get_value(arg1, dmap_allocated_index, arg9);
   //@ assume(arg9->int_src_port == dmap_value32);
@@ -88,8 +88,9 @@ void to_verify()
   //@ open int_k_p(_, _);
   //@ leak last_time(_);
   //@ leak nat_flow_p(_, _, _, _);
+  //@ leak flw_p(_, _);
   //@ leak dmap_dchain_coherent(_, _);
   //@ leak dmap_dchain_coherent(_, _);
-  //@ leak dmappingp<int_k, ext_k>(_, _, _, _, _, _);
+  //@ leak dmappingp<int_k, ext_k, flw>(_, _, _, _, _, _, _);
   //@ leak double_chainp(_, _, _);
 }

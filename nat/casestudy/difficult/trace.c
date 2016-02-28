@@ -112,13 +112,20 @@ void to_verify()
                              user_buf034, tmp1, user_buf036, user_buf026,
                              184789184, user_buf030, val, 1, user_buf023));
     @*/
-  /*@ close flow_p(arg8, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
-                   ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
-                   new_index);
+  /*@ close flow_p(flwc(ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+                        ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
+                        user_buf034, tmp1, user_buf036, user_buf026,
+                        184789184, user_buf030, val, 1, user_buf023),
+                   ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+                   ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
     @*/
   /*@ close nat_flow_p
-            (arg8, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+            (ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
              ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
+             flwc(ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
+                  ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023),
+                  user_buf034, tmp1, user_buf036, user_buf026,
+                  184789184, user_buf030, val, 1, user_buf023),
              new_index);
     @*/
   /*@ dmap_erase_all_has_trans(m, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023),
@@ -129,10 +136,10 @@ void to_verify()
     if (dmap_has_k2_fp(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023))) {
        int index = dmap_get_k2_fp(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
        dmap_get_k2_gives_used(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
-       void* value = dmap_get_val_fp(m2, index);
-       dmap_get_value_valp(m2, index);
+       flw value = dmap_get_val_fp(m2, index);
+       dmap_get_by_index_rp(m2, index);
        dmap_get_by_k2_invertible(m2, ekc(tmp1, user_buf036, 184789184, user_buf030, 1, user_buf023));
-       open nat_flow_p(value, _, _, index);
+       open nat_flow_p(_, _, value, index);
 
        assert(index == new_index);
        assert(true == dmap_index_used_fp(m2, new_index));

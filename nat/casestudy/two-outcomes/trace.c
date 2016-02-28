@@ -57,7 +57,7 @@ void to_verify()
     //@ assume(dmap_allocated_index < 1024);
     //@ assume(dmap_allocated_index + 2747 == (uint32_t)dmap_value16);
     //@ assert(dmap_dchain_coherent(?m, _));
-    //@ dmap_get_k1_limits<int_k,ext_k>(m, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023));
+    //@ dmap_get_k1_limits(m, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023));
     int dump_state_here;
     // @ assert(arg6 == dmap_allocated_index);
   } else {
@@ -66,6 +66,6 @@ void to_verify()
   //@ open int_k_p(_, _);
   //@ leak last_time(_);
   //@ leak dmap_dchain_coherent(_, _);
-  //@ leak dmappingp<int_k, ext_k>(_, _, _, _, _, _);
+  //@ leak dmappingp<int_k, ext_k, flw>(_, _, _, _, _, _, _);
   //@ leak double_chainp(_, _, _);
 }
