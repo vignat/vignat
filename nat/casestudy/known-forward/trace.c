@@ -81,12 +81,13 @@ void to_verify()
   //@ assume(arg9->ext_device_id == dmap_value53);
   //@ assume(arg9->protocol == dmap_value54);
   //@ dmap_get_k1_limits(m2, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023));
-  //@ coherent_dmap_returns_allocated(m2, ch2, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023));
+  //@ dmap_get_k1_gives_used(m2, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023));
+  //@ coherent_dmap_used_dchain_allocated(m2, ch2, dmap_get_k1_fp(m2, ikc(user_buf034, user_buf036, user_buf026, user_buf030, val, user_buf023)));
   int rez5 = dchain_rejuvenate_index(arg2, dmap_allocated_index, next_time_1);
   //@ assert(rez5 == 1);
   //@ open int_k_p(_, _);
   //@ leak last_time(_);
-  //@ leak flow_p(_, _, _, _);
+  //@ leak nat_flow_p(_, _, _, _);
   //@ leak dmap_dchain_coherent(_, _);
   //@ leak dmap_dchain_coherent(_, _);
   //@ leak dmappingp<int_k, ext_k>(_, _, _, _, _, _);
