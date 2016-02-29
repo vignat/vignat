@@ -21,9 +21,9 @@ There are 4 tools that perform validation:
 
 The simplest part of the validator. It takes the call traces, builds execution-tree and extracts all the prefixes. May be implemented as a part of Klee export, and later-on Klee may directly generate the prefixes for performance reasons, since the execution-tree is a projection of the Klee full execution tree.
 
-#### Convertor
+#### Converter
 
-Convertor takes each prefix, and with the help of a decision procedure generates the C source file with VeriFast annotations that will convince VeriFast later on that this call sequence is legit. It will probably use VeriFast itself to check different annotations. At the last call in the file, it will either generate an assertion ensuring that the spec-prescribed output matches the model generated one, or it will mark the point for the VeriFast to export output formulas for Comparator. In the latter case it will also generate a separate file expressing the output from the symbolic model.
+Converter takes each prefix, and with the help of a decision procedure generates the C source file with VeriFast annotations that will convince VeriFast later on that this call sequence is legit. It will probably use VeriFast itself to check different annotations. At the last call in the file, it will either generate an assertion ensuring that the spec-prescribed output matches the model generated one, or it will mark the point for the VeriFast to export output formulas for Comparator. In the latter case it will also generate a separate file expressing the output from the symbolic model.
 
 #### VeriFast-based verificator
 
@@ -39,7 +39,7 @@ For difficult cases, where the simple assertion is not sufficient, there will be
 
 2. Prefix generator, in oCaml, reads API traces and generates API trace prefixes.
 
-3. Validator takes API trace prefixes and generates a VeriFast input file with 0,1 or more dump-points. For 0 dump points this is it. For more dump points, it generates also expressions for the tip-call outputs, namely the tip-call-alternatives.ret-val, tip-call-alternatives.args.pointee-after, and tip-call-alternatives.ret-context.
+3. Converter takes API trace prefixes and generates a VeriFast input file with 0,1 or more dump-points. For 0 dump points this is it. For more dump points, it generates also expressions for the tip-call outputs, namely the tip-call-alternatives.ret-val, tip-call-alternatives.args.pointee-after, and tip-call-alternatives.ret-context.
 
 4. VeriFast checks the input C file and for 0 dump points, it checks the assertions on the return value; for more dump points it dumps expressions for the tip-call outputs.
 
