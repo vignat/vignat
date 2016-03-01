@@ -50,14 +50,13 @@ S-expr.
 
 *APITrace* := calls : CallNode+
 
-*CallNode* := fun-name : Symbol, args : Arg+, ret-val : Ret, call-context : Assumption+, ret-context : Assumption+
+*CallNode* := fun-name : Symbol, args : Arg+, ret: Ret?, call-context : Expr+, ret-context : Expr+
 
-*Arg* := name : Symbol, value : Val, is-ptr : Bool,
-       (is-fun-ptr : Bool, (fun-name : Symbol | pointee-before : Val, pointee-after : Val))?
+*Arg* := name : Symbol, value : Val, is-ptr : Bool, pointee : Ptee?
 
-*Ret* := value : Val, is-ptr : bool (is-fun-ptr : Bool, (fun-name : Symbol | pointee : Val))?
+*Ptee* := is-fun-ptr : Bool, fun-name : Symbol?, before : Val?, after : Val?
 
-*Assumption* := SMT2 S-expr
+*Ret* := value : Val, is-ptr : bool pointee : Ptee?
 
 *Val* := full : Expr, break-down : Field*
 
@@ -65,10 +64,14 @@ S-expr.
 
 *Symbol* := string
 
+*Bool* := true | false
+
+*Expr* := SMTlib2 formatted formula
+
 ### API trace prefix format
 S-expr.
 
-*APITracePrefix* := history : CallNode+, tip-call-alternatives : CallNode+
+*APITracePrefix* := history : CallNode+, tip-calls : CallNode+
 
 #### Restriction
 
