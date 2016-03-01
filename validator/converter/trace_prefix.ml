@@ -2,7 +2,7 @@
 open Core.Std.Sexp
 open Sexplib.Conv
 
-type expr = string with sexp
+type expr = Core.Std.Sexp.t with sexp
 
 type field = {name: string; value: struct_val}
 and struct_val = {full: expr; break_down: field list;} with sexp
