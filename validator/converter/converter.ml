@@ -101,22 +101,23 @@ let render_vars_declarations vars =
       | Some t -> acc_str ^ "\n" ^ c_type_to_str t ^ " " ^ v.name ^ ";"
       | None -> acc_str ^ "\n??? " ^ v.name ^ ";" )
 
-let get_arg_value (arg : Trace_prefix.arg) =
-  match arg.value.full with
+let get_val_value valu =
+  match valu.full with
   | Sexp.Atom v -> v
   | exp -> match get_var_name_of_sexp exp with
     | Some name -> name
     | None -> "?"
 
 let render_function_list tpref =
-  let render_fun_call call = 
+  let render_fun_call call =
     let args = List.fold_left call.args ~init:""
         ~f:(fun str_acc arg->
             (if String.equal str_acc "" then "" else str_acc ^ ", ") ^
-            get_arg_value arg) in
+            get_val_value arg.value) in
     String.concat [call.fun_name; "("; args; ");\n"] in
   let cnt = ref 0 in
-  List.fold_left tpref.history ~init:""
+  assert (Int.equal 1 (List.length tpref.tip_calls)) ;
+  List.fold_left (List.append tpref.history tpref.tip_calls) ~init:""
     ~f:(fun str_acc call ->
         let pre_rend = render_fun_call call in
         match call.ret with
@@ -125,8 +126,10 @@ let render_function_list tpref =
             let ret_var = "ret" ^ Int.to_string !cnt in
             cnt := !cnt + 1 ;
             match get_fun_ret_type call.fun_name with
-            | Some t -> str_acc  ^ c_type_to_str t ^
-                        " " ^ ret_var ^ " = " ^ pre_rend
+            | Some t -> let ret_val = get_val_value ret.value in
+              let ret_ass = "//@ assume(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
+              str_acc ^ c_type_to_str t ^
+              " " ^ ret_var ^ " = " ^ pre_rend ^ ret_ass
             | None -> str_acc ^ "??? " ^ ret_var ^ " = " ^ pre_rend
           end
         | None -> str_acc ^ pre_rend
