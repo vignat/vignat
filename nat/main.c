@@ -478,7 +478,7 @@ main_loop(__attribute__((unused)) void *dummy)
          * Read packet from RX queues
          */
 #ifdef KLEE_VERIFICATION
-        klee_make_symbolic(&i, sizeof(int), "queue #: i");
+        klee_make_symbolic(&i, sizeof(int), "queue_num_i");
         klee_assume(i < qconf->n_rx_queue);
         klee_assume(0 <= i);
         loop_enumeration_begin(i);
