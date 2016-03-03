@@ -79,7 +79,7 @@ let get_var_name_of_sexp exp =
     when String.equal rd "ReadLSB" -> Some (to_symbol name ^ "_" ^ pos ^ w)
   | _ -> None
 
-type var_spec = {name: string; t: c_type option; v: string option}
+type var_spec = {name: string; t: c_type option; v: struct_val option}
 
 let get_vars tpref arg_name_gen =
   let get_vars call =
@@ -109,10 +109,10 @@ let get_vars tpref arg_name_gen =
                          v = None} ::
                         {name = p_name;
                          t = ty;
-                         v = Some var_name;} :: acc
+                         v = Some v;} :: acc
                       | None -> {name = p_name;
                                  t = ty;
-                                 v = Some (Sexp.to_string v.full);} :: acc
+                                 v = Some v;} :: acc
                     end
                   | None -> {name = p_name;
                              t = ty;
@@ -151,21 +151,30 @@ let get_vars tpref arg_name_gen =
   let tip_vars = (List.join (List.map tpref.tip_calls ~f:(fun call -> get_vars call))) in
   List.join [hist_vars; tip_vars]
 
-let render_vars_declarations vars =
-  List.fold vars ~init:"\n" ~f:(fun acc_str v ->
-      (match v.t with
-       | Some t -> acc_str ^ c_type_to_str t ^ " " ^ v.name
-       | None -> acc_str ^ "??? " ^ v.name ) ^
-      (match v.v with | Some x -> " = " ^ x | None -> "") ^ ";\n")
-
 let get_val_value valu =
   match valu.full with
   | Sexp.Atom v -> v
   | exp ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
-      | None -> "?"
+      | None -> "?" ^ Sexp.to_string exp
     end
+
+let rec render_assignment var_name var_value =
+  match var_value with
+  | Some v ->
+    if List.is_empty v.break_down then
+      var_name ^ " = " ^ (get_val_value v) ^ ";\n"
+    else String.concat (List.map v.break_down (fun f ->
+      render_assignment (var_name ^ "." ^ f.name) (Some f.value)))
+  | None -> ""
+
+let render_vars_declarations vars =
+  List.fold vars ~init:"\n" ~f:(fun acc_str v ->
+      (match v.t with
+       | Some t -> acc_str ^ c_type_to_str t ^ " " ^ v.name
+       | None -> acc_str ^ "??? " ^ v.name ) ^ ";\n" ^
+      (render_assignment v.name v.v))
 
 let name_gen prefix = object
   val mutable cnt = 0
@@ -174,6 +183,15 @@ let name_gen prefix = object
     cnt <- cnt + 1 ;
     prefix ^ Int.to_string cnt
 end
+
+let rec render_eq_sttmt head out_arg out_val =
+  match out_val with
+  | Some v ->
+    if List.is_empty v.break_down then
+      "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_val_value v) ^ ");\n"
+    else String.concat (List.map v.break_down (fun f ->
+      render_eq_sttmt head (out_arg ^ "." ^ f.name) (Some f.value)))
+  | None -> ""
 
 let render_fun_call_in_context call rname_gen is_tip =
   let render_fun_call call =
@@ -222,14 +240,12 @@ let render_fun_call_in_context call rname_gen is_tip =
             else begin
               match ptee.after with
               | Some v ->
-                let out_val = get_val_value v in
                 let out_arg =
                   match String.Map.find !allocated_args (Sexp.to_string arg.value.full) with
                   | Some out_arg -> out_arg
                   | None -> "???"
                 in
-                "//@ " ^ (if is_tip then "assert" else "assume") ^
-                "(" ^ out_arg ^ " == " ^ out_val ^ ");\n"
+                render_eq_sttmt (if is_tip then "assert" else "assume") out_arg ptee.after
               | None -> ""
             end
           | None -> ""
