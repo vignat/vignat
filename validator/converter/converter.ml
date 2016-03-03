@@ -54,7 +54,7 @@ let fun_types =
      "loop_enumeration_end", {ret_type = Void;
                               arg_types = []};
      "dmap_get_b", {ret_type = Int;
-                   arg_types = [Ptr (Str "DoubleMap"); Ptr (Str "ext_key"); Ptr Int;]};
+                    arg_types = [Ptr (Str "DoubleMap"); Ptr (Str "ext_key"); Ptr Int;]};
     ]
 
 let allocated_args = ref String.Map.empty
@@ -91,29 +91,42 @@ let get_vars tpref arg_name_gen =
               if ptee.is_fun_ptr then
                 acc
               else
+              if String.Map.mem !allocated_args (Sexp.to_string arg.value.full) then
+                acc
+              else
                 let p_name = arg_name_gen#generate in
                 allocated_args := String.Map.add !allocated_args
                     (Sexp.to_string arg.value.full) p_name ;
                 let ty =
                   Option.map (get_fun_arg_type call.fun_name i) get_pointee
                 in
-                match ptee.before with
+                let before_vars = match ptee.before with
+                  | Some v ->
+                    begin match get_var_name_of_sexp v.full with
+                      | Some var_name ->
+                        {name = var_name;
+                         t = ty;
+                         v = None} ::
+                        {name = p_name;
+                         t = ty;
+                         v = Some var_name;} :: acc
+                      | None -> {name = p_name;
+                                 t = ty;
+                                 v = Some (Sexp.to_string v.full);} :: acc
+                    end
+                  | None -> {name = p_name;
+                             t = ty;
+                             v = None;} :: acc in
+                match ptee.after with
                 | Some v ->
                   begin match get_var_name_of_sexp v.full with
                     | Some var_name ->
                       {name = var_name;
                        t = ty;
-                       v = None} ::
-                      {name = p_name;
-                       t = ty;
-                       v = Some var_name;} :: acc
-                    | None -> {name = p_name;
-                               t = ty;
-                              v = None;} :: acc
+                       v = None} :: before_vars
+                    | None -> before_vars
                   end
-                | None -> {name = p_name;
-                           t = ty;
-                           v = None;} :: acc
+                | None -> before_vars
             end
           | None -> acc
         else
@@ -165,7 +178,7 @@ end
 let render_fun_call_in_context call rname_gen is_tip =
   let render_fun_call call =
     let args = List.fold_left call.args ~init:""
-        ~f:(fun str_acc arg->
+        ~f:(fun str_acc arg ->
             (if String.equal str_acc "" then "" else str_acc ^ ", ") ^
             ( if arg.is_ptr then
                 match arg.pointee with
@@ -187,18 +200,44 @@ let render_fun_call_in_context call rname_gen is_tip =
               get_val_value arg.value )) in
     String.concat [call.fun_name; "("; args; ");\n"] in
   let pre_rend = render_fun_call call in
-  match call.ret with
-  | Some ret ->
-    begin
-      let ret_var = rname_gen#generate in
-      match get_fun_ret_type call.fun_name with
-      | Some t -> let ret_val = get_val_value ret.value in
-        let ret_ass = "//@ " ^ (if is_tip then "assert" else "assume") ^
-                      "(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
-        c_type_to_str t ^ " " ^ ret_var ^ " = " ^ pre_rend ^ ret_ass
-      | None -> "??? " ^ ret_var ^ " = " ^ pre_rend
-    end
-  | None -> pre_rend
+  let call_with_ret = match call.ret with
+    | Some ret ->
+      begin
+        let ret_var = rname_gen#generate in
+        match get_fun_ret_type call.fun_name with
+        | Some t -> let ret_val = get_val_value ret.value in
+          let ret_ass = "//@ " ^ (if is_tip then "assert" else "assume") ^
+                        "(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
+          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ pre_rend ^ ret_ass
+        | None -> "??? " ^ ret_var ^ " = " ^ pre_rend
+      end
+    | None -> pre_rend
+  in
+  let post_statements =
+    let sttmts = List.map call.args (fun arg ->
+        if arg.is_ptr then
+          match arg.pointee with
+          | Some ptee ->
+            if ptee.is_fun_ptr then ""
+            else begin
+              match ptee.after with
+              | Some v ->
+                let out_val = get_val_value v in
+                let out_arg =
+                  match String.Map.find !allocated_args (Sexp.to_string arg.value.full) with
+                  | Some out_arg -> out_arg
+                  | None -> "???"
+                in
+                "//@ " ^ (if is_tip then "assert" else "assume") ^
+                "(" ^ out_arg ^ " == " ^ out_val ^ ");\n"
+              | None -> ""
+            end
+          | None -> ""
+        else "")
+    in
+    String.concat sttmts
+  in
+  call_with_ret ^ post_statements
 
 let render_function_list tpref =
   let cnt = ref 0 in
