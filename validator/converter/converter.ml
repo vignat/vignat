@@ -26,7 +26,8 @@ let is_void = function | Void -> true | _ -> false
 
 let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
 
-type fun_spec = {ret_type: c_type; arg_types: c_type list}
+type fun_spec = {ret_type: c_type; arg_types: c_type list;
+                lemmas_before: string list; lemmas_after: string list}
 
 let dmap_struct = Str ( "DoubleMap", [] )
 let dchain_struct = Str ( "DoubleChain", [] )
@@ -40,30 +41,72 @@ let ext_key_struct = Str ( "ext_key", ["ext_src_port", Uint16;
 let fun_types =
   String.Map.of_alist_exn
     ["current_time", {ret_type = Uint32;
-                      arg_types = []};
+                      arg_types = [];
+                      lemmas_before = [];
+                      lemmas_after = [];};
      "start_time", {ret_type = Void;
-                    arg_types = []};
+                    arg_types = [];
+                    lemmas_before = [];
+                    lemmas_after = [];};
      "dmap_allocate", {ret_type = Int;
                        arg_types =
                          [Int;Int;Ptr (Ctm "map_keys_equality");
                           Int;Int;Ptr (Ctm "map_keys_equality");
-                          Int;Int;Ptr (Ptr dmap_struct)];};
+                          Int;Int;Ptr (Ptr dmap_struct)];
+                       lemmas_before = [
+                         "/*@ produce_function_pointer_chunk map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
+                          {\
+                          call();\
+                          }\
+                          @*/";
+                         "/*@ produce_function_pointer_chunk map_keys_equality<ext_k>(ext_key_eq)(ext_k_p)(a, b)\
+                          {\
+                          call();\
+                          }\
+                          @*/";
+                         "\
+  /*@ close exists<pair<pair<int_k, ext_k>, flw > >(pair(pair(ikc(0,0,0,0,0,0), ekc(0,0,0,0,0,0)),\
+                                                         flwc(ikc(0,0,0,0,0,0),\
+                                                              ekc(0,0,0,0,0,0),\
+                                                              0,0,0,0,0,0,0,0,0)));\
+    @*/\
+ ";
+                         "//@ close pred_arg2<void*, flw>(flw_p);";
+                         "//@ close pred_arg4(nat_flow_p);"];
+                       lemmas_after = [];};
      "dmap_set_entry_condition", {ret_type = Void;
-                                  arg_types = [Ptr (Ctm "entry_condition")]};
+                                  arg_types = [Ptr (Ctm "entry_condition")];
+                                  lemmas_before = [];
+                                  lemmas_after = [];};
      "dchain_allocate", {ret_type = Int;
-                         arg_types = [Int; Ptr (Ptr dchain_struct)]};
+                         arg_types = [Int; Ptr (Ptr dchain_struct)];
+                         lemmas_before = [];
+                         lemmas_after = [];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
-                                             Ptr (Ptr dchain_struct)]};
+                                             Ptr (Ptr dchain_struct)];
+                                lemmas_before = [
+                                  "//@ close dmap_dchain_coherent\
+                                   (empty_dmap_fp(), empty_dchain_fp());";
+                                  "//@ close evproc_loop_invariant(arg1, arg2);"];
+                                lemmas_after = [];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
-                                             Ptr (Ptr dchain_struct)]};
+                                             Ptr (Ptr dchain_struct)];
+                                lemmas_before = [];
+                                lemmas_after = ["//@ open evproc_loop_invariant(?mp, ?chp);"];};
      "loop_enumeration_begin", {ret_type = Void;
-                                arg_types = [Int]};
+                                arg_types = [Int];
+                                lemmas_before = [];
+                                lemmas_after = [];};
      "loop_enumeration_end", {ret_type = Void;
-                              arg_types = []};
+                              arg_types = [];
+                              lemmas_before = [];
+                              lemmas_after = [];};
      "dmap_get_b", {ret_type = Int;
-                    arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Int;]};
+                    arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Int;];
+                    lemmas_before = [];
+                    lemmas_after = [];};
     ]
 
 type var_spec = {name: string; t: c_type; v: struct_val option}
@@ -284,6 +327,11 @@ let render_fun_call_in_context call rname_gen is_tip =
               get_val_value arg.value None )) in
     String.concat [call.fun_name; "("; args; ");\n"] in
   let pre_rend = render_fun_call call in
+  let (pre_lemmas,post_lemmas) =
+    match String.Map.find fun_types call.fun_name with
+    | Some t -> ((String.concat ~sep:"\n" t.lemmas_before) ^ "\n",
+                (String.concat ~sep:"\n" t.lemmas_after) ^ "\n")
+    | None -> failwith "" in
   let call_with_ret = match call.ret with
     | Some ret ->
       begin
@@ -319,7 +367,7 @@ let render_fun_call_in_context call rname_gen is_tip =
     in
     String.concat sttmts
   in
-  call_with_ret ^ post_statements
+  pre_lemmas ^ call_with_ret ^ post_statements ^ post_lemmas
 
 
 let render_function_list tpref =
