@@ -35,7 +35,7 @@ let ext_key_struct = Str ( "ext_key", ["ext_src_port", Uint16;
                                        "ext_src_ip", Uint32;
                                        "dst_ip", Uint32;
                                        "ext_device_id", Uint8;
-                                       "protocol", Uint32;] )
+                                       "protocol", Uint8;] )
 
 let fun_types =
   String.Map.of_alist_exn
@@ -66,7 +66,9 @@ let fun_types =
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Int;]};
     ]
 
-let allocated_args = ref String.Map.empty
+type var_spec = {name: string; t: c_type; v: struct_val option}
+
+let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 
 let get_fun_arg_type fun_name arg_num =
   match String.Map.find fun_types fun_name with
@@ -89,11 +91,9 @@ let get_var_name_of_sexp exp =
            String.equal rd "Read") -> Some (to_symbol name ^ "_" ^ pos ^ w)
   | _ -> None
 
-type var_spec = {name: string; t: c_type; v: struct_val option}
-
 let rec get_vars_from_struct_val v ty =
   match ty with
-  | Str (name, fields) ->
+  | Str (_, fields) ->
     let ftypes = List.map fields ~f:snd in
     List.join (List.map2_exn v.break_down ftypes ~f:(fun v t -> get_vars_from_struct_val v.value t))
   | ty ->
@@ -118,18 +118,18 @@ let get_vars tpref arg_name_gen =
               if String.Map.mem !allocated_args (Sexp.to_string arg.value.full) then
                 acc
               else
-                let p_name = arg_name_gen#generate in
-                allocated_args := String.Map.add !allocated_args
-                    ~key:(Sexp.to_string arg.value.full) ~data:p_name ;
                 let ty =
                   Option.map (get_fun_arg_type call.fun_name i) ~f:get_pointee
                 in
+                let p_name = arg_name_gen#generate in
                 let ptr = match ty with | Some t ->
                   {name = p_name;
                    t = t;
                    v = ptee.before}
                                         | None -> failwith ("no type for " ^ p_name)
                 in
+                allocated_args := String.Map.add !allocated_args
+                    ~key:(Sexp.to_string arg.value.full) ~data:ptr ;
                 let before_vars =
                   match ptee.before with
                   | Some v ->
@@ -192,9 +192,24 @@ end
 let allocated_complex_vals = ref String.Map.empty
 let complex_val_name_gen = name_gen "cmplx"
 
+let put_in_int_bounds v =
+  let integer_val = Int.of_string v in
+  if Int.(integer_val > 2147483647) then
+    Int.to_string (integer_val - 2*2147483648)
+  else
+    Int.to_string integer_val
+
 let get_val_value valu t =
   match valu.full with
-  | Sexp.Atom v -> v
+  | Sexp.Atom v ->
+    begin
+      match t with
+      | Some t -> begin match t with
+          | Int -> put_in_int_bounds v
+          | _ -> v
+        end
+      | None -> v
+    end
   | exp ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
@@ -207,10 +222,10 @@ let get_val_value valu t =
               | Some t ->
                 let name = complex_val_name_gen#generate in
                 allocated_complex_vals :=
-                  String.Map.add !allocated_complex_vals key
-                    {name = name;
-                     t = t;
-                     v = Some valu;} ;
+                  String.Map.add !allocated_complex_vals ~key
+                    ~data:{name = name;
+                           t = t;
+                           v = Some valu;} ;
                 name
               | None -> key
     end
@@ -219,9 +234,9 @@ let rec render_assignment var_name var_value var_type =
   match var_value with
   | Some v ->
     begin match var_type with
-      | Str (str_name, fields) ->
+      | Str (_, fields) ->
         let fts = List.map fields ~f:snd in
-        String.concat (List.map2_exn v.break_down fts (fun f ft ->
+        String.concat (List.map2_exn v.break_down fts ~f:(fun f ft ->
             render_assignment (var_name ^ "." ^ f.name) (Some f.value) ft))
       | _ ->
         var_name ^ " = " ^ (get_val_value v (Some var_type)) ^ ";\n"
@@ -230,17 +245,19 @@ let rec render_assignment var_name var_value var_type =
 
 let render_vars_declarations vars =
   List.fold vars ~init:"\n" ~f:(fun acc_str v ->
-      acc_str ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n" ^
-      (render_assignment v.name v.v v.t))
+      acc_str ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n")
 
-let rec render_eq_sttmt head out_arg out_val =
-  match out_val with
-  | Some v ->
-    if List.is_empty v.break_down then
-      "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_val_value v None) ^ ");\n"
-    else String.concat (List.map v.break_down (fun f ->
-      render_eq_sttmt head (out_arg ^ "." ^ f.name) (Some f.value)))
-  | None -> ""
+let render_var_assignments vars =
+  List.fold vars ~init:"\n" ~f:(fun acc_str v ->
+      acc_str ^ (render_assignment v.name v.v v.t))
+
+let rec render_eq_sttmt head out_arg out_val out_t =
+  match out_t with
+  | Str (_, fields) -> let f_types = List.map fields ~f:snd in
+    String.concat (List.map2_exn out_val.break_down f_types ~f:(fun f ft ->
+        render_eq_sttmt head (out_arg ^ "." ^ f.name) f.value ft))
+  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_val_value out_val (Some out_t)) ^ ");\n"
+
 
 let render_fun_call_in_context call rname_gen is_tip =
   let render_fun_call call =
@@ -253,13 +270,13 @@ let render_fun_call_in_context call rname_gen is_tip =
                   begin
                     if ptee.is_fun_ptr then
                       match ptee.fun_name with
-                      | Some n -> "&" ^ n
+                      | Some n -> n
                       | None -> "fun???"
                     else
                       let arg_name = String.Map.find !allocated_args
                           ( Sexp.to_string arg.value.full ) in
                       match arg_name with
-                      | Some n -> "&" ^ n
+                      | Some n -> "&" ^ n.name
                       | None -> "&arg??"
                   end
                 | None -> "???"
@@ -281,7 +298,7 @@ let render_fun_call_in_context call rname_gen is_tip =
     | None -> pre_rend
   in
   let post_statements =
-    let sttmts = List.map call.args (fun arg ->
+    let sttmts = List.map call.args ~f:(fun arg ->
         if arg.is_ptr then
           match arg.pointee with
           | Some ptee ->
@@ -292,9 +309,9 @@ let render_fun_call_in_context call rname_gen is_tip =
                 let out_arg =
                   match String.Map.find !allocated_args (Sexp.to_string arg.value.full) with
                   | Some out_arg -> out_arg
-                  | None -> "???"
+                  | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
                 in
-                render_eq_sttmt (if is_tip then "assert" else "assume") out_arg ptee.after
+                render_eq_sttmt (if is_tip then "assert" else "assume") out_arg.name v out_arg.t
               | None -> ""
             end
           | None -> ""
@@ -303,6 +320,7 @@ let render_fun_call_in_context call rname_gen is_tip =
     String.concat sttmts
   in
   call_with_ret ^ post_statements
+
 
 let render_function_list tpref =
   let rez_gen = name_gen "rez" in
@@ -322,14 +340,17 @@ let render_cmplxes () =
 
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
-  Out_channel.output_string cout "void to_verify()/*requires true; */ /* ensures true; */\n{\n" ;
+  Out_channel.output_string cout "void to_verify()\
+                                  /*@ requires true; @*/ \
+                                  /*@ ensures true; @*/\n{\n" ;
   let pref = Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin) in
-  (*Sexp.pp (Format.formatter_of_out_channel cout) (Trace_prefix.sexp_of_trace_prefix pref) ; *)
-  let var_decls = (render_vars_declarations
-                     (List.dedup (get_vars pref (name_gen "arg")))) in
+  let vars = (List.dedup (get_vars pref (name_gen "arg"))) in
+  let var_decls = (render_vars_declarations vars) in
+  let var_assigns = (render_var_assignments vars) in
   let fun_calls = (render_function_list pref) in
   Out_channel.output_string cout ( render_cmplxes () ) ;
   Out_channel.output_string cout var_decls;
+  Out_channel.output_string cout var_assigns;
   Out_channel.newline cout ;
   Out_channel.output_string cout fun_calls;
   Out_channel.output_string cout "}\n"
