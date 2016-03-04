@@ -1,113 +1,11 @@
 open Core.Std
 open Sexp
 open Trace_prefix
+open Function_spec
 
 type tp = Trace_prefix.trace_prefix
 
 let preamble = In_channel.read_all "preamble.tmpl"
-
-type c_type = | Ptr of c_type
-              | Int
-              | Uint32
-              | Uint16
-              | Uint8
-              | Void
-              | Str of string * (string * c_type) list
-              | Ctm of string
-              | Fptr of string
-
-let rec c_type_to_str = function
-  | Ptr c_type -> c_type_to_str c_type ^ "*"
-  | Int -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
-  | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
-  | Ctm name -> name | Fptr name -> name ^ "*"
-
-let is_void = function | Void -> true | _ -> false
-
-let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
-
-type fun_spec = {ret_type: c_type; arg_types: c_type list;
-                lemmas_before: string list; lemmas_after: string list}
-
-let dmap_struct = Str ( "DoubleMap", [] )
-let dchain_struct = Str ( "DoubleChain", [] )
-let ext_key_struct = Str ( "ext_key", ["ext_src_port", Uint16;
-                                       "dst_port", Uint16;
-                                       "ext_src_ip", Uint32;
-                                       "dst_ip", Uint32;
-                                       "ext_device_id", Uint8;
-                                       "protocol", Uint8;] )
-
-let fun_types =
-  String.Map.of_alist_exn
-    ["current_time", {ret_type = Uint32;
-                      arg_types = [];
-                      lemmas_before = [];
-                      lemmas_after = [];};
-     "start_time", {ret_type = Void;
-                    arg_types = [];
-                    lemmas_before = [];
-                    lemmas_after = [];};
-     "dmap_allocate", {ret_type = Int;
-                       arg_types =
-                         [Int;Int;Ptr (Ctm "map_keys_equality");
-                          Int;Int;Ptr (Ctm "map_keys_equality");
-                          Int;Int;Ptr (Ptr dmap_struct)];
-                       lemmas_before = [
-                         "/*@ produce_function_pointer_chunk map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
-                          {\
-                          call();\
-                          }\
-                          @*/";
-                         "/*@ produce_function_pointer_chunk map_keys_equality<ext_k>(ext_key_eq)(ext_k_p)(a, b)\
-                          {\
-                          call();\
-                          }\
-                          @*/";
-                         "\
-  /*@ close exists<pair<pair<int_k, ext_k>, flw > >(pair(pair(ikc(0,0,0,0,0,0), ekc(0,0,0,0,0,0)),\
-                                                         flwc(ikc(0,0,0,0,0,0),\
-                                                              ekc(0,0,0,0,0,0),\
-                                                              0,0,0,0,0,0,0,0,0)));\
-    @*/\
- ";
-                         "//@ close pred_arg2<void*, flw>(flw_p);";
-                         "//@ close pred_arg4(nat_flow_p);"];
-                       lemmas_after = [];};
-     "dmap_set_entry_condition", {ret_type = Void;
-                                  arg_types = [Ptr (Ctm "entry_condition")];
-                                  lemmas_before = [];
-                                  lemmas_after = [];};
-     "dchain_allocate", {ret_type = Int;
-                         arg_types = [Int; Ptr (Ptr dchain_struct)];
-                         lemmas_before = [];
-                         lemmas_after = [];};
-     "loop_invariant_consume", {ret_type = Void;
-                                arg_types = [Ptr (Ptr dmap_struct);
-                                             Ptr (Ptr dchain_struct)];
-                                lemmas_before = [
-                                  "//@ close dmap_dchain_coherent\
-                                   (empty_dmap_fp(), empty_dchain_fp());";
-                                  "//@ close evproc_loop_invariant(arg1, arg2);"];
-                                lemmas_after = [];};
-     "loop_invariant_produce", {ret_type = Void;
-                                arg_types = [Ptr (Ptr dmap_struct);
-                                             Ptr (Ptr dchain_struct)];
-                                lemmas_before = [];
-                                lemmas_after = ["//@ open evproc_loop_invariant(?mp, ?chp);"];};
-     "loop_enumeration_begin", {ret_type = Void;
-                                arg_types = [Int];
-                                lemmas_before = [];
-                                lemmas_after = [];};
-     "loop_enumeration_end", {ret_type = Void;
-                              arg_types = [];
-                              lemmas_before = [];
-                              lemmas_after = [];};
-     "dmap_get_b", {ret_type = Int;
-                    arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Int;];
-                    lemmas_before = [];
-                    lemmas_after = [];};
-    ]
 
 type var_spec = {name: string; t: c_type; v: struct_val option}
 
@@ -131,7 +29,9 @@ let get_var_name_of_sexp exp =
   match exp with
   | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.Atom pos; Sexp.Atom name]
     when ( String.equal rd "ReadLSB" ||
-           String.equal rd "Read") -> Some (to_symbol name ^ "_" ^ pos ^ w)
+           String.equal rd "Read") -> Some (to_symbol name ^ "_" ^
+                                            pos(* FIXME: '^ w' - this reveals a bug where
+                                               allocated_dmap appears to be w32 and w64*))
   | _ -> None
 
 let rec get_vars_from_struct_val v ty =
@@ -367,7 +267,7 @@ let render_fun_call_in_context call rname_gen is_tip =
     in
     String.concat sttmts
   in
-  pre_lemmas ^ call_with_ret ^ post_statements ^ post_lemmas
+  pre_lemmas ^ call_with_ret ^ post_lemmas ^ post_statements
 
 
 let render_function_list tpref =
@@ -386,12 +286,23 @@ let render_cmplxes () =
        | Some v -> " //=" ^ (Sexp.to_string v.full) ^ "\n"
        | None -> "\n")))
 
+let rec get_relevant_segment pref =
+  match List.findi pref.history ~f:(fun _ call ->
+      String.equal call.fun_name "loop_invariant_consume") with
+  | Some (pos,_) ->
+    let tail_len = (List.length pref.history) - pos - 1 in
+    get_relevant_segment
+      {history = List.sub pref.history ~pos:(pos + 1) ~len:tail_len;
+       tip_calls = pref.tip_calls;}
+  | None -> pref
+
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
   Out_channel.output_string cout "void to_verify()\
                                   /*@ requires true; @*/ \
                                   /*@ ensures true; @*/\n{\n" ;
-  let pref = Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin) in
+  let pref = get_relevant_segment
+      (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
   let vars = (List.dedup (get_vars pref (name_gen "arg"))) in
   let var_decls = (render_vars_declarations vars) in
   let var_assigns = (render_var_assignments vars) in
@@ -404,4 +315,6 @@ let convert_prefix fin cout =
   Out_channel.output_string cout "}\n"
 
 let () =
-  convert_prefix "tst.klee" Out_channel.stdout
+  Out_channel.with_file Sys.argv.(2) ~f:(fun fout ->
+      convert_prefix Sys.argv.(1) fout
+    )
