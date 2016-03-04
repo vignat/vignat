@@ -1,5 +1,4 @@
 open Core.Std
-open Sexp
 open Trace_prefix
 open Function_spec
 
@@ -196,43 +195,45 @@ let render_var_assignments vars =
 
 let rec render_eq_sttmt head out_arg out_val out_t =
   match out_t with
-  | Str (_, fields) -> let f_types = List.map fields ~f:snd in
+  | Some (Str (_, fields)) -> let f_types = List.map fields ~f:snd in
     String.concat (List.map2_exn out_val.break_down f_types ~f:(fun f ft ->
-        render_eq_sttmt head (out_arg ^ "." ^ f.name) f.value ft))
-  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_val_value out_val (Some out_t)) ^ ");\n"
+        render_eq_sttmt head (out_arg ^ "." ^ f.name) f.value (Some ft)))
+  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_val_value out_val out_t) ^ ");\n"
 
+let render_fun_call_preamble call =
+  let pre_lemmas =
+    match String.Map.find fun_types call.fun_name with
+    | Some t -> (String.concat ~sep:"\n" t.lemmas_before)
+    | None -> failwith "" in
+  pre_lemmas ^ "\n"
 
-let render_fun_call_in_context call rname_gen is_tip =
-  let render_fun_call call =
-    let args = List.fold_left call.args ~init:""
-        ~f:(fun str_acc arg ->
-            (if String.equal str_acc "" then "" else str_acc ^ ", ") ^
-            ( if arg.is_ptr then
-                match arg.pointee with
-                | Some ptee ->
-                  begin
-                    if ptee.is_fun_ptr then
-                      match ptee.fun_name with
-                      | Some n -> n
-                      | None -> "fun???"
-                    else
-                      let arg_name = String.Map.find !allocated_args
-                          ( Sexp.to_string arg.value.full ) in
-                      match arg_name with
-                      | Some n -> "&" ^ n.name
-                      | None -> "&arg??"
-                  end
-                | None -> "???"
+let render_fun_call_body call =
+  let args = List.fold_left call.args ~init:""
+      ~f:(fun str_acc arg ->
+          (if String.equal str_acc "" then "" else str_acc ^ ", ") ^
+          ( if arg.is_ptr then
+              match arg.pointee with
+              | Some ptee ->
+                begin
+                  if ptee.is_fun_ptr then
+                    match ptee.fun_name with
+                    | Some n -> n
+                    | None -> "fun???"
+                  else
+                    let arg_name = String.Map.find !allocated_args
+                        ( Sexp.to_string arg.value.full ) in
+                    match arg_name with
+                    | Some n -> "&" ^ n.name
+                    | None -> "&arg??"
+                end
+              | None -> "???"
             else
               get_val_value arg.value None )) in
-    String.concat [call.fun_name; "("; args; ");\n"] in
-  let pre_rend = render_fun_call call in
-  let (pre_lemmas,post_lemmas) =
-    match String.Map.find fun_types call.fun_name with
-    | Some t -> ((String.concat ~sep:"\n" t.lemmas_before) ^ "\n",
-                (String.concat ~sep:"\n" t.lemmas_after) ^ "\n")
-    | None -> failwith "" in
-  let call_with_ret = match call.ret with
+  String.concat [call.fun_name; "("; args; ");\n"]
+
+let render_fun_call call rname_gen ~is_tip =
+  let fname_with_args = render_fun_call_body call in
+  let call_with_ret call_body = match call.ret with
     | Some ret ->
       begin
         let ret_var = rname_gen#generate in
@@ -240,44 +241,111 @@ let render_fun_call_in_context call rname_gen is_tip =
         | Some t -> let ret_val = get_val_value ret.value None in
           let ret_ass = "//@ " ^ (if is_tip then "assert" else "assume") ^
                         "(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
-          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ pre_rend ^ ret_ass
-        | None -> "??? " ^ ret_var ^ " = " ^ pre_rend
+          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
+        | None -> "??? " ^ ret_var ^ " = " ^ call_body
       end
-    | None -> pre_rend
+    | None -> call_body
   in
-  let post_statements =
-    let sttmts = List.map call.args ~f:(fun arg ->
-        if arg.is_ptr then
-          match arg.pointee with
-          | Some ptee ->
-            if ptee.is_fun_ptr then ""
-            else begin
-              match ptee.after with
-              | Some v ->
-                let out_arg =
-                  match String.Map.find !allocated_args (Sexp.to_string arg.value.full) with
-                  | Some out_arg -> out_arg
-                  | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
-                in
-                render_eq_sttmt (if is_tip then "assert" else "assume") out_arg.name v out_arg.t
-              | None -> ""
-            end
-          | None -> ""
-        else "")
-    in
-    String.concat sttmts
-  in
-  pre_lemmas ^ call_with_ret ^ post_lemmas ^ post_statements
+  call_with_ret (fname_with_args)
 
+let render_2tip_call fst_tip snd_tip ret_var =
+  let fname_with_args = render_fun_call_body fst_tip in
+  let call_with_ret call_body = match fst_tip.ret with
+    | Some ret1 ->
+      begin
+        match snd_tip.ret with
+        | Some ret2 ->
+          begin
+            match get_fun_ret_type fst_tip.fun_name with
+            | Some t ->
+              let ret1_val = get_val_value ret1.value (Some t) in
+              let ret2_val = get_val_value ret2.value (Some t) in
+              let ret_ass = "//@ " ^ "assert" ^
+                            "(" ^ ret_var ^ " == " ^ ret1_val ^
+                            " || " ^ ret_var ^ " == " ^ ret2_val ^
+                            ");\n" in
+              c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
+            | None -> "??? " ^ ret_var ^ " = " ^ call_body
+          end
+        | None -> failwith "tip call must either allways return or never"
+      end
+    | None -> call_body
+  in
+  call_with_ret (fname_with_args)
+
+let render_post_lemmas call =
+  let post_lemmas =
+    match String.Map.find fun_types call.fun_name with
+    | Some t -> (String.concat ~sep:"\n" t.lemmas_after)
+    | None -> failwith "" in
+  post_lemmas
+
+let render_post_statements call ~is_tip =
+  let sttmts = List.map call.args ~f:(fun arg ->
+      if arg.is_ptr then
+        match arg.pointee with
+        | Some ptee ->
+          if ptee.is_fun_ptr then ""
+          else begin
+            match ptee.after with
+            | Some v ->
+              let out_arg =
+                match String.Map.find !allocated_args (Sexp.to_string arg.value.full) with
+                | Some out_arg -> out_arg
+                | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
+              in
+              render_eq_sttmt (if is_tip then "assert" else "assume")
+                out_arg.name v (Some out_arg.t)
+            | None -> ""
+          end
+        | None -> ""
+      else "") in
+  String.concat sttmts
+
+let render_fun_call_fabule call ~is_tip =
+  let post_statements = render_post_statements call ~is_tip in
+  (render_post_lemmas call) ^ "\n" ^ post_statements
+
+let render_2tip_call_fabule fst_tip snd_tip ret_name =
+  let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
+  let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
+  match fst_tip.ret, snd_tip.ret with
+  | Some r1, Some r2 ->
+    (render_post_lemmas fst_tip) ^ "\n" ^
+    "if (" ^ ret_name ^ " == " ^ (get_val_value r1.value None) ^ ") {\n" ^
+    post_statements_fst_alternative ^ "\n} else {\n" ^
+    (render_eq_sttmt "assert" ret_name r2.value None) ^ "\n" ^
+    post_statements_snd_alternative ^ "\n}\n"
+  | _,_ -> failwith "tip calls non-differentiated by return value not supported."
+
+let render_fun_call_in_context call rname_gen =
+  (render_fun_call_preamble call) ^
+  (render_fun_call call rname_gen ~is_tip:false) ^
+  (render_fun_call_fabule call ~is_tip:false)
+
+let render_tip_call_in_context calls rname_gen =
+  if List.length calls = 1 then
+    let call = List.hd_exn calls in
+    (render_fun_call_preamble call) ^
+    (render_fun_call call rname_gen ~is_tip:true) ^
+    (render_fun_call_fabule call ~is_tip:true)
+  else if List.length calls = 2 then
+    let fst_tip = List.hd_exn calls in
+    let snd_tip = List.nth_exn calls 1 in
+    let ret_name = rname_gen#generate in
+    (*TODO: assert that the inputs of the tip calls are identicall.*)
+    (render_fun_call_preamble fst_tip) ^
+    (render_2tip_call fst_tip snd_tip ret_name) ^
+    (render_2tip_call_fabule fst_tip snd_tip ret_name)
+  else failwith "0 or too many tip-calls"
 
 let render_function_list tpref =
   let rez_gen = name_gen "rez" in
-  assert (Int.equal 1 (List.length tpref.tip_calls)) ;
   (List.fold_left tpref.history ~init:""
      ~f:(fun str_acc call ->
-         str_acc ^ render_fun_call_in_context call rez_gen false
+         str_acc ^ render_fun_call_in_context call rez_gen
        )) ^
-   (render_fun_call_in_context (List.hd_exn tpref.tip_calls) rez_gen true)
+   (render_tip_call_in_context tpref.tip_calls rez_gen)
 
 let render_cmplxes () =
   String.concat (List.map (String.Map.data !allocated_complex_vals) ~f:(fun var ->
@@ -316,5 +384,4 @@ let convert_prefix fin cout =
 
 let () =
   Out_channel.with_file Sys.argv.(2) ~f:(fun fout ->
-      convert_prefix Sys.argv.(1) fout
-    )
+      convert_prefix Sys.argv.(1) fout)
