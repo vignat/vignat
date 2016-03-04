@@ -112,12 +112,15 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              [_]is_map_keys_equality<K2>(eq_b, ?keyp2) &*&
              pred_arg2<void*, V>(?valp) &*&
              pred_arg4<K1,K2,V,int>(?recp) &*&
-             pointer(map_out, _) &*&
+             pointer(map_out, ?old_map_out) &*&
              0 < key_a_size &*& 0 < key_b_size &*& 0 < value_size; @*/
-/*@ ensures result == 0 ? true : (*map_out |-> ?mapp &*&
-                                  dmappingp<K1,K2,V>(empty_dmap_fp(), keyp1,
-                                                     keyp2, valp, recp,
-                                                     capacity, mapp)); @*/
+/*@ ensures result == 0 ?
+            (pointer(map_out, old_map_out)) :
+            (*map_out |-> ?mapp &*&
+             result == 1 &*&
+             dmappingp<K1,K2,V>(empty_dmap_fp(), keyp1,
+                                keyp2, valp, recp,
+                                capacity, mapp)); @*/
 
 int dmap_get_a/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?vp, ?rp, ?cap, map) &*&
