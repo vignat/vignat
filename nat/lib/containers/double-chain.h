@@ -34,8 +34,9 @@ struct DoubleChain;
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
-/*@ requires pointer(chain_out, _); @*/
-/*@ ensures result == 0 ? true :
+/*@ requires pointer(chain_out, ?old_val); @*/
+/*@ ensures result == 0 ?
+            pointer(chain_out, old_val) :
             (result == 1 &*& *chain_out |-> ?chp &*&
              double_chainp(empty_dchain_fp(), index_range, chp));
             @*/

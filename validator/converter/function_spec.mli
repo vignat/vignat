@@ -16,6 +16,7 @@ type fun_spec = {
   arg_types : c_type list;
   lemmas_before : bytes list;
   lemmas_after : bytes list;
+  leaks : bytes list;
 }
 val dmap_struct : c_type
 val dchain_struct : c_type

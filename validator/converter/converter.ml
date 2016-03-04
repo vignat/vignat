@@ -364,6 +364,12 @@ let rec get_relevant_segment pref =
        tip_calls = pref.tip_calls;}
   | None -> pref
 
+let render_leaks pref =
+  ( String.concat (List.map ( (List.hd_exn pref.tip_calls)::pref.history ) ~f:(fun call ->
+      match String.Map.find fun_types call.fun_name with
+      | Some t -> String.concat ~sep:"\n" t.leaks
+      | None -> failwith "unknown function") ) ^ "\n")
+
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
   Out_channel.output_string cout "void to_verify()\
@@ -375,11 +381,13 @@ let convert_prefix fin cout =
   let var_decls = (render_vars_declarations vars) in
   let var_assigns = (render_var_assignments vars) in
   let fun_calls = (render_function_list pref) in
+  let leaks = (render_leaks pref) in
   Out_channel.output_string cout ( render_cmplxes () ) ;
   Out_channel.output_string cout var_decls;
   Out_channel.output_string cout var_assigns;
   Out_channel.newline cout ;
   Out_channel.output_string cout fun_calls;
+  Out_channel.output_string cout leaks;
   Out_channel.output_string cout "}\n"
 
 let () =
