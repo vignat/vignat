@@ -32,6 +32,23 @@ let ext_key_struct = Str ( "ext_key", ["ext_src_port", Uint16;
                                        "dst_ip", Uint32;
                                        "ext_device_id", Uint8;
                                        "protocol", Uint8;] )
+let int_key_struct = Str ( "int_key", ["int_src_port", Uint16;
+                                       "dst_port", Uint16;
+                                       "int_src_ip", Uint32;
+                                       "dst_ip", Uint32;
+                                       "int_device_id", Uint8;
+                                       "protocol", Uint8;] )
+let flw_struct = Str ("flow", ["ik", int_key_struct;
+                               "ek", ext_key_struct;
+                               "int_src_port", Uint16;
+                               "ext_src_port", Uint16;
+                               "dst_port", Uint16;
+                               "int_src_ip", Uint32;
+                               "ext_src_ip", Uint32;
+                               "dst_ip", Uint32;
+                               "int_device_id", Uint8;
+                               "ext_device_id", Uint8;
+                               "protocol", Uint8;])
 
 let fun_types =
   String.Map.of_alist_exn
@@ -119,4 +136,29 @@ let fun_types =
                     lemmas_after = [
                     "//@ open (ext_k_p(_,_));"];
                     leaks = [];};
+     "dmap_get_a", {ret_type = Int;
+                    arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Int;];
+                    lemmas_before = [
+                      "//@ close (int_k_p(&arg3, ikc(user_buf0_34, user_buf0_36,\
+                       user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
+                    lemmas_after = [
+                    "//@ open (int_k_p(_,_));"];
+                    leaks = [];};
+     "dmap_get_value", {ret_type = Void;
+                        arg_types = [Ptr dmap_struct; Int; Ptr flw_struct;];
+                        lemmas_before = [];
+                        lemmas_after = [];
+                        leaks = [];};
+     "expire_items", {ret_type = Int;
+                      arg_types = [Ptr dchain_struct;
+                                   Ptr dmap_struct;
+                                   Uint32;];
+                      lemmas_before = [];
+                      lemmas_after = [];
+                      leaks = [];};
+     "dchain_allocate_new_index", {ret_type = Int;
+                                   arg_types = [Ptr dchain_struct; Ptr Int; Uint32;];
+                                   lemmas_before = [];
+                                   lemmas_after = [];
+                                   leaks = [];}
     ]

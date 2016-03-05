@@ -13,11 +13,11 @@ let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 let get_fun_arg_type fun_name arg_num =
   match String.Map.find fun_types fun_name with
   | Some spec -> List.nth spec.arg_types arg_num
-  | None -> None
+  | None -> failwith ("unknown function " ^ fun_name)
 
 let get_fun_ret_type fun_name = match String.Map.find fun_types fun_name with
   | Some spec -> Some spec.ret_type
-  | None -> None
+  | None -> failwith ("unknown function " ^ fun_name)
 
 let to_symbol str =
   let no_spaces = String.substr_replace_all str ~pattern:" " ~with_:"_" in
@@ -137,11 +137,11 @@ let complex_val_name_gen = name_gen "cmplx"
 let put_in_int_bounds v =
   let integer_val = Int.of_string v in
   if Int.(integer_val > 2147483647) then
-    Int.to_string (integer_val - 2*2147483648)
+    "(" ^ (Int.to_string (integer_val - 2*2147483648)) ^ ")"
   else
     Int.to_string integer_val
 
-let get_val_value valu t =
+let rec get_val_value valu t =
   match valu.full with
   | Sexp.Atom v ->
     begin
@@ -152,6 +152,10 @@ let get_val_value valu t =
         end
       | None -> v
     end
+  (*| Sexp.List [Sexp.Atom f; Sexp.Atom w; lhs; rhs;]
+    when (String.equal f "Add") ->
+    "(" ^ (get_val_value {full=lhs;break_down=[]} t) ^ " + " ^
+    (get_val_value {full=rhs;break_down=[]} t) ^ ")"*)
   | exp ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
@@ -208,8 +212,9 @@ let render_fun_call_preamble call =
   pre_lemmas ^ "\n"
 
 let render_fun_call_body call =
-  let args = List.fold_left call.args ~init:""
-      ~f:(fun str_acc arg ->
+  let args = List.foldi call.args ~init:""
+      ~f:(fun i str_acc arg ->
+          let a_type = get_fun_arg_type call.fun_name i in
           (if String.equal str_acc "" then "" else str_acc ^ ", ") ^
           ( if arg.is_ptr then
               match arg.pointee with
@@ -228,7 +233,7 @@ let render_fun_call_body call =
                 end
               | None -> "???"
             else
-              get_val_value arg.value None )) in
+              get_val_value arg.value a_type)) in
   String.concat [call.fun_name; "("; args; ");\n"]
 
 let render_fun_call call rname_gen ~is_tip =
