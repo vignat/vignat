@@ -112,7 +112,9 @@ let fun_types =
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct)];
                                 lemmas_before = [];
-                                lemmas_after = ["//@ open evproc_loop_invariant(?mp, ?chp);"];
+                                lemmas_after = [
+                                  "//@ open evproc_loop_invariant(?mp, ?chp);";
+                                  "//@ assert dmap_dchain_coherent(?map,?chain);"];
                                 leaks = [
                                   "//@ leak last_time(_);";
                                   "//@ leak dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_);";
@@ -134,7 +136,12 @@ let fun_types =
                       "//@ close (ext_k_p(&arg3, ekc(user_buf0_36, user_buf0_34,\
                        user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
-                    "//@ open (ext_k_p(_,_));"];
+                      "//@ open (ext_k_p(_,_));";
+                      "//@ dmap_get_k2_gives_used(map, ekc(user_buf0_36, user_buf0_34, \
+                       user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));";
+                      "//@ dmap_get_k2_limits(map, ekc(user_buf0_36, user_buf0_34, \
+                       user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));";
+                    ];
                     leaks = [];};
      "dmap_get_a", {ret_type = Int;
                     arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Int;];
@@ -142,13 +149,25 @@ let fun_types =
                       "//@ close (int_k_p(&arg3, ikc(user_buf0_34, user_buf0_36,\
                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
-                    "//@ open (int_k_p(_,_));"];
+                      "//@ open (int_k_p(_,_));";
+                      "//@ dmap_get_k1_gives_used(map, ikc(user_buf0_34, user_buf0_36, \
+                       user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));";
+                      "//@ dmap_get_k1_limits(map, ikc(user_buf0_34, user_buf0_36, \
+                       user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));";
+                    ];
                     leaks = [];};
+     "dmap_put", {ret_type = Int;
+                  arg_types = [Ptr dmap_struct; Ptr flw_struct; Int;];
+                  lemmas_before = [];
+                  lemmas_after = [];
+                  leaks = [];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Int; Ptr flw_struct;];
                         lemmas_before = [];
                         lemmas_after = [];
-                        leaks = [];};
+                        leaks = [
+                          "//@ leak flw_p(_,_);";
+                          "//@ leak nat_flow_p(_,_,_,_);"];};
      "expire_items", {ret_type = Int;
                       arg_types = [Ptr dchain_struct;
                                    Ptr dmap_struct;
@@ -160,5 +179,10 @@ let fun_types =
                                    arg_types = [Ptr dchain_struct; Ptr Int; Uint32;];
                                    lemmas_before = [];
                                    lemmas_after = [];
-                                   leaks = [];}
+                                   leaks = [];};
+     "dchain_rejuvenate_index", {ret_type = Int;
+                                 arg_types = [Ptr dchain_struct; Int; Uint32;];
+                                 lemmas_before = [];
+                                 lemmas_after = [];
+                                 leaks = [];}
     ]

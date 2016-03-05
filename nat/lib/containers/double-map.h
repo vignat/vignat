@@ -53,6 +53,13 @@ struct DoubleMap;
           0 <= dmap_get_k1_fp<t1,t2,vt>(m, k1) &*&
           dmap_get_k1_fp<t1,t2,vt>(m, k1) < cap;
 
+  lemma void dmap_get_k2_limits<t1,t2,vt>(dmap<t1,t2,vt> m, t2 k2);
+  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?vp, ?recp, ?cap, ?mp) &*&
+           dmap_has_k2_fp<t1,t2,vt>(m, k2) == true;
+  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, vp, recp, cap, mp) &*&
+          0 <= dmap_get_k2_fp<t1,t2,vt>(m, k2) &*&
+          dmap_get_k2_fp<t1,t2,vt>(m, k2) < cap;
+
   lemma void dmap_get_k1_gives_used<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k1);
   requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?vp, ?recp, ?cap, ?mp) &*&
            dmap_has_k1_fp<t1,t2,vt>(m, k1) == true;

@@ -37,6 +37,9 @@ let rec get_vars_from_struct_val v ty =
   match ty with
   | Str (_, fields) ->
     let ftypes = List.map fields ~f:snd in
+    if (List.length v.break_down) = 0 then
+      [] (*FIXME: Klee currently does not export substructure break down. *)
+    else
     List.join (List.map2_exn v.break_down ftypes ~f:(fun v t -> get_vars_from_struct_val v.value t))
   | ty ->
     begin
@@ -182,6 +185,10 @@ let rec render_assignment var_name var_value var_type =
     begin match var_type with
       | Str (_, fields) ->
         let fts = List.map fields ~f:snd in
+        if (List.length v.break_down) = 0 then
+          "/*TODO:substructure assignment here*/\n"
+          (*FIXME: Klee does not export substructures yet.*)
+        else
         String.concat (List.map2_exn v.break_down fts ~f:(fun f ft ->
             render_assignment (var_name ^ "." ^ f.name) (Some f.value) ft))
       | _ ->
@@ -200,6 +207,10 @@ let render_var_assignments vars =
 let rec render_eq_sttmt head out_arg out_val out_t =
   match out_t with
   | Some (Str (_, fields)) -> let f_types = List.map fields ~f:snd in
+    if (List.length out_val.break_down) = 0 then
+      "/*TODO:substructure equality here*/\n"
+      (*FIXME: Klee does not export substructures yet.*)
+    else
     String.concat (List.map2_exn out_val.break_down f_types ~f:(fun f ft ->
         render_eq_sttmt head (out_arg ^ "." ^ f.name) f.value (Some ft)))
   | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_val_value out_val out_t) ^ ");\n"
@@ -370,7 +381,7 @@ let rec get_relevant_segment pref =
   | None -> pref
 
 let render_leaks pref =
-  ( String.concat (List.map ( (List.hd_exn pref.tip_calls)::pref.history ) ~f:(fun call ->
+  ( String.concat ~sep:"\n" (List.map ( (List.hd_exn pref.tip_calls)::pref.history ) ~f:(fun call ->
       match String.Map.find fun_types call.fun_name with
       | Some t -> String.concat ~sep:"\n" t.leaks
       | None -> failwith "unknown function") ) ^ "\n")
