@@ -9,16 +9,20 @@ type c_type =
   | Ctm of bytes
   | Fptr of bytes
 val c_type_to_str : c_type -> bytes
+type lemma_term = Txt of bytes | Rez_var
+type lemma = lemma_term list
 val is_void : c_type -> bool
 val get_pointee : c_type -> c_type
 type fun_spec = {
   ret_type : c_type;
   arg_types : c_type list;
   lemmas_before : bytes list;
-  lemmas_after : bytes list;
+  lemmas_after : lemma list;
   leaks : bytes list;
 }
 val dmap_struct : c_type
 val dchain_struct : c_type
 val ext_key_struct : c_type
+val int_key_struct : c_type
+val flw_struct : c_type
 val fun_types : fun_spec Core.Std.String.Map.t

@@ -16,7 +16,7 @@ let get_fun_arg_type fun_name arg_num =
   | None -> failwith ("unknown function " ^ fun_name)
 
 let get_fun_ret_type fun_name = match String.Map.find fun_types fun_name with
-  | Some spec -> Some spec.ret_type
+  | Some spec -> spec.ret_type
   | None -> failwith ("unknown function " ^ fun_name)
 
 let to_symbol str =
@@ -113,12 +113,10 @@ let get_vars tpref arg_name_gen =
     | Some ret ->
       begin
         match get_var_name_of_sexp ret.value.full with
-        | Some var_name -> begin match get_fun_ret_type call.fun_name with
-            | Some t -> {name = var_name;
-                         t = t;
-                         v = None} :: arg_vars
-            | None -> failwith ("no type for " ^ var_name)
-          end
+        | Some var_name ->
+          {name = var_name;
+           t = get_fun_ret_type call.fun_name;
+           v = None} :: arg_vars
         | None -> arg_vars
       end
     | None -> arg_vars in
@@ -247,18 +245,16 @@ let render_fun_call_body call =
               get_val_value arg.value a_type)) in
   String.concat [call.fun_name; "("; args; ");\n"]
 
-let render_fun_call call rname_gen ~is_tip =
+let render_fun_call call ret_var ~is_tip =
   let fname_with_args = render_fun_call_body call in
   let call_with_ret call_body = match call.ret with
     | Some ret ->
       begin
-        let ret_var = rname_gen#generate in
-        match get_fun_ret_type call.fun_name with
-        | Some t -> let ret_val = get_val_value ret.value None in
-          let ret_ass = "//@ " ^ (if is_tip then "assert" else "assume") ^
-                        "(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
-          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
-        | None -> "??? " ^ ret_var ^ " = " ^ call_body
+        let t = get_fun_ret_type call.fun_name in
+        let ret_val = get_val_value ret.value ( Some t ) in
+        let ret_ass = "//@ " ^ (if is_tip then "assert" else "assume") ^
+                      "(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
+        c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
       end
     | None -> call_body
   in
@@ -271,28 +267,32 @@ let render_2tip_call fst_tip snd_tip ret_var =
       begin
         match snd_tip.ret with
         | Some ret2 ->
-          begin
-            match get_fun_ret_type fst_tip.fun_name with
-            | Some t ->
-              let ret1_val = get_val_value ret1.value (Some t) in
-              let ret2_val = get_val_value ret2.value (Some t) in
-              let ret_ass = "//@ " ^ "assert" ^
-                            "(" ^ ret_var ^ " == " ^ ret1_val ^
-                            " || " ^ ret_var ^ " == " ^ ret2_val ^
-                            ");\n" in
-              c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
-            | None -> "??? " ^ ret_var ^ " = " ^ call_body
-          end
+          let t = get_fun_ret_type fst_tip.fun_name in
+          let ret1_val = get_val_value ret1.value (Some t) in
+          let ret2_val = get_val_value ret2.value (Some t) in
+          let ret_ass = "//@ " ^ "assert" ^
+                        "(" ^ ret_var ^ " == " ^ ret1_val ^
+                        " || " ^ ret_var ^ " == " ^ ret2_val ^
+                        ");\n" in
+          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
         | None -> failwith "tip call must either allways return or never"
       end
     | None -> call_body
   in
   call_with_ret (fname_with_args)
 
-let render_post_lemmas call =
+let render_a_post_lemma ret_name lemma =
+  let render_lemma_term = function
+    | Txt str -> str
+    | Rez_var -> ret_name
+  in
+  String.concat (List.map lemma ~f:render_lemma_term)
+
+let render_post_lemmas call ret_name =
   let post_lemmas =
     match String.Map.find fun_types call.fun_name with
-    | Some t -> (String.concat ~sep:"\n" t.lemmas_after)
+    | Some t -> (String.concat ~sep:"\n"
+                   (List.map t.lemmas_after ~f:( render_a_post_lemma ret_name)))
     | None -> failwith "" in
   post_lemmas
 
@@ -318,16 +318,16 @@ let render_post_statements call ~is_tip =
       else "") in
   String.concat sttmts
 
-let render_fun_call_fabule call ~is_tip =
+let render_fun_call_fabule call ret_name ~is_tip =
   let post_statements = render_post_statements call ~is_tip in
-  (render_post_lemmas call) ^ "\n" ^ post_statements
+  (render_post_lemmas call ret_name) ^ "\n" ^ post_statements
 
 let render_2tip_call_fabule fst_tip snd_tip ret_name =
   let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
   let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
   match fst_tip.ret, snd_tip.ret with
   | Some r1, Some r2 ->
-    (render_post_lemmas fst_tip) ^ "\n" ^
+    (render_post_lemmas fst_tip ret_name) ^ "\n" ^
     "if (" ^ ret_name ^ " == " ^ (get_val_value r1.value None) ^ ") {\n" ^
     post_statements_fst_alternative ^ "\n} else {\n" ^
     (render_eq_sttmt "assert" ret_name r2.value None) ^ "\n" ^
@@ -335,16 +335,20 @@ let render_2tip_call_fabule fst_tip snd_tip ret_name =
   | _,_ -> failwith "tip calls non-differentiated by return value not supported."
 
 let render_fun_call_in_context call rname_gen =
+  let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
+                 else rname_gen#generate) in
   (render_fun_call_preamble call) ^
-  (render_fun_call call rname_gen ~is_tip:false) ^
-  (render_fun_call_fabule call ~is_tip:false)
+  (render_fun_call call ret_name ~is_tip:false) ^
+  (render_fun_call_fabule call ret_name ~is_tip:false)
 
 let render_tip_call_in_context calls rname_gen =
   if List.length calls = 1 then
     let call = List.hd_exn calls in
+    let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
+                    else rname_gen#generate) in
     (render_fun_call_preamble call) ^
-    (render_fun_call call rname_gen ~is_tip:true) ^
-    (render_fun_call_fabule call ~is_tip:true)
+    (render_fun_call call ret_name ~is_tip:true) ^
+    (render_fun_call_fabule call ret_name ~is_tip:true)
   else if List.length calls = 2 then
     let fst_tip = List.hd_exn calls in
     let snd_tip = List.nth_exn calls 1 in
