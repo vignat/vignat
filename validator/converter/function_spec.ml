@@ -159,8 +159,9 @@ let fun_types =
                         user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));";
                       (fun _ _ ->
                          last_index_gotten :=
-                          "ekc(user_buf0_36, user_buf0_34, \
-                           user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)";
+                           "dmap_get_k2_fp(map, " ^
+                           "ekc(user_buf0_36, user_buf0_34, \
+                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23))";
                          "");
                     ];
                     leaks = [];};
@@ -184,8 +185,9 @@ let fun_types =
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));";
                       (fun _ _ ->
                          last_index_gotten :=
-                          "ikc(user_buf0_34, user_buf0_36, \
-                           user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
+                           "dmap_get_k1_fp(map, " ^
+                           "ikc(user_buf0_34, user_buf0_36, \
+                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23))";
                          "");
                     ];
                     leaks = [];};
@@ -198,12 +200,12 @@ let fun_types =
                         arg_types = [Ptr dmap_struct; Int; Ptr flw_struct;];
                         lemmas_before = [];
                         lemmas_after = [
-                          (fun ret_var _ ->
+                          (fun _ _ ->
                              "/*@ " ^
-                             "{assert double_chainp(?rej_ch, _, _);\n\
-                              coherent_dmap_used_dchain_allocated(map, rej_ch,\
-                              dmap_get_k1_fp(map, " ^ !last_index_gotten ^
-                             "));\
+                             "{assert double_chainp(?ch, _, _);\n\
+                              coherent_dmap_used_dchain_allocated(map, ch," ^
+                             !last_index_gotten ^
+                             ");\
                               }@*/");];
                         leaks = [
                           "//@ leak flw_p(_,_);";
@@ -223,6 +225,12 @@ let fun_types =
      "dchain_rejuvenate_index", {ret_type = Int;
                                  arg_types = [Ptr dchain_struct; Int; Uint32;];
                                  lemmas_before = [];
-                                 lemmas_after = [];
+                                 lemmas_after = [
+                                   (fun reg_var args ->
+                                      "/*@ if (" ^ reg_var ^ " != 0) {\n" ^
+                                      "assert dmap_dchain_coherent(_,?ch);\n" ^
+                                      "rejuvenate_preserves_coherent(map, ch, " ^
+                                      (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
+                                      ");\n}@*/");];
                                  leaks = [];}
     ]

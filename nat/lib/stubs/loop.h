@@ -34,6 +34,11 @@ requires dmap_dchain_coherent(m, ch);
 ensures dmap_dchain_coherent(m, ch) &*&
         dmap_dchain_coherent(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time)),
                              dchain_expire_old_indexes_fp(ch, time));
+
+lemma void rejuvenate_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch,
+                                         int index, uint32_t time);
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
 @*/
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch);
