@@ -16,11 +16,14 @@ let rec c_type_to_str = function
   | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
   | Ctm name -> name | Fptr name -> name ^ "*"
 
-type lemma_term =
-  | Txt of string
-  | Rez_var
+type lemma = (string -> string list -> string)
 
-type lemma = lemma_term list
+let tx_l str = (fun _ _ -> "/*@"^str^"@*/" )
+
+let on_rez_nonzero str = (fun rez_var _ ->
+    "/*@ if(" ^ rez_var ^ "==1) " ^ str ^ "@*/")
+
+let last_index_gotten = ref ""
 
 let is_void = function | Void -> true | _ -> false
 
@@ -119,8 +122,8 @@ let fun_types =
                                              Ptr (Ptr dchain_struct)];
                                 lemmas_before = [];
                                 lemmas_after = [
-                                  [Txt "//@ open evproc_loop_invariant(?mp, ?chp);" ];
-                                  [Txt "//@ assert dmap_dchain_coherent(?map,?chain);"]];
+                                  tx_l "open evproc_loop_invariant(?mp, ?chp);";
+                                  tx_l "assert dmap_dchain_coherent(?map,?chain);"];
                                 leaks = [
                                   "//@ leak last_time(_);";
                                   "//@ leak dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_);";
@@ -142,18 +145,23 @@ let fun_types =
                       "//@ close (ext_k_p(&arg3, ekc(user_buf0_36, user_buf0_34,\
                        user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
-                      [Txt "//@ open (ext_k_p(_,_));" ];
-                      [Txt "//@ if ("; Rez_var;
-                       Txt "!=0)dmap_get_k2_gives_used(map, ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));" ];
-                      [Txt "//@ if ("; Rez_var;
-                       Txt "!=0)dmap_get_k2_limits(map, ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));" ];
-                      [Txt "//@ if ("; Rez_var;
-                       Txt "!=0) coherent_dmap_used_dchain_allocated\
-                            (map, chain, \
-                            dmap_get_k2_fp(map, ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
+                      tx_l "open (ext_k_p(_,_));";
+                      on_rez_nonzero
+                        "dmap_get_k2_gives_used(map, ekc(user_buf0_36, user_buf0_34, \
+                         user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));";
+                      on_rez_nonzero
+                        "dmap_get_k2_limits(map, ekc(user_buf0_36, user_buf0_34, \
+                         user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));";
+                      on_rez_nonzero
+                       "coherent_dmap_used_dchain_allocated\
+                        (map, chain, \
+                        dmap_get_k2_fp(map, ekc(user_buf0_36, user_buf0_34, \
+                        user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));";
+                      (fun _ _ ->
+                         last_index_gotten :=
+                          "ekc(user_buf0_36, user_buf0_34, \
+                           user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)";
+                         "");
                     ];
                     leaks = [];};
      "dmap_get_a", {ret_type = Int;
@@ -162,18 +170,23 @@ let fun_types =
                       "//@ close (int_k_p(&arg3, ikc(user_buf0_34, user_buf0_36,\
                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
-                      [Txt "//@ open (int_k_p(_,_));" ];
-                      [Txt  "//@ if ("; Rez_var;
-                       Txt ") dmap_get_k1_gives_used(map, ikc(user_buf0_34, user_buf0_36, \
-                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));" ];
-                      [Txt "//@ if ("; Rez_var;
-                       Txt ") dmap_get_k1_limits(map, ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));" ];
-                      [Txt "//@ if ("; Rez_var;
-                       Txt "!=0) coherent_dmap_used_dchain_allocated\
-                            (map, chain, \
-                            dmap_get_k1_fp(map, ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
+                      tx_l "open (int_k_p(_,_));";
+                      on_rez_nonzero
+                       "dmap_get_k1_gives_used(map, ikc(user_buf0_34, user_buf0_36, \
+                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));";
+                      on_rez_nonzero
+                        "dmap_get_k1_limits(map, ikc(user_buf0_34, user_buf0_36, \
+                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));";
+                      on_rez_nonzero
+                       "coherent_dmap_used_dchain_allocated\
+                        (map, chain, \
+                        dmap_get_k1_fp(map, ikc(user_buf0_34, user_buf0_36, \
+                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));";
+                      (fun _ _ ->
+                         last_index_gotten :=
+                          "ikc(user_buf0_34, user_buf0_36, \
+                           user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
+                         "");
                     ];
                     leaks = [];};
      "dmap_put", {ret_type = Int;
@@ -184,7 +197,14 @@ let fun_types =
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Int; Ptr flw_struct;];
                         lemmas_before = [];
-                        lemmas_after = [];
+                        lemmas_after = [
+                          (fun ret_var _ ->
+                             "/*@ " ^
+                             "{assert double_chainp(?rej_ch, _, _);\n\
+                              coherent_dmap_used_dchain_allocated(map, rej_ch,\
+                              dmap_get_k1_fp(map, " ^ !last_index_gotten ^
+                             "));\
+                              }@*/");];
                         leaks = [
                           "//@ leak flw_p(_,_);";
                           "//@ leak nat_flow_p(_,_,_,_);"];};

@@ -9,8 +9,7 @@ type c_type =
   | Ctm of bytes
   | Fptr of bytes
 val c_type_to_str : c_type -> bytes
-type lemma_term = Txt of bytes | Rez_var
-type lemma = lemma_term list
+type lemma = (string -> string list -> string)
 val is_void : c_type -> bool
 val get_pointee : c_type -> c_type
 type fun_spec = {

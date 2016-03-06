@@ -142,7 +142,7 @@ let put_in_int_bounds v =
   else
     Int.to_string integer_val
 
-let rec get_val_value valu t =
+let get_val_value valu t =
   match valu.full with
   | Sexp.Atom v ->
     begin
@@ -220,11 +220,10 @@ let render_fun_call_preamble call =
     | None -> failwith "" in
   pre_lemmas ^ "\n"
 
-let render_fun_call_body call =
-  let args = List.foldi call.args ~init:""
-      ~f:(fun i str_acc arg ->
+let gen_fun_call_arg_list call =
+  List.mapi call.args
+      ~f:(fun i arg ->
           let a_type = get_fun_arg_type call.fun_name i in
-          (if String.equal str_acc "" then "" else str_acc ^ ", ") ^
           ( if arg.is_ptr then
               match arg.pointee with
               | Some ptee ->
@@ -242,11 +241,11 @@ let render_fun_call_body call =
                 end
               | None -> "???"
             else
-              get_val_value arg.value a_type)) in
-  String.concat [call.fun_name; "("; args; ");\n"]
+              get_val_value arg.value a_type))
 
-let render_fun_call call ret_var ~is_tip =
-  let fname_with_args = render_fun_call_body call in
+let render_fun_call call ret_var args ~is_tip =
+  let arg_list = String.concat ~sep:", " args in
+  let fname_with_args = String.concat [call.fun_name; "("; arg_list; ");\n"] in
   let call_with_ret call_body = match call.ret with
     | Some ret ->
       begin
@@ -260,8 +259,9 @@ let render_fun_call call ret_var ~is_tip =
   in
   call_with_ret (fname_with_args)
 
-let render_2tip_call fst_tip snd_tip ret_var =
-  let fname_with_args = render_fun_call_body fst_tip in
+let render_2tip_call fst_tip snd_tip ret_var args =
+  let arg_list = String.concat ~sep:", " args in
+  let fname_with_args = String.concat [fst_tip.fun_name; "("; arg_list; ");\n"] in
   let call_with_ret call_body = match fst_tip.ret with
     | Some ret1 ->
       begin
@@ -281,18 +281,11 @@ let render_2tip_call fst_tip snd_tip ret_var =
   in
   call_with_ret (fname_with_args)
 
-let render_a_post_lemma ret_name lemma =
-  let render_lemma_term = function
-    | Txt str -> str
-    | Rez_var -> ret_name
-  in
-  String.concat (List.map lemma ~f:render_lemma_term)
-
-let render_post_lemmas call ret_name =
+let render_post_lemmas call ret_name args =
   let post_lemmas =
     match String.Map.find fun_types call.fun_name with
     | Some t -> (String.concat ~sep:"\n"
-                   (List.map t.lemmas_after ~f:( render_a_post_lemma ret_name)))
+                   (List.map t.lemmas_after ~f:(fun l -> l ret_name args)))
     | None -> failwith "" in
   post_lemmas
 
@@ -318,16 +311,16 @@ let render_post_statements call ~is_tip =
       else "") in
   String.concat sttmts
 
-let render_fun_call_fabule call ret_name ~is_tip =
+let render_fun_call_fabule call ret_name args ~is_tip =
   let post_statements = render_post_statements call ~is_tip in
-  (render_post_lemmas call ret_name) ^ "\n" ^ post_statements
+  (render_post_lemmas call ret_name args) ^ "\n" ^ post_statements
 
-let render_2tip_call_fabule fst_tip snd_tip ret_name =
+let render_2tip_call_fabule fst_tip snd_tip ret_name args =
   let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
   let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
   match fst_tip.ret, snd_tip.ret with
   | Some r1, Some r2 ->
-    (render_post_lemmas fst_tip ret_name) ^ "\n" ^
+    (render_post_lemmas fst_tip ret_name args) ^ "\n" ^
     "if (" ^ ret_name ^ " == " ^ (get_val_value r1.value None) ^ ") {\n" ^
     post_statements_fst_alternative ^ "\n} else {\n" ^
     (render_eq_sttmt "assert" ret_name r2.value None) ^ "\n" ^
@@ -337,35 +330,41 @@ let render_2tip_call_fabule fst_tip snd_tip ret_name =
 let render_fun_call_in_context call rname_gen =
   let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
                  else rname_gen#generate) in
+  let args = (gen_fun_call_arg_list call) in
   (render_fun_call_preamble call) ^
-  (render_fun_call call ret_name ~is_tip:false) ^
-  (render_fun_call_fabule call ret_name ~is_tip:false)
+  (render_fun_call call ret_name args ~is_tip:false) ^
+  (render_fun_call_fabule call ret_name args ~is_tip:false)
 
 let render_tip_call_in_context calls rname_gen =
   if List.length calls = 1 then
     let call = List.hd_exn calls in
     let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
                     else rname_gen#generate) in
+    let args = (gen_fun_call_arg_list call) in
     (render_fun_call_preamble call) ^
-    (render_fun_call call ret_name ~is_tip:true) ^
-    (render_fun_call_fabule call ret_name ~is_tip:true)
+    (render_fun_call call ret_name args ~is_tip:true) ^
+    (render_fun_call_fabule call ret_name args ~is_tip:true)
   else if List.length calls = 2 then
     let fst_tip = List.hd_exn calls in
     let snd_tip = List.nth_exn calls 1 in
     let ret_name = rname_gen#generate in
+    let args = (gen_fun_call_arg_list fst_tip) in
     (*TODO: assert that the inputs of the tip calls are identicall.*)
     (render_fun_call_preamble fst_tip) ^
-    (render_2tip_call fst_tip snd_tip ret_name) ^
-    (render_2tip_call_fabule fst_tip snd_tip ret_name)
+    (render_2tip_call fst_tip snd_tip ret_name args) ^
+    (render_2tip_call_fabule fst_tip snd_tip ret_name args)
   else failwith "0 or too many tip-calls"
 
 let render_function_list tpref =
   let rez_gen = name_gen "rez" in
-  (List.fold_left tpref.history ~init:""
-     ~f:(fun str_acc call ->
-         str_acc ^ render_fun_call_in_context call rez_gen
-       )) ^
-   (render_tip_call_in_context tpref.tip_calls rez_gen)
+  let hist_funs =
+    (List.fold_left tpref.history ~init:""
+       ~f:(fun str_acc call ->
+           str_acc ^ render_fun_call_in_context call rez_gen
+         )) in
+  let tip_call =
+    (render_tip_call_in_context tpref.tip_calls rez_gen) in
+  hist_funs ^ tip_call
 
 let render_cmplxes () =
   String.concat (List.map (String.Map.data !allocated_complex_vals) ~f:(fun var ->
