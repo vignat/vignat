@@ -35,6 +35,14 @@ let get_var_name_of_sexp exp =
                                                allocated_dmap appears to be w32 and w64*))
   | _ -> None
 
+let rec get_var_names_of_sexp exp =
+  match get_var_name_of_sexp exp with
+  | Some name -> [name]
+  | None ->
+    match exp with
+    | Sexp.List (hd :: tl) -> List.join (List.map tl ~f:get_var_names_of_sexp)
+    | _ -> []
+
 let rec get_vars_from_struct_val v ty : var_spec list =
   match ty with
   | Str (_, fields) ->
@@ -44,16 +52,16 @@ let rec get_vars_from_struct_val v ty : var_spec list =
     else
     List.join (List.map2_exn v.break_down ftypes ~f:(fun v t -> get_vars_from_struct_val v.value t))
   | ty ->
-    begin
-      match get_var_name_of_sexp v.full with
-      | Some var_name -> [{name = var_name;
-                           t = ty;
-                           v = None}]
-      | None -> []
-    end
+    (*TODO: proper type induction here, e.g. Sadd w16 -> SInt16, ....*)
+    List.map (get_var_names_of_sexp v.full) ~f:(fun name -> {name = name; t = ty; v = None;})
 
 let get_vars tpref arg_name_gen =
   let get_vars call =
+    let ctxt_vars = List.map (List.join (List.map (List.join [call.call_context;call.ret_context])
+                                           ~f:get_var_names_of_sexp))
+        (* TODO: proper type induction here*)
+        ~f:(fun name -> {name = name; t = Int; v = None;})
+    in
     let arg_vars = List.foldi call.args ~f:(fun i ( acc : var_spec list )
                                              (arg:Trace_prefix.arg) ->
         if arg.is_ptr then
@@ -97,17 +105,12 @@ let get_vars tpref arg_name_gen =
           | None -> acc
       ) ~init:[]
     in
-    match call.ret with
-    | Some ret ->
-      begin
-        match get_var_name_of_sexp ret.value.full with
-        | Some var_name ->
-          {name = var_name;
-           t = get_fun_ret_type call.fun_name;
-           v = None} :: arg_vars
-        | None -> arg_vars
-      end
-    | None -> arg_vars in
+    let ret_vars = match call.ret with
+      | Some ret -> get_vars_from_struct_val ret.value (get_fun_ret_type call.fun_name)
+                      (*TODO: get also ret.pointee vars.*)
+      | None -> [] in
+    List.join [ctxt_vars;arg_vars;ret_vars]
+  in
   let hist_vars = (List.join (List.map tpref.history ~f:(fun call -> get_vars call))) in
   let tip_vars = (List.join (List.map tpref.tip_calls ~f:(fun call -> get_vars call))) in
   List.join [hist_vars; tip_vars]
@@ -168,6 +171,21 @@ let rec get_sexp_value exp t =
     when (String.equal f "Add") ->
     "(" ^ (get_sexp_value lhs t) ^ " + " ^
     (get_sexp_value rhs t) ^ ")"
+  | Sexp.List [Sexp.Atom f; lhs; rhs]
+    when (String.equal f "Slt") ->
+    (*FIXME: get the actual type*)
+    "(" ^ (get_sexp_value lhs Int) ^ " < " ^
+    (get_sexp_value rhs Int) ^ ")"
+  | Sexp.List [Sexp.Atom f; lhs; rhs]
+    when (String.equal f "Sle") ->
+    (*FIXME: get the actual type*)
+    "(" ^ (get_sexp_value lhs Int) ^ " <= " ^
+    (get_sexp_value rhs Int) ^ ")"
+  | Sexp.List [Sexp.Atom f; lhs; rhs]
+    when (String.equal f "Ule") ->
+    (*FIXME: get the actual type*)
+    "(" ^ (get_sexp_value lhs Int) ^ " <= " ^
+    (get_sexp_value rhs Int) ^ ")"
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
