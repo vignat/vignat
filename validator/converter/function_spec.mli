@@ -8,6 +8,7 @@ type c_type =
   | Str of bytes * (bytes * c_type) list
   | Ctm of bytes
   | Fptr of bytes
+  | Bool
 val c_type_to_str : c_type -> bytes
 type lemma = (string -> string list -> string)
 val is_void : c_type -> bool

@@ -9,12 +9,13 @@ type c_type = | Ptr of c_type
               | Str of string * (string * c_type) list
               | Ctm of string
               | Fptr of string
+              | Bool
 
 let rec c_type_to_str = function
   | Ptr c_type -> c_type_to_str c_type ^ "*"
   | Int -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
   | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
-  | Ctm name -> name | Fptr name -> name ^ "*"
+  | Ctm name -> name | Fptr name -> name ^ "*" | Bool -> "bool"
 
 type lemma = (string -> string list -> string)
 
@@ -215,7 +216,12 @@ let fun_types =
                                    Ptr dmap_struct;
                                    Uint32;];
                       lemmas_before = [];
-                      lemmas_after = [];
+                      lemmas_after = [
+                        (fun rez_var args ->
+                           "/*@ if (" ^ rez_var ^ " != 0) {\n" ^
+                           "assert dmap_dchain_coherent(?mmmmap, ?ccchhhh);\n\
+                            expire_preserves_coherent(mmmmap, ccchhhh, " ^
+                           (List.nth_exn args 2) ^ ");\n}@*/");];
                       leaks = [];};
      "dchain_allocate_new_index", {ret_type = Int;
                                    arg_types = [Ptr dchain_struct; Ptr Int; Uint32;];
