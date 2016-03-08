@@ -22,8 +22,10 @@ let rec c_type_to_str = function
   | Sunknown -> "s??" | Uunknown -> "u??"
 
 type lemma = (string -> string list -> string)
+type blemma = (string list -> string)
 
 let tx_l str = (fun _ _ -> "/*@"^str^"@*/" )
+let tx_bl str = (fun _ -> "/*@"^str^"@*/" )
 
 let on_rez_nonzero str = (fun rez_var _ ->
     "/*@ if(" ^ rez_var ^ "==1) " ^ str ^ "@*/")
@@ -35,7 +37,7 @@ let is_void = function | Void -> true | _ -> false
 let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
 
 type fun_spec = {ret_type: c_type; arg_types: c_type list;
-                 lemmas_before: string list; lemmas_after: lemma list;
+                 lemmas_before: blemma list; lemmas_after: lemma list;
                  leaks: string list;}
 
 let dmap_struct = Str ( "DoubleMap", [] )
@@ -82,25 +84,23 @@ let fun_types =
                           Int;Int;Ptr (Ctm "map_keys_equality");
                           Int;Int;Ptr (Ptr dmap_struct)];
                        lemmas_before = [
-                         "/*@ produce_function_pointer_chunk map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
-                          {\
-                          call();\
-                          }\
-                          @*/";
-                         "/*@ produce_function_pointer_chunk map_keys_equality<ext_k>(ext_key_eq)(ext_k_p)(a, b)\
-                          {\
-                          call();\
-                          }\
-                          @*/";
-                         "\
-  /*@ close exists<pair<pair<int_k, ext_k>, flw > >(pair(pair(ikc(0,0,0,0,0,0), ekc(0,0,0,0,0,0)),\
-                                                         flwc(ikc(0,0,0,0,0,0),\
-                                                              ekc(0,0,0,0,0,0),\
-                                                              0,0,0,0,0,0,0,0,0)));\
-    @*/\
- ";
-                         "//@ close pred_arg2<void*, flw>(flw_p);";
-                         "//@ close pred_arg4(nat_flow_p);"];
+                         tx_bl "produce_function_pointer_chunk \
+                                map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
+                                {\
+                                call();\
+                                }";
+                         tx_bl "produce_function_pointer_chunk \
+                                map_keys_equality<ext_k>(ext_key_eq)(ext_k_p)(a, b)\
+                                {\
+                                call();\
+                                }";
+                         tx_bl "close exists<pair<pair<int_k, ext_k>, flw > >\
+                                (pair(pair(ikc(0,0,0,0,0,0), ekc(0,0,0,0,0,0)),\
+                                      flwc(ikc(0,0,0,0,0,0),\
+                                           ekc(0,0,0,0,0,0),\
+                                           0,0,0,0,0,0,0,0,0)));";
+                         tx_bl "close pred_arg2<void*, flw>(flw_p);";
+                         tx_bl "close pred_arg4(nat_flow_p);"];
                        lemmas_after = [];
                        leaks = [];};
      "dmap_set_entry_condition", {ret_type = Void;
@@ -117,9 +117,12 @@ let fun_types =
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct)];
                                 lemmas_before = [
-                                  "//@ close dmap_dchain_coherent\
-                                   (empty_dmap_fp(), empty_dchain_fp());";
-                                  "//@ close evproc_loop_invariant(arg1, arg2);"];
+                                  tx_bl "close dmap_dchain_coherent\
+                                         (empty_dmap_fp(), empty_dchain_fp());";
+                                  (fun args ->
+                                     "/*@ close evproc_loop_invariant(*" ^
+                                     List.nth_exn args 0 ^ ", *" ^
+                                     List.nth_exn args 1 ^ "); @*/")];
                                 lemmas_after = [];
                                 leaks = [];};
      "loop_invariant_produce", {ret_type = Void;
@@ -147,8 +150,8 @@ let fun_types =
      "dmap_get_b", {ret_type = Int;
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Int;];
                     lemmas_before = [
-                      "//@ close (ext_k_p(&arg3, ekc(user_buf0_36, user_buf0_34,\
-                       user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
+                      tx_bl "close (ext_k_p(&arg3, ekc(user_buf0_36, user_buf0_34,\
+                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
                       tx_l "open (ext_k_p(_,_));";
                       on_rez_nonzero
@@ -173,8 +176,8 @@ let fun_types =
      "dmap_get_a", {ret_type = Int;
                     arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Int;];
                     lemmas_before = [
-                      "//@ close (int_k_p(&arg3, ikc(user_buf0_34, user_buf0_36,\
-                       user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
+                      tx_bl "close (int_k_p(&arg3, ikc(user_buf0_34, user_buf0_36,\
+                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
                       tx_l "open (int_k_p(_,_));";
                       on_rez_nonzero

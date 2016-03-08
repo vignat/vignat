@@ -14,12 +14,13 @@ type c_type =
   | Unknown
 val c_type_to_str : c_type -> bytes
 type lemma = (string -> string list -> string)
+type blemma = (string list -> string)
 val is_void : c_type -> bool
 val get_pointee : c_type -> c_type
 type fun_spec = {
   ret_type : c_type;
   arg_types : c_type list;
-  lemmas_before : bytes list;
+  lemmas_before : blemma list;
   lemmas_after : lemma list;
   leaks : bytes list;
 }

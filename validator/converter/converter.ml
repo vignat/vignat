@@ -267,7 +267,11 @@ let rec render_assignment var_name var_value var_type =
 
 let render_vars_declarations ( vars : var_spec list ) =
   List.fold vars ~init:"\n" ~f:(fun acc_str v ->
-      acc_str ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n")
+      match v.t with
+      | Unknown | Sunknown | Uunknown ->
+        acc_str ^ "//" ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n"
+      | _ ->
+        acc_str ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n")
 
 let render_var_assignments ( vars : var_spec list ) =
   List.fold vars ~init:"\n" ~f:(fun acc_str v ->
@@ -284,10 +288,11 @@ let rec render_eq_sttmt head out_arg out_val out_t =
         render_eq_sttmt head (out_arg ^ "." ^ f.name) f.value ft))
   | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_struct_val_value out_val out_t) ^ ");\n"
 
-let render_fun_call_preamble call =
+let render_fun_call_preamble call args =
   let pre_lemmas =
     match String.Map.find fun_types call.fun_name with
-    | Some t -> (String.concat ~sep:"\n" t.lemmas_before)
+    | Some t -> (String.concat ~sep:"\n"
+                   (List.map t.lemmas_before ~f:(fun l -> l args)))
     | None -> failwith "" in
   pre_lemmas ^ "\n"
 
@@ -403,7 +408,7 @@ let render_fun_call_in_context call rname_gen =
   let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
                  else rname_gen#generate) in
   let args = (gen_fun_call_arg_list call) in
-  (render_fun_call_preamble call) ^
+  (render_fun_call_preamble call args) ^
   (render_fun_call call ret_name args ~is_tip:false) ^
   (render_fun_call_fabule call ret_name args ~is_tip:false)
 
@@ -413,7 +418,7 @@ let render_tip_call_in_context calls rname_gen =
     let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
                     else rname_gen#generate) in
     let args = (gen_fun_call_arg_list call) in
-    (render_fun_call_preamble call) ^
+    (render_fun_call_preamble call args) ^
     (render_fun_call call ret_name args ~is_tip:true) ^
     (render_fun_call_fabule call ret_name args ~is_tip:true)
   else if List.length calls = 2 then
@@ -422,7 +427,7 @@ let render_tip_call_in_context calls rname_gen =
     let ret_name = rname_gen#generate in
     let args = (gen_fun_call_arg_list fst_tip) in
     (*TODO: assert that the inputs of the tip calls are identicall.*)
-    (render_fun_call_preamble fst_tip) ^
+    (render_fun_call_preamble fst_tip args) ^
     (render_2tip_call fst_tip snd_tip ret_name args) ^
     (render_2tip_call_fabule fst_tip snd_tip ret_name args)
   else failwith "0 or too many tip-calls"
@@ -477,6 +482,11 @@ let render_allocated_args () =
                                ~f:(fun spec -> (c_type_to_str spec.t) ^ " " ^
                                                (spec.name) ^ ";")))
 
+let render_alloc_args_assignments () =
+  List.fold (String.Map.data !allocated_args) ~init:"\n" ~f:(fun acc_str v ->
+      acc_str ^ (render_assignment v.name v.v v.t))
+
+
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
   Out_channel.output_string cout "void to_verify()\
@@ -486,8 +496,8 @@ let convert_prefix fin cout =
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
   let vars = (List.dedup (get_vars pref (name_gen "arg"))) in
   let var_decls = (render_vars_declarations vars) in
-  let var_assigns = (render_var_assignments vars) in
   let fun_calls = (render_function_list pref) in
+  let var_assigns = (render_var_assignments vars) in
   let leaks = (render_leaks pref) in
   let context_lemmas = ( render_context pref ) in
   Out_channel.output_string cout ( render_cmplxes () );
@@ -495,8 +505,8 @@ let convert_prefix fin cout =
   Out_channel.output_string cout context_lemmas;
   Out_channel.output_string cout ( render_tmps ());
   Out_channel.output_string cout ( render_allocated_args ());
+  Out_channel.output_string cout ( render_alloc_args_assignments ());
   Out_channel.output_string cout var_assigns;
-  Out_channel.newline cout;
   Out_channel.output_string cout fun_calls;
   Out_channel.output_string cout leaks;
   Out_channel.output_string cout "}\n"
