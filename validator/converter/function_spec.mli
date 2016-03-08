@@ -1,5 +1,5 @@
 type c_type =
-    Ptr of c_type
+  | Ptr of c_type
   | Int
   | Uint32
   | Uint16
@@ -9,6 +9,9 @@ type c_type =
   | Ctm of bytes
   | Fptr of bytes
   | Bool
+  | Sunknown
+  | Uunknown
+  | Unknown
 val c_type_to_str : c_type -> bytes
 type lemma = (string -> string list -> string)
 val is_void : c_type -> bool

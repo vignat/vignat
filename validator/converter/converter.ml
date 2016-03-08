@@ -12,6 +12,23 @@ type cmplx_val_spec = {name: string; t: c_type; exp: string;}
 
 let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 
+let infer_signed_type w =
+  if String.equal w "w32" then Int
+  else failwith (w ^ " signed is not supported")
+
+let infer_unsigned_type w =
+  if String.equal w "w32" then Uint32
+  else if String.equal w "w16" then Uint16
+  else if String.equal w "w8" then Uint8
+  else failwith (w ^ " unsigned is not supported")
+
+let infer_type_class f =
+  if String.equal f "Sle" then Sunknown
+  else if String.equal f "Slt" then Sunknown
+  else if String.equal f "Ule" then Uunknown
+  else if String.equal f "Ult" then Uunknown
+  else Unknown
+
 let get_fun_arg_type fun_name arg_num =
   match String.Map.find fun_types fun_name with
   | Some spec -> List.nth_exn spec.arg_types arg_num
@@ -35,85 +52,116 @@ let get_var_name_of_sexp exp =
                                                allocated_dmap appears to be w32 and w64*))
   | _ -> None
 
-let rec get_var_names_of_sexp exp =
-  match get_var_name_of_sexp exp with
-  | Some name -> [name]
-  | None ->
-    match exp with
-    | Sexp.List (hd :: tl) -> List.join (List.map tl ~f:get_var_names_of_sexp)
-    | _ -> []
+let get_read_width_of_sexp exp =
+  match exp with
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.Atom pos; Sexp.Atom name]
+    when (String.equal rd "ReadLSB" ||
+          String.equal rd "Read") -> Some w
+  | _ -> None
 
-let rec get_vars_from_struct_val v ty : var_spec list =
+let determine_type t w =
+  match t with
+  | Sunknown -> infer_signed_type w
+  | Uunknown -> infer_unsigned_type w
+  | _ -> t
+
+let add_alist_to_map mp lst =
+  List.fold lst ~init:mp ~f:(fun acc (key,data) ->
+      match String.Map.find acc key with
+      | Some _ -> acc
+      | None -> String.Map.add acc ~key ~data)
+
+let rec get_var_decls_of_sexp exp t known_vars =
+  match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
+  | Some name, Some w ->
+    begin match String.Map.find known_vars name with
+      | Some _ -> []
+      | None -> [{name = name; t = determine_type t w; v = None;}]
+    end
+  | None, None ->
+    begin
+    match exp with
+    | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
+      when (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
+      let ty = determine_type (infer_type_class f) w in
+      (List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars)))
+    | Sexp.List (Sexp.Atom f :: tl) ->
+      let ty = match (infer_type_class f) with |Unknown -> t | ty -> ty in
+      List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars))
+    | _ -> []
+    end
+  | _,_ -> failwith "inconsistency in get_var_name/get_read_width"
+
+let make_name_alist_from_var_decls (lst: var_spec list) =
+  List.map lst ~f:(fun x -> (x.name,x))
+
+let rec get_vars_from_struct_val v ty known_vars =
   match ty with
   | Str (_, fields) ->
     let ftypes = List.map fields ~f:snd in
     if (List.length v.break_down) = 0 then
-      [] (*FIXME: Klee currently does not export substructure break down. *)
+      known_vars (*FIXME: Klee currently does not export substructure break down. *)
     else
-    List.join (List.map2_exn v.break_down ftypes ~f:(fun v t -> get_vars_from_struct_val v.value t))
+      List.fold (List.zip_exn v.break_down ftypes) ~init:known_vars
+        ~f:(fun acc (v,t)->
+          get_vars_from_struct_val v.value t acc)
   | ty ->
     (*TODO: proper type induction here, e.g. Sadd w16 -> SInt16, ....*)
-    List.map (get_var_names_of_sexp v.full) ~f:(fun name -> {name = name; t = ty; v = None;})
+    let decls = get_var_decls_of_sexp v.full ty known_vars in
+    add_alist_to_map known_vars (make_name_alist_from_var_decls decls)
 
 let get_vars tpref arg_name_gen =
-  let get_vars call =
-    let ctxt_vars = List.map (List.join (List.map (List.join [call.call_context;call.ret_context])
-                                           ~f:get_var_names_of_sexp))
-        (* TODO: proper type induction here*)
-        ~f:(fun name -> {name = name; t = Int; v = None;})
+  let get_vars known_vars call =
+    let alloc_local_arg addr t v =
+      if not (String.Map.mem !allocated_args addr)
+      then
+        let p_name = arg_name_gen#generate in
+        allocated_args := String.Map.add !allocated_args
+            ~key:addr ~data:{name = p_name;
+                             t = t;
+                             v = v;};
     in
-    let arg_vars = List.foldi call.args ~f:(fun i ( acc : var_spec list )
-                                             (arg:Trace_prefix.arg) ->
-        if arg.is_ptr then
-          match arg.pointee with
-          | Some ptee ->
-            begin
-              if ptee.is_fun_ptr then
-                acc
-              else
-              if String.Map.mem !allocated_args (Sexp.to_string arg.value.full) then
-                acc
-              else
-                let ty =
-                  get_pointee (get_fun_arg_type call.fun_name i)
-                in
-                let p_name = arg_name_gen#generate in
-                let ptr : var_spec = {name = p_name;
-                                      t = ty;
-                                      v = ptee.before}
-                in
-                allocated_args := String.Map.add !allocated_args
-                    ~key:(Sexp.to_string arg.value.full) ~data:ptr ;
+    let arg_vars = List.foldi call.args ~init:known_vars
+        ~f:(fun i acc arg ->
+            let arg_type = get_fun_arg_type call.fun_name i in
+            match arg.pointee with
+            | Some ptee ->
+              begin
+                let ptee_type = get_pointee arg_type in
+                assert(arg.is_ptr);
+                let addr = (Sexp.to_string arg.value.full) in
+                alloc_local_arg addr ptee_type ptee.before;
                 let before_vars =
                   match ptee.before with
-                  | Some v -> get_vars_from_struct_val v ty
-                  | None -> ptr :: acc
-                in
-                let after_vars =
-                  match ptee.after with
-                  | Some v -> get_vars_from_struct_val v ty
-                  | None -> []
-                in
-                List.join [before_vars; [ptr]; after_vars; acc]
-            end
-          | None -> acc
-        else
-          match get_var_name_of_sexp arg.value.full with
-          | Some var_name -> {name = var_name;
-                              t = get_fun_arg_type call.fun_name i;
-                              v = None} :: acc
-          | None -> acc
-      ) ~init:[]
+                  | Some v -> get_vars_from_struct_val v ptee_type acc
+                  | None -> acc in
+                match ptee.before with
+                | Some v -> get_vars_from_struct_val v ptee_type before_vars
+                | None -> before_vars
+              end
+            | None ->
+              assert(not arg.is_ptr);
+              get_vars_from_struct_val arg.value arg_type acc)
     in
     let ret_vars = match call.ret with
-      | Some ret -> get_vars_from_struct_val ret.value (get_fun_ret_type call.fun_name)
-                      (*TODO: get also ret.pointee vars.*)
-      | None -> [] in
-    List.join [ctxt_vars;arg_vars;ret_vars]
+      | Some ret -> get_vars_from_struct_val
+                      ret.value (get_fun_ret_type call.fun_name) arg_vars
+      (*TODO: get also ret.pointee vars.*)
+      | None -> arg_vars in
+    let add_vars_from_ctxt vars ctxt =
+      add_alist_to_map vars (make_name_alist_from_var_decls
+                               (get_var_decls_of_sexp ctxt Bool vars)) in
+    let call_ctxt_vars =
+      List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
+    let ret_ctxt_vars =
+      List.fold call.ret_context ~f:add_vars_from_ctxt ~init:call_ctxt_vars in
+    ret_ctxt_vars
   in
-  let hist_vars = (List.join (List.map tpref.history ~f:(fun call -> get_vars call))) in
-  let tip_vars = (List.join (List.map tpref.tip_calls ~f:(fun call -> get_vars call))) in
-  List.join [hist_vars; tip_vars]
+  let hist_vars = (List.fold tpref.history ~init:String.Map.empty
+                     ~f:get_vars) in
+  let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
+                    ~f:get_vars) in
+  String.Map.data tip_vars
 
 let name_gen prefix = object
   val mutable cnt = 0
@@ -424,6 +472,11 @@ let render_leaks pref =
       | Some t -> String.concat ~sep:"\n" t.leaks
       | None -> failwith "unknown function") ) ^ "\n")
 
+let render_allocated_args () =
+  ( String.concat ~sep:"\n" (List.map (String.Map.data !allocated_args)
+                               ~f:(fun spec -> (c_type_to_str spec.t) ^ " " ^
+                                               (spec.name) ^ ";")))
+
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
   Out_channel.output_string cout "void to_verify()\
@@ -441,6 +494,7 @@ let convert_prefix fin cout =
   Out_channel.output_string cout var_decls;
   Out_channel.output_string cout context_lemmas;
   Out_channel.output_string cout ( render_tmps ());
+  Out_channel.output_string cout ( render_allocated_args ());
   Out_channel.output_string cout var_assigns;
   Out_channel.newline cout;
   Out_channel.output_string cout fun_calls;

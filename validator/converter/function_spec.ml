@@ -10,12 +10,16 @@ type c_type = | Ptr of c_type
               | Ctm of string
               | Fptr of string
               | Bool
+              | Sunknown
+              | Uunknown
+              | Unknown
 
 let rec c_type_to_str = function
   | Ptr c_type -> c_type_to_str c_type ^ "*"
   | Int -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
   | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
-  | Ctm name -> name | Fptr name -> name ^ "*" | Bool -> "bool"
+  | Ctm name -> name | Fptr name -> name ^ "*" | Bool -> "bool" | Unknown -> "???"
+  | Sunknown -> "s??" | Uunknown -> "u??"
 
 type lemma = (string -> string list -> string)
 
