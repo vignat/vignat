@@ -202,6 +202,10 @@ let allocate_tmp exp t =
     {name = name; t = t; exp = exp} :: !allocated_tmp_vals;
   name
 
+let is_int str =
+  try ignore (int_of_string str); true
+  with _ -> false
+
 let rec get_sexp_value exp t =
   match exp with
   | Sexp.Atom v ->
@@ -217,8 +221,21 @@ let rec get_sexp_value exp t =
     "(" ^ (c_type_to_str t) ^ ")" ^ (allocate_tmp (get_sexp_value src Int) Int)
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; lhs; rhs]
     when (String.equal f "Add") ->
-    "(" ^ (get_sexp_value lhs t) ^ " + " ^
-    (get_sexp_value rhs t) ^ ")"
+    begin (* Prefer a variable in the left position
+          due to the weird VeriFast type inference rules.*)
+      match lhs with
+      | Sexp.Atom str when is_int str ->
+        let ival = int_of_string str in (* avoid overflow *)
+        if ival > 2147483648 then
+          "(" ^ (get_sexp_value rhs t) ^ " - " ^
+          (Int.to_string (2*2147483648 - ival)) ^ ")"
+        else
+          "(" ^ (get_sexp_value rhs t) ^ " + " ^
+          (Int.to_string ival) ^ ")"
+      | _ ->
+        "(" ^ (get_sexp_value lhs t) ^ " + " ^
+        (get_sexp_value rhs t) ^ ")"
+    end
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Slt") ->
     (*FIXME: get the actual type*)
@@ -234,6 +251,14 @@ let rec get_sexp_value exp t =
     (*FIXME: get the actual type*)
     "(" ^ (get_sexp_value lhs Int) ^ " <= " ^
     (get_sexp_value rhs Int) ^ ")"
+  | Sexp.List [Sexp.Atom f; lhs; rhs]
+    when (String.equal f "Ult") ->
+    "(" ^ (get_sexp_value lhs Uunknown) ^ " < " ^
+    (get_sexp_value rhs Int) ^ ")"
+  | Sexp.List [Sexp.Atom f; lhs; rhs]
+    when (String.equal f "Eq") ->
+    "(" ^ (get_sexp_value lhs Unknown) ^ " == " ^
+    (get_sexp_value rhs Unknown) ^ ")"
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
@@ -500,12 +525,13 @@ let convert_prefix fin cout =
   let var_assigns = (render_var_assignments vars) in
   let leaks = (render_leaks pref) in
   let context_lemmas = ( render_context pref ) in
+  let args_assignments = ( render_alloc_args_assignments ()) in
   Out_channel.output_string cout ( render_cmplxes () );
   Out_channel.output_string cout var_decls;
   Out_channel.output_string cout context_lemmas;
   Out_channel.output_string cout ( render_tmps ());
   Out_channel.output_string cout ( render_allocated_args ());
-  Out_channel.output_string cout ( render_alloc_args_assignments ());
+  Out_channel.output_string cout args_assignments;
   Out_channel.output_string cout var_assigns;
   Out_channel.output_string cout fun_calls;
   Out_channel.output_string cout leaks;
