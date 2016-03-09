@@ -224,8 +224,8 @@ let fun_types =
                                    Uint32;];
                       lemmas_before = [];
                       lemmas_after = [
-                        (fun rez_var args ->
-                           "/*@ if (" ^ rez_var ^ " != 0) {\n" ^
+                        (fun _ args ->
+                           "/*@ {\n" ^
                            "assert dmap_dchain_coherent(?mmmmap, ?ccchhhh);\n\
                             expire_preserves_coherent(mmmmap, ccchhhh, " ^
                            (List.nth_exn args 2) ^ ");\n}@*/");];

@@ -6,7 +6,8 @@ type tp = Trace_prefix.trace_prefix
 
 let preamble = In_channel.read_all "preamble.tmpl"
 
-type var_spec = {name: string; t: c_type; v: struct_val option}
+type var_spec = {name: string; t: c_type; v: struct_val option;
+                 unique_mention: bool}
 
 type cmplx_val_spec = {name: string; t: c_type; exp: string;}
 
@@ -100,14 +101,15 @@ let merge_var_spec_with_t_and_val (spec:var_spec) t v =
     | None -> v in
   {name = spec.name;
    t = t_final;
-   v = v_final;}
+   v = v_final;
+   unique_mention = false;}
 
 let rec get_var_decls_of_sexp exp t known_vars =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
     begin match String.Map.find known_vars name with
       | Some spec -> [merge_var_spec_with_t_and_val spec (determine_type t w) None]
-      | None -> [{name = name; t = determine_type t w; v = None;}]
+      | None -> [{name = name; t = determine_type t w; v = None; unique_mention = true;}]
     end
   | None, None ->
     begin
@@ -156,7 +158,8 @@ let get_vars tpref arg_name_gen =
         allocated_args := String.Map.add !allocated_args
             ~key:addr ~data:{name = p_name;
                              t = t;
-                             v = v;};
+                             v = v;
+                             unique_mention = true};
       | Some spec ->
         allocated_args := String.Map.add !allocated_args
             ~key:addr ~data:(merge_var_spec_with_t_and_val spec t v)
@@ -201,7 +204,7 @@ let get_vars tpref arg_name_gen =
                      ~f:get_vars) in
   let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
                     ~f:get_vars) in
-  String.Map.data tip_vars
+  tip_vars
 
 let name_gen prefix = object
   val mutable cnt = 0
@@ -315,21 +318,18 @@ let get_struct_val_value valu t =
   | _ -> get_sexp_value valu.full t
 
 let rec render_assignment var_name var_value var_type =
-  match var_value with
-  | Some v ->
-    begin match var_type with
-      | Str (_, fields) ->
-        let fts = List.map fields ~f:snd in
-        if (List.length v.break_down) = 0 then
-          "/*TODO:substructure assignment here*/\n"
-          (*FIXME: Klee does not export substructures yet.*)
-        else
-        String.concat (List.map2_exn v.break_down fts ~f:(fun f ft ->
-            render_assignment (var_name ^ "." ^ f.name) (Some f.value) ft))
-      | _ ->
-        var_name ^ " = " ^ (get_struct_val_value v var_type) ^ ";\n"
-    end
-  | None -> ""
+  begin match var_type with
+    | Str (_, fields) ->
+      let fts = List.map fields ~f:snd in
+      if (List.length var_value.break_down) = 0 then
+        "/*TODO:substructure assignment here*/\n"
+        (*FIXME: Klee does not export substructures yet.*)
+      else
+        String.concat (List.map2_exn var_value.break_down fts ~f:(fun f ft ->
+            render_assignment (var_name ^ "." ^ f.name) f.value ft))
+    | _ ->
+      var_name ^ " = " ^ (get_struct_val_value var_value var_type) ^ ";\n"
+  end
 
 let render_vars_declarations ( vars : var_spec list ) =
   List.fold vars ~init:"\n" ~f:(fun acc_str v ->
@@ -341,9 +341,12 @@ let render_vars_declarations ( vars : var_spec list ) =
 
 let render_var_assignments ( vars : var_spec list ) =
   List.fold vars ~init:"\n" ~f:(fun acc_str v ->
-      acc_str ^ (render_assignment v.name v.v v.t))
+      match v.v with
+      | Some value -> acc_str ^ (render_assignment v.name value v.t)
+      | None -> "")
 
-let rec render_eq_sttmt head out_arg out_val out_t =
+let rec render_eq_sttmt ~is_assert out_arg out_val out_t vars =
+  let head = (if is_assert then "assert" else "assume") in
   match out_t with
   | Str (_, fields) -> let f_types = List.map fields ~f:snd in
     if (List.length out_val.break_down) = 0 then
@@ -351,8 +354,15 @@ let rec render_eq_sttmt head out_arg out_val out_t =
       (*FIXME: Klee does not export substructures yet.*)
     else
     String.concat (List.map2_exn out_val.break_down f_types ~f:(fun f ft ->
-        render_eq_sttmt head (out_arg ^ "." ^ f.name) f.value ft))
-  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_struct_val_value out_val out_t) ^ ");\n"
+        render_eq_sttmt ~is_assert (out_arg ^ "." ^ f.name) f.value ft vars))
+  | _ ->
+    let value = (get_struct_val_value out_val out_t) in
+    (match String.Map.find vars value with
+     | Some spec when spec.unique_mention ->
+       value ^ " = " ^ out_arg ^
+       ";//No mention means I can choose the value freely.\n"
+     | _ -> "") ^
+    "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_struct_val_value out_val out_t) ^ ");\n"
 
 let render_fun_call_preamble call args =
   let pre_lemmas =
@@ -431,7 +441,7 @@ let render_post_lemmas call ret_name args =
     | None -> failwith "" in
   post_lemmas
 
-let render_post_statements call ~is_tip =
+let render_post_statements call ~is_tip vars =
   let sttmts = List.map call.args ~f:(fun arg ->
       if arg.is_ptr then
         match arg.pointee with
@@ -445,40 +455,48 @@ let render_post_statements call ~is_tip =
                 | Some out_arg -> out_arg
                 | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
               in
-              render_eq_sttmt (if is_tip then "assert" else "assume")
-                out_arg.name v out_arg.t
+              render_eq_sttmt ~is_assert:is_tip
+                out_arg.name v out_arg.t vars
             | None -> ""
           end
         | None -> ""
       else "") in
-  String.concat sttmts
+  let ret_post_asserts =
+    (if is_tip then
+       String.concat (List.map call.ret_context ~f:(fun sttmt ->
+           "//@ assert(" ^ get_sexp_value sttmt Bool ^ ");\n"))
+     else
+       "") in
+  (String.concat sttmts) ^ ret_post_asserts
 
-let render_fun_call_fabule call ret_name args ~is_tip =
-  let post_statements = render_post_statements call ~is_tip in
+let render_fun_call_fabule call ret_name args ~is_tip vars =
+  let post_statements = render_post_statements call ~is_tip vars in
   (render_post_lemmas call ret_name args) ^ "\n" ^ post_statements
 
-let render_2tip_call_fabule fst_tip snd_tip ret_name args =
-  let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
-  let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
+let render_2tip_call_fabule fst_tip snd_tip ret_name args vars =
+  let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true vars in
+  let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true vars in
   let ret_t = get_fun_ret_type fst_tip.fun_name in
   match fst_tip.ret, snd_tip.ret with
-  | Some r1, Some r2 ->
+  | Some r1, Some r2
+    when not (String.equal (get_struct_val_value r1.value ret_t)
+                (get_struct_val_value r2.value ret_t))->
     (render_post_lemmas fst_tip ret_name args) ^ "\n" ^
     "if (" ^ ret_name ^ " == " ^ (get_struct_val_value r1.value ret_t) ^ ") {\n" ^
     post_statements_fst_alternative ^ "\n} else {\n" ^
-    (render_eq_sttmt "assert" ret_name r2.value ret_t) ^ "\n" ^
+    (render_eq_sttmt ~is_assert:true ret_name r2.value ret_t vars) ^ "\n" ^
     post_statements_snd_alternative ^ "\n}\n"
   | _,_ -> failwith "tip calls non-differentiated by return value not supported."
 
-let render_fun_call_in_context call rname_gen =
+let render_fun_call_in_context call rname_gen vars =
   let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
                  else rname_gen#generate) in
   let args = (gen_fun_call_arg_list call) in
   (render_fun_call_preamble call args) ^
   (render_fun_call call ret_name args ~is_tip:false) ^
-  (render_fun_call_fabule call ret_name args ~is_tip:false)
+  (render_fun_call_fabule call ret_name args ~is_tip:false vars)
 
-let render_tip_call_in_context calls rname_gen =
+let render_tip_call_in_context calls rname_gen vars =
   if List.length calls = 1 then
     let call = List.hd_exn calls in
     let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
@@ -486,7 +504,7 @@ let render_tip_call_in_context calls rname_gen =
     let args = (gen_fun_call_arg_list call) in
     (render_fun_call_preamble call args) ^
     (render_fun_call call ret_name args ~is_tip:true) ^
-    (render_fun_call_fabule call ret_name args ~is_tip:true)
+    (render_fun_call_fabule call ret_name args ~is_tip:true vars)
   else if List.length calls = 2 then
     let fst_tip = List.hd_exn calls in
     let snd_tip = List.nth_exn calls 1 in
@@ -495,18 +513,18 @@ let render_tip_call_in_context calls rname_gen =
     (*TODO: assert that the inputs of the tip calls are identicall.*)
     (render_fun_call_preamble fst_tip args) ^
     (render_2tip_call fst_tip snd_tip ret_name args) ^
-    (render_2tip_call_fabule fst_tip snd_tip ret_name args)
+    (render_2tip_call_fabule fst_tip snd_tip ret_name args vars)
   else failwith "0 or too many tip-calls"
 
-let render_function_list tpref =
+let render_function_list tpref vars =
   let rez_gen = name_gen "rez" in
   let hist_funs =
     (List.fold_left tpref.history ~init:""
        ~f:(fun str_acc call ->
-           str_acc ^ render_fun_call_in_context call rez_gen
+           str_acc ^ render_fun_call_in_context call rez_gen vars
          )) in
   let tip_call =
-    (render_tip_call_in_context tpref.tip_calls rez_gen) in
+    (render_tip_call_in_context tpref.tip_calls rez_gen vars) in
   hist_funs ^ tip_call
 
 let render_cmplxes () =
@@ -520,12 +538,16 @@ let render_tmps () =
       var.exp ^ ";\n"))
 
 let render_context pref =
+  let render_ctxt_list l =
+    String.concat ~sep:"\n" (List.map l ~f:(fun e ->
+        "//@ assume(" ^ (get_sexp_value e Bool) ^ ");"))
+  in
   (String.concat ~sep:"\n" (List.map pref.history ~f:(fun call ->
-       let render_ctxt_list l =
-         String.concat ~sep:"\n" (List.map l ~f:(fun e ->
-             "//@ assume(" ^ (get_sexp_value e Bool) ^ ");")) in
        (render_ctxt_list call.call_context) ^ "\n" ^
-       (render_ctxt_list call.ret_context)))) ^ "\n"
+       (render_ctxt_list call.ret_context)))) ^ "\n" ^
+  (match pref.tip_calls with
+   | hd :: tl -> (render_ctxt_list hd.call_context) ^ "\n"
+   | nil -> failwith "must have at least one tip call")
 
 let rec get_relevant_segment pref =
   match List.findi pref.history ~f:(fun _ call ->
@@ -550,7 +572,10 @@ let render_allocated_args () =
 
 let render_alloc_args_assignments () =
   List.fold (String.Map.data !allocated_args) ~init:"\n" ~f:(fun acc_str v ->
-      acc_str ^ (render_assignment v.name v.v v.t))
+      match v.v with
+      | Some value ->
+        acc_str ^ (render_assignment v.name value v.t)
+      | None -> "")
 
 
 let convert_prefix fin cout =
@@ -560,10 +585,11 @@ let convert_prefix fin cout =
                                   /*@ ensures true; @*/\n{\n" ;
   let pref = get_relevant_segment
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
-  let vars = (List.dedup (get_vars pref (name_gen "arg"))) in
-  let var_decls = (render_vars_declarations vars) in
-  let fun_calls = (render_function_list pref) in
-  let var_assigns = (render_var_assignments vars) in
+  let vars = (get_vars pref (name_gen "arg")) in
+  let vars_list = String.Map.data vars in
+  let var_decls = (render_vars_declarations vars_list) in
+  let fun_calls = (render_function_list pref vars) in
+  let var_assigns = (render_var_assignments vars_list) in
   let leaks = (render_leaks pref) in
   let context_lemmas = ( render_context pref ) in
   let args_assignments = ( render_alloc_args_assignments ()) in
