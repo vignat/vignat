@@ -65,11 +65,9 @@ let determine_type t w =
   | Uunknown -> infer_unsigned_type w
   | _ -> t
 
-let add_alist_to_map mp lst =
+let map_set_n_update_alist mp lst =
   List.fold lst ~init:mp ~f:(fun acc (key,data) ->
-      match String.Map.find acc key with
-      | Some _ -> acc
-      | None -> String.Map.add acc ~key ~data)
+      String.Map.add acc ~key ~data)
 
 let is_int str =
   try ignore (int_of_string str); true
@@ -92,11 +90,23 @@ let rec guess_type_l exps =
     end
   | nil -> Unknown
 
+let merge_var_spec_with_t_and_val (spec:var_spec) t v =
+  let t_final = match spec.t with
+    | Unknown -> t
+    | Sunknown | Uunknown -> if t = Unknown then spec.t else t
+    | _ -> spec.t in
+  let v_final = match spec.v with
+    | Some _ -> spec.v
+    | None -> v in
+  {name = spec.name;
+   t = t_final;
+   v = v_final;}
+
 let rec get_var_decls_of_sexp exp t known_vars =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
     begin match String.Map.find known_vars name with
-      | Some _ -> []
+      | Some spec -> [merge_var_spec_with_t_and_val spec (determine_type t w) None]
       | None -> [{name = name; t = determine_type t w; v = None;}]
     end
   | None, None ->
@@ -135,18 +145,21 @@ let rec get_vars_from_struct_val v ty known_vars =
   | ty ->
     (*TODO: proper type induction here, e.g. Sadd w16 -> SInt16, ....*)
     let decls = get_var_decls_of_sexp v.full ty known_vars in
-    add_alist_to_map known_vars (make_name_alist_from_var_decls decls)
+    map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
 
 let get_vars tpref arg_name_gen =
   let get_vars known_vars call =
     let alloc_local_arg addr t v =
-      if not (String.Map.mem !allocated_args addr)
-      then
+      match String.Map.find !allocated_args addr with
+      | None ->
         let p_name = arg_name_gen#generate in
         allocated_args := String.Map.add !allocated_args
             ~key:addr ~data:{name = p_name;
                              t = t;
                              v = v;};
+      | Some spec ->
+        allocated_args := String.Map.add !allocated_args
+            ~key:addr ~data:(merge_var_spec_with_t_and_val spec t v)
     in
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
@@ -162,7 +175,7 @@ let get_vars tpref arg_name_gen =
                   match ptee.before with
                   | Some v -> get_vars_from_struct_val v ptee_type acc
                   | None -> acc in
-                match ptee.before with
+                match ptee.after with
                 | Some v -> get_vars_from_struct_val v ptee_type before_vars
                 | None -> before_vars
               end
@@ -176,7 +189,7 @@ let get_vars tpref arg_name_gen =
       (*TODO: get also ret.pointee vars.*)
       | None -> arg_vars in
     let add_vars_from_ctxt vars ctxt =
-      add_alist_to_map vars (make_name_alist_from_var_decls
+      map_set_n_update_alist vars (make_name_alist_from_var_decls
                                (get_var_decls_of_sexp ctxt Bool vars)) in
     let call_ctxt_vars =
       List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
@@ -262,26 +275,31 @@ let rec get_sexp_value exp t =
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Slt") ->
     (*FIXME: get the actual type*)
-    "(" ^ (get_sexp_value lhs Int) ^ " < " ^
-    (get_sexp_value rhs Int) ^ ")"
+    "(" ^ (get_sexp_value lhs Sunknown) ^ " < " ^
+    (get_sexp_value rhs Sunknown) ^ ")"
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Sle") ->
     (*FIXME: get the actual type*)
-    "(" ^ (get_sexp_value lhs Int) ^ " <= " ^
-    (get_sexp_value rhs Int) ^ ")"
+    "(" ^ (get_sexp_value lhs Sunknown) ^ " <= " ^
+    (get_sexp_value rhs Sunknown) ^ ")"
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Ule") ->
     (*FIXME: get the actual type*)
-    "(" ^ (get_sexp_value lhs Int) ^ " <= " ^
-    (get_sexp_value rhs Int) ^ ")"
+    "(" ^ (get_sexp_value lhs Uunknown) ^ " <= " ^
+    (get_sexp_value rhs Uunknown) ^ ")"
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Ult") ->
     "(" ^ (get_sexp_value lhs Uunknown) ^ " < " ^
-    (get_sexp_value rhs Int) ^ ")"
+    (get_sexp_value rhs Uunknown) ^ ")"
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
-    "(" ^ (get_sexp_value lhs Unknown) ^ " == " ^
-    (get_sexp_value rhs Unknown) ^ ")"
+    let ty = guess_type_l [lhs;rhs] in
+    "(" ^ (get_sexp_value lhs ty) ^ " == " ^
+    (get_sexp_value rhs ty) ^ ")"
+  (*| Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
+    when (String.equal f "And") ->
+    "(" ^ (get_sexp_value lhs Int) ^ " && " ^
+    (get_sexp_value rhs Int) ^ ")" *)
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
