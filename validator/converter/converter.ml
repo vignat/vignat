@@ -71,6 +71,27 @@ let add_alist_to_map mp lst =
       | Some _ -> acc
       | None -> String.Map.add acc ~key ~data)
 
+let is_int str =
+  try ignore (int_of_string str); true
+  with _ -> false
+
+let guess_type exp =
+  match exp with
+  | Sexp.Atom str ->
+    if (String.equal str "true") ||
+       (String.equal str "false") then Bool
+    else if is_int str then Int
+    else Unknown
+  | _ -> Unknown
+
+let rec guess_type_l exps =
+  match exps with
+  | hd :: tl -> begin match guess_type hd with
+      | Unknown -> guess_type_l tl
+      | t -> t
+    end
+  | nil -> Unknown
+
 let rec get_var_decls_of_sexp exp t known_vars =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
@@ -86,7 +107,13 @@ let rec get_var_decls_of_sexp exp t known_vars =
       let ty = determine_type (infer_type_class f) w in
       (List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars)))
     | Sexp.List (Sexp.Atom f :: tl) ->
-      let ty = match (infer_type_class f) with |Unknown -> t | ty -> ty in
+      let ty = match (infer_type_class f) with
+        | Unknown -> begin match guess_type_l tl with
+            | Unknown -> t
+            | ty -> ty
+          end
+        | tc -> tc
+      in
       List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars))
     | _ -> []
     end
@@ -201,10 +228,6 @@ let allocate_tmp exp t =
   allocated_tmp_vals :=
     {name = name; t = t; exp = exp} :: !allocated_tmp_vals;
   name
-
-let is_int str =
-  try ignore (int_of_string str); true
-  with _ -> false
 
 let rec get_sexp_value exp t =
   match exp with
