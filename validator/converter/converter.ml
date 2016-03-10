@@ -411,6 +411,26 @@ let render_fun_call call ret_var args ~is_tip =
   in
   call_with_ret (fname_with_args)
 
+let find_false_eq_sttmts sttmts =
+  List.filter sttmts ~f:(fun sttmt ->
+      match sttmt with
+      | Sexp.List [Sexp.Atom rel; Sexp.Atom lhs; rhs] ->
+        (String.equal rel "Eq") && (String.equal lhs "false")
+      | _ -> false)
+
+let find_complementary_sttmts sttmts1 sttmts2 =
+  let find_from_left sttmts1 sttmts2 =
+  List.find_map (find_false_eq_sttmts sttmts1) ~f:(fun sttmt1 ->
+      match sttmt1 with
+      | Sexp.List [Sexp.Atom rel; Sexp.Atom lhs; rhs]
+        when (String.equal rel "Eq") && (String.equal lhs "false") ->
+        List.find sttmts2 ~f:(Sexp.equal rhs)
+      | _ -> None)
+  in
+  match find_from_left sttmts1 sttmts2 with
+  | Some st -> Some st
+  | None -> find_from_left sttmts2 sttmts1
+
 let render_2tip_call fst_tip snd_tip ret_var args =
   let arg_list = String.concat ~sep:", " args in
   let fname_with_args = String.concat [fst_tip.fun_name; "("; arg_list; ");\n"] in
@@ -486,6 +506,23 @@ let render_2tip_call_fabule fst_tip snd_tip ret_name args vars =
     post_statements_fst_alternative ^ "\n} else {\n" ^
     (render_eq_sttmt ~is_assert:true ret_name r2.value ret_t vars) ^ "\n" ^
     post_statements_snd_alternative ^ "\n}\n"
+  | Some _, Some _ -> begin match find_complementary_sttmts
+                                      fst_tip.ret_context
+                                      snd_tip.ret_context with
+      | Some sttmt ->
+        let pos_sttmts,neg_sttmts =
+          (if List.mem fst_tip.ret_context sttmt then
+             post_statements_fst_alternative,
+             post_statements_snd_alternative
+           else post_statements_snd_alternative,
+                post_statements_fst_alternative)
+        in
+        "if (" ^ (get_sexp_value sttmt Bool) ^ ") {\n" ^
+        pos_sttmts ^ "} else {\n" ^
+        neg_sttmts ^ "}\n"
+      | None -> failwith "tip calls non-differentiated by ret nor\
+                          by a complementary condition are not supported"
+    end
   | _,_ -> failwith "tip calls non-differentiated by return value not supported."
 
 let render_fun_call_in_context call rname_gen vars =
