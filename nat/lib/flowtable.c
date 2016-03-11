@@ -98,6 +98,33 @@ struct str_field_descr ext_key_descrs[] = {
   {offsetof(struct ext_key, ext_device_id), sizeof(uint8_t), "ext_device_id"},
   {offsetof(struct ext_key, protocol), sizeof(uint8_t), "protocol"},
 };
+struct nested_field_descr flow_nests[] = {
+  {offsetof(struct flow, ik), offsetof(struct int_key, int_src_port),
+   sizeof(uint16_t), "int_src_port"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, dst_port),
+   sizeof(uint16_t), "dst_port"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, int_src_ip),
+   sizeof(uint32_t), "int_src_ip"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, dst_ip),
+   sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, int_device_id),
+   sizeof(uint8_t), "int_device_id"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, protocol),
+   sizeof(uint8_t), "protocol"},
+
+  {offsetof(struct flow, ek), offsetof(struct ext_key, ext_src_port),
+   sizeof(uint16_t), "ext_src_port"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, dst_port),
+   sizeof(uint16_t), "dst_port"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, ext_src_ip),
+   sizeof(uint32_t), "ext_src_ip"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, dst_ip),
+   sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, ext_device_id),
+   sizeof(uint8_t), "ext_device_id"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, protocol),
+   sizeof(uint8_t), "protocol"},
+};
 struct str_field_descr flow_descrs[] = {
   {offsetof(struct flow, ik), sizeof(struct int_key), "ik"},
   {offsetof(struct flow, ek), sizeof(struct ext_key), "ek"},
@@ -123,7 +150,8 @@ int allocate_flowtables(uint8_t nb_ports) {
 #ifdef KLEE_VERIFICATION
     dmap_set_layout(int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),
                     ext_key_descrs, sizeof(ext_key_descrs)/sizeof(struct str_field_descr),
-                    flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr));
+                    flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr),
+                    flow_nests, sizeof(flow_nests)/sizeof(struct nested_field_descr));
 #endif //KLEE_VERIFICATION
     return dmap_allocate(sizeof(struct int_key),
                          offsetof(struct flow, ik), int_key_eq,

@@ -25,9 +25,11 @@ entry_condition* ent_cond = NULL;
 struct str_field_descr key_a_fields[prealloc_size],
   key_b_fields[prealloc_size],
   value_fields[prealloc_size];
+struct nested_field_descr value_nests[prealloc_size];
 int key_a_field_count = 0,
   key_b_field_count = 0,
-  value_field_count = 0;
+  value_field_count = 0,
+  value_nests_count = 0;
 
 void dmap_set_entry_condition(entry_condition* c) {
   klee_trace_param_fptr(c, "c");
@@ -36,16 +38,20 @@ void dmap_set_entry_condition(entry_condition* c) {
 
 void dmap_set_layout(struct str_field_descr* key_a_field_, int key_a_count_,
                      struct str_field_descr* key_b_field_, int key_b_count_,
-                     struct str_field_descr* value_field_, int value_count_) {
+                     struct str_field_descr* value_field_, int value_count_,
+                     struct nested_field_descr* value_nests_, int value_nests_count_) {
   klee_assert(key_a_count_ < prealloc_size);
   klee_assert(key_b_count_ < prealloc_size);
   klee_assert(value_count_ < prealloc_size);
+  klee_assert(value_nests_count_ < prealloc_size);
   memcpy(key_a_fields, key_a_field_, sizeof(struct str_field_descr)*key_a_count_);
   memcpy(key_b_fields, key_b_field_, sizeof(struct str_field_descr)*key_b_count_);
   memcpy(value_fields, value_field_, sizeof(struct str_field_descr)*value_count_);
+  memcpy(value_nests, value_nests_, sizeof(struct nested_field_descr)*value_nests_count_);
   key_a_field_count = key_a_count_;
   key_b_field_count = key_b_count_;
   value_field_count = value_count_;
+  value_nests_count = value_nests_count_;
 }
 
 int dmap_allocate(int key_a_size,
@@ -182,6 +188,15 @@ int dmap_put(struct DoubleMap* map, void* value_, int index) {
                                  value_fields[i].name);
     }
   }
+  {
+    for (int i = 0; i < value_nests_count; ++i) {
+      klee_trace_param_ptr_nested_field(value_,
+                                        value_nests[i].base_offset,
+                                        value_nests[i].offset,
+                                        value_nests[i].width,
+                                        value_nests[i].name);
+    }
+  }
   // Can not ever fail, because index is guaranteed to point to the available
   // slot, therefore the map can not be full at this point.
   // Always returns 1.
@@ -228,6 +243,15 @@ void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
                                  value_fields[i].offset,
                                  value_fields[i].width,
                                  value_fields[i].name);
+    }
+  }
+  {
+    for (int i = 0; i < value_nests_count; ++i) {
+      klee_trace_param_ptr_nested_field(value_out,
+                                        value_nests[i].base_offset,
+                                        value_nests[i].offset,
+                                        value_nests[i].width,
+                                        value_nests[i].name);
     }
   }
   klee_assert(allocation_succeeded);
