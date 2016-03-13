@@ -335,7 +335,12 @@ let fun_types =
                               coherent_dmap_used_dchain_allocated(cur_map, cur_ch," ^
                              !last_index_gotten ^
                              ");\n\
-                              }}@*/");];
+                              }}@*/");
+                          (fun _ args ->
+                             "/*@\
+                              open flw_p(" ^ (List.nth_exn args 2) ^
+                             ", _);\n\
+                              @*/")];
                         leaks = [
                           "//@ leak flw_p(_,_);";
                           "//@ leak nat_flow_p(_,_,_,_);"];};
