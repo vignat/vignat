@@ -39,6 +39,14 @@ lemma void rejuvenate_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch,
                                          int index, uint32_t time);
 requires dmap_dchain_coherent(m, ch);
 ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
+
+lemma void coherent_put_allocated_preserves_coherent
+(dmap<int_k,ext_k,flw> m, dchain ch, int_k k1, ext_k k2, flw value);
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(dmap_put_fp(m, k1, k2,
+                                         dchain_get_next_index_fp(ch),
+                                         value),
+                             dchain_take_next_index_fp(ch));
 @*/
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch);

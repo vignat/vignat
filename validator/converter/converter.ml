@@ -139,7 +139,7 @@ let rec get_vars_from_struct_val v ty known_vars =
   | Str (_, fields) ->
     let ftypes = List.map fields ~f:snd in
     if (List.length v.break_down) = 0 then
-      known_vars (*FIXME: Klee currently does not export substructure break down. *)
+      known_vars (* TODO: report an error here*)
     else
       List.fold (List.zip_exn v.break_down ftypes) ~init:known_vars
         ~f:(fun acc (v,t)->
