@@ -33,8 +33,16 @@ let on_rez_nonzero str = (fun rez_var _ ->
 let on_rez_nz f = (fun rez_var args ->
     "/*@ if(" ^ rez_var ^ "!=0) " ^ (f args) ^ " @*/")
 
+type map_key = Int | Ext
+
 let last_index_gotten = ref ""
+let last_index_key = ref Int
 let last_indexing_succ_ret_var = ref ""
+
+let gen_get_fp map_name =
+  match !last_index_key with
+  | Int -> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
+  | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
 let is_void = function | Void -> true | _ -> false
 
@@ -106,7 +114,8 @@ let fun_types =
                          tx_bl "close pred_arg2<void*, flw>(flw_p);";
                          tx_bl "close pred_arg4(nat_flow_p);"];
                        lemmas_after = [];
-                       leaks = [];};
+                       leaks = [
+                         "//@ leak dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_);";];};
      "dmap_set_entry_condition", {ret_type = Void;
                                   arg_types = [Ptr (Ctm "entry_condition")];
                                   lemmas_before = [];
@@ -182,11 +191,11 @@ let fun_types =
                             (cur_map, cur_ch, \
                             dmap_get_k2_fp(cur_map, ekc(user_buf0_36, user_buf0_34, \
                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));\n}");
-                      (fun ret_var args ->
-                         last_index_gotten := (*TODO: make sure map points to the right value*)
-                           "dmap_get_k2_fp(map, " ^
+                      (fun ret_var _ ->
+                         last_index_gotten :=
                            "ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23))";
+                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)";
+                         last_index_key := Ext;
                          last_indexing_succ_ret_var := ret_var;
                          "");
                     ];
@@ -224,9 +233,9 @@ let fun_types =
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));\n}");
                       (fun ret_var _ ->
                          last_index_gotten :=
-                           "dmap_get_k1_fp(cur_map, " ^
                            "ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23))";
+                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
+                         last_index_key := Int;
                          last_indexing_succ_ret_var := ret_var;
                          "");
                     ];
@@ -366,7 +375,7 @@ let fun_types =
                               if (" ^ !last_indexing_succ_ret_var ^ "!= 0) { \n\
                               assert dmap_dchain_coherent(cur_map, ?cur_ch);\n\
                               coherent_dmap_used_dchain_allocated(cur_map, cur_ch," ^
-                             !last_index_gotten ^
+                             (gen_get_fp "cur_map") ^
                              ");\n\
                               }}@*/");
                           (fun _ args ->
@@ -393,7 +402,20 @@ let fun_types =
                             user_buf0_36, user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
                             dchain_get_expired_indexes_fp(cur_chain, " ^ (List.nth_exn args 2) ^
                            "));\n\
-                            }@*/");];
+                            }@*/");
+                        (fun args ->
+                           "/*@ {\n\
+                            assert double_chainp(?cur_chain, _, " ^
+                           (List.nth_exn args 0) ^
+                           ");\n\
+                            if (length(dchain_get_expired_indexes_fp(cur_chain, " ^
+                           (List.nth_exn args 2) ^
+                           ")) > 0 ) {\n\
+                            expire_old_dchain_nonfull\
+                            (cur_chain, " ^ (List.nth_exn args 2) ^
+                           ");\n\
+                            }} @*/");
+                        ];
                       lemmas_after = [
                         (fun _ args ->
                            "/*@ {\n" ^

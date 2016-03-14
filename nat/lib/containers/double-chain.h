@@ -31,6 +31,11 @@ struct DoubleChain;
   lemma void dchain_next_index_not_allocated(dchain ch);
   requires true;
   ensures false == dchain_allocated_index_fp(ch, dchain_get_next_index_fp(ch));
+
+  lemma void expire_old_dchain_nonfull(dchain ch, uint32_t time);
+  requires length(dchain_get_expired_indexes_fp(ch, time)) > 0;
+  ensures dchain_out_of_space_fp(dchain_expire_old_indexes_fp(ch, time))
+          == false;
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
