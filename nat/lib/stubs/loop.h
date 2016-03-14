@@ -31,8 +31,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 lemma void expire_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch, uint32_t time);
 requires dmap_dchain_coherent(m, ch);
-ensures dmap_dchain_coherent(m, ch) &*&
-        dmap_dchain_coherent(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time)),
+ensures dmap_dchain_coherent(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time)),
                              dchain_expire_old_indexes_fp(ch, time));
 
 lemma void rejuvenate_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch,
@@ -47,6 +46,14 @@ ensures dmap_dchain_coherent(dmap_put_fp(m, k1, k2,
                                          dchain_get_next_index_fp(ch),
                                          value),
                              dchain_take_next_index_fp(ch));
+
+lemma void coherent_dchain_non_out_of_space_map_nonfull(dmap<int_k,ext_k,flw> m, dchain ch);
+requires dmappingp<int_k,ext_k,flw>(m, ?a, ?b, ?c, ?d, ?cap, ?f) &*&
+         dmap_dchain_coherent(m, ch) &*&
+         dchain_out_of_space_fp(ch) == false;
+ensures dmappingp<int_k,ext_k,flw>(m, a, b, c, d, cap, f) &*&
+        dmap_dchain_coherent(m, ch) &*&
+        dmap_size_fp(m) < cap;
 @*/
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch);
