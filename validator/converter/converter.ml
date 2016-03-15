@@ -32,7 +32,7 @@ let infer_type_class f =
 
 let expand_shorted_sexp sexp =
   let rec get_defs sexp =
-    let merge_defs d1 d2 = 
+    let merge_defs d1 d2 =
       String.Map.merge d1 d2
         ~f:(fun ~key pres ->
             match pres with
@@ -51,7 +51,7 @@ let expand_shorted_sexp sexp =
     in
     match sexp with
     | Sexp.List lst -> do_list lst
-    | Sexp.Atom str -> String.Map.empty
+    | Sexp.Atom _ -> String.Map.empty
   in
   let rec remove_defs exp =
     let rec do_list lst =
@@ -63,7 +63,7 @@ let expand_shorted_sexp sexp =
     in
     match exp with
     | Sexp.List lst -> Sexp.List (do_list lst)
-    | Sexp.Atom str -> exp
+    | Sexp.Atom _ -> exp
   in
   let rec expand_exp exp vars =
     match exp with
@@ -116,7 +116,7 @@ let get_var_name_of_sexp exp =
 
 let get_read_width_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.Atom pos; Sexp.Atom name]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.Atom _; Sexp.Atom _]
     when (String.equal rd "ReadLSB" ||
           String.equal rd "Read") -> Some w
   | _ -> None
@@ -352,7 +352,7 @@ let rec get_sexp_value exp t =
       | _ -> v
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
-    when (String.equal f "Extract") ->
+    when (String.equal f "Extract") && (String.equal offset "0") ->
     (*FIXME: make sure the typetransformation works.*)
     (*FIXME: pass a right type to get_sexp_value and llocate_tmp here*)
     "(" ^ (c_type_to_str t) ^ ")" ^ (allocate_tmp (get_sexp_value src Int) Int)
@@ -519,7 +519,7 @@ let render_fun_call call ret_var args ~is_tip =
 let find_false_eq_sttmts sttmts =
   List.filter sttmts ~f:(fun sttmt ->
       match sttmt with
-      | Sexp.List [Sexp.Atom rel; Sexp.Atom lhs; rhs] ->
+      | Sexp.List [Sexp.Atom rel; Sexp.Atom lhs; _] ->
         (String.equal rel "Eq") && (String.equal lhs "false")
       | _ -> false)
 
@@ -688,7 +688,7 @@ let render_context pref =
        (render_ctxt_list call.call_context) ^ "\n" ^
        (render_ctxt_list call.ret_context)))) ^ "\n" ^
   (match pref.tip_calls with
-   | hd :: tl -> (render_ctxt_list hd.call_context) ^ "\n"
+   | hd :: _ -> (render_ctxt_list hd.call_context) ^ "\n"
    | [] -> failwith "must have at least one tip call")
 
 let rec get_relevant_segment pref =
