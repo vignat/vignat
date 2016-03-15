@@ -30,6 +30,67 @@ let infer_type_class f =
   else if String.equal f "Ult" then Uunknown
   else Unknown
 
+let expand_shorted_sexp sexp =
+  let rec get_defs sexp =
+    let merge_defs d1 d2 = 
+      String.Map.merge d1 d2
+        ~f:(fun ~key pres ->
+            match pres with
+            | `Both (_,_) -> failwith "double definition"
+            | `Left x -> Some x
+            | `Right x -> Some x)
+    in
+    let rec do_list lst =
+      match lst with
+      | Sexp.Atom v :: def :: tl when String.is_suffix v ~suffix:":" ->
+        merge_defs (get_defs def) (String.Map.add (do_list tl)
+                                     ~key:(String.prefix v ((String.length v) - 1))
+                                     ~data:def)
+      | hd :: tl -> merge_defs (get_defs hd) (do_list tl)
+      | [] -> String.Map.empty
+    in
+    match sexp with
+    | Sexp.List lst -> do_list lst
+    | Sexp.Atom str -> String.Map.empty
+  in
+  let rec remove_defs exp =
+    let rec do_list lst =
+      match lst with
+      | Sexp.Atom v :: tl when String.is_suffix v ~suffix:":" ->
+        do_list tl
+      | hd :: tl -> (remove_defs hd) :: (do_list tl)
+      | [] -> []
+    in
+    match exp with
+    | Sexp.List lst -> Sexp.List (do_list lst)
+    | Sexp.Atom str -> exp
+  in
+  let rec expand_exp exp vars =
+    match exp with
+    | Sexp.List lst ->
+      let (expaneded_lst,smth_changed) =
+        List.fold_left lst ~init:([],false)
+          ~f:(fun (prev_expanded,prev_changed) el ->
+              let (expanded,changed) = expand_exp el vars in
+              (expanded::prev_expanded,changed||prev_changed))
+      in
+      (Sexp.List (List.rev expaneded_lst),smth_changed)
+    | Sexp.Atom str -> match String.Map.find vars str with
+      | Some ex -> (ex,true)
+      | None -> (exp,false)
+  in
+  let expand_map map defs =
+    String.Map.map map ~f:(fun el ->
+        let (new_el, _) = expand_exp el defs in new_el)
+  in
+  let map_non_expandable map defs =
+    not (List.exists (String.Map.data map) ~f:(fun el -> (snd (expand_exp el defs))))
+  in
+  let defs = get_defs sexp in
+  let defs = expand_map defs defs in
+  assert(map_non_expandable defs defs);
+  (fst (expand_exp (remove_defs sexp) defs))
+
 let get_fun_arg_type fun_name arg_num =
   match String.Map.find fun_types fun_name with
   | Some spec -> List.nth_exn spec.arg_types arg_num
@@ -89,7 +150,7 @@ let rec guess_type_l exps =
       | Unknown -> guess_type_l tl
       | t -> t
     end
-  | nil -> Unknown
+  | [] -> Unknown
 
 let merge_var_spec_with_t_and_val (spec:var_spec) t v =
   let t_final = match spec.t with
@@ -245,7 +306,44 @@ let allocate_tmp exp t =
     {name = name; t = t; exp = exp} :: !allocated_tmp_vals;
   name
 
+let eliminate_false_eq_0 exp t =
+  match (exp,t) with
+  | Sexp.List [Sexp.Atom eq1; Sexp.Atom fls;
+               Sexp.List [Sexp.Atom eq2; Sexp.Atom zero; e]],
+    Bool
+    when (String.equal eq1 "Eq") && (String.equal fls "false") &&
+         (String.equal eq2 "Eq") && (String.equal zero "0") ->
+    e
+  | _ -> exp
+
+let is_bool_fun fname =
+  if String.equal fname "Eq" then true
+  else if String.equal fname "Sle" then true
+  else if String.equal fname "Slt" then true
+  else if String.equal fname "Ule" then true
+  else if String.equal fname "Ult" then true
+  else false
+
+let rec is_bool_expr exp =
+  match exp with
+  | Sexp.List [Sexp.Atom f; _; _] when is_bool_fun f -> true
+  | Sexp.List [Sexp.Atom a; w; lhs; rhs] when String.equal a "And" ->
+    (*FIXME: and here, but really that is a bool expression, I know it*)
+    (is_bool_expr lhs) || (is_bool_expr rhs)
+  | Sexp.List [Sexp.Atom ext; w; e] when String.equal ext "ZExt" ->
+    is_bool_expr e
+  | _ -> false
+
+let remove_outside_parens str =
+  if (String.is_prefix str ~prefix:"(") &&
+     (String.is_suffix str ~suffix:")") then
+    String.chop_prefix_exn (String.chop_suffix_exn str ~suffix:")")
+      ~prefix:"("
+  else str
+
 let rec get_sexp_value exp t =
+  let exp = expand_shorted_sexp exp in
+  let exp = eliminate_false_eq_0 exp t in
   match exp with
   | Sexp.Atom v ->
     begin
@@ -299,10 +397,17 @@ let rec get_sexp_value exp t =
     let ty = guess_type_l [lhs;rhs] in
     "(" ^ (get_sexp_value lhs ty) ^ " == " ^
     (get_sexp_value rhs ty) ^ ")"
-  (*| Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
-    when (String.equal f "And") ->
-    "(" ^ (get_sexp_value lhs Int) ^ " && " ^
-    (get_sexp_value rhs Int) ^ ")" *)
+  | Sexp.List [Sexp.Atom f; _; e]
+    when String.equal f "ZExt" ->
+    (*TODO: something smarter here.*)
+    get_sexp_value e t
+  | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
+    when (String.equal f "And") &&
+         ((is_bool_expr lhs) || (is_bool_expr rhs)) ->
+    (*FIXME: and here, but really that is a bool expression, I know it*)
+    "(" ^ (remove_outside_parens (get_sexp_value lhs Bool)) ^ " && " ^
+    (get_sexp_value rhs Bool) ^ ")"
+  (* parens removing account for VeriFast buggy parser*)
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> name
@@ -584,7 +689,7 @@ let render_context pref =
        (render_ctxt_list call.ret_context)))) ^ "\n" ^
   (match pref.tip_calls with
    | hd :: tl -> (render_ctxt_list hd.call_context) ^ "\n"
-   | nil -> failwith "must have at least one tip call")
+   | [] -> failwith "must have at least one tip call")
 
 let rec get_relevant_segment pref =
   match List.findi pref.history ~f:(fun _ call ->

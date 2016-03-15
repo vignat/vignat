@@ -125,7 +125,8 @@ let fun_types =
                          arg_types = [Int; Ptr (Ptr dchain_struct)];
                          lemmas_before = [];
                          lemmas_after = [];
-                         leaks = [];};
+                         leaks = [
+                         "//@ leak double_chainp(_,_,_);";];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct)];
@@ -320,8 +321,9 @@ let fun_types =
                         _,_,_,_,_," ^ (List.nth_exn args 0) ^ ");\n");
                     tx_bl "{\n\
                            assert dmap_dchain_coherent(map_before_put, ?ch);\n\
-                           coherent_dchain_non_out_of_space_map_nonfull(map_before_put, ch);\n\
-                          }";];
+                           coherent_dchain_non_out_of_space_map_nonfull\
+                           (map_before_put, ch);\n\
+                           }";];
                   lemmas_after = [
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
