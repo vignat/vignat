@@ -13,26 +13,28 @@ let rec replace_in_term old_t new_t term =
 let replace_in_list id_old id_new ass_list =
   List.map ass_list ~f:(replace_in_term id_old id_new)
 
-let choose_simpler t1 t2 =
-  match t1 with
-  | Int _ | Bool _ -> (t1,t2)
-  | Id i1 -> begin
-      match t2 with
-      | Int _ | Bool _ -> (t2,t1)
-      | Id i2 -> if (String.length i1) < (String.length i2) then (t1,t2) else (t2,t1)
-      | _ -> (t1,t2)
-    end
-  | Cmp _ | Not _ -> (t2,t1)
+let choose_simpler t1 t2 keep_that =
+  if term_eq keep_that t1 then (t1,t2) else
+  if term_eq keep_that t2 then (t2,t1) else
+    match t1 with
+    | Int _ | Bool _ -> (t1,t2)
+    | Id i1 -> begin
+        match t2 with
+        | Int _ | Bool _ -> (t2,t1)
+        | Id i2 -> if (String.length i1) < (String.length i2) then (t1,t2) else (t2,t1)
+        | _ -> (t1,t2)
+      end
+    | Cmp _ | Not _ -> (t2,t1)
 
 let extract_equalities ass_list =
   List.partition_tf ass_list ~f:(function Cmp(Eq,_,_) -> true | _ -> false)
 
-let replace_with_equalities ass_list eqs =
+let replace_with_equalities ass_list eqs keep_that =
   List.fold eqs ~init:ass_list
     ~f:(fun acc eq ->
          match eq with
          | Cmp(Eq,lhs,rhs) ->
-           let (old_t,new_t) = choose_simpler lhs rhs in
+           let (new_t,old_t) = choose_simpler lhs rhs keep_that in
            replace_in_list old_t new_t acc
          | _ -> failwith "eqs must contain only equalities")
 
@@ -41,7 +43,7 @@ let print_assumption_list al =
       printf "%s\n" (Assumption.term_to_string ass))
 
 
-let simplify ass_list =
+let simplify ass_list keep_that =
   let rec remove_double_negation a =
     match a with
     | Not (Not t) -> remove_double_negation t
@@ -54,10 +56,11 @@ let simplify ass_list =
   in
   let ass_list = List.map ass_list ~f:remove_double_negation in
   let (eqs,non_eq_assumptions) = (extract_equalities ass_list) in
-  let ass_list = replace_with_equalities non_eq_assumptions eqs in
+  let ass_list = replace_with_equalities non_eq_assumptions eqs keep_that in
   remove_trues ass_list
 
 let () =
+  let interesting_id = Id Sys.argv.(2) in
   let ass_list = parse_file Sys.argv.(1) in
-  let ass_list = simplify ass_list in
+  let ass_list = simplify ass_list interesting_id in
   print_assumption_list ass_list
