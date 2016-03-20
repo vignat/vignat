@@ -29,6 +29,21 @@ let choose_simpler t1 t2 keep_that =
 let extract_equalities ass_list =
   List.partition_tf ass_list ~f:(function Cmp(Eq,_,_) -> true | _ -> false)
 
+let remove_trivial_eqs eqs =
+  List.filter eqs ~f:(function Cmp(Eq,lhs,rhs) -> not (term_eq lhs rhs) | _ -> true)
+
+(* The equalities that do not reduce to a simple variable renaming:
+   anything except (a = b).*)
+let get_meaningful_equalities eqs =
+  List.filter eqs ~f:(function Cmp (Eq,lhs,rhs) ->
+      begin
+        match lhs,rhs with
+        | Id _, _ -> true
+        | _, Id _ -> true
+        | _,_ -> false
+      end
+                             | _ -> failwith "only equalities here")
+
 let replace_with_equalities ass_list eqs keep_that =
   List.fold eqs ~init:ass_list
     ~f:(fun acc eq ->
@@ -101,7 +116,10 @@ let simplify ass_list keep_that =
   in
   let ass_list = List.map ass_list ~f:remove_double_negation in
   let (eqs,non_eq_assumptions) = (extract_equalities ass_list) in
-  let ass_list = replace_with_equalities non_eq_assumptions eqs keep_that in
+  let eqs = remove_trivial_eqs eqs in
+  let ass_list = non_eq_assumptions in
+  let ass_list = replace_with_equalities ass_list eqs keep_that in
+  let ass_list = (get_meaningful_equalities eqs) @ ass_list in
   remove_trues ass_list
 
 let () =
