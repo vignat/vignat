@@ -25,3 +25,13 @@ let rec term_to_string = (function
                               (cmp_op_to_string op) ^ "(" ^
                               (term_to_string rhs) ^ ")"
       | Not t -> "!" ^ "(" ^ (term_to_string t) ^ ")")
+
+let rec term_eq a b =
+  match (a,b) with
+  | Int x, Int y -> x = y
+  | Id x, Id y -> Core.Std.String.equal x y
+  | Bool x, Bool y -> x = y
+  | Cmp (acmp,alhs,arhs), Cmp (bcmp,blhs,brhs) ->
+    acmp = bcmp && (term_eq alhs blhs) && (term_eq arhs brhs)
+  | Not x, Not y -> term_eq x y
+  | _, _ -> false

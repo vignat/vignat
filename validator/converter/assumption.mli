@@ -7,3 +7,4 @@ type term =
   | Not of term
 val cmp_op_to_string : cmp -> bytes
 val term_to_string : term -> bytes
+val term_eq : term -> term -> bool
