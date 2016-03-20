@@ -42,6 +42,51 @@ let print_assumption_list al =
   List.iter al ~f:(fun ass ->
       printf "%s\n" (Assumption.term_to_string ass))
 
+let rec get_ids_from_term = function
+  | Int _ | Bool _ -> []
+  | Id x -> [x]
+  | Cmp (_,lhs,rhs) ->
+    List.dedup ~compare:String.compare (get_ids_from_term lhs)@(get_ids_from_term rhs)
+  | Not t -> get_ids_from_term t
+
+let index_assumptions ass_list =
+  List.fold ass_list ~init:String.Map.empty ~f:(fun acc ass ->
+      let ids = get_ids_from_term ass in
+      List.fold ids ~init:acc ~f:(fun acc id ->
+          String.Map.add acc ~key:id
+            ~data:(match String.Map.find acc id with
+                | Some ass_list -> ass::ass_list
+                | None -> [ass])))
+
+let take_relevant ass_list interesting_id =
+  let map = index_assumptions ass_list in
+  if not (String.Map.mem map interesting_id) then
+    failwith (interesting_id ^ " is never mentioned in this assumption list")
+  else
+    let retreive_relevant_terms id =
+      match String.Map.find map id with
+      | Some l -> l
+      | None -> failwith "inconsistent indexing"
+    in
+    let rec take_relevant id processed =
+      if String.Set.mem processed id then ([],processed)
+      else
+        let processed = String.Set.add processed id in
+        let rele_terms = retreive_relevant_terms id in
+        let rele_ids =
+          List.dedup ~compare:String.compare
+            (List.join (List.map rele_terms ~f:get_ids_from_term))
+        in
+        let (deep_terms, procd) =
+          List.fold rele_ids ~init:([],processed)
+            ~f:(fun (acc,procd) id ->
+                let (terms,procd) = take_relevant id procd in
+                (terms@acc,procd))
+        in
+        (rele_terms@deep_terms, procd)
+    in
+    let (terms,_) = take_relevant interesting_id String.Set.empty in
+    List.dedup terms
 
 let simplify ass_list keep_that =
   let rec remove_double_negation a =
@@ -60,7 +105,8 @@ let simplify ass_list keep_that =
   remove_trues ass_list
 
 let () =
-  let interesting_id = Id Sys.argv.(2) in
+  let interesting = Sys.argv.(2) in
+  let interesting_id = Id interesting in
   let ass_list = parse_file Sys.argv.(1) in
   let ass_list = simplify ass_list interesting_id in
-  print_assumption_list ass_list
+  print_assumption_list (take_relevant ass_list interesting)
