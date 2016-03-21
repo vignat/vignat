@@ -1,9 +1,5 @@
 %{
 open Assumption
-
-let args_to_string args =
-  String.concat ", " (List.map term_to_string args)
-
 %}
 
 %token <int> INT
@@ -37,7 +33,7 @@ term:
   | i = INT                              { Int i }
   | i = ID                               { Id i }
   | f = ID; LPAREN; al = arg_list; RPAREN
-                    { Id (f ^ "(" ^ (args_to_string al) ^ ")") }
+                    { Call (f, al) }
   | lhs = term; op = BAOP; rhs = term
                     { Id ((term_to_string lhs) ^ " " ^
                           (String.make 1 op) ^ " " ^ (term_to_string rhs)) }

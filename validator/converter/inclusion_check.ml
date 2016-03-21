@@ -8,23 +8,38 @@ let rec replace_in_term old_t new_t term =
     | Not t -> Not (replace_in_term old_t new_t t)
     | Cmp (cmp,lhs,rhs) -> Cmp (cmp,replace_in_term old_t new_t lhs,
                                 replace_in_term old_t new_t rhs)
+    | Call (fname,args) -> Call (fname,replace_in_list old_t new_t args)
     | _ -> term
+and replace_in_list id_old id_new term_list =
+  List.map term_list ~f:(replace_in_term id_old id_new)
 
-let replace_in_list id_old id_new ass_list =
-  List.map ass_list ~f:(replace_in_term id_old id_new)
+let rec term_contains sub_t t =
+  if term_eq t sub_t then true
+  else match t with
+    | Int _ | Bool _ | Id _ -> false
+    | Call (_, args) -> List.exists args ~f:(term_contains sub_t)
+    | Cmp (_,lhs,rhs) -> (term_contains sub_t lhs) || (term_contains sub_t rhs)
+    | Not t -> term_contains sub_t t
+
+let rec term_depth = function
+  | Int _ | Id _ | Bool _ -> 0
+  | Cmp (_,lhs,rhs) -> (max (term_depth lhs) (term_depth rhs)) + 1
+  | Call (_,args) -> (List.reduce_exn
+                        (List.map args ~f:term_depth)
+                        ~f:Int.max) + 1
+  | Not t -> 1 + (term_depth t)
 
 let choose_simpler t1 t2 keep_that =
-  if term_eq keep_that t1 then (t1,t2) else
-  if term_eq keep_that t2 then (t2,t1) else
+  if term_contains keep_that t1 then (t1,t2) else
+  if term_contains keep_that t2 then (t2,t1) else
     match t1 with
     | Int _ | Bool _ -> (t1,t2)
-    | Id i1 -> begin
+    | Id _ -> begin
         match t2 with
         | Int _ | Bool _ -> (t2,t1)
-        | Id i2 -> if (String.length i1) < (String.length i2) then (t1,t2) else (t2,t1)
         | _ -> (t1,t2)
       end
-    | Cmp _ | Not _ -> (t2,t1)
+    | _ -> if (term_depth t1) < (term_depth t2) then (t1,t2) else (t2,t1)
 
 let extract_equalities ass_list =
   List.partition_tf ass_list ~f:(function Cmp(Eq,_,_) -> true | _ -> false)
@@ -38,9 +53,8 @@ let get_meaningful_equalities eqs =
   List.filter eqs ~f:(function Cmp (Eq,lhs,rhs) ->
       begin
         match lhs,rhs with
-        | Id _, _ -> true
-        | _, Id _ -> true
-        | _,_ -> false
+        | Id _, Id _ -> false
+        | _, _ -> true
       end
                              | _ -> failwith "only equalities here")
 
@@ -55,13 +69,16 @@ let replace_with_equalities ass_list eqs keep_that =
 
 let print_assumption_list al =
   List.iter al ~f:(fun ass ->
-      printf "%s\n" (Assumption.term_to_string ass))
+      printf "%s\n\n" (Assumption.term_to_string ass))
 
 let rec get_ids_from_term = function
   | Int _ | Bool _ -> []
   | Id x -> [x]
   | Cmp (_,lhs,rhs) ->
     List.dedup ~compare:String.compare (get_ids_from_term lhs)@(get_ids_from_term rhs)
+  | Call (_, args) ->
+    List.dedup ~compare:String.compare
+      (List.join (List.map args ~f:get_ids_from_term))
   | Not t -> get_ids_from_term t
 
 let index_assumptions ass_list =

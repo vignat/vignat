@@ -7,7 +7,7 @@ type term =
          | Bool of bool
          | Cmp of (cmp*term*term)
          | Not of term
-         (* fun call is flattened to just an id *)
+         | Call of (string*term list)
 
 
 let cmp_op_to_string = (function
@@ -24,7 +24,12 @@ let rec term_to_string = (function
       | Cmp (op, lhs, rhs) -> "(" ^ (term_to_string lhs) ^ ")" ^
                               (cmp_op_to_string op) ^ "(" ^
                               (term_to_string rhs) ^ ")"
-      | Not t -> "!" ^ "(" ^ (term_to_string t) ^ ")")
+      | Not t -> "!" ^ "(" ^ (term_to_string t) ^ ")"
+      | Call (fname, args) -> fname ^ "(" ^
+                              (String.concat ", "
+                                 (List.map term_to_string args)) ^
+                              ")")
+
 
 let rec term_eq a b =
   match (a,b) with
