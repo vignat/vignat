@@ -35,6 +35,7 @@ let expand_shorted_sexp sexp =
     let merge_defs d1 d2 =
       String.Map.merge d1 d2
         ~f:(fun ~key pres ->
+            ignore key;
             match pres with
             | `Both (_,_) -> failwith "double definition"
             | `Left x -> Some x
@@ -560,7 +561,7 @@ let render_post_lemmas call ret_name args =
     | None -> failwith "" in
   post_lemmas
 
-let render_post_statements call ~is_tip vars =
+let render_post_statements call ~is_tip =
   let sttmts = List.map call.args ~f:(fun arg ->
       if arg.is_ptr then
         match arg.pointee with
@@ -588,13 +589,13 @@ let render_post_statements call ~is_tip vars =
        "") in
   (String.concat sttmts) ^ ret_post_asserts
 
-let render_fun_call_fabule call ret_name args ~is_tip vars =
-  let post_statements = render_post_statements call ~is_tip vars in
+let render_fun_call_fabule call ret_name args ~is_tip =
+  let post_statements = render_post_statements call ~is_tip in
   (render_post_lemmas call ret_name args) ^ "\n" ^ post_statements
 
-let render_2tip_call_fabule fst_tip snd_tip ret_name args vars =
-  let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true vars in
-  let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true vars in
+let render_2tip_call_fabule fst_tip snd_tip ret_name args =
+  let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
+  let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
   let ret_t = get_fun_ret_type fst_tip.fun_name in
   match fst_tip.ret, snd_tip.ret with
   | Some r1, Some r2
@@ -624,15 +625,15 @@ let render_2tip_call_fabule fst_tip snd_tip ret_name args vars =
     end
   | _,_ -> failwith "tip calls non-differentiated by return value not supported."
 
-let render_fun_call_in_context call rname_gen vars =
+let render_fun_call_in_context call rname_gen =
   let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
                  else rname_gen#generate) in
   let args = (gen_fun_call_arg_list call) in
   (render_fun_call_preamble call args) ^
   (render_fun_call call ret_name args ~is_tip:false) ^
-  (render_fun_call_fabule call ret_name args ~is_tip:false vars)
+  (render_fun_call_fabule call ret_name args ~is_tip:false)
 
-let render_tip_call_in_context calls rname_gen vars =
+let render_tip_call_in_context calls rname_gen =
   if List.length calls = 1 then
     let call = List.hd_exn calls in
     let ret_name = (if is_void (get_fun_ret_type call.fun_name) then ""
@@ -640,7 +641,7 @@ let render_tip_call_in_context calls rname_gen vars =
     let args = (gen_fun_call_arg_list call) in
     (render_fun_call_preamble call args) ^
     (render_fun_call call ret_name args ~is_tip:true) ^
-    (render_fun_call_fabule call ret_name args ~is_tip:true vars)
+    (render_fun_call_fabule call ret_name args ~is_tip:true)
   else if List.length calls = 2 then
     let fst_tip = List.hd_exn calls in
     let snd_tip = List.nth_exn calls 1 in
@@ -649,18 +650,18 @@ let render_tip_call_in_context calls rname_gen vars =
     (*TODO: assert that the inputs of the tip calls are identicall.*)
     (render_fun_call_preamble fst_tip args) ^
     (render_2tip_call fst_tip snd_tip ret_name args) ^
-    (render_2tip_call_fabule fst_tip snd_tip ret_name args vars)
+    (render_2tip_call_fabule fst_tip snd_tip ret_name args)
   else failwith "0 or too many tip-calls"
 
-let render_function_list tpref vars =
+let render_function_list tpref =
   let rez_gen = name_gen "rez" in
   let hist_funs =
     (List.fold_left tpref.history ~init:""
        ~f:(fun str_acc call ->
-           str_acc ^ render_fun_call_in_context call rez_gen vars
+           str_acc ^ render_fun_call_in_context call rez_gen
          )) in
   let tip_call =
-    (render_tip_call_in_context tpref.tip_calls rez_gen vars) in
+    (render_tip_call_in_context tpref.tip_calls rez_gen) in
   hist_funs ^ tip_call
 
 let render_cmplxes () =
@@ -728,7 +729,7 @@ let convert_prefix fin cout =
   let vars = (get_vars pref (name_gen "arg")) in
   let vars_list = String.Map.data vars in
   let var_decls = (render_vars_declarations vars_list) in
-  let fun_calls = (render_function_list pref vars) in
+  let fun_calls = (render_function_list pref) in
   let var_assigns = (render_var_assignments vars_list) in
   let leaks = (render_leaks pref) in
   let context_lemmas = ( render_context pref ) in
