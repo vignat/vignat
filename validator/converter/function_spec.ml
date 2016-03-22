@@ -248,33 +248,33 @@ let fun_types =
                     ".ik, ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
                      user_buf0_30, cmplx1, user_buf0_23));@*/");
                     (fun args -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ek, ekc(tmp5, user_buf0_36, 184789184, user_buf0_30,\
+                    ".ek, ekc(tmp4, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23));@*/");
                     (fun args -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
                     ", flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26, user_buf0_30,\
-                     cmplx1, user_buf0_23), ekc(tmp5, user_buf0_36, 184789184, user_buf0_30,\
-                     1, user_buf0_23), user_buf0_34, tmp5, user_buf0_36, user_buf0_26,\
+                     cmplx1, user_buf0_23), ekc(tmp4, user_buf0_36, 184789184, user_buf0_30,\
+                     1, user_buf0_23), user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
                      184789184, user_buf0_30, cmplx1, 1, user_buf0_23));@*/");
                     (fun args -> "/*@ close flow_p(flwc(ikc(user_buf0_34, user_buf0_36,\
                                   user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp5, user_buf0_36, 184789184,\
+                                  ekc(tmp4, user_buf0_36, 184789184,\
                                   user_buf0_30, 1, user_buf0_23),\
-                                  user_buf0_34, tmp5, user_buf0_36, user_buf0_26,\
+                                  user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
                                   184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
                                   ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
                                   user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp5, user_buf0_36, 184789184,\
+                                  ekc(tmp4, user_buf0_36, 184789184,\
                                   user_buf0_30, 1, user_buf0_23));@*/");
                     (fun args -> "/*@ close nat_flow_p \
                                   (ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
                                   user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp5, user_buf0_36, 184789184,\
+                                  ekc(tmp4, user_buf0_36, 184789184,\
                                   user_buf0_30, 1, user_buf0_23),\
                                   flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
                                   user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp5, user_buf0_36, 184789184,\
+                                  ekc(tmp4, user_buf0_36, 184789184,\
                                   user_buf0_30, 1, user_buf0_23),\
-                                  user_buf0_34, tmp5, user_buf0_36, user_buf0_26,\
+                                  user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
                                   184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
                                   new_index_0);@*/");
                     (fun args -> "/*@{\n\
@@ -289,7 +289,7 @@ let fun_types =
                                   _,_,_,_,_," ^ (List.nth_exn args 0) ^
                                  ");\n\
                                   assert dmap_dchain_coherent(cur_map, ?cur_ch);\n\
-                                  ext_k ek = ekc(tmp5, user_buf0_36,\
+                                  ext_k ek = ekc(tmp4, user_buf0_36,\
                                   184789184, user_buf0_30, 1, user_buf0_23);\n\
                                   if (dmap_has_k2_fp(cur_map, ek)) {\n\
                                   int index = dmap_get_k2_fp(cur_map, ek);\n\
@@ -334,7 +334,7 @@ let fun_types =
                         dmap_put_get(map_before_put,\
                         flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
-                        ekc(tmp5, user_buf0_36, 184789184, user_buf0_30,\
+                        ekc(tmp4, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n\
@@ -353,11 +353,11 @@ let fun_types =
                        (map_before_put, cur_ch,\
                         ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
-                        ekc(tmp5, user_buf0_36, 184789184, user_buf0_30,\
+                        ekc(tmp4, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\
                         flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
-                        ekc(tmp5, user_buf0_36, 184789184, user_buf0_30,\
+                        ekc(tmp4, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23));\

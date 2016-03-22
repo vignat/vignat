@@ -450,7 +450,7 @@ let render_var_assignments ( vars : var_spec list ) =
       | Some value -> acc_str ^ (render_assignment v.name value v.t)
       | None -> "")
 
-let rec render_eq_sttmt ~is_assert out_arg out_val out_t vars =
+let rec render_eq_sttmt ~is_assert out_arg out_val out_t =
   let head = (if is_assert then "assert" else "assume") in
   match out_t with
   | Str (_, fields) -> let f_types = List.map fields ~f:snd in
@@ -459,15 +459,9 @@ let rec render_eq_sttmt ~is_assert out_arg out_val out_t vars =
       (*FIXME: Klee does not export substructures yet.*)
     else
     String.concat (List.map2_exn out_val.break_down f_types ~f:(fun f ft ->
-        render_eq_sttmt ~is_assert (out_arg ^ "." ^ f.name) f.value ft vars))
-  | _ ->
-    let value = (get_struct_val_value out_val out_t) in
-    (match String.Map.find vars value with
-     | Some spec when spec.unique_mention ->
-       value ^ " = " ^ out_arg ^
-       ";//No mention means I can choose the value freely.\n"
-     | _ -> "") ^
-    "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^ (get_struct_val_value out_val out_t) ^ ");\n"
+        render_eq_sttmt ~is_assert (out_arg ^ "." ^ f.name) f.value ft))
+  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
+         (get_struct_val_value out_val out_t) ^ ");\n"
 
 let render_fun_call_preamble call args =
   let pre_lemmas =
@@ -581,7 +575,7 @@ let render_post_statements call ~is_tip vars =
                 | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
               in
               render_eq_sttmt ~is_assert:is_tip
-                out_arg.name v out_arg.t vars
+                out_arg.name v out_arg.t
             | None -> ""
           end
         | None -> ""
@@ -609,7 +603,7 @@ let render_2tip_call_fabule fst_tip snd_tip ret_name args vars =
     (render_post_lemmas fst_tip ret_name args) ^ "\n" ^
     "if (" ^ ret_name ^ " == " ^ (get_struct_val_value r1.value ret_t) ^ ") {\n" ^
     post_statements_fst_alternative ^ "\n} else {\n" ^
-    (render_eq_sttmt ~is_assert:true ret_name r2.value ret_t vars) ^ "\n" ^
+    (render_eq_sttmt ~is_assert:true ret_name r2.value ret_t) ^ "\n" ^
     post_statements_snd_alternative ^ "\n}\n"
   | Some _, Some _ -> begin match find_complementary_sttmts
                                       fst_tip.ret_context
@@ -719,6 +713,10 @@ let render_alloc_args_assignments () =
         acc_str ^ (render_assignment v.name value v.t)
       | None -> "")
 
+(*let compose_all_assignments () =
+  let tmp_assignments = List.fold allocated_tmp_vals ~init:String.Map.empty
+      ~f:(fun acc tmp ->
+          String.Map.add acc ~key:tmp.name ~data:) *)
 
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
