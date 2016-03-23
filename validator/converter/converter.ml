@@ -2,19 +2,38 @@ open Core.Std
 open Trace_prefix
 open Function_spec
 
+type bop = Eq | Le | Lt | Ge | Gt
+         | Add | Sub
+         | And
+
+type term_type = Function_spec.c_type
+
+type term = Bop of bop*tterm*tterm
+          | Apply of string*tterm list
+          | Id of string
+          | Struct of string*struct_field list
+          | Int of int
+          | Bool of bool
+          | Not of tterm
+          | Str_idx of tterm*string
+          | Deref of tterm
+          | Addr of tterm
+          | Fptr of string
+          | Cast of c_type*tterm
+          | Undef
+and struct_field = {name:string; value:tterm}
+and tterm = {v:term; t:term_type}
+
 type tp = Trace_prefix.trace_prefix
 
 let preamble = In_channel.read_all "preamble.tmpl"
 
-type var_spec = {name: string; t: c_type; v: struct_val option;
-                 unique_mention: bool}
-
-type cmplx_val_spec = {name: string; t: c_type; exp: string;}
+type var_spec = {name: string; v:tterm}
 
 let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 
 let infer_signed_type w =
-  if String.equal w "w32" then Int
+  if String.equal w "w32" then Sint32
   else failwith (w ^ " signed is not supported")
 
 let infer_unsigned_type w =
@@ -103,8 +122,8 @@ let get_fun_ret_type fun_name = match String.Map.find fun_types fun_name with
 
 let to_symbol str =
   let no_spaces = String.substr_replace_all str ~pattern:" " ~with_:"_" in
-  let no_sharps = String.substr_replace_all no_spaces ~pattern:"#" ~with_:"num" in
-  no_sharps
+  let no_octotorps = String.substr_replace_all no_spaces ~pattern:"#" ~with_:"num" in
+  no_octotorps
 
 let get_var_name_of_sexp exp =
   match exp with
@@ -140,8 +159,8 @@ let guess_type exp =
   match exp with
   | Sexp.Atom str ->
     if (String.equal str "true") ||
-       (String.equal str "false") then Bool
-    else if is_int str then Int
+       (String.equal str "false") then Boolean
+    else if is_int str then Sint32 (*TODO: set uint for out-of-signed-range value*)
     else Unknown
   | _ -> Unknown
 
@@ -153,25 +172,23 @@ let rec guess_type_l exps =
     end
   | [] -> Unknown
 
-let merge_var_spec_with_t_and_val (spec:var_spec) t v =
-  let t_final = match spec.t with
-    | Unknown -> t
-    | Sunknown | Uunknown -> if t = Unknown then spec.t else t
-    | _ -> spec.t in
-  let v_final = match spec.v with
-    | Some _ -> spec.v
-    | None -> v in
+let update_var_spec (spec:var_spec) v =
+  let t_final = match spec.v.t with
+    | Unknown -> v.t
+    | Sunknown | Uunknown -> if v.t = Unknown then spec.v.t else v.t
+    | _ -> spec.v.t in
+  let v_final = match spec.v.v with
+    | Undef -> v.v
+    | _ -> spec.v.v in
   {name = spec.name;
-   t = t_final;
-   v = v_final;
-   unique_mention = false;}
+   v = {v=v_final; t=t_final};}
 
 let rec get_var_decls_of_sexp exp t known_vars =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
     begin match String.Map.find known_vars name with
-      | Some spec -> [merge_var_spec_with_t_and_val spec (determine_type t w) None]
-      | None -> [{name = name; t = determine_type t w; v = None; unique_mention = true;}]
+      | Some spec -> [update_var_spec spec {v=Undef;t=(determine_type t w)}]
+      | None -> [{name = name; v={v=Undef;t=determine_type t w}}]
     end
   | None, None ->
     begin
@@ -201,72 +218,15 @@ let rec get_vars_from_struct_val v ty known_vars =
   | Str (_, fields) ->
     let ftypes = List.map fields ~f:snd in
     if (List.length v.break_down) = 0 then
-      known_vars (* TODO: report an error here*)
+      failwith "unreported structure breakdown."
     else
       List.fold (List.zip_exn v.break_down ftypes) ~init:known_vars
         ~f:(fun acc (v,t)->
           get_vars_from_struct_val v.value t acc)
   | ty ->
-    (*TODO: proper type induction here, e.g. Sadd w16 -> SInt16, ....*)
+    (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
     let decls = get_var_decls_of_sexp v.full ty known_vars in
     map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
-
-let get_vars tpref arg_name_gen =
-  let get_vars known_vars call =
-    let alloc_local_arg addr t v =
-      match String.Map.find !allocated_args addr with
-      | None ->
-        let p_name = arg_name_gen#generate in
-        allocated_args := String.Map.add !allocated_args
-            ~key:addr ~data:{name = p_name;
-                             t = t;
-                             v = v;
-                             unique_mention = true};
-      | Some spec ->
-        allocated_args := String.Map.add !allocated_args
-            ~key:addr ~data:(merge_var_spec_with_t_and_val spec t v)
-    in
-    let arg_vars = List.foldi call.args ~init:known_vars
-        ~f:(fun i acc arg ->
-            let arg_type = get_fun_arg_type call.fun_name i in
-            match arg.pointee with
-            | Some ptee ->
-              begin
-                let ptee_type = get_pointee arg_type in
-                assert(arg.is_ptr);
-                let addr = (Sexp.to_string arg.value.full) in
-                alloc_local_arg addr ptee_type ptee.before;
-                let before_vars =
-                  match ptee.before with
-                  | Some v -> get_vars_from_struct_val v ptee_type acc
-                  | None -> acc in
-                match ptee.after with
-                | Some v -> get_vars_from_struct_val v ptee_type before_vars
-                | None -> before_vars
-              end
-            | None ->
-              assert(not arg.is_ptr);
-              get_vars_from_struct_val arg.value arg_type acc)
-    in
-    let ret_vars = match call.ret with
-      | Some ret -> get_vars_from_struct_val
-                      ret.value (get_fun_ret_type call.fun_name) arg_vars
-      (*TODO: get also ret.pointee vars.*)
-      | None -> arg_vars in
-    let add_vars_from_ctxt vars ctxt =
-      map_set_n_update_alist vars (make_name_alist_from_var_decls
-                               (get_var_decls_of_sexp ctxt Bool vars)) in
-    let call_ctxt_vars =
-      List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
-    let ret_ctxt_vars =
-      List.fold call.ret_context ~f:add_vars_from_ctxt ~init:call_ctxt_vars in
-    ret_ctxt_vars
-  in
-  let hist_vars = (List.fold tpref.history ~init:String.Map.empty
-                     ~f:get_vars) in
-  let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
-                    ~f:get_vars) in
-  tip_vars
 
 let name_gen prefix = object
   val mutable cnt = 0
@@ -275,43 +235,44 @@ let name_gen prefix = object
     prefix ^ Int.to_string cnt
 end
 
-let allocated_complex_vals = ref String.Map.empty
 let complex_val_name_gen = name_gen "cmplx"
+let allocated_complex_vals = ref String.Map.empty
 
 let tmp_val_name_gen = name_gen "tmp"
 let allocated_tmp_vals = ref []
 
-let put_in_int_bounds v =
+let get_sint_in_bounds v =
   let integer_val = Int.of_string v in
   if Int.(integer_val > 2147483647) then
-    "(" ^ (Int.to_string (integer_val - 2*2147483648)) ^ ")"
+    integer_val - 2*2147483648
   else
-    Int.to_string integer_val
+    integer_val
 
-let get_cmplx_val_name exp t =
+let make_cmplx_val exp t =
   let key = Sexp.to_string exp in
   match String.Map.find !allocated_complex_vals key with
-  | Some v -> v.name
+  | Some v -> v.v
   | None ->
     let name = complex_val_name_gen#generate in
+    let value = {v=Id name;t} in
     allocated_complex_vals :=
       String.Map.add !allocated_complex_vals ~key
         ~data:{name = name;
-               t = t;
-               exp = key;} ;
-    name
+               v=value;};
+    value
 
-let allocate_tmp exp t =
+let allocate_tmp value =
   let name = tmp_val_name_gen#generate in
   allocated_tmp_vals :=
-    {name = name; t = t; exp = exp} :: !allocated_tmp_vals;
-  name
+    {name = name; v=value} :: !allocated_tmp_vals;
+  {v=Id name;t=value.t}
 
+(*TODO: rewrite this in terms of my IR instead of raw Sexps*)
 let eliminate_false_eq_0 exp t =
   match (exp,t) with
   | Sexp.List [Sexp.Atom eq1; Sexp.Atom fls;
                Sexp.List [Sexp.Atom eq2; Sexp.Atom zero; e]],
-    Bool
+    Boolean
     when (String.equal eq1 "Eq") && (String.equal fls "false") &&
          (String.equal eq2 "Eq") && (String.equal zero "0") ->
     e
@@ -335,7 +296,7 @@ let rec is_bool_expr exp =
     is_bool_expr e
   | _ -> false
 
-let remove_outside_parens str =
+let strip_outside_parens str =
   if (String.is_prefix str ~prefix:"(") &&
      (String.is_suffix str ~suffix:")") then
     String.chop_prefix_exn (String.chop_suffix_exn str ~suffix:")")
@@ -349,55 +310,47 @@ let rec get_sexp_value exp t =
   | Sexp.Atom v ->
     begin
       match t with
-      | Int -> put_in_int_bounds v
-      | _ -> v
+      | Sint32 -> {v=Int (get_sint_in_bounds v);t}
+      | _ -> {v=Id v;t}
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
     (*FIXME: make sure the typetransformation works.*)
     (*FIXME: pass a right type to get_sexp_value and llocate_tmp here*)
-    "(" ^ (c_type_to_str t) ^ ")" ^ (allocate_tmp (get_sexp_value src Int) Int)
+    {v=Cast (t, allocate_tmp (get_sexp_value src Sint32));t}
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; lhs; rhs]
     when (String.equal f "Add") ->
     begin (* Prefer a variable in the left position
-          due to the weird VeriFast type inference rules.*)
+             due to the weird VeriFast type inference rules.*)
       match lhs with
       | Sexp.Atom str when is_int str ->
         let ival = int_of_string str in (* avoid overflow *)
         if ival > 2147483648 then
-          "(" ^ (get_sexp_value rhs t) ^ " - " ^
-          (Int.to_string (2*2147483648 - ival)) ^ ")"
+          {v=Bop (Sub,(get_sexp_value rhs t),{v=(Int (2*2147483648 - ival));t});t}
         else
-          "(" ^ (get_sexp_value rhs t) ^ " + " ^
-          (Int.to_string ival) ^ ")"
+          {v=Bop (Add,(get_sexp_value rhs t),{v=(Int ival);t});t}
       | _ ->
-        "(" ^ (get_sexp_value lhs t) ^ " + " ^
-        (get_sexp_value rhs t) ^ ")"
+        {v=Bop (Add,(get_sexp_value lhs t),(get_sexp_value rhs t));t}
     end
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Slt") ->
     (*FIXME: get the actual type*)
-    "(" ^ (get_sexp_value lhs Sunknown) ^ " < " ^
-    (get_sexp_value rhs Sunknown) ^ ")"
+    {v=Bop (Lt,(get_sexp_value lhs Sunknown),(get_sexp_value rhs Sunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Sle") ->
     (*FIXME: get the actual type*)
-    "(" ^ (get_sexp_value lhs Sunknown) ^ " <= " ^
-    (get_sexp_value rhs Sunknown) ^ ")"
+    {v=Bop (Le,(get_sexp_value lhs Sunknown),(get_sexp_value rhs Sunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Ule") ->
     (*FIXME: get the actual type*)
-    "(" ^ (get_sexp_value lhs Uunknown) ^ " <= " ^
-    (get_sexp_value rhs Uunknown) ^ ")"
+    {v=Bop (Le,(get_sexp_value lhs Uunknown),(get_sexp_value rhs Uunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Ult") ->
-    "(" ^ (get_sexp_value lhs Uunknown) ^ " < " ^
-    (get_sexp_value rhs Uunknown) ^ ")"
+    {v=Bop (Lt,(get_sexp_value lhs Uunknown),(get_sexp_value rhs Uunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
     let ty = guess_type_l [lhs;rhs] in
-    "(" ^ (get_sexp_value lhs ty) ^ " == " ^
-    (get_sexp_value rhs ty) ^ ")"
+    {v=Bop (Eq,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t}
   | Sexp.List [Sexp.Atom f; _; e]
     when String.equal f "ZExt" ->
     (*TODO: something smarter here.*)
@@ -406,63 +359,163 @@ let rec get_sexp_value exp t =
     when (String.equal f "And") &&
          ((is_bool_expr lhs) || (is_bool_expr rhs)) ->
     (*FIXME: and here, but really that is a bool expression, I know it*)
-    "(" ^ (remove_outside_parens (get_sexp_value lhs Bool)) ^ " && " ^
-    (get_sexp_value rhs Bool) ^ ")"
-  (* parens removing account for VeriFast buggy parser*)
+    (*TODO: check t is really Boolean here*)
+    {v=Bop (And,(get_sexp_value lhs Boolean),(get_sexp_value rhs Boolean));t}
   | _ ->
     begin match get_var_name_of_sexp exp with
-      | Some name -> name
-      | None -> get_cmplx_val_name exp t
+      | Some name -> {v=Id name;t}
+      | None -> make_cmplx_val exp t
     end
 
-let get_struct_val_value valu t =
+let rec get_struct_val_value valu t =
   match t with
-  | Str _ -> begin match get_var_name_of_sexp valu.full with
-    | Some name -> name
-    | None -> failwith "Inline structure values not supported."
+  | Str (strname, fields) -> begin match get_var_name_of_sexp valu.full with
+    | Some name -> {v=Id name;t}
+    | None ->
+      let fields = List.map2_exn valu.break_down fields
+          ~f:(fun {name;value} (name,t) -> (*How did it allow two name args?*)
+              {name;value=(get_struct_val_value value t)})
+      in
+      {v=Struct (strname, fields);t}
+      (*failwith ("Inline structure values not supported. " ^
+                        (Sexp.to_string valu.full))*)
     end
   | _ -> get_sexp_value valu.full t
 
-let rec render_assignment var_name var_value var_type =
-  begin match var_type with
-    | Str (_, fields) ->
-      let fts = List.map fields ~f:snd in
-      if (List.length var_value.break_down) = 0 then
-        "/*TODO:substructure assignment here*/\n"
-        (*FIXME: Klee does not export substructures yet.*)
-      else
-        String.concat (List.map2_exn var_value.break_down fts ~f:(fun f ft ->
-            render_assignment (var_name ^ "." ^ f.name) f.value ft))
-    | _ ->
-      var_name ^ " = " ^ (get_struct_val_value var_value var_type) ^ ";\n"
-  end
+let get_vars tpref arg_name_gen =
+  let get_vars known_vars call =
+    let alloc_local_arg addr v =
+      match String.Map.find !allocated_args addr with
+      | None ->
+        let p_name = arg_name_gen#generate in
+        allocated_args := String.Map.add !allocated_args
+            ~key:addr ~data:{name = p_name;
+                             v};
+      | Some spec ->
+        allocated_args := String.Map.add !allocated_args
+            ~key:addr ~data:(update_var_spec spec v)
+    in
+    let arg_vars = List.foldi call.args ~init:known_vars
+        ~f:(fun i acc arg ->
+            let arg_type = get_fun_arg_type call.fun_name i in
+            match arg.pointee with
+            | Some ptee ->
+              begin
+                let ptee_type = get_pointee arg_type in
+                assert(arg.is_ptr);
+                let addr = (Sexp.to_string arg.value.full) in
+                if ptee.is_fun_ptr then acc
+                else begin
+                  let value =
+                    match ptee.before with
+                    | Some v -> (get_struct_val_value v ptee_type)
+                    | None ->
+                      failwith ("arguments must be initialized for call " ^
+                                call.fun_name)
+                  in
+                  alloc_local_arg addr value;
+                  let before_vars =
+                    match ptee.before with
+                    | Some v -> get_vars_from_struct_val v ptee_type acc
+                    | None -> acc in
+                  match ptee.after with
+                  | Some v -> get_vars_from_struct_val v ptee_type before_vars
+                  | None -> before_vars
+                end
+              end
+            | None ->
+              assert(not arg.is_ptr);
+              get_vars_from_struct_val arg.value arg_type acc)
+    in
+    let ret_vars = match call.ret with
+      | Some ret -> get_vars_from_struct_val
+                      ret.value (get_fun_ret_type call.fun_name) arg_vars
+      (*TODO: get also ret.pointee vars.*)
+      | None -> arg_vars in
+    let add_vars_from_ctxt vars ctxt =
+      map_set_n_update_alist vars (make_name_alist_from_var_decls
+                               (get_var_decls_of_sexp ctxt Boolean vars)) in
+    let call_ctxt_vars =
+      List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
+    let ret_ctxt_vars =
+      List.fold call.ret_context ~f:add_vars_from_ctxt ~init:call_ctxt_vars in
+    ret_ctxt_vars
+  in
+  let hist_vars = (List.fold tpref.history ~init:String.Map.empty
+                     ~f:get_vars) in
+  let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
+                    ~f:get_vars) in
+  tip_vars
+
+let render_bop = function
+  | Eq -> "=="
+  | Le -> "<="
+  | Lt -> "<"
+  | Ge -> ">="
+  | Gt -> ">"
+  | Add -> "+"
+  | Sub -> "-"
+  | And -> "&&"
+
+let rec render_tterm (t:tterm) =
+  match t.v with  (*strip parens: account for weird VeriFast parser*)
+  | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
+                          " " ^ (render_bop op) ^ " " ^
+                          (render_tterm rhs) ^ ")"
+  | Apply (_,args) ->
+    let arg_strings = List.map args ~f:render_tterm in
+    "fname(" ^ (String.concat ~sep:", " arg_strings) ^ ")"
+  | Id name -> name;
+  | Struct (_,fields) ->
+    "{" ^ (String.concat ~sep:", "
+             (List.map fields ~f:(fun {name;value} ->
+                  name ^ " = " ^ (render_tterm value)))) ^
+    "}"
+  | Int i -> string_of_int i
+  | Bool b -> string_of_bool b
+  | Not t -> "!(" ^ (render_tterm t) ^ ")"
+  | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
+  | Deref t -> "*(" ^ (render_tterm t) ^ ")"
+  | Fptr f -> f
+  | Addr t -> "&(" ^ (render_tterm t) ^ ")"
+  | Cast (t,v) -> "(" ^ c_type_to_str t ^ ")" ^ (render_tterm v)
+  | Undef -> "???"
+
+let rec render_assignment var_name (var_value:tterm) =
+  match var_value.v with
+  | Struct (_, fvals) ->
+    (*TODO: make sure that the var_value.t is also Str .*)
+    String.concat ~sep:"\n"
+      (List.map fvals
+         ~f:(fun fv -> render_assignment
+                (var_name ^ "." ^ fv.name) fv.value ^ ";"))
+  | Undef -> ""
+  | _ -> var_name ^ " = " ^ (render_tterm var_value)
 
 let render_vars_declarations ( vars : var_spec list ) =
-  List.fold vars ~init:"\n" ~f:(fun acc_str v ->
-      match v.t with
-      | Unknown | Sunknown | Uunknown ->
-        acc_str ^ "//" ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n"
-      | _ ->
-        acc_str ^ c_type_to_str v.t ^ " " ^ v.name ^ ";\n")
+  String.concat ~sep:"\n"
+    (List.map vars ~f:(fun v ->
+         match v.v.t with
+         | Unknown | Sunknown | Uunknown ->
+           "//" ^ c_type_to_str v.v.t ^ " " ^ v.name ^ ";"
+         | _ ->
+           c_type_to_str v.v.t ^ " " ^ v.name ^ ";"))
 
 let render_var_assignments ( vars : var_spec list ) =
-  List.fold vars ~init:"\n" ~f:(fun acc_str v ->
-      match v.v with
-      | Some value -> acc_str ^ (render_assignment v.name value v.t)
-      | None -> "")
+  String.concat ~sep:"\n"
+    (List.map vars ~f:(fun v ->
+       render_assignment v.name v.v))
 
-let rec render_eq_sttmt ~is_assert out_arg out_val out_t =
+let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
-  match out_t with
-  | Str (_, fields) -> let f_types = List.map fields ~f:snd in
-    if (List.length out_val.break_down) = 0 then
-      "/*TODO:substructure equality here*/\n"
-      (*FIXME: Klee does not export substructures yet.*)
-    else
-    String.concat (List.map2_exn out_val.break_down f_types ~f:(fun f ft ->
-        render_eq_sttmt ~is_assert (out_arg ^ "." ^ f.name) f.value ft))
+  match out_val.v with
+  | Struct (_, fields) ->
+    (*TODO: check that the types of Str (_,fts)
+      are the same as in fields*)
+    String.concat (List.map fields ~f:(fun {name;value} ->
+      render_eq_sttmt ~is_assert (out_arg ^ "." ^ name) value))
   | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
-         (get_struct_val_value out_val out_t) ^ ");\n"
+         (render_tterm out_val) ^ ");\n"
 
 let render_fun_call_preamble call args =
   let pre_lemmas =
@@ -493,7 +546,7 @@ let gen_fun_call_arg_list call =
                 end
               | None -> "???"
             else
-              get_struct_val_value arg.value a_type))
+              render_tterm (get_struct_val_value arg.value a_type)))
 
 let render_fun_call call ret_var args ~is_tip =
   let arg_list = String.concat ~sep:", " args in
@@ -503,8 +556,7 @@ let render_fun_call call ret_var args ~is_tip =
       begin
         let t = get_fun_ret_type call.fun_name in
         let ret_val = get_struct_val_value ret.value t in
-        let ret_ass = "//@ " ^ (if is_tip then "assert" else "assume") ^
-                      "(" ^ ret_var ^ " == " ^ ret_val ^ ");\n" in
+        let ret_ass = render_eq_sttmt ~is_assert:is_tip ret_var ret_val in
         c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
       end
     | None -> call_body
@@ -535,18 +587,12 @@ let render_2tip_call fst_tip snd_tip ret_var args =
   let arg_list = String.concat ~sep:", " args in
   let fname_with_args = String.concat [fst_tip.fun_name; "("; arg_list; ");\n"] in
   let call_with_ret call_body = match fst_tip.ret with
-    | Some ret1 ->
+    | Some _ ->
       begin
         match snd_tip.ret with
-        | Some ret2 ->
+        | Some _ ->
           let t = get_fun_ret_type fst_tip.fun_name in
-          let ret1_val = get_struct_val_value ret1.value t in
-          let ret2_val = get_struct_val_value ret2.value t in
-          let ret_ass = "//@ " ^ "assert" ^
-                        "(" ^ ret_var ^ " == " ^ ret1_val ^
-                        " || " ^ ret_var ^ " == " ^ ret2_val ^
-                        ");\n" in
-          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
+          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body
         | None -> failwith "tip call must either allways return or never"
       end
     | None -> call_body
@@ -576,7 +622,7 @@ let render_post_statements call ~is_tip =
                 | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
               in
               render_eq_sttmt ~is_assert:is_tip
-                out_arg.name v out_arg.t
+                out_arg.name (get_struct_val_value v out_arg.v.t)
             | None -> ""
           end
         | None -> ""
@@ -584,7 +630,7 @@ let render_post_statements call ~is_tip =
   let ret_post_asserts =
     (if is_tip then
        String.concat (List.map call.ret_context ~f:(fun sttmt ->
-           "//@ assert(" ^ get_sexp_value sttmt Bool ^ ");\n"))
+           "//@ assert(" ^ render_tterm (get_sexp_value sttmt Boolean) ^ ");\n"))
      else
        "") in
   (String.concat sttmts) ^ ret_post_asserts
@@ -593,19 +639,46 @@ let render_fun_call_fabule call ret_name args ~is_tip =
   let post_statements = render_post_statements call ~is_tip in
   (render_post_lemmas call ret_name args) ^ "\n" ^ post_statements
 
+let rec term_eq a b =
+  match a,b with
+  | Bop (opa,lhsa,rhsa), Bop (opb,lhsb,rhsb) ->
+    opa = opb && (term_eq lhsa.v lhsb.v) && (term_eq rhsa.v rhsb.v)
+  | Apply (fa,argsa), Apply (fb, argsb) ->
+    (String.equal fa fb) && ((List.length argsa) = (List.length argsb)) &&
+    (List.for_all2_exn argsa argsb ~f:(fun arga argb -> term_eq arga.v argb.v))
+  | Id a, Id b -> String.equal a b
+  | Struct (sna,fdsa), Struct (snb,fdsb) ->
+    (String.equal sna snb) && ((List.length fdsa) = (List.length fdsb)) &&
+    (List.for_all2_exn fdsa fdsb ~f:(fun fda fdb ->
+         (String.equal fda.name fdb.name) &&
+         term_eq fda.value.v fdb.value.v))
+  | Int ia, Int ib -> ia = ib
+  | Bool ba, Bool bb -> ba = bb
+  | Not tta, Not ttb -> term_eq tta.v ttb.v
+  | Str_idx (tta,fda), Str_idx (ttb,fdb) -> term_eq tta.v ttb.v && String.equal fda fdb
+  | Deref tta, Deref ttb -> term_eq tta.v ttb.v
+  | Fptr fa, Fptr fb -> String.equal fa fb
+  | Addr tta, Addr ttb -> term_eq tta.v ttb.v
+  | Cast (ctypea,terma), Cast (ctypeb,termb) -> (ctypea = ctypeb) && (term_eq terma.v termb.v)
+  | Undef, Undef -> true
+  | _, _ -> false
+
 let render_2tip_call_fabule fst_tip snd_tip ret_name args =
   let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
   let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
   let ret_t = get_fun_ret_type fst_tip.fun_name in
   match fst_tip.ret, snd_tip.ret with
   | Some r1, Some r2
-    when not (String.equal (get_struct_val_value r1.value ret_t)
-                (get_struct_val_value r2.value ret_t))->
+    when not (term_eq (get_struct_val_value r1.value ret_t).v
+                (get_struct_val_value r2.value ret_t).v) ->
     (render_post_lemmas fst_tip ret_name args) ^ "\n" ^
-    "if (" ^ ret_name ^ " == " ^ (get_struct_val_value r1.value ret_t) ^ ") {\n" ^
-    post_statements_fst_alternative ^ "\n} else {\n" ^
-    (render_eq_sttmt ~is_assert:true ret_name r2.value ret_t) ^ "\n" ^
-    post_statements_snd_alternative ^ "\n}\n"
+    "if (" ^ ret_name ^ " == " ^
+    (render_tterm (get_struct_val_value r1.value ret_t) ^ ") {\n" ^
+     post_statements_fst_alternative ^
+     "\n} else {\n" ^
+     (render_eq_sttmt ~is_assert:true ret_name
+        (get_struct_val_value r2.value ret_t)) ^ "\n" ^
+     post_statements_snd_alternative ^ "\n}\n")
   | Some _, Some _ -> begin match find_complementary_sttmts
                                       fst_tip.ret_context
                                       snd_tip.ret_context with
@@ -617,7 +690,7 @@ let render_2tip_call_fabule fst_tip snd_tip ret_name args =
            else post_statements_snd_alternative,
                 post_statements_fst_alternative)
         in
-        "if (" ^ (get_sexp_value sttmt Bool) ^ ") {\n" ^
+        "if (" ^ (render_tterm (get_sexp_value sttmt Boolean)) ^ ") {\n" ^
         pos_sttmts ^ "} else {\n" ^
         neg_sttmts ^ "}\n"
       | None -> failwith "tip calls non-differentiated by ret nor\
@@ -658,26 +731,26 @@ let render_function_list tpref =
   let hist_funs =
     (List.fold_left tpref.history ~init:""
        ~f:(fun str_acc call ->
-           str_acc ^ render_fun_call_in_context call rez_gen
-         )) in
+           str_acc ^ render_fun_call_in_context call rez_gen))
+  in
   let tip_call =
     (render_tip_call_in_context tpref.tip_calls rez_gen) in
   hist_funs ^ tip_call
 
 let render_cmplxes () =
   String.concat (List.map (String.Map.data !allocated_complex_vals) ~f:(fun var ->
-      ((c_type_to_str var.t) ^ " " ^ var.name ^ ";//") ^
-      var.exp ^ "\n"))
+      ((c_type_to_str var.v.t) ^ " " ^ var.name ^ ";//") ^
+      (render_tterm var.v) ^ "\n"))
 
 let render_tmps () =
   String.concat (List.map (List.rev !allocated_tmp_vals) ~f:(fun var ->
-      ((c_type_to_str var.t) ^ " " ^ var.name ^ " = ") ^
-      var.exp ^ ";\n"))
+      ((c_type_to_str var.v.t) ^ " " ^ var.name ^ " = ") ^
+      (render_tterm var.v) ^ ";\n"))
 
 let render_context pref =
   let render_ctxt_list l =
     String.concat ~sep:"\n" (List.map l ~f:(fun e ->
-        "//@ assume(" ^ (get_sexp_value e Bool) ^ ");"))
+        "//@ assume(" ^ (render_tterm (get_sexp_value e Boolean)) ^ ");"))
   in
   (String.concat ~sep:"\n" (List.map pref.history ~f:(fun call ->
        (render_ctxt_list call.call_context) ^ "\n" ^
@@ -704,20 +777,13 @@ let render_leaks pref =
 
 let render_allocated_args () =
   ( String.concat ~sep:"\n" (List.map (String.Map.data !allocated_args)
-                               ~f:(fun spec -> (c_type_to_str spec.t) ^ " " ^
+                               ~f:(fun spec -> (c_type_to_str spec.v.t) ^ " " ^
                                                (spec.name) ^ ";")))
 
 let render_alloc_args_assignments () =
-  List.fold (String.Map.data !allocated_args) ~init:"\n" ~f:(fun acc_str v ->
-      match v.v with
-      | Some value ->
-        acc_str ^ (render_assignment v.name value v.t)
-      | None -> "")
-
-(*let compose_all_assignments () =
-  let tmp_assignments = List.fold allocated_tmp_vals ~init:String.Map.empty
-      ~f:(fun acc tmp ->
-          String.Map.add acc ~key:tmp.name ~data:) *)
+  String.concat ~sep:"\n"
+    (List.map (String.Map.data !allocated_args) ~f:(fun arg ->
+       render_assignment arg.name arg.v ^ ";"))
 
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
@@ -739,6 +805,7 @@ let convert_prefix fin cout =
   Out_channel.output_string cout context_lemmas;
   Out_channel.output_string cout ( render_tmps ());
   Out_channel.output_string cout ( render_allocated_args ());
+  Out_channel.newline cout;
   Out_channel.output_string cout args_assignments;
   Out_channel.output_string cout var_assigns;
   Out_channel.output_string cout fun_calls;

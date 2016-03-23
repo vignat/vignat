@@ -1,7 +1,7 @@
 open Core.Std
 
 type c_type = | Ptr of c_type
-              | Int
+              | Sint32
               | Uint32
               | Uint16
               | Uint8
@@ -9,16 +9,16 @@ type c_type = | Ptr of c_type
               | Str of string * (string * c_type) list
               | Ctm of string
               | Fptr of string
-              | Bool
+              | Boolean
               | Sunknown
               | Uunknown
               | Unknown
 
 let rec c_type_to_str = function
   | Ptr c_type -> c_type_to_str c_type ^ "*"
-  | Int -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
+  | Sint32 -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
   | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
-  | Ctm name -> name | Fptr name -> name ^ "*" | Bool -> "bool" | Unknown -> "???"
+  | Ctm name -> name | Fptr name -> name ^ "*" | Boolean -> "bool" | Unknown -> "???"
   | Sunknown -> "s??" | Uunknown -> "u??"
 
 type lemma = (string -> string list -> string)
@@ -33,15 +33,15 @@ let on_rez_nonzero str = (fun rez_var _ ->
 let on_rez_nz f = (fun rez_var args ->
     "/*@ if(" ^ rez_var ^ "!=0) " ^ (f args) ^ " @*/")
 
-type map_key = Int | Ext
+type map_key = Sint32 | Ext
 
 let last_index_gotten = ref ""
-let last_index_key = ref Int
+let last_index_key = ref Sint32
 let last_indexing_succ_ret_var = ref ""
 
 let gen_get_fp map_name =
   match !last_index_key with
-  | Int -> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
+  | Sint32 -> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
   | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
 let is_void = function | Void -> true | _ -> false
@@ -90,11 +90,11 @@ let fun_types =
                     lemmas_before = [];
                     lemmas_after = [];
                     leaks = ["//@ leak last_time(_);"];};
-     "dmap_allocate", {ret_type = Int;
+     "dmap_allocate", {ret_type = Sint32;
                        arg_types =
-                         [Int;Int;Ptr (Ctm "map_keys_equality");
-                          Int;Int;Ptr (Ctm "map_keys_equality");
-                          Int;Int;Ptr (Ptr dmap_struct)];
+                         [Sint32;Sint32;Ptr (Ctm "map_keys_equality");
+                          Sint32;Sint32;Ptr (Ctm "map_keys_equality");
+                          Sint32;Sint32;Ptr (Ptr dmap_struct)];
                        lemmas_before = [
                          tx_bl "produce_function_pointer_chunk \
                                 map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
@@ -121,8 +121,8 @@ let fun_types =
                                   lemmas_before = [];
                                   lemmas_after = [];
                                   leaks = [];};
-     "dchain_allocate", {ret_type = Int;
-                         arg_types = [Int; Ptr (Ptr dchain_struct)];
+     "dchain_allocate", {ret_type = Sint32;
+                         arg_types = [Sint32; Ptr (Ptr dchain_struct)];
                          lemmas_before = [];
                          lemmas_after = [];
                          leaks = [
@@ -152,7 +152,7 @@ let fun_types =
                                   "//@ leak double_chainp(_,_,_);";
                                   "//@ leak dmap_dchain_coherent(_,_);"];};
      "loop_enumeration_begin", {ret_type = Void;
-                                arg_types = [Int];
+                                arg_types = [Sint32];
                                 lemmas_before = [];
                                 lemmas_after = [];
                                 leaks = [];};
@@ -161,8 +161,8 @@ let fun_types =
                               lemmas_before = [];
                               lemmas_after = [];
                               leaks = [];};
-     "dmap_get_b", {ret_type = Int;
-                    arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Int;];
+     "dmap_get_b", {ret_type = Sint32;
+                    arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
                     lemmas_before = [
                       tx_bl "close (ext_k_p(&arg3, ekc(user_buf0_36, user_buf0_34,\
                              user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
@@ -201,8 +201,8 @@ let fun_types =
                          "");
                     ];
                     leaks = [];};
-     "dmap_get_a", {ret_type = Int;
-                    arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Int;];
+     "dmap_get_a", {ret_type = Sint32;
+                    arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Sint32;];
                     lemmas_before = [
                       tx_bl "close (int_k_p(&arg3, ikc(user_buf0_34, user_buf0_36,\
                              user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
@@ -236,13 +236,13 @@ let fun_types =
                          last_index_gotten :=
                            "ikc(user_buf0_34, user_buf0_36, \
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
-                         last_index_key := Int;
+                         last_index_key := Sint32;
                          last_indexing_succ_ret_var := ret_var;
                          "");
                     ];
                     leaks = [];};
-     "dmap_put", {ret_type = Int;
-                  arg_types = [Ptr dmap_struct; Ptr flw_struct; Int;];
+     "dmap_put", {ret_type = Sint32;
+                  arg_types = [Ptr dmap_struct; Ptr flw_struct; Sint32;];
                   lemmas_before = [
                     (fun args -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
                     ".ik, ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
@@ -366,7 +366,7 @@ let fun_types =
                   leaks = [
                     "//@ leak nat_flow_p(_,_,_,_);"];};
      "dmap_get_value", {ret_type = Void;
-                        arg_types = [Ptr dmap_struct; Int; Ptr flw_struct;];
+                        arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         lemmas_before = [];
                         lemmas_after = [
                           (fun _ args ->
@@ -388,7 +388,7 @@ let fun_types =
                         leaks = [
                           "//@ leak flw_p(_,_);";
                           "//@ leak nat_flow_p(_,_,_,_);"];};
-     "expire_items", {ret_type = Int;
+     "expire_items", {ret_type = Sint32;
                       arg_types = [Ptr dchain_struct;
                                    Ptr dmap_struct;
                                    Uint32;];
@@ -426,13 +426,13 @@ let fun_types =
                            (List.nth_exn args 2) ^ ");\n}@*/");
                       ];
                       leaks = [];};
-     "dchain_allocate_new_index", {ret_type = Int;
-                                   arg_types = [Ptr dchain_struct; Ptr Int; Uint32;];
+     "dchain_allocate_new_index", {ret_type = Sint32;
+                                   arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];
                                    lemmas_before = [];
                                    lemmas_after = [];
                                    leaks = [];};
-     "dchain_rejuvenate_index", {ret_type = Int;
-                                 arg_types = [Ptr dchain_struct; Int; Uint32;];
+     "dchain_rejuvenate_index", {ret_type = Sint32;
+                                 arg_types = [Ptr dchain_struct; Sint32; Uint32;];
                                  lemmas_before = [];
                                  lemmas_after = [
                                    (fun reg_var args ->

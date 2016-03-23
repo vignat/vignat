@@ -1,6 +1,6 @@
 type c_type =
   | Ptr of c_type
-  | Int
+  | Sint32
   | Uint32
   | Uint16
   | Uint8
@@ -8,7 +8,7 @@ type c_type =
   | Str of bytes * (bytes * c_type) list
   | Ctm of bytes
   | Fptr of bytes
-  | Bool
+  | Boolean
   | Sunknown
   | Uunknown
   | Unknown
