@@ -216,7 +216,7 @@ let complex_val_name_gen = name_gen "cmplx"
 let allocated_complex_vals = ref String.Map.empty
 
 let tmp_val_name_gen = name_gen "tmp"
-let allocated_tmp_vals = ref []
+let allocated_tmp_vals = ref String.Map.empty
 
 let get_sint_in_bounds v =
   let integer_val = Int.of_string v in
@@ -239,10 +239,16 @@ let make_cmplx_val exp t =
     value
 
 let allocate_tmp value =
-  let name = tmp_val_name_gen#generate in
-  allocated_tmp_vals :=
-    {name = name; v=value} :: !allocated_tmp_vals;
-  {v=Id name;t=value.t}
+  let key = (render_tterm value) in
+  match String.Map.find !allocated_tmp_vals key with
+  | Some {name;v} -> {v=Id name;t=value.t}
+  | None ->
+    let name = tmp_val_name_gen#generate in
+    allocated_tmp_vals :=
+      String.Map.add !allocated_tmp_vals
+        ~key
+        ~data:{name; v=value};
+    {v=Id name;t=value.t}
 
 (*TODO: rewrite this in terms of my IR instead of raw Sexps*)
 let eliminate_false_eq_0 exp t =
@@ -272,13 +278,6 @@ let rec is_bool_expr exp =
   | Sexp.List [Sexp.Atom ext; w; e] when String.equal ext "ZExt" ->
     is_bool_expr e
   | _ -> false
-
-let strip_outside_parens str =
-  if (String.is_prefix str ~prefix:"(") &&
-     (String.is_suffix str ~suffix:")") then
-    String.chop_prefix_exn (String.chop_suffix_exn str ~suffix:")")
-      ~prefix:"("
-  else str
 
 let rec get_sexp_value exp t =
   let exp = expand_shorted_sexp exp in
@@ -350,8 +349,8 @@ let rec get_struct_val_value valu t =
     | Some name -> {v=Id name;t}
     | None ->
       let fields = List.map2_exn valu.break_down fields
-          ~f:(fun {fname;value} (name,t) -> (*How did it allow two name args?*)
-              assert(String.equal fname name);
+          ~f:(fun {fname;value} (name,t) ->
+              assert(String.equal name fname);
               (name,(get_struct_val_value value t)))
       in
       {v=Struct (strname, fields);t}
@@ -425,50 +424,16 @@ let get_vars tpref arg_name_gen =
                     ~f:get_vars) in
   tip_vars
 
-let render_bop = function
-  | Eq -> "=="
-  | Le -> "<="
-  | Lt -> "<"
-  | Ge -> ">="
-  | Gt -> ">"
-  | Add -> "+"
-  | Sub -> "-"
-  | And -> "&&"
-
-let rec render_tterm (t:tterm) =
-  match t.v with  (*strip parens: account for weird VeriFast parser*)
-  | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
-                          " " ^ (render_bop op) ^ " " ^
-                          (render_tterm rhs) ^ ")"
-  | Apply (_,args) ->
-    let arg_strings = List.map args ~f:render_tterm in
-    "fname(" ^ (String.concat ~sep:", " arg_strings) ^ ")"
-  | Id name -> name;
-  | Struct (_,fields) ->
-    "{" ^ (String.concat ~sep:", "
-             (List.map fields ~f:(fun (name,value) ->
-                  name ^ " = " ^ (render_tterm value)))) ^
-    "}"
-  | Int i -> string_of_int i
-  | Bool b -> string_of_bool b
-  | Not t -> "!(" ^ (render_tterm t) ^ ")"
-  | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
-  | Deref t -> "*(" ^ (render_tterm t) ^ ")"
-  | Fptr f -> f
-  | Addr t -> "&(" ^ (render_tterm t) ^ ")"
-  | Cast (t,v) -> "(" ^ ttype_to_str t ^ ")" ^ (render_tterm v)
-  | Undef -> "???"
-
-let rec render_assignment var_name (var_value:tterm) =
-  match var_value.v with
+let rec render_assignment var =
+  match var.v.v with
   | Struct (_, fvals) ->
     (*TODO: make sure that the var_value.t is also Str .*)
     String.concat ~sep:"\n"
       (List.map fvals
          ~f:(fun (name,value) -> render_assignment
-                (var_name ^ "." ^ name) value ^ ";"))
+                {name=(var.name ^ "." ^ name);v=value} ^ ";"))
   | Undef -> ""
-  | _ -> var_name ^ " = " ^ (render_tterm var_value)
+  | _ -> var.name ^ " = " ^ (render_tterm var.v)
 
 let render_vars_declarations ( vars : var_spec list ) =
   String.concat ~sep:"\n"
@@ -477,12 +442,12 @@ let render_vars_declarations ( vars : var_spec list ) =
          | Unknown | Sunknown | Uunknown ->
            "//" ^ ttype_to_str v.v.t ^ " " ^ v.name ^ ";"
          | _ ->
-           ttype_to_str v.v.t ^ " " ^ v.name ^ ";"))
+           ttype_to_str v.v.t ^ " " ^ v.name ^ ";")) ^ "\n"
 
 let render_var_assignments ( vars : var_spec list ) =
   String.concat ~sep:"\n"
     (List.map vars ~f:(fun v ->
-       render_assignment v.name v.v))
+       render_assignment v))
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
@@ -617,30 +582,6 @@ let render_fun_call_fabule call ret_name args ~is_tip =
   let post_statements = render_post_statements call ~is_tip in
   (render_post_lemmas call ret_name args) ^ "\n" ^ post_statements
 
-let rec term_eq a b =
-  match a,b with
-  | Bop (opa,lhsa,rhsa), Bop (opb,lhsb,rhsb) ->
-    opa = opb && (term_eq lhsa.v lhsb.v) && (term_eq rhsa.v rhsb.v)
-  | Apply (fa,argsa), Apply (fb, argsb) ->
-    (String.equal fa fb) && ((List.length argsa) = (List.length argsb)) &&
-    (List.for_all2_exn argsa argsb ~f:(fun arga argb -> term_eq arga.v argb.v))
-  | Id a, Id b -> String.equal a b
-  | Struct (sna,fdsa), Struct (snb,fdsb) ->
-    (String.equal sna snb) && ((List.length fdsa) = (List.length fdsb)) &&
-    (List.for_all2_exn fdsa fdsb ~f:(fun (fnamea,fvala) (fnameb,fvalb) ->
-         (String.equal fnamea fnameb) &&
-         term_eq fvala.v fvalb.v))
-  | Int ia, Int ib -> ia = ib
-  | Bool ba, Bool bb -> ba = bb
-  | Not tta, Not ttb -> term_eq tta.v ttb.v
-  | Str_idx (tta,fda), Str_idx (ttb,fdb) -> term_eq tta.v ttb.v && String.equal fda fdb
-  | Deref tta, Deref ttb -> term_eq tta.v ttb.v
-  | Fptr fa, Fptr fb -> String.equal fa fb
-  | Addr tta, Addr ttb -> term_eq tta.v ttb.v
-  | Cast (ctypea,terma), Cast (ctypeb,termb) -> (ctypea = ctypeb) && (term_eq terma.v termb.v)
-  | Undef, Undef -> true
-  | _, _ -> false
-
 let render_2tip_call_fabule fst_tip snd_tip ret_name args =
   let post_statements_fst_alternative = render_post_statements fst_tip ~is_tip:true in
   let post_statements_snd_alternative = render_post_statements snd_tip ~is_tip:true in
@@ -721,21 +662,27 @@ let render_cmplxes () =
       (render_tterm var.v) ^ "\n"))
 
 let render_tmps () =
-  String.concat (List.map (List.rev !allocated_tmp_vals) ~f:(fun var ->
-      ((ttype_to_str var.v.t) ^ " " ^ var.name ^ " = ") ^
-      (render_tterm var.v) ^ ";\n"))
+  String.concat ~sep:"\n" (List.map (List.sort ~cmp:(fun a b ->
+      (String.compare a.name b.name))
+      (String.Map.data !allocated_tmp_vals))
+      ~f:(fun tmp ->
+          ttype_to_str tmp.v.t ^ " " ^ tmp.name ^ " = " ^
+          render_tterm tmp.v ^ ";")) ^ "\n"
+
+let collect_context pref =
+  let collect_ctxt_list l = List.map l ~f:(fun e ->
+      (get_sexp_value e Boolean))
+  in
+  (List.join (List.map pref.history ~f:(fun call ->
+      (collect_ctxt_list call.call_context) @
+      (collect_ctxt_list call.ret_context)))) @
+  (match pref.tip_calls with
+   | hd :: _ -> (collect_ctxt_list hd.call_context)
+   | [] -> failwith "Must have at least one tip call.")
 
 let render_context pref =
-  let render_ctxt_list l =
-    String.concat ~sep:"\n" (List.map l ~f:(fun e ->
-        "//@ assume(" ^ (render_tterm (get_sexp_value e Boolean)) ^ ");"))
-  in
-  (String.concat ~sep:"\n" (List.map pref.history ~f:(fun call ->
-       (render_ctxt_list call.call_context) ^ "\n" ^
-       (render_ctxt_list call.ret_context)))) ^ "\n" ^
-  (match pref.tip_calls with
-   | hd :: _ -> (render_ctxt_list hd.call_context) ^ "\n"
-   | [] -> failwith "must have at least one tip call")
+  String.concat ~sep:"\n" (List.map (collect_context pref) ~f:(fun t ->
+    "//@ assume(" ^ (render_tterm t) ^ ");")) ^ "\n"
 
 let rec get_relevant_segment pref =
   match List.findi pref.history ~f:(fun _ call ->
@@ -754,14 +701,33 @@ let render_leaks pref =
       | None -> failwith "unknown function") ) ^ "\n")
 
 let render_allocated_args () =
-  ( String.concat ~sep:"\n" (List.map (String.Map.data !allocated_args)
-                               ~f:(fun spec -> (ttype_to_str spec.v.t) ^ " " ^
-                                               (spec.name) ^ ";")))
+  String.concat ~sep:"\n" (List.map (String.Map.data !allocated_args)
+                             ~f:(fun spec -> (ttype_to_str spec.v.t) ^ " " ^
+                                             (spec.name) ^ ";")) ^ "\n"
 
 let render_alloc_args_assignments () =
   String.concat ~sep:"\n"
     (List.map (String.Map.data !allocated_args) ~f:(fun arg ->
-       render_assignment arg.name arg.v ^ ";"))
+       render_assignment arg ^ ";"))
+
+let build_ir fin =
+  let pref = get_relevant_segment
+      (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
+  let preamble = preamble ^
+                 "void to_verify()\
+                  /*@ requires true; @*/ \
+                  /*@ ensures true; @*/\n{\n" in
+  let free_vars = (get_vars pref (name_gen "arg")) in
+  let arguments = !allocated_args in
+  let tmps = !allocated_tmp_vals in
+  let cmplxs = !allocated_complex_vals in
+  let context_lemmas = collect_context pref in
+  let calls = [] in (*extract_calls_info pref in*)
+  let leaks = [] in (*extract_leaks pref in*)
+  {preamble;free_vars;arguments;tmps;
+   cmplxs;context_lemmas;calls;leaks}
+
+
 
 let convert_prefix fin cout =
   Out_channel.output_string cout preamble ;
@@ -780,9 +746,9 @@ let convert_prefix fin cout =
   let args_assignments = ( render_alloc_args_assignments ()) in
   Out_channel.output_string cout ( render_cmplxes () );
   Out_channel.output_string cout var_decls;
+  Out_channel.output_string cout ( render_allocated_args ());
   Out_channel.output_string cout context_lemmas;
   Out_channel.output_string cout ( render_tmps ());
-  Out_channel.output_string cout ( render_allocated_args ());
   Out_channel.newline cout;
   Out_channel.output_string cout args_assignments;
   Out_channel.output_string cout var_assigns;

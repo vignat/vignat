@@ -1,3 +1,5 @@
+open Core.Std
+
 type bop = Eq | Le | Lt | Ge | Gt
          | Add | Sub
          | And
@@ -47,5 +49,76 @@ type var_spec = {name: string; v:tterm}
 
 type ir = {
   preamble:string;
-  var_defs:string list;
+  free_vars:var_spec String.Map.t;
+  arguments:var_spec String.Map.t;
+  tmps:var_spec String.Map.t;
+  cmplxs:var_spec String.Map.t;
+  context_lemmas:tterm list;
+  calls:string list;
+  leaks:string list;
 }
+
+let strip_outside_parens str =
+  if (String.is_prefix str ~prefix:"(") &&
+     (String.is_suffix str ~suffix:")") then
+    String.chop_prefix_exn (String.chop_suffix_exn str ~suffix:")")
+      ~prefix:"("
+  else str
+
+let render_bop = function
+  | Eq -> "=="
+  | Le -> "<="
+  | Lt -> "<"
+  | Ge -> ">="
+  | Gt -> ">"
+  | Add -> "+"
+  | Sub -> "-"
+  | And -> "&&"
+
+let rec render_tterm (t:tterm) =
+  match t.v with  (*strip parens: account for weird VeriFast parser*)
+  | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
+                          " " ^ (render_bop op) ^ " " ^
+                          (render_tterm rhs) ^ ")"
+  | Apply (_,args) ->
+    let arg_strings = List.map args ~f:render_tterm in
+    "fname(" ^ (String.concat ~sep:", " arg_strings) ^ ")"
+  | Id name -> name;
+  | Struct (_,fields) ->
+    "{" ^ (String.concat ~sep:", "
+             (List.map fields ~f:(fun (name,value) ->
+                  name ^ " = " ^ (render_tterm value)))) ^
+    "}"
+  | Int i -> string_of_int i
+  | Bool b -> string_of_bool b
+  | Not t -> "!(" ^ (render_tterm t) ^ ")"
+  | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
+  | Deref t -> "*(" ^ (render_tterm t) ^ ")"
+  | Fptr f -> f
+  | Addr t -> "&(" ^ (render_tterm t) ^ ")"
+  | Cast (t,v) -> "(" ^ ttype_to_str t ^ ")" ^ (render_tterm v)
+  | Undef -> "???"
+
+let rec term_eq a b =
+  match a,b with
+  | Bop (opa,lhsa,rhsa), Bop (opb,lhsb,rhsb) ->
+    opa = opb && (term_eq lhsa.v lhsb.v) && (term_eq rhsa.v rhsb.v)
+  | Apply (fa,argsa), Apply (fb, argsb) ->
+    (String.equal fa fb) && ((List.length argsa) = (List.length argsb)) &&
+    (List.for_all2_exn argsa argsb ~f:(fun arga argb -> term_eq arga.v argb.v))
+  | Id a, Id b -> String.equal a b
+  | Struct (sna,fdsa), Struct (snb,fdsb) ->
+    (String.equal sna snb) && ((List.length fdsa) = (List.length fdsb)) &&
+    (List.for_all2_exn fdsa fdsb ~f:(fun (fnamea,fvala) (fnameb,fvalb) ->
+         (String.equal fnamea fnameb) &&
+         term_eq fvala.v fvalb.v))
+  | Int ia, Int ib -> ia = ib
+  | Bool ba, Bool bb -> ba = bb
+  | Not tta, Not ttb -> term_eq tta.v ttb.v
+  | Str_idx (tta,fda), Str_idx (ttb,fdb) -> term_eq tta.v ttb.v && String.equal fda fdb
+  | Deref tta, Deref ttb -> term_eq tta.v ttb.v
+  | Fptr fa, Fptr fb -> String.equal fa fb
+  | Addr tta, Addr ttb -> term_eq tta.v ttb.v
+  | Cast (ctypea,terma), Cast (ctypeb,termb) -> (ctypea = ctypeb) && (term_eq terma.v termb.v)
+  | Undef, Undef -> true
+  | _, _ -> false

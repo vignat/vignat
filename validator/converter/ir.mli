@@ -17,7 +17,7 @@ type term =
     Bop of bop * tterm * tterm
   | Apply of bytes * tterm list
   | Id of bytes
-  | Struct of bytes * (string * tterm) list
+  | Struct of bytes * (bytes * tterm) list
   | Int of int
   | Bool of bool
   | Not of tterm
@@ -32,4 +32,17 @@ val ttype_to_str : ttype -> bytes
 val is_void : ttype -> bool
 val get_pointee : ttype -> ttype
 type var_spec = { name : bytes; v : tterm; }
-type ir = { preamble : bytes; var_defs : bytes list; }
+type ir = {
+  preamble : bytes;
+  free_vars : var_spec Core.Std.String.Map.t;
+  arguments : var_spec Core.Std.String.Map.t;
+  tmps : var_spec Core.Std.String.Map.t;
+  cmplxs : var_spec Core.Std.String.Map.t;
+  context_lemmas : tterm list;
+  calls : bytes list;
+  leaks : bytes list;
+}
+val strip_outside_parens : bytes -> bytes
+val render_bop : bop -> bytes
+val render_tterm : tterm -> bytes
+val term_eq : term -> term -> bool
