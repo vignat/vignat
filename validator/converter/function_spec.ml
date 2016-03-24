@@ -1,31 +1,11 @@
 open Core.Std
-
-type c_type = | Ptr of c_type
-              | Sint32
-              | Uint32
-              | Uint16
-              | Uint8
-              | Void
-              | Str of string * (string * c_type) list
-              | Ctm of string
-              | Fptr of string
-              | Boolean
-              | Sunknown
-              | Uunknown
-              | Unknown
-
-let rec c_type_to_str = function
-  | Ptr c_type -> c_type_to_str c_type ^ "*"
-  | Sint32 -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
-  | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
-  | Ctm name -> name | Fptr name -> name ^ "*" | Boolean -> "bool" | Unknown -> "???"
-  | Sunknown -> "s??" | Uunknown -> "u??"
+open Ir
 
 type lemma = (string -> string list -> string)
 type blemma = (string list -> string)
 
-let tx_l str = (fun _ _ -> "/*@ "^str^" @*/" )
-let tx_bl str = (fun _ -> "/*@ "^str^" @*/" )
+let tx_l str = (fun _ _ -> "/*@ " ^ str ^ " @*/" )
+let tx_bl str = (fun _ -> "/*@ " ^ str ^ " @*/" )
 
 let on_rez_nonzero str = (fun rez_var _ ->
     "/*@ if(" ^ rez_var ^ "!=0) " ^ str ^ "@*/")
@@ -44,11 +24,7 @@ let gen_get_fp map_name =
   | Sint32 -> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
   | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
-let is_void = function | Void -> true | _ -> false
-
-let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
-
-type fun_spec = {ret_type: c_type; arg_types: c_type list;
+type fun_spec = {ret_type: ttype; arg_types: ttype list;
                  lemmas_before: blemma list; lemmas_after: lemma list;
                  leaks: string list;}
 
@@ -255,28 +231,28 @@ let fun_types =
                      cmplx1, user_buf0_23), ekc(tmp4, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23), user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
                      184789184, user_buf0_30, cmplx1, 1, user_buf0_23));@*/");
-                    (fun args -> "/*@ close flow_p(flwc(ikc(user_buf0_34, user_buf0_36,\
-                                  user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp4, user_buf0_36, 184789184,\
-                                  user_buf0_30, 1, user_buf0_23),\
-                                  user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
-                                  184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                                  ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                                  user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp4, user_buf0_36, 184789184,\
-                                  user_buf0_30, 1, user_buf0_23));@*/");
-                    (fun args -> "/*@ close nat_flow_p \
-                                  (ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                                  user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp4, user_buf0_36, 184789184,\
-                                  user_buf0_30, 1, user_buf0_23),\
-                                  flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                                  user_buf0_30, cmplx1, user_buf0_23),\
-                                  ekc(tmp4, user_buf0_36, 184789184,\
-                                  user_buf0_30, 1, user_buf0_23),\
-                                  user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
-                                  184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                                  new_index_0);@*/");
+                    (fun _ -> "/*@ close flow_p(flwc(ikc(user_buf0_34, user_buf0_36,\
+                               user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\
+                               ekc(tmp4, user_buf0_36, 184789184,\
+                               user_buf0_30, 1, user_buf0_23),\
+                               user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
+                               184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
+                               ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
+                               user_buf0_30, cmplx1, user_buf0_23),\
+                               ekc(tmp4, user_buf0_36, 184789184,\
+                               user_buf0_30, 1, user_buf0_23));@*/");
+                    (fun _ -> "/*@ close nat_flow_p \
+                               (ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
+                               user_buf0_30, cmplx1, user_buf0_23),\
+                               ekc(tmp4, user_buf0_36, 184789184,\
+                               user_buf0_30, 1, user_buf0_23),\
+                               flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
+                               user_buf0_30, cmplx1, user_buf0_23),\
+                               ekc(tmp4, user_buf0_36, 184789184,\
+                               user_buf0_30, 1, user_buf0_23),\
+                               user_buf0_34, tmp4, user_buf0_36, user_buf0_26,\
+                               184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
+                               new_index_0);@*/");
                     (fun args -> "/*@{\n\
                                   assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                                   _,_,_,_,_," ^ (List.nth_exn args 0) ^
@@ -328,7 +304,7 @@ let fun_types =
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
                     tx_l "open ext_k_p(_,_);";
-                    (fun ret_var args ->
+                    (fun ret_var _ ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
                         dmap_put_get(map_before_put,\
@@ -345,7 +321,7 @@ let fun_types =
                         new_index_0);\n\
                         }@*/"
                     );
-                    (fun ret_var args ->
+                    (fun ret_var _ ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
                        assert dmap_dchain_coherent(map_before_put, ?cur_ch);\n\

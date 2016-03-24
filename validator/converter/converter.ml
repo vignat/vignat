@@ -1,34 +1,11 @@
 open Core.Std
 open Trace_prefix
-open Function_spec
+open Ir
 
-type bop = Eq | Le | Lt | Ge | Gt
-         | Add | Sub
-         | And
-
-type term_type = Function_spec.c_type
-
-type term = Bop of bop*tterm*tterm
-          | Apply of string*tterm list
-          | Id of string
-          | Struct of string*struct_field list
-          | Int of int
-          | Bool of bool
-          | Not of tterm
-          | Str_idx of tterm*string
-          | Deref of tterm
-          | Addr of tterm
-          | Fptr of string
-          | Cast of c_type*tterm
-          | Undef
-and struct_field = {name:string; value:tterm}
-and tterm = {v:term; t:term_type}
-
-type tp = Trace_prefix.trace_prefix
+module Fs = Function_spec
 
 let preamble = In_channel.read_all "preamble.tmpl"
 
-type var_spec = {name: string; v:tterm}
 
 let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 
@@ -112,12 +89,12 @@ let expand_shorted_sexp sexp =
   (fst (expand_exp (remove_defs sexp) defs))
 
 let get_fun_arg_type fun_name arg_num =
-  match String.Map.find fun_types fun_name with
-  | Some spec -> List.nth_exn spec.arg_types arg_num
+  match String.Map.find Fs.fun_types fun_name with
+  | Some spec -> List.nth_exn spec.Fs.arg_types arg_num
   | None -> failwith ("unknown function " ^ fun_name)
 
-let get_fun_ret_type fun_name = match String.Map.find fun_types fun_name with
-  | Some spec -> spec.ret_type
+let get_fun_ret_type fun_name = match String.Map.find Fs.fun_types fun_name with
+  | Some spec -> spec.Fs.ret_type
   | None -> failwith ("unknown function " ^ fun_name)
 
 let to_symbol str =
@@ -373,8 +350,9 @@ let rec get_struct_val_value valu t =
     | Some name -> {v=Id name;t}
     | None ->
       let fields = List.map2_exn valu.break_down fields
-          ~f:(fun {name;value} (name,t) -> (*How did it allow two name args?*)
-              {name;value=(get_struct_val_value value t)})
+          ~f:(fun {fname;value} (name,t) -> (*How did it allow two name args?*)
+              assert(String.equal fname name);
+              (name,(get_struct_val_value value t)))
       in
       {v=Struct (strname, fields);t}
       (*failwith ("Inline structure values not supported. " ^
@@ -468,7 +446,7 @@ let rec render_tterm (t:tterm) =
   | Id name -> name;
   | Struct (_,fields) ->
     "{" ^ (String.concat ~sep:", "
-             (List.map fields ~f:(fun {name;value} ->
+             (List.map fields ~f:(fun (name,value) ->
                   name ^ " = " ^ (render_tterm value)))) ^
     "}"
   | Int i -> string_of_int i
@@ -478,7 +456,7 @@ let rec render_tterm (t:tterm) =
   | Deref t -> "*(" ^ (render_tterm t) ^ ")"
   | Fptr f -> f
   | Addr t -> "&(" ^ (render_tterm t) ^ ")"
-  | Cast (t,v) -> "(" ^ c_type_to_str t ^ ")" ^ (render_tterm v)
+  | Cast (t,v) -> "(" ^ ttype_to_str t ^ ")" ^ (render_tterm v)
   | Undef -> "???"
 
 let rec render_assignment var_name (var_value:tterm) =
@@ -487,8 +465,8 @@ let rec render_assignment var_name (var_value:tterm) =
     (*TODO: make sure that the var_value.t is also Str .*)
     String.concat ~sep:"\n"
       (List.map fvals
-         ~f:(fun fv -> render_assignment
-                (var_name ^ "." ^ fv.name) fv.value ^ ";"))
+         ~f:(fun (name,value) -> render_assignment
+                (var_name ^ "." ^ name) value ^ ";"))
   | Undef -> ""
   | _ -> var_name ^ " = " ^ (render_tterm var_value)
 
@@ -497,9 +475,9 @@ let render_vars_declarations ( vars : var_spec list ) =
     (List.map vars ~f:(fun v ->
          match v.v.t with
          | Unknown | Sunknown | Uunknown ->
-           "//" ^ c_type_to_str v.v.t ^ " " ^ v.name ^ ";"
+           "//" ^ ttype_to_str v.v.t ^ " " ^ v.name ^ ";"
          | _ ->
-           c_type_to_str v.v.t ^ " " ^ v.name ^ ";"))
+           ttype_to_str v.v.t ^ " " ^ v.name ^ ";"))
 
 let render_var_assignments ( vars : var_spec list ) =
   String.concat ~sep:"\n"
@@ -512,16 +490,16 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   | Struct (_, fields) ->
     (*TODO: check that the types of Str (_,fts)
       are the same as in fields*)
-    String.concat (List.map fields ~f:(fun {name;value} ->
+    String.concat (List.map fields ~f:(fun (name,value) ->
       render_eq_sttmt ~is_assert (out_arg ^ "." ^ name) value))
   | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 
 let render_fun_call_preamble call args =
   let pre_lemmas =
-    match String.Map.find fun_types call.fun_name with
+    match String.Map.find Fs.fun_types call.fun_name with
     | Some t -> (String.concat ~sep:"\n"
-                   (List.map t.lemmas_before ~f:(fun l -> l args)))
+                   (List.map t.Fs.lemmas_before ~f:(fun l -> l args)))
     | None -> failwith "" in
   pre_lemmas ^ "\n"
 
@@ -557,7 +535,7 @@ let render_fun_call call ret_var args ~is_tip =
         let t = get_fun_ret_type call.fun_name in
         let ret_val = get_struct_val_value ret.value t in
         let ret_ass = render_eq_sttmt ~is_assert:is_tip ret_var ret_val in
-        c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
+        ttype_to_str t ^ " " ^ ret_var ^ " = " ^ call_body ^ ret_ass
       end
     | None -> call_body
   in
@@ -592,7 +570,7 @@ let render_2tip_call fst_tip snd_tip ret_var args =
         match snd_tip.ret with
         | Some _ ->
           let t = get_fun_ret_type fst_tip.fun_name in
-          c_type_to_str t ^ " " ^ ret_var ^ " = " ^ call_body
+          ttype_to_str t ^ " " ^ ret_var ^ " = " ^ call_body
         | None -> failwith "tip call must either allways return or never"
       end
     | None -> call_body
@@ -601,9 +579,9 @@ let render_2tip_call fst_tip snd_tip ret_var args =
 
 let render_post_lemmas call ret_name args =
   let post_lemmas =
-    match String.Map.find fun_types call.fun_name with
+    match String.Map.find Fs.fun_types call.fun_name with
     | Some t -> (String.concat ~sep:"\n"
-                   (List.map t.lemmas_after ~f:(fun l -> l ret_name args)))
+                   (List.map t.Fs.lemmas_after ~f:(fun l -> l ret_name args)))
     | None -> failwith "" in
   post_lemmas
 
@@ -649,9 +627,9 @@ let rec term_eq a b =
   | Id a, Id b -> String.equal a b
   | Struct (sna,fdsa), Struct (snb,fdsb) ->
     (String.equal sna snb) && ((List.length fdsa) = (List.length fdsb)) &&
-    (List.for_all2_exn fdsa fdsb ~f:(fun fda fdb ->
-         (String.equal fda.name fdb.name) &&
-         term_eq fda.value.v fdb.value.v))
+    (List.for_all2_exn fdsa fdsb ~f:(fun (fnamea,fvala) (fnameb,fvalb) ->
+         (String.equal fnamea fnameb) &&
+         term_eq fvala.v fvalb.v))
   | Int ia, Int ib -> ia = ib
   | Bool ba, Bool bb -> ba = bb
   | Not tta, Not ttb -> term_eq tta.v ttb.v
@@ -739,12 +717,12 @@ let render_function_list tpref =
 
 let render_cmplxes () =
   String.concat (List.map (String.Map.data !allocated_complex_vals) ~f:(fun var ->
-      ((c_type_to_str var.v.t) ^ " " ^ var.name ^ ";//") ^
+      ((ttype_to_str var.v.t) ^ " " ^ var.name ^ ";//") ^
       (render_tterm var.v) ^ "\n"))
 
 let render_tmps () =
   String.concat (List.map (List.rev !allocated_tmp_vals) ~f:(fun var ->
-      ((c_type_to_str var.v.t) ^ " " ^ var.name ^ " = ") ^
+      ((ttype_to_str var.v.t) ^ " " ^ var.name ^ " = ") ^
       (render_tterm var.v) ^ ";\n"))
 
 let render_context pref =
@@ -771,13 +749,13 @@ let rec get_relevant_segment pref =
 
 let render_leaks pref =
   ( String.concat ~sep:"\n" (List.map ( (List.hd_exn pref.tip_calls)::pref.history ) ~f:(fun call ->
-      match String.Map.find fun_types call.fun_name with
-      | Some t -> String.concat ~sep:"\n" t.leaks
+      match String.Map.find Fs.fun_types call.fun_name with
+      | Some t -> String.concat ~sep:"\n" t.Fs.leaks
       | None -> failwith "unknown function") ) ^ "\n")
 
 let render_allocated_args () =
   ( String.concat ~sep:"\n" (List.map (String.Map.data !allocated_args)
-                               ~f:(fun spec -> (c_type_to_str spec.v.t) ^ " " ^
+                               ~f:(fun spec -> (ttype_to_str spec.v.t) ^ " " ^
                                                (spec.name) ^ ";")))
 
 let render_alloc_args_assignments () =

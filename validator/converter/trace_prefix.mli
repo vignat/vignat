@@ -2,7 +2,7 @@ type expr = Core_kernel.Core_sexp.t
 val __expr_of_sexp__ : expr -> expr
 val expr_of_sexp : expr -> expr
 val sexp_of_expr : expr -> expr
-type field = { name : bytes; value : struct_val; }
+type field = { fname : bytes; value : struct_val; }
 and struct_val = { full : expr; break_down : field list; }
 val __field_of_sexp__ : expr -> field
 val field_of_sexp : expr -> field
@@ -20,7 +20,7 @@ val __ptee_of_sexp__ : expr -> ptee
 val ptee_of_sexp : expr -> ptee
 val sexp_of_ptee : ptee -> expr
 type arg = {
-  name : bytes;
+  aname : bytes;
   value : struct_val;
   is_ptr : bool;
   pointee : ptee option;
