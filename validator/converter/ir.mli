@@ -1,4 +1,8 @@
+module Sexp = Core.Std.Sexp
 type bop = Eq | Le | Lt | Ge | Gt | Add | Sub | And
+val __bop_of_sexp__ : Sexp.t -> bop
+val bop_of_sexp : Sexp.t -> bop
+val sexp_of_bop : bop -> Sexp.t
 type ttype =
     Ptr of ttype
   | Sint32
@@ -13,11 +17,14 @@ type ttype =
   | Sunknown
   | Uunknown
   | Unknown
+val __ttype_of_sexp__ : Sexp.t -> ttype
+val ttype_of_sexp : Sexp.t -> ttype
+val sexp_of_ttype : ttype -> Sexp.t
 type term =
     Bop of bop * tterm * tterm
   | Apply of bytes * tterm list
   | Id of bytes
-  | Struct of bytes * (bytes * tterm) list
+  | Struct of bytes * var_spec list
   | Int of int
   | Bool of bool
   | Not of tterm
@@ -28,10 +35,19 @@ type term =
   | Cast of ttype * tterm
   | Undef
 and tterm = { v : term; t : ttype; }
+and var_spec = { name : bytes; value : tterm; }
+val __term_of_sexp__ : Sexp.t -> term
+val term_of_sexp : Sexp.t -> term
+val __tterm_of_sexp__ : Sexp.t -> tterm
+val tterm_of_sexp : Sexp.t -> tterm
+val __var_spec_of_sexp__ : Sexp.t -> var_spec
+val var_spec_of_sexp : Sexp.t -> var_spec
+val sexp_of_term : term -> Sexp.t
+val sexp_of_tterm : tterm -> Sexp.t
+val sexp_of_var_spec : var_spec -> Sexp.t
 val ttype_to_str : ttype -> bytes
 val is_void : ttype -> bool
 val get_pointee : ttype -> ttype
-type var_spec = { name : bytes; v : tterm; }
 type fun_call_context = {
   pre_lemmas : bytes list;
   application : term;
@@ -39,13 +55,25 @@ type fun_call_context = {
   ret_name : bytes option;
   ret_type : ttype;
 }
+val __fun_call_context_of_sexp__ : Sexp.t -> fun_call_context
+val fun_call_context_of_sexp : Sexp.t -> fun_call_context
+val sexp_of_fun_call_context : fun_call_context -> Sexp.t
 type call_result = {
   args_post_conditions : var_spec list;
   ret_val : tterm;
   post_statements : tterm list;
 }
+val __call_result_of_sexp__ : Sexp.t -> call_result
+val call_result_of_sexp : Sexp.t -> call_result
+val sexp_of_call_result : call_result -> Sexp.t
 type hist_call = { context : fun_call_context; result : call_result; }
+val __hist_call_of_sexp__ : Sexp.t -> hist_call
+val hist_call_of_sexp : Sexp.t -> hist_call
+val sexp_of_hist_call : hist_call -> Sexp.t
 type tip_call = { context : fun_call_context; results : call_result list; }
+val __tip_call_of_sexp__ : Sexp.t -> tip_call
+val tip_call_of_sexp : Sexp.t -> tip_call
+val sexp_of_tip_call : tip_call -> Sexp.t
 type ir = {
   preamble : bytes;
   free_vars : var_spec Core.Std.String.Map.t;
@@ -53,9 +81,21 @@ type ir = {
   tmps : var_spec Core.Std.String.Map.t;
   cmplxs : var_spec Core.Std.String.Map.t;
   context_assumptions : tterm list;
-  calls : hist_call list * tip_call;
+  hist_calls : hist_call list;
+  tip_call : tip_call;
   leaks : bytes list;
 }
+val __ir_of_sexp__ : Sexp.t -> ir
+val ir_of_sexp : Sexp.t -> ir
+val sexp_of_ir : ir -> Sexp.t
+type task = {
+  path_constraints : tterm list;
+  exists_such : tterm list;
+  assert_lino : int;
+}
+val __task_of_sexp__ : Sexp.t -> task
+val task_of_sexp : Sexp.t -> task
+val sexp_of_task : task -> Sexp.t
 val strip_outside_parens : bytes -> bytes
 val render_bop : bop -> bytes
 val render_tterm : tterm -> bytes

@@ -149,22 +149,22 @@ let rec guess_type_l exps =
   | [] -> Unknown
 
 let update_var_spec (spec:var_spec) v =
-  let t_final = match spec.v.t with
+  let t_final = match spec.value.t with
     | Unknown -> v.t
-    | Sunknown | Uunknown -> if v.t = Unknown then spec.v.t else v.t
-    | _ -> spec.v.t in
-  let v_final = match spec.v.v with
+    | Sunknown | Uunknown -> if v.t = Unknown then spec.value.t else v.t
+    | _ -> spec.value.t in
+  let v_final = match spec.value.v with
     | Undef -> v.v
-    | _ -> spec.v.v in
+    | _ -> spec.value.v in
   {name = spec.name;
-   v = {v=v_final; t=t_final};}
+   value = {v=v_final; t=t_final};}
 
 let rec get_var_decls_of_sexp exp t known_vars =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
     begin match String.Map.find known_vars name with
       | Some spec -> [update_var_spec spec {v=Undef;t=(determine_type t w)}]
-      | None -> [{name = name; v={v=Undef;t=determine_type t w}}]
+      | None -> [{name = name; value={v=Undef;t=determine_type t w}}]
     end
   | None, None ->
     begin
@@ -212,7 +212,7 @@ let name_gen prefix = object
 end
 
 let complex_val_name_gen = name_gen "cmplx"
-let allocated_complex_vals = ref String.Map.empty
+let allocated_complex_vals : var_spec String.Map.t ref = ref String.Map.empty
 
 let tmp_val_name_gen = name_gen "tmp"
 let allocated_tmp_vals = ref String.Map.empty
@@ -227,26 +227,25 @@ let get_sint_in_bounds v =
 let make_cmplx_val exp t =
   let key = Sexp.to_string exp in
   match String.Map.find !allocated_complex_vals key with
-  | Some v -> v.v
+  | Some v -> v.value
   | None ->
     let name = complex_val_name_gen#generate in
     let value = {v=Id name;t} in
     allocated_complex_vals :=
       String.Map.add !allocated_complex_vals ~key
-        ~data:{name = name;
-               v=value;};
+        ~data:{name;value};
     value
 
 let allocate_tmp value =
   let key = (render_tterm value) in
   match String.Map.find !allocated_tmp_vals key with
-  | Some {name;v} -> {v=Id name;t=value.t}
+  | Some {name;value} -> {v=Id name;t=value.t}
   | None ->
     let name = tmp_val_name_gen#generate in
     allocated_tmp_vals :=
       String.Map.add !allocated_tmp_vals
         ~key
-        ~data:{name; v=value};
+        ~data:{name; value};
     {v=Id name;t=value.t}
 
 (*TODO: rewrite this in terms of my IR instead of raw Sexps*)
@@ -354,7 +353,7 @@ let rec get_struct_val_value valu t =
       let fields = List.map2_exn valu.break_down fields
           ~f:(fun {fname;value} (name,t) ->
               assert(String.equal name fname);
-              (name,(get_struct_val_value value t)))
+              {name;value=(get_struct_val_value value t)})
       in
       {v=Struct (strname, fields);t}
     end
@@ -362,16 +361,16 @@ let rec get_struct_val_value valu t =
 
 let get_vars tpref arg_name_gen =
   let get_vars known_vars call =
-    let alloc_local_arg addr v =
+    let alloc_local_arg addr value =
       match String.Map.find !allocated_args addr with
       | None ->
         let p_name = arg_name_gen#generate in
         allocated_args := String.Map.add !allocated_args
             ~key:addr ~data:{name = p_name;
-                             v};
+                             value};
       | Some spec ->
         allocated_args := String.Map.add !allocated_args
-            ~key:addr ~data:(update_var_spec spec v)
+            ~key:addr ~data:(update_var_spec spec value)
     in
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
@@ -426,24 +425,24 @@ let get_vars tpref arg_name_gen =
   tip_vars
 
 let rec render_assignment var =
-  match var.v.v with
+  match var.value.v with
   | Struct (_, fvals) ->
     (*TODO: make sure that the var_value.t is also Str .*)
     String.concat ~sep:"\n"
       (List.map fvals
-         ~f:(fun (name,value) -> render_assignment
-                {name=(var.name ^ "." ^ name);v=value} ^ ";"))
+         ~f:(fun {name;value} -> render_assignment
+                {name=(var.name ^ "." ^ name);value} ^ ";"))
   | Undef -> ""
-  | _ -> var.name ^ " = " ^ (render_tterm var.v)
+  | _ -> var.name ^ " = " ^ (render_tterm var.value)
 
 let render_vars_declarations ( vars : var_spec list ) =
   String.concat ~sep:"\n"
     (List.map vars ~f:(fun v ->
-         match v.v.t with
+         match v.value.t with
          | Unknown | Sunknown | Uunknown ->
-           "//" ^ ttype_to_str v.v.t ^ " " ^ v.name ^ ";"
+           "//" ^ ttype_to_str v.value.t ^ " " ^ v.name ^ ";"
          | _ ->
-           ttype_to_str v.v.t ^ " " ^ v.name ^ ";")) ^ "\n"
+           ttype_to_str v.value.t ^ " " ^ v.name ^ ";")) ^ "\n"
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
@@ -451,7 +450,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   | Struct (_, fields) ->
     (*TODO: check that the types of Str (_,fts)
       are the same as in fields*)
-    String.concat (List.map fields ~f:(fun (name,value) ->
+    String.concat (List.map fields ~f:(fun {name;value} ->
       render_eq_sttmt ~is_assert (out_arg ^ "." ^ name) value))
   | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
          (render_tterm out_val) ^ ");\n"
@@ -541,7 +540,7 @@ let render_post_statements call ~is_tip =
                 | None -> failwith ( "unknown argument for " ^ (Sexp.to_string arg.value.full))
               in
               render_eq_sttmt ~is_assert:is_tip
-                out_arg.name (get_struct_val_value v out_arg.v.t)
+                out_arg.name (get_struct_val_value v out_arg.value.t)
             | None -> ""
           end
         | None -> ""
@@ -567,7 +566,8 @@ let compose_args_post_conditions call =
               | Some out_arg -> out_arg
               | None -> failwith ("unknown argument " ^ key)
             in
-            Some {name=out_arg.name;v=(get_struct_val_value v out_arg.v.t)}
+            Some {name=out_arg.name;
+                  value=(get_struct_val_value v out_arg.value.t)}
           | None -> assert ptee.is_fun_ptr;
             None
         end
@@ -587,34 +587,29 @@ let render_fcall_preamble context =
   (render_term context.application) ^ ";\n" ^
   (String.concat ~sep:"\n" context.post_lemmas) ^ "\n"
 
-let render_hist_fun_call {context;result} =
-  (render_fcall_preamble context) ^
-  (String.concat ~sep:"\n" (List.map result.args_post_conditions
-                              ~f:(fun {name;v} ->
-                                  render_eq_sttmt ~is_assert:false
-                                    name v))) ^ "\n" ^
-  (match context.ret_name with
-   | Some name -> (render_eq_sttmt ~is_assert:false name result.ret_val)
-   | None -> "") ^ "\n" ^
-  (String.concat ~sep:"\n" (List.map result.post_statements
-                              ~f:(fun t ->
-                                  "/*@ assume(" ^ (render_tterm t) ^
-                                  ");@*/")))
-
-let render_post_assertions {args_post_conditions;ret_val=_;post_statements} =
+let render_post_sttmts ~is_assert {args_post_conditions;
+                                       ret_val=_;post_statements} =
   (String.concat ~sep:"\n" (List.map args_post_conditions
-                              ~f:(fun {name;v} ->
-                                  render_eq_sttmt ~is_assert:true
-                                    name v))) ^ "\n" ^
+                              ~f:(fun {name;value} ->
+                                  render_eq_sttmt ~is_assert
+                                    name value))) ^ "\n" ^
   (String.concat ~sep:"\n" (List.map post_statements
                               ~f:(fun t ->
-                                  "/*@ assert(" ^ (render_tterm t) ^
+                                  "/*@ " ^ (if is_assert
+                                            then "assert"
+                                            else "assume") ^
+                                  "(" ^ (render_tterm t) ^
                                   ");@*/")))
 
-let render_ret_assertion ret_name ret_val =
+let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   (match ret_name with
-   | Some name -> (render_eq_sttmt ~is_assert:true name ret_val)
+   | Some name -> (render_eq_sttmt ~is_assert name ret_val)
    | None -> "") ^ "\n"
+
+let render_hist_fun_call {context;result} =
+  (render_fcall_preamble context) ^
+  render_post_sttmts ~is_assert:false result ^
+  render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
 
 let render_2tip_post_assertions res1 res2 ret_name =
   if term_eq res1.ret_val.v res2.ret_val.v then
@@ -624,17 +619,19 @@ let render_2tip_post_assertions res1 res2 ret_name =
               res2.post_statements with
       | Some (sttmt,fst) ->
         begin
+          let res1_assertions =
+            (render_post_sttmts ~is_assert:true res1 ^ "\n" ^
+             render_ret_equ_sttmt ~is_assert:true ret_name res1.ret_val)
+          in
+          let res2_assertions =
+            (render_post_sttmts~is_assert:true res2 ^ "\n" ^
+             render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val)
+          in
           let (pos_sttmts,neg_sttmts) =
             if fst then
-              (render_post_assertions res1 ^ "\n" ^
-               render_ret_assertion ret_name res1.ret_val),
-              (render_post_assertions res2 ^ "\n" ^
-               render_ret_assertion ret_name res2.ret_val)
+              res1_assertions,res2_assertions
             else
-              (render_post_assertions res2 ^ "\n" ^
-               render_ret_assertion ret_name res2.ret_val),
-              ((render_post_assertions res1) ^ "\n" ^
-               (render_ret_assertion ret_name res1.ret_val))
+              res2_assertions,res1_assertions
           in
           "if (" ^ (render_tterm sttmt) ^ ") {\n" ^
           pos_sttmts ^ "} else {\n" ^
@@ -650,16 +647,16 @@ let render_2tip_post_assertions res1 res2 ret_name =
       | None -> failwith "this can't be true!"
     in
     "if (" ^ rname ^ " == " ^ (render_tterm res1.ret_val) ^ ") {\n" ^
-    (render_post_assertions res1) ^ "} else {\n" ^
-    (render_post_assertions res2) ^ "\n" ^
-    (render_ret_assertion ret_name res2.ret_val) ^ "}\n"
+    (render_post_sttmts ~is_assert:true res1) ^ "} else {\n" ^
+    (render_post_sttmts ~is_assert:true res2) ^ "\n" ^
+    (render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val) ^ "}\n"
 
 let render_tip_fun_calls {context;results} =
   (render_fcall_preamble context) ^
   (match results with
    | result :: [] ->
-     (render_post_assertions result) ^ "\n" ^
-     (render_ret_assertion context.ret_name result.ret_val)
+     (render_post_sttmts ~is_assert:true result) ^ "\n" ^
+     (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val)
    | res1 :: res2 :: [] ->
      render_2tip_post_assertions res1 res2 context.ret_name
    | [] -> failwith "must be at least one tip call"
@@ -703,14 +700,8 @@ let tip_calls_context calls rname_gen =
   in
   {context;results}
 
-let render_fun_calls (hist_funs,tip_calls) =
-  let hist =
-    String.concat ~sep:"\n" (List.map hist_funs ~f:render_hist_fun_call)
-  in
-  let tip =
-    render_tip_fun_calls tip_calls
-  in
-  hist ^ tip
+let render_hist_calls hist_funs =
+  String.concat ~sep:"\n" (List.map hist_funs ~f:render_hist_fun_call)
 
 let extract_calls_info tpref =
   let rez_gen = name_gen "rez" in
@@ -723,16 +714,16 @@ let extract_calls_info tpref =
 
 let render_cmplexes cmplxes =
   String.concat ~sep:"\n" (List.map (String.Map.data cmplxes) ~f:(fun var ->
-      (ttype_to_str var.v.t) ^ " " ^ var.name ^ ";//" ^
-      (render_tterm var.v))) ^ "\n"
+      (ttype_to_str var.value.t) ^ " " ^ var.name ^ ";//" ^
+      (render_tterm var.value))) ^ "\n"
 
 let render_tmps tmps =
   String.concat ~sep:"\n" (List.map (List.sort ~cmp:(fun a b ->
       (String.compare a.name b.name))
       (String.Map.data tmps))
       ~f:(fun tmp ->
-          ttype_to_str tmp.v.t ^ " " ^ tmp.name ^ " = " ^
-          render_tterm tmp.v ^ ";")) ^ "\n"
+          ttype_to_str tmp.value.t ^ " " ^ tmp.name ^ " = " ^
+          render_tterm tmp.value ^ ";")) ^ "\n"
 
 let collect_context pref =
   let collect_ctxt_list l = List.map l ~f:(fun e ->
@@ -770,9 +761,10 @@ let extract_leaks pref =
          | None -> failwith ("unknown function " ^ call.fun_name)))
 
 let render_allocated_args args =
-  String.concat ~sep:"\n" (List.map (String.Map.data args)
-                             ~f:(fun spec -> (ttype_to_str spec.v.t) ^ " " ^
-                                             (spec.name) ^ ";")) ^ "\n"
+  String.concat ~sep:"\n"
+    (List.map (String.Map.data args)
+       ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
+                       (spec.name) ^ ";")) ^ "\n"
 
 let render_alloc_args_assignments () =
   String.concat ~sep:"\n"
@@ -792,14 +784,33 @@ let build_ir fin =
                   /*@ requires true; @*/ \
                   /*@ ensures true; @*/\n{\n" in
   let free_vars = (get_vars pref (name_gen "arg")) in
-  let calls = extract_calls_info pref in
+  let (hist_calls,tip_call) = extract_calls_info pref in
   let leaks = extract_leaks pref in
   let cmplxs = !allocated_complex_vals in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let arguments = !allocated_args in
   {preamble;free_vars;arguments;tmps;
-   cmplxs;context_assumptions;calls;leaks}
+   cmplxs;context_assumptions;hist_calls;tip_call;leaks}
+
+let prepare_tasks ir =
+  match ir.tip_call.results with
+  | result :: [] ->
+    begin
+      match ir.tip_call.context.ret_name with
+      | Some ret_name ->
+        {path_constraints=ir.context_assumptions;
+         exists_such=
+           {v=Bop (Eq,{v=Id ret_name;t=ir.tip_call.context.ret_type},
+                   result.ret_val);t=Boolean}::
+           (List.map result.args_post_conditions
+              ~f:(fun spec -> {v=Bop (Eq,{v=Id spec.name;t=Unknown},
+                                      spec.value);
+                              t=Boolean}));
+         assert_lino=118}
+      | None -> failwith "not supported"
+    end
+  | _ -> failwith "not supported"
 
 let convert_prefix fin cout =
   let ir = build_ir fin in
@@ -810,9 +821,13 @@ let convert_prefix fin cout =
   Out_channel.output_string cout (render_context_assumptions ir.context_assumptions);
   Out_channel.output_string cout (render_tmps ir.tmps);
   Out_channel.output_string cout (render_args_assignments ir.arguments);
-  Out_channel.output_string cout (render_fun_calls ir.calls);
+  Out_channel.output_string cout (render_hist_calls ir.hist_calls);
+  Out_channel.output_string cout (render_tip_fun_calls ir.tip_call);
   Out_channel.output_string cout (render_leaks ir.leaks);
-  Out_channel.output_string cout "}\n"
+  Out_channel.output_string cout "}\n";
+  Out_channel.with_file "tasks.sexp" ~f:(fun fout ->
+      Out_channel.output_string fout
+        (Sexp.to_string (Ir.sexp_of_task (prepare_tasks ir))))
 
 let () =
   Out_channel.with_file Sys.argv.(2) ~f:(fun fout ->

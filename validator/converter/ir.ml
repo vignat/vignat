@@ -1,8 +1,11 @@
+open Sexplib.Conv
 open Core.Std
+
+module Sexp = Core.Std.Sexp
 
 type bop = Eq | Le | Lt | Ge | Gt
          | Add | Sub
-         | And
+         | And with sexp
 
 
 type ttype = | Ptr of ttype
@@ -18,11 +21,12 @@ type ttype = | Ptr of ttype
              | Sunknown
              | Uunknown
              | Unknown
+with sexp
 
 type term = Bop of bop*tterm*tterm
           | Apply of string*tterm list
           | Id of string
-          | Struct of string*(string * tterm) list
+          | Struct of string*var_spec list
           | Int of int
           | Bool of bool
           | Not of tterm
@@ -33,6 +37,8 @@ type term = Bop of bop*tterm*tterm
           | Cast of ttype*tterm
           | Undef
 and tterm = {v:term; t:ttype}
+and var_spec = {name: string; value:tterm}
+with sexp
 
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
@@ -45,29 +51,27 @@ let is_void = function | Void -> true | _ -> false
 
 let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
 
-type var_spec = {name: string; v:tterm}
-
 type fun_call_context = {
   pre_lemmas:string list;
   application:term;
   post_lemmas:string list;
   ret_name:string option;
   ret_type:ttype;
-}
+} with sexp
 
 type call_result = {
   args_post_conditions:var_spec list;
   ret_val:tterm;
   post_statements:tterm list;
-}
+} with sexp
 
 type hist_call = {
   context:fun_call_context;
   result:call_result;
-}
+} with sexp
 
 type tip_call = {context:fun_call_context;
-                 results:call_result list}
+                 results:call_result list} with sexp
 
 type ir = {
   preamble:string;
@@ -76,9 +80,16 @@ type ir = {
   tmps:var_spec String.Map.t;
   cmplxs:var_spec String.Map.t;
   context_assumptions:tterm list;
-  calls:hist_call list*tip_call;
+  hist_calls:hist_call list;
+  tip_call:tip_call;
   leaks:string list;
-}
+} with sexp
+
+type task = {
+  path_constraints:tterm list;
+  exists_such:tterm list;
+  assert_lino:int;
+} with sexp
 
 let strip_outside_parens str =
   if (String.is_prefix str ~prefix:"(") &&
@@ -108,7 +119,7 @@ let rec render_tterm (t:tterm) =
   | Id name -> name;
   | Struct (_,fields) ->
     "{" ^ (String.concat ~sep:", "
-             (List.map fields ~f:(fun (name,value) ->
+             (List.map fields ~f:(fun {name;value} ->
                   name ^ " = " ^ (render_tterm value)))) ^
     "}"
   | Int i -> string_of_int i
@@ -132,7 +143,8 @@ let rec term_eq a b =
   | Id a, Id b -> String.equal a b
   | Struct (sna,fdsa), Struct (snb,fdsb) ->
     (String.equal sna snb) && ((List.length fdsa) = (List.length fdsb)) &&
-    (List.for_all2_exn fdsa fdsb ~f:(fun (fnamea,fvala) (fnameb,fvalb) ->
+    (List.for_all2_exn fdsa fdsb ~f:(fun {name=fnamea;value=fvala}
+                                      {name=fnameb;value=fvalb} ->
          (String.equal fnamea fnameb) &&
          term_eq fvala.v fvalb.v))
   | Int ia, Int ib -> ia = ib
@@ -145,3 +157,15 @@ let rec term_eq a b =
   | Cast (ctypea,terma), Cast (ctypeb,termb) -> (ctypea = ctypeb) && (term_eq terma.v termb.v)
   | Undef, Undef -> true
   | _, _ -> false
+
+              (*
+                let rec replace_term_in_term old_t new_t term =
+                  if term_eq term old_t then new_t else
+                    match term with
+                    | Bop (opa,lhs,rhs) ->
+                      Bop (opa,{v=replace_term_in_term old_t new_t lhs.v;t=lhs.t},
+                           {v=replace_term_in_term old_t new_t rhs.v;t=rhs.t})
+                    | Apply (f,args) -> Apply (f,replace_term_in_tterm_list old_t new_t args)
+                    | Id x -> Id x
+                    | Struct ()
+              *)
