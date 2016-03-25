@@ -58,7 +58,7 @@ ensures dmappingp<int_k,ext_k,flw>(m, a, b, c, d, cap, f) &*&
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch);
 //@ requires *m |-> ?mp &*& *ch |-> ?chp &*& evproc_loop_invariant(mp, chp);
-//@ ensures *m |-> _ &*& *ch |-> _;
+//@ ensures *m |-> mp &*& *ch |-> chp;
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch);
 //@ requires *m |-> ?mp &*& *ch |-> ?chp;
