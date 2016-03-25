@@ -47,14 +47,36 @@ let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
 
 type var_spec = {name: string; v:tterm}
 
+type fun_call_context = {
+  pre_lemmas:string list;
+  application:term;
+  post_lemmas:string list;
+  ret_name:string option;
+  ret_type:ttype;
+}
+
+type call_result = {
+  args_post_conditions:var_spec list;
+  ret_val:tterm;
+  post_statements:tterm list;
+}
+
+type hist_call = {
+  context:fun_call_context;
+  result:call_result;
+}
+
+type tip_call = {context:fun_call_context;
+                 results:call_result list}
+
 type ir = {
   preamble:string;
   free_vars:var_spec String.Map.t;
   arguments:var_spec String.Map.t;
   tmps:var_spec String.Map.t;
   cmplxs:var_spec String.Map.t;
-  context_lemmas:tterm list;
-  calls:string list;
+  context_assumptions:tterm list;
+  calls:hist_call list*tip_call;
   leaks:string list;
 }
 
@@ -80,9 +102,9 @@ let rec render_tterm (t:tterm) =
   | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
                           " " ^ (render_bop op) ^ " " ^
                           (render_tterm rhs) ^ ")"
-  | Apply (_,args) ->
+  | Apply (fname,args) ->
     let arg_strings = List.map args ~f:render_tterm in
-    "fname(" ^ (String.concat ~sep:", " arg_strings) ^ ")"
+    fname ^ "(" ^ (String.concat ~sep:", " arg_strings) ^ ")"
   | Id name -> name;
   | Struct (_,fields) ->
     "{" ^ (String.concat ~sep:", "
@@ -98,6 +120,7 @@ let rec render_tterm (t:tterm) =
   | Addr t -> "&(" ^ (render_tterm t) ^ ")"
   | Cast (t,v) -> "(" ^ ttype_to_str t ^ ")" ^ (render_tterm v)
   | Undef -> "???"
+and render_term t = render_tterm {v=t;t=Unknown} (*TODO: reformulate this coupled definition*)
 
 let rec term_eq a b =
   match a,b with
