@@ -89,6 +89,7 @@ type task = {
   path_constraints:tterm list;
   exists_such:tterm list;
   assert_lino:int;
+  filename:string;
 } with sexp
 
 let strip_outside_parens str =
@@ -158,14 +159,83 @@ let rec term_eq a b =
   | Undef, Undef -> true
   | _, _ -> false
 
-              (*
-                let rec replace_term_in_term old_t new_t term =
-                  if term_eq term old_t then new_t else
-                    match term with
-                    | Bop (opa,lhs,rhs) ->
-                      Bop (opa,{v=replace_term_in_term old_t new_t lhs.v;t=lhs.t},
-                           {v=replace_term_in_term old_t new_t rhs.v;t=rhs.t})
-                    | Apply (f,args) -> Apply (f,replace_term_in_tterm_list old_t new_t args)
-                    | Id x -> Id x
-                    | Struct ()
-              *)
+let rec replace_term_in_term old_t new_t term =
+  if term_eq term old_t then new_t else
+    match term with
+    | Bop (opa,lhs,rhs) ->
+      Bop (opa,replace_term_in_tterm old_t new_t lhs,
+           replace_term_in_tterm old_t new_t rhs)
+    | Apply (f,args) -> Apply (f,replace_term_in_tterms old_t new_t args)
+    | Id x -> Id x
+    | Struct (name,fields) ->
+      Struct (name, List.map fields ~f:(fun field ->
+          {field with value = replace_term_in_tterm old_t new_t field.value}))
+    | Int _ -> term
+    | Bool _ -> term
+    | Not t -> Not (replace_term_in_tterm old_t new_t t)
+    | Str_idx (term,field) ->
+      Str_idx (replace_term_in_tterm old_t new_t term,field)
+    | Deref term -> Deref (replace_term_in_tterm old_t new_t term)
+    | Fptr _ -> term
+    | Addr tterm -> Addr (replace_term_in_tterm old_t new_t tterm)
+    | Cast (ctype,tterm) ->
+      Cast (ctype,replace_term_in_tterm old_t new_t tterm)
+    | Undef -> Undef
+and replace_term_in_tterm old_t new_t tterm =
+  {tterm with v=replace_term_in_term old_t new_t tterm.v}
+and replace_term_in_tterms old_t new_t tterm_list =
+  List.map tterm_list ~f:(replace_term_in_tterm old_t new_t)
+
+let rec call_recursively_on_tterm f tterm =
+  match f tterm.v with
+  | Some tt -> call_recursively_on_tterm f {v=tt;t=tterm.t}
+  | None ->
+    {v= begin
+        match tterm.v with
+        | Bop (op,lhs,rhs) ->
+          Bop (op, call_recursively_on_tterm f lhs, call_recursively_on_tterm f rhs)
+        | Apply (fname,args) ->
+          Apply (fname, List.map args ~f:(call_recursively_on_tterm f))
+        | Id x -> Id x
+        | Struct (name,fds) ->
+          Struct (name,List.map fds ~f:(fun field ->
+              {field with value = call_recursively_on_tterm f field.value}))
+        | Int i -> Int i
+        | Bool b -> Bool b
+        | Not x -> Not (call_recursively_on_tterm f x)
+        | Str_idx (tt,fname) -> Str_idx (call_recursively_on_tterm f tt,fname)
+        | Deref tt -> Deref (call_recursively_on_tterm f tt)
+        | Fptr fname -> Fptr fname
+        | Addr tt -> Addr (call_recursively_on_tterm f tt)
+        | Cast (ctype,tt) -> Cast (ctype,call_recursively_on_tterm f tt)
+        | Undef -> Undef
+      end;
+     t=tterm.t}
+
+
+let rec term_contains_term super sub =
+  if term_eq super sub then true else
+    match super with
+    | Bop (_,lhs,rhs) ->
+      tterm_contains_term lhs sub || tterm_contains_term rhs sub
+    | Apply (_,args) -> tterms_contain_term args sub
+    | Id _ -> false
+    | Struct (_,fields) ->
+      List.exists fields ~f:(fun field ->
+        tterm_contains_term field.value sub)
+    | Int _ -> false
+    | Bool _ -> false
+    | Not t -> tterm_contains_term t sub
+    | Str_idx (term,_) ->
+      tterm_contains_term term sub
+    | Deref term -> tterm_contains_term term sub
+    | Fptr _ -> false
+    | Addr tterm -> tterm_contains_term tterm sub
+    | Cast (_,tterm) ->
+      tterm_contains_term tterm sub
+    | Undef -> false
+and tterm_contains_term super sub =
+  term_contains_term super.v sub
+and tterms_contain_term supers sub =
+  List.exists supers ~f:(fun sup -> tterm_contains_term sup sub)
+

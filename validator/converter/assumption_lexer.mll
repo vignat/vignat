@@ -26,14 +26,14 @@ rule read =
        | ','     {COMMA}
        | '('     {LPAREN}
        | ')'     {RPAREN}
-       | '<'     {CMP Lt}
-       | '>'     {CMP Gt}
-       | "<="    {CMP Le}
-       | ">="    {CMP Ge}
-       | '='     {CMP Eq}
-       | "<==>"  {CMP Eq}
-       | '-'     {BAOP '-'}
-       | '+'     {BAOP '+'}
+       | '<'     {BOP Lt}
+       | '>'     {BOP Gt}
+       | "<="    {BOP Le}
+       | ">="    {BOP Ge}
+       | '='     {BOP Eq}
+       | "<==>"  {BOP Eq}
+       | '-'     {BOP Sub}
+       | '+'     {BOP Add}
        | '!'     {BANG}
        | _       {raise (SyntaxError ("Unexpected char: " ^ (Lexing.lexeme lexbuf)))}
        | eof     {EOF}

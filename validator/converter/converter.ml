@@ -802,12 +802,14 @@ let prepare_tasks ir =
         {path_constraints=ir.context_assumptions;
          exists_such=
            {v=Bop (Eq,{v=Id ret_name;t=ir.tip_call.context.ret_type},
-                   result.ret_val);t=Boolean}::
+                   result.ret_val);t=Boolean} ::
            (List.map result.args_post_conditions
               ~f:(fun spec -> {v=Bop (Eq,{v=Id spec.name;t=Unknown},
                                       spec.value);
-                              t=Boolean}));
-         assert_lino=118}
+                               t=Boolean})) @
+           result.post_statements;
+         assert_lino=41;
+         filename="aaa.c"}
       | None -> failwith "not supported"
     end
   | _ -> failwith "not supported"

@@ -92,6 +92,7 @@ type task = {
   path_constraints : tterm list;
   exists_such : tterm list;
   assert_lino : int;
+  filename : bytes;
 }
 val __task_of_sexp__ : Sexp.t -> task
 val task_of_sexp : Sexp.t -> task
@@ -101,3 +102,10 @@ val render_bop : bop -> bytes
 val render_tterm : tterm -> bytes
 val render_term : term -> bytes
 val term_eq : term -> term -> bool
+val replace_term_in_term : term -> term -> term -> term
+val replace_term_in_tterm : term -> term -> tterm -> tterm
+val replace_term_in_tterms : term -> term -> tterm list -> tterm list
+val call_recursively_on_tterm : (term -> term option) -> tterm -> tterm
+val term_contains_term : term -> term -> bool
+val tterm_contains_term : tterm -> term -> bool
+val tterms_contain_term : tterm list -> term -> bool
