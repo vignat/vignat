@@ -62,6 +62,7 @@ type call_result = {
   args_post_conditions : var_spec list;
   ret_val : tterm;
   post_statements : tterm list;
+  export_point : bytes option;
 }
 val __call_result_of_sexp__ : Sexp.t -> call_result
 val call_result_of_sexp : Sexp.t -> call_result
@@ -89,10 +90,9 @@ val __ir_of_sexp__ : Sexp.t -> ir
 val ir_of_sexp : Sexp.t -> ir
 val sexp_of_ir : ir -> Sexp.t
 type task = {
-  path_constraints : tterm list;
   exists_such : tterm list;
-  assert_lino : int;
   filename : bytes;
+  export_point : bytes;
 }
 val __task_of_sexp__ : Sexp.t -> task
 val task_of_sexp : Sexp.t -> task

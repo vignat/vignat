@@ -588,7 +588,11 @@ let render_fcall_preamble context =
   (String.concat ~sep:"\n" context.post_lemmas) ^ "\n"
 
 let render_post_sttmts ~is_assert {args_post_conditions;
-                                       ret_val=_;post_statements} =
+                                   ret_val=_;post_statements;
+                                   export_point} =
+  (match export_point with
+   | Some name -> "int " ^ name ^ ";\n"
+   | None -> "") ^
   (String.concat ~sep:"\n" (List.map args_post_conditions
                               ~f:(fun {name;value} ->
                                   render_eq_sttmt ~is_assert
@@ -684,7 +688,8 @@ let extract_hist_call_context call rname_gen =
   let args_post_conditions = compose_args_post_conditions call in
   {context=extract_common_call_context call ret_name args;
    result={args_post_conditions;ret_val=get_ret_val call;
-           post_statements=[]}}
+           post_statements=[];
+           export_point=None}}
 
 let tip_calls_context calls rname_gen =
   let call = List.hd_exn calls in
@@ -692,11 +697,13 @@ let tip_calls_context calls rname_gen =
     else Some rname_gen#generate in
   let args = extract_fun_args call in
   let context = extract_common_call_context call ret_name args in
+  let export_pt_gen = name_gen "export_point" in
   let results = List.map calls ~f:(fun call ->
       let args_post_conditions = compose_args_post_conditions call in
       {args_post_conditions;
        ret_val=get_ret_val call;
-       post_statements=(extract_tip_ret_post_conditions call)})
+       post_statements=(extract_tip_ret_post_conditions call);
+       export_point=Some export_pt_gen#generate})
   in
   {context;results}
 
@@ -799,7 +806,8 @@ let prepare_tasks ir =
     begin
       match ir.tip_call.context.ret_name with
       | Some ret_name ->
-        {path_constraints=ir.context_assumptions;
+        let export_point = Option.value_exn result.export_point in
+        [{(*path_constraints=ir.context_assumptions;*)
          exists_such=
            {v=Bop (Eq,{v=Id ret_name;t=ir.tip_call.context.ret_type},
                    result.ret_val);t=Boolean} ::
@@ -808,8 +816,8 @@ let prepare_tasks ir =
                                       spec.value);
                                t=Boolean})) @
            result.post_statements;
-         assert_lino=41;
-         filename="aaa.c"}
+         export_point=export_point;
+         filename="aaa.c"}]
       | None -> failwith "not supported"
     end
   | _ -> failwith "not supported"
@@ -829,7 +837,7 @@ let convert_prefix fin cout =
   Out_channel.output_string cout "}\n";
   Out_channel.with_file "tasks.sexp" ~f:(fun fout ->
       Out_channel.output_string fout
-        (Sexp.to_string (Ir.sexp_of_task (prepare_tasks ir))))
+        (Sexp.to_string (List.sexp_of_t Ir.sexp_of_task (prepare_tasks ir))))
 
 let () =
   Out_channel.with_file Sys.argv.(2) ~f:(fun fout ->

@@ -26,7 +26,7 @@ let rec term_depth = function
 
 let choose_simpler t1 t2 keep_these =
   let contain_any term =
-    List.exists keep_these ~f:(fun k -> term_contains_term t1 k)
+    List.exists keep_these ~f:(fun k -> term_contains_term term k)
   in
   match contain_any t1, contain_any t2 with
   | true, true -> None
@@ -185,7 +185,7 @@ let is_congruent given test : assignment list option =
       given_ids
   in
   match test with
-  | {v=Bop (Eq,{v=Id lhs;t=_},{v=Id rhs;t=_})} ->
+  | {v=Bop (Eq,{v=Id lhs;t=_},{v=Id rhs;t=_});_} ->
     let lhs_unbound = String.Set.mem unbound_ids lhs in
     let rhs_unbound = String.Set.mem unbound_ids rhs in
     begin
@@ -256,23 +256,31 @@ let can_be_congruent given test_set =
   impl given test_set
 
 let () =
-  let task = Ir.task_of_sexp (Sexp.load_sexp "./tasks.sexp") in
-  let _ =
-    Sys.command ( "~/proj/verifast-1757/bin/verifast -c -I ../../nat " ^
-                  " -breakpoint " ^ (string_of_int task.assert_lino) ^
-                  " -breakpoint_context_file bcf.txt " ^
-                  task.filename )
-  in
-  let interesting = List.join (List.map task.exists_such
-                                 ~f:get_ids_from_tterm) in
-  let target_assumptions =
-    load_n_simplify_assumptions "bcf.txt" interesting in
-  print_assumption_list task.path_constraints;
-  print_assumption_list task.exists_such;
-  print_assumption_list target_assumptions;
-  match can_be_congruent target_assumptions task.exists_such with
-  | Some assignments ->
-    printf "congruent: \n";
-    List.iter assignments ~f:(fun (var,value) ->
-        printf "%s := %s\n" var (render_term value))
-  | None -> printf "Not congruent\n"
+  let tasks = List.t_of_sexp Ir.task_of_sexp (Sexp.load_sexp "./tasks.sexp") in
+  List.iter tasks ~f:(fun task ->
+      let _ = (* locate the line to dump VeriFast assumptions *)
+        Sys.command ("sed -n '/" ^ task.export_point ^ "/=' " ^
+                     task.filename ^ " > export_lino.int ")
+      in
+      let export_lino = String.strip (In_channel.read_all "export_lino.int") in
+      let _ =
+        Sys.command ( "~/proj/verifast-1757/bin/verifast -c -I ../../nat " ^
+                      " -breakpoint " ^ export_lino ^
+                      " -breakpoint_context_file bcf.txt " ^
+                      task.filename )
+      in
+      let interesting = List.join (List.map task.exists_such
+                                     ~f:get_ids_from_tterm) in
+      let target_assumptions =
+        load_n_simplify_assumptions "bcf.txt" interesting in
+      printf "Given the following context:\n";
+      print_assumption_list target_assumptions;
+      printf "Checking compatibility of these assertions:\n";
+      print_assumption_list task.exists_such;
+      match can_be_congruent target_assumptions task.exists_such with
+      | Some assignments ->
+        printf "congruent: \n";
+        List.iter assignments ~f:(fun (var,value) ->
+            printf "%s := %s\n" var (render_term value))
+      | None -> printf "Not congruent\n")
+

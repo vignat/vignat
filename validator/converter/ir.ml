@@ -63,6 +63,7 @@ type call_result = {
   args_post_conditions:var_spec list;
   ret_val:tterm;
   post_statements:tterm list;
+  export_point:string option;
 } with sexp
 
 type hist_call = {
@@ -86,10 +87,9 @@ type ir = {
 } with sexp
 
 type task = {
-  path_constraints:tterm list;
   exists_such:tterm list;
-  assert_lino:int;
   filename:string;
+  export_point:string;
 } with sexp
 
 let strip_outside_parens str =
