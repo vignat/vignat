@@ -176,6 +176,13 @@ let find_congruent_assumption target heap =
         | _ -> None)
   | _ -> None
 
+let not_stronger op1 op2 =
+  if op1=op2 then true else
+    match op1,op2 with
+    | Le,Lt -> true
+    | Ge,Gt -> true
+    | _,_ -> false
+
 type assignment = (string*term)
 
 let is_congruent given test : assignment list option =
@@ -200,7 +207,7 @@ let is_congruent given test : assignment list option =
   | {v=Bop (op,{v=Id lhs;t=_},{v=Id rhs;t=_});t=_} ->
     List.find_map given ~f:(function
         | {v=Bop (aop,{v=Id alhs;t=_},{v=Id arhs;t=_});t=_}
-          when op = aop ->
+          when not_stronger op aop ->
           let lhs_unbound = String.Set.mem unbound_ids lhs in
           let rhs_unbound = String.Set.mem unbound_ids rhs in
           begin
@@ -222,6 +229,14 @@ let is_congruent given test : assignment list option =
                 None
           end
         | _ -> None)
+  | {v=Bop (op, {v;_}, {v=Id rhs;_});_} ->
+    if String.Set.mem unbound_ids rhs then Some []
+    else
+      List.find_map given ~f:(function
+          | {v=Bop (aop, {v=av;_}, {v=Id arhs;_});_}
+            when not_stronger op aop ->
+            if String.equal arhs rhs then Some [] else None
+          | _ -> None)
   | _ -> None
 
 let can_be_congruent given test_set =
@@ -235,7 +250,7 @@ let can_be_congruent given test_set =
       | ([],hd::tl) -> (hd,tl)
       | ([],[]) -> ({v=Bool true;t=Boolean},[])
     in
-    printf "testing %s \n" (render_tterm next_test);
+    printf "checking %s\n" (render_tterm next_test);
     match next_test with
     | {v=Bool true;t=_} -> Some []
     | _ ->
@@ -258,6 +273,7 @@ let can_be_congruent given test_set =
 let () =
   let tasks = List.t_of_sexp Ir.task_of_sexp (Sexp.load_sexp "./tasks.sexp") in
   List.iter tasks ~f:(fun task ->
+      printf "running compatibility check for %s\n" task.export_point;
       let _ = (* locate the line to dump VeriFast assumptions *)
         Sys.command ("sed -n '/" ^ task.export_point ^ "/=' " ^
                      task.filename ^ " > export_lino.int ")

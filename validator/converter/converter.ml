@@ -283,6 +283,9 @@ let rec get_sexp_value exp t =
   match exp with
   | Sexp.Atom v ->
     begin
+      let t = match t with Unknown|Sunknown|Uunknown ->
+        guess_type exp |_->t
+      in
       match t with
       | Sint32 -> {v=Int (get_sint_in_bounds v);t}
       | Boolean ->
@@ -588,11 +591,7 @@ let render_fcall_preamble context =
   (String.concat ~sep:"\n" context.post_lemmas) ^ "\n"
 
 let render_post_sttmts ~is_assert {args_post_conditions;
-                                   ret_val=_;post_statements;
-                                   export_point} =
-  (match export_point with
-   | Some name -> "int " ^ name ^ ";\n"
-   | None -> "") ^
+                                   ret_val=_;post_statements} =
   (String.concat ~sep:"\n" (List.map args_post_conditions
                               ~f:(fun {name;value} ->
                                   render_eq_sttmt ~is_assert
@@ -655,8 +654,12 @@ let render_2tip_post_assertions res1 res2 ret_name =
     (render_post_sttmts ~is_assert:true res2) ^ "\n" ^
     (render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val) ^ "}\n"
 
-let render_tip_fun_calls {context;results} =
+let render_export_point name =
+  "int " ^ name ^ ";\n"
+
+let render_tip_fun_calls {context;results} export_point =
   (render_fcall_preamble context) ^
+  (render_export_point export_point) ^
   (match results with
    | result :: [] ->
      (render_post_sttmts ~is_assert:true result) ^ "\n" ^
@@ -688,8 +691,7 @@ let extract_hist_call_context call rname_gen =
   let args_post_conditions = compose_args_post_conditions call in
   {context=extract_common_call_context call ret_name args;
    result={args_post_conditions;ret_val=get_ret_val call;
-           post_statements=[];
-           export_point=None}}
+           post_statements=[]}}
 
 let tip_calls_context calls rname_gen =
   let call = List.hd_exn calls in
@@ -697,13 +699,11 @@ let tip_calls_context calls rname_gen =
     else Some rname_gen#generate in
   let args = extract_fun_args call in
   let context = extract_common_call_context call ret_name args in
-  let export_pt_gen = name_gen "export_point" in
   let results = List.map calls ~f:(fun call ->
       let args_post_conditions = compose_args_post_conditions call in
       {args_post_conditions;
        ret_val=get_ret_val call;
-       post_statements=(extract_tip_ret_post_conditions call);
-       export_point=Some export_pt_gen#generate})
+       post_statements=(extract_tip_ret_post_conditions call);})
   in
   {context;results}
 
@@ -790,6 +790,7 @@ let build_ir fin =
                  "void to_verify()\
                   /*@ requires true; @*/ \
                   /*@ ensures true; @*/\n{\n" in
+  let export_point = "export_point" in
   let free_vars = (get_vars pref (name_gen "arg")) in
   let (hist_calls,tip_call) = extract_calls_info pref in
   let leaks = extract_leaks pref in
@@ -798,29 +799,28 @@ let build_ir fin =
   let context_assumptions = collect_context pref in
   let arguments = !allocated_args in
   {preamble;free_vars;arguments;tmps;
-   cmplxs;context_assumptions;hist_calls;tip_call;leaks}
+   cmplxs;context_assumptions;hist_calls;tip_call;
+   leaks;export_point}
 
 let prepare_tasks ir =
-  match ir.tip_call.results with
-  | result :: [] ->
-    begin
-      match ir.tip_call.context.ret_name with
-      | Some ret_name ->
-        let export_point = Option.value_exn result.export_point in
-        [{(*path_constraints=ir.context_assumptions;*)
-         exists_such=
-           {v=Bop (Eq,{v=Id ret_name;t=ir.tip_call.context.ret_type},
-                   result.ret_val);t=Boolean} ::
-           (List.map result.args_post_conditions
-              ~f:(fun spec -> {v=Bop (Eq,{v=Id spec.name;t=Unknown},
-                                      spec.value);
-                               t=Boolean})) @
-           result.post_statements;
-         export_point=export_point;
-         filename="aaa.c"}]
-      | None -> failwith "not supported"
-    end
-  | _ -> failwith "not supported"
+  List.map ir.tip_call.results ~f:(fun result ->
+      let exists_such =
+        (List.map result.args_post_conditions
+           ~f:(fun spec -> {v=Bop (Eq,{v=Id spec.name;t=Unknown},
+                                   spec.value);
+                            t=Boolean})) @
+        result.post_statements
+      in
+      let exists_such =
+        match ir.tip_call.context.ret_name with
+        | Some ret_name ->
+          {v=Bop (Eq,{v=Id ret_name;t=ir.tip_call.context.ret_type},
+                  result.ret_val);t=Boolean} :: exists_such
+        | None -> exists_such
+      in
+      {exists_such;
+       filename="aaa.c";
+       export_point=ir.export_point})
 
 let convert_prefix fin cout =
   let ir = build_ir fin in
@@ -832,7 +832,7 @@ let convert_prefix fin cout =
   Out_channel.output_string cout (render_tmps ir.tmps);
   Out_channel.output_string cout (render_args_assignments ir.arguments);
   Out_channel.output_string cout (render_hist_calls ir.hist_calls);
-  Out_channel.output_string cout (render_tip_fun_calls ir.tip_call);
+  Out_channel.output_string cout (render_tip_fun_calls ir.tip_call ir.export_point);
   Out_channel.output_string cout (render_leaks ir.leaks);
   Out_channel.output_string cout "}\n";
   Out_channel.with_file "tasks.sexp" ~f:(fun fout ->

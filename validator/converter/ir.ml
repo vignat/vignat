@@ -63,7 +63,6 @@ type call_result = {
   args_post_conditions:var_spec list;
   ret_val:tterm;
   post_statements:tterm list;
-  export_point:string option;
 } with sexp
 
 type hist_call = {
@@ -84,6 +83,7 @@ type ir = {
   hist_calls:hist_call list;
   tip_call:tip_call;
   leaks:string list;
+  export_point:string;
 } with sexp
 
 type task = {
