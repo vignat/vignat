@@ -160,6 +160,11 @@ let load_n_simplify_assumptions fname importants =
   let assumptions = simplify assumptions important_ids in
   take_relevant assumptions importants
 
+let get_all_ids assumptions =
+  (List.map assumptions ~f:get_ids_from_tterm) |>
+  List.join |>
+  String.Set.of_list
+
 let find_congruent_assumption target heap =
   match target with (*TODO: differentiate known/unknown ids*)
   | Bop (op,{v=Id lhs;t=_},{v=Id rhs;t=_}) ->
@@ -170,6 +175,85 @@ let find_congruent_assumption target heap =
                 {v=(Bop (Eq,{v=Id rhs;t=t2},{v=Id arhs;t=t2}));t=Boolean}]
         | _ -> None)
   | _ -> None
+
+type assignment = (string*term)
+
+let is_congruent given test : assignment list option =
+  let given_ids = get_all_ids given in
+  let unbound_ids =
+    String.Set.diff (String.Set.of_list (get_ids_from_tterm test))
+      given_ids
+  in
+  match test with
+  | {v=Bop (Eq,{v=Id lhs;t=_},{v=Id rhs;t=_})} ->
+    let lhs_unbound = String.Set.mem unbound_ids lhs in
+    let rhs_unbound = String.Set.mem unbound_ids rhs in
+    begin
+      match lhs_unbound,rhs_unbound with
+      | true,true -> Some [lhs,Id rhs]
+      | true,false -> Some [lhs,Id rhs]
+      | false,true -> Some [rhs,Id lhs]
+      | false,false -> if String.equal lhs rhs then Some []
+        else if tterms_contain_term given test.v then Some []
+        else None
+    end
+  | {v=Bop (op,{v=Id lhs;t=_},{v=Id rhs;t=_});t=_} ->
+    List.find_map given ~f:(function
+        | {v=Bop (aop,{v=Id alhs;t=_},{v=Id arhs;t=_});t=_}
+          when op = aop ->
+          let lhs_unbound = String.Set.mem unbound_ids lhs in
+          let rhs_unbound = String.Set.mem unbound_ids rhs in
+          begin
+            match lhs_unbound,rhs_unbound with
+            | true,true -> Some [lhs,Id alhs;rhs,Id arhs]
+            | true,false ->
+              if String.equal rhs arhs then
+                Some [lhs,Id alhs]
+              else
+                None
+            | false,true ->
+              if String.equal lhs alhs then
+                Some [rhs,Id arhs]
+              else
+                None
+            | false,false -> if String.equal lhs alhs && String.equal rhs arhs then
+                Some []
+              else
+                None
+          end
+        | _ -> None)
+  | _ -> None
+
+let can_be_congruent given test_set =
+  let rec impl given test_set : assignment list option =
+    let (next_test,rest) =
+      let given_ids = get_all_ids given in
+      match List.partition_tf test_set ~f:(fun ass ->
+          List.exists (get_ids_from_tterm ass) ~f:(String.Set.mem given_ids))
+      with
+      | (ass::tl,rest) -> (ass,tl@rest)
+      | ([],hd::tl) -> (hd,tl)
+      | ([],[]) -> ({v=Bool true;t=Boolean},[])
+    in
+    printf "testing %s \n" (render_tterm next_test);
+    match next_test with
+    | {v=Bool true;t=_} -> Some []
+    | _ ->
+      match is_congruent given next_test with
+      | Some assignments ->
+        let test_left =
+          List.map rest ~f:(fun assumption ->
+              List.fold assignments ~init:assumption ~f:(fun acc (name,term) ->
+                  replace_term_in_tterm (Id name) term acc))
+        in
+        begin
+          match impl (next_test::given) test_left with
+          | Some assigns -> Some (assigns@assignments)
+          | None -> None
+        end
+      | None -> None
+  in
+  impl given test_set
 
 let () =
   let task = Ir.task_of_sexp (Sexp.load_sexp "./tasks.sexp") in
@@ -186,9 +270,9 @@ let () =
   print_assumption_list task.path_constraints;
   print_assumption_list task.exists_such;
   print_assumption_list target_assumptions;
-  List.iter task.exists_such ~f:(fun ex ->
-      match find_congruent_assumption ex.v target_assumptions with
-      | Some assumptions ->
-        printf "%s has a congruent one: \n" (render_tterm ex);
-        print_assumption_list assumptions
-      | None -> printf "%s has no congruents\n" (render_tterm ex))
+  match can_be_congruent target_assumptions task.exists_such with
+  | Some assignments ->
+    printf "congruent: \n";
+    List.iter assignments ~f:(fun (var,value) ->
+        printf "%s := %s\n" var (render_term value))
+  | None -> printf "Not congruent\n"
