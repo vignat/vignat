@@ -70,7 +70,7 @@ let replace_with_equalities ass_list eqs keep_these =
 
 let print_assumption_list al =
   List.iter al ~f:(fun ass ->
-      printf "%s\n\n" (render_term ass.v))
+      printf "%s\n" (render_term ass.v))
 
 let get_ids_from_tterm tterm =
   let rec impl = function
@@ -156,9 +156,12 @@ let simplify ass_list keep_these =
 
 let load_n_simplify_assumptions fname importants =
   let important_ids = List.map importants ~f:(fun x -> Id x) in
-  let assumptions = parse_file fname in
-  let assumptions = simplify assumptions important_ids in
-  take_relevant assumptions importants
+  let assumptions_lists = parse_file fname in
+  let assumptions_lists = List.map assumptions_lists
+      ~f:(fun assumptions -> simplify assumptions important_ids)
+  in
+  List.map assumptions_lists
+    ~f:(fun assumptions -> take_relevant assumptions importants)
 
 let get_all_ids assumptions =
   (List.map assumptions ~f:get_ids_from_tterm) |>
@@ -235,9 +238,10 @@ let is_congruent given test : assignment list option =
       List.find_map given ~f:(function
           | {v=Bop (aop, {v=av;_}, {v=Id arhs;_});_}
             when not_stronger op aop ->
-            if String.equal arhs rhs then Some [] else None
+            if String.equal arhs rhs &&
+               term_eq v av then Some [] else None
           | _ -> None)
-  | _ -> None
+  | _ -> if List.exists given ~f:(fun ass -> term_eq test.v ass.v) then Some [] else None
 
 let can_be_congruent given test_set =
   let rec impl given test_set : assignment list option =
@@ -270,10 +274,19 @@ let can_be_congruent given test_set =
   in
   impl given test_set
 
+let canonicalize statements =
+  let canonicalize1 sttmt =
+    match sttmt with
+    | {v=Bop (Eq,{v=Bool false;_},rhs);t} ->
+      {v=Not rhs;t}
+    | _ -> sttmt
+  in
+  List.map statements ~f:canonicalize1
+
 let () =
   let tasks = List.t_of_sexp Ir.task_of_sexp (Sexp.load_sexp "./tasks.sexp") in
-  List.iter tasks ~f:(fun task ->
-      printf "running compatibility check for %s\n" task.export_point;
+  let compatible = List.for_all tasks ~f:(fun task ->
+      printf "running compatibility check\n";
       let _ = (* locate the line to dump VeriFast assumptions *)
         Sys.command ("sed -n '/" ^ task.export_point ^ "/=' " ^
                      task.filename ^ " > export_lino.int ")
@@ -281,22 +294,31 @@ let () =
       let export_lino = String.strip (In_channel.read_all "export_lino.int") in
       let _ =
         Sys.command ( "~/proj/verifast-1757/bin/verifast -c -I ../../nat " ^
-                      " -breakpoint " ^ export_lino ^
-                      " -breakpoint_context_file bcf.txt " ^
+                      " -exportpoint " ^ export_lino ^
+                      " -context_export_file bcf.txt " ^
                       task.filename )
       in
       let interesting = List.join (List.map task.exists_such
                                      ~f:get_ids_from_tterm) in
-      let target_assumptions =
+      let target_executions =
         load_n_simplify_assumptions "bcf.txt" interesting in
-      printf "Given the following context:\n";
-      print_assumption_list target_assumptions;
+      let exists_such = canonicalize task.exists_such in
       printf "Checking compatibility of these assertions:\n";
-      print_assumption_list task.exists_such;
-      match can_be_congruent target_assumptions task.exists_such with
-      | Some assignments ->
-        printf "congruent: \n";
-        List.iter assignments ~f:(fun (var,value) ->
-            printf "%s := %s\n" var (render_term value))
-      | None -> printf "Not congruent\n")
+      print_assumption_list exists_such;
+      List.exists target_executions ~f:(fun target_assumptions ->
+          printf "Given the following context:\n";
+          print_assumption_list target_assumptions;
+          match can_be_congruent target_assumptions exists_such with
+          | Some assignments ->
+            printf "congruent: \n";
+            List.iter assignments ~f:(fun (var,value) ->
+                printf "%s := %s\n" var (render_term value));
+            true
+          | None -> printf "Not congruent\n";
+            false))
+  in
+  if compatible then
+      printf "All statements are compatible.\n"
+  else
+    printf "Some statements can not be proven compatible.\n";
 

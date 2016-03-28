@@ -8,18 +8,27 @@ open Ir
 %token COMMA
 %token LPAREN
 %token RPAREN
+%token EXEC
+%token LCBR
+%token RCBR
 %token BANG
 %token <Ir.bop> BOP
 %token EOF
 
 %right BOP BANG
 
-%start <Ir.tterm list> assumption_list
+%start <(Ir.tterm list) list> execution_list
 
 %%
 
-assumption_list:
+execution_list:
   | EOF { [] }
+  | EXEC; LCBR; al = assumption_list; RCBR;
+    lst = execution_list
+        { al::lst }
+
+assumption_list:
+  | LPAREN; a = term; RPAREN; { [{v=a;t=Ir.Boolean}] }
   | LPAREN; a = term; RPAREN; lst = assumption_list
         { {v=a;t=Ir.Boolean}::lst }
   ;

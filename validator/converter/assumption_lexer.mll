@@ -23,6 +23,9 @@ rule read =
        | "true"  {BOOL true}
        | "false" {BOOL false}
        | id      {ID (Lexing.lexeme lexbuf)}
+       | "--[another execution]--" {EXEC}
+       | '{'     {LCBR}
+       | '}'     {RCBR}
        | ','     {COMMA}
        | '('     {LPAREN}
        | ')'     {RPAREN}

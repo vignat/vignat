@@ -386,6 +386,9 @@ let fun_types =
                             assert double_chainp(?cur_chain, _, " ^
                            (List.nth_exn args 0) ^
                            ");\n\
+                           length_nonnegative(\
+                            dchain_get_expired_indexes_fp(cur_chain, " ^
+                           (List.nth_exn args 2) ^ "));\n\
                             if (length(dchain_get_expired_indexes_fp(cur_chain, " ^
                            (List.nth_exn args 2) ^
                            ")) > 0 ) {\n\

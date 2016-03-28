@@ -7,7 +7,7 @@ let print_position outx lexbuf =
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol + 1)
 
 let parse_with_error lexbuf =
-  try Assumption_parser.assumption_list Assumption_lexer.read lexbuf with
+  try Assumption_parser.execution_list Assumption_lexer.read lexbuf with
   | Assumption_lexer.SyntaxError msg ->
     fprintf stderr "%a:%s" print_position lexbuf msg;
     []
