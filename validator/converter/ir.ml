@@ -10,6 +10,7 @@ type bop = Eq | Le | Lt | Ge | Gt
 
 type ttype = | Ptr of ttype
              | Sint32
+             | Sint8
              | Uint32
              | Uint16
              | Uint8
@@ -42,7 +43,7 @@ with sexp
 
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
-  | Sint32 -> "int" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
+  | Sint32 -> "int" | Sint8 -> "char" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
   | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
   | Ctm name -> name | Fptr name -> name ^ "*" | Boolean -> "bool" | Unknown -> "???"
   | Sunknown -> "s??" | Uunknown -> "u??"

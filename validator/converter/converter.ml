@@ -10,6 +10,7 @@ let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 
 let infer_signed_type w =
   if String.equal w "w32" then Sint32
+  else if String.equal w "w8" then Sint8
   else failwith (w ^ " signed is not supported")
 
 let infer_unsigned_type w =
@@ -159,6 +160,11 @@ let update_var_spec (spec:var_spec) v =
   {name = spec.name;
    value = {v=v_final; t=t_final};}
 
+let failback_type t1 t2 =
+  match t1 with
+  | Unknown -> t2
+  | _ -> t1
+
 let rec get_var_decls_of_sexp exp t known_vars =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
@@ -171,15 +177,11 @@ let rec get_var_decls_of_sexp exp t known_vars =
     match exp with
     | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
       when (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
-      let ty = determine_type (infer_type_class f) w in
+      let ty = failback_type (determine_type (infer_type_class f) w) t in
       (List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars)))
     | Sexp.List (Sexp.Atom f :: tl) ->
-      let ty = match (infer_type_class f) with
-        | Unknown -> begin match guess_type_l tl with
-            | Unknown -> t
-            | ty -> ty
-          end
-        | tc -> tc
+      let ty = failback_type (infer_type_class f)
+          (failback_type (guess_type_l tl) t)
       in
       List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars))
     | _ -> []

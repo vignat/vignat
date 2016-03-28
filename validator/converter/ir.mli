@@ -6,6 +6,7 @@ val sexp_of_bop : bop -> Sexp.t
 type ttype =
     Ptr of ttype
   | Sint32
+  | Sint8
   | Uint32
   | Uint16
   | Uint8

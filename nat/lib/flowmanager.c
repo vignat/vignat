@@ -57,7 +57,7 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value) {
 #endif//0 -- inessential for crash freedom part.
     ( 0 <= flow->int_device_id) &
           (flow->int_device_id < RTE_MAX_ETHPORTS) &
-    ( 0 <= flow->ext_device_id) &
+    ( 0 <= flow->ext_device_id) & //FIXME: Klee translates this to signed variable
           (flow->ext_device_id < RTE_MAX_ETHPORTS) &
     ( ext_key->ext_src_port == starting_port + index) &
     ( flow->ext_src_port == starting_port + index ) &
