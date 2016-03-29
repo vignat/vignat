@@ -429,50 +429,10 @@ let get_vars tpref arg_name_gen =
                     ~f:get_vars) in
   tip_vars
 
-let rec render_assignment var =
-  match var.value.v with
-  | Struct (_, fvals) ->
-    (*TODO: make sure that the var_value.t is also Str .*)
-    String.concat ~sep:"\n"
-      (List.map fvals
-         ~f:(fun {name;value} -> render_assignment
-                {name=(var.name ^ "." ^ name);value} ^ ";"))
-  | Undef -> ""
-  | _ -> var.name ^ " = " ^ (render_tterm var.value)
-
-let render_vars_declarations ( vars : var_spec list ) =
-  String.concat ~sep:"\n"
-    (List.map vars ~f:(fun v ->
-         match v.value.t with
-         | Unknown | Sunknown | Uunknown ->
-           "//" ^ ttype_to_str v.value.t ^ " " ^ v.name ^ ";"
-         | _ ->
-           ttype_to_str v.value.t ^ " " ^ v.name ^ ";")) ^ "\n"
-
-let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
-  let head = (if is_assert then "assert" else "assume") in
-  match out_val.v with
-  | Struct (_, fields) ->
-    (*TODO: check that the types of Str (_,fts)
-      are the same as in fields*)
-    String.concat (List.map fields ~f:(fun {name;value} ->
-      render_eq_sttmt ~is_assert (out_arg ^ "." ^ name) value))
-  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
-         (render_tterm out_val) ^ ");\n"
-
-let render_fun_call_preamble call args =
-  let pre_lemmas =
-    match String.Map.find Fs.fun_types call.fun_name with
-    | Some t -> (String.concat ~sep:"\n"
-                   (List.map t.Fs.lemmas_before ~f:(fun l -> l args)))
-    | None -> failwith "" in
-  pre_lemmas ^ "\n"
-
 let compose_fcall_preamble call args =
   match String.Map.find Fs.fun_types call.fun_name with
   | Some t -> (List.map t.Fs.lemmas_before ~f:(fun l -> l args))
   | None -> failwith ("function not found " ^ call.fun_name)
-
 
 let extract_fun_args call =
   List.mapi call.args
@@ -530,6 +490,144 @@ let compose_post_lemmas call ret_name args =
   | Some t -> List.map t.Fs.lemmas_after ~f:(fun l -> l ret_name args)
   | None -> failwith ("unknown function " ^ call.fun_name)
 
+let compose_args_post_conditions call =
+  List.filter_map call.args ~f:(fun arg ->
+      match arg.pointee with
+      | Some ptee -> assert arg.is_ptr;
+        begin
+          match ptee.after with
+          | Some v -> assert (not ptee.is_fun_ptr);
+            let out_arg =
+              let key =Sexp.to_string arg.value.full in
+              match String.Map.find !allocated_args key with
+              | Some out_arg -> out_arg
+              | None -> failwith ("unknown argument " ^ key)
+            in
+            Some {name=out_arg.name;
+                  value=(get_struct_val_value v out_arg.value.t)}
+          | None -> assert ptee.is_fun_ptr;
+            None
+        end
+      | None -> assert (not arg.is_ptr);
+        None)
+
+let extract_tip_ret_post_conditions call =
+  List.map call.ret_context ~f:(fun sttmt ->
+      get_sexp_value sttmt Boolean)
+
+let get_ret_val call =
+  match call.ret with
+  | Some ret ->
+    let t = get_fun_ret_type call.fun_name in
+    get_struct_val_value ret.value t
+  | None -> {v=Undef;t=Unknown}
+
+let extract_common_call_context call (ret_name:string option) args =
+  let ret_type = get_fun_ret_type call.fun_name in
+  let arg_names = List.map args ~f:render_tterm in
+  let pre_lemmas = compose_fcall_preamble call arg_names in
+  let application = Apply (call.fun_name,args) in
+  let post_lemmas = compose_post_lemmas call ret_name arg_names in
+  {pre_lemmas;application;post_lemmas;ret_name;ret_type}
+
+let extract_hist_call_context call rname_gen =
+  let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
+    else Some rname_gen#generate in
+  let args = extract_fun_args call in
+  let args_post_conditions = compose_args_post_conditions call in
+  {context=extract_common_call_context call ret_name args;
+   result={args_post_conditions;ret_val=get_ret_val call;
+           post_statements=[]}}
+
+let tip_calls_context calls rname_gen =
+  let call = List.hd_exn calls in
+  let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
+    else Some rname_gen#generate in
+  let args = extract_fun_args call in
+  let context = extract_common_call_context call ret_name args in
+  let results = List.map calls ~f:(fun call ->
+      let args_post_conditions = compose_args_post_conditions call in
+      {args_post_conditions;
+       ret_val=get_ret_val call;
+       post_statements=(extract_tip_ret_post_conditions call);})
+  in
+  {context;results}
+
+let extract_calls_info tpref =
+  let rez_gen = name_gen "rez" in
+  let hist_funs =
+    (List.map tpref.history ~f:(fun call ->
+         extract_hist_call_context call rez_gen))
+  in
+  let tip_calls = tip_calls_context tpref.tip_calls rez_gen in
+  hist_funs, tip_calls
+
+let collect_context pref =
+  let collect_ctxt_list l = List.map l ~f:(fun e ->
+      (get_sexp_value e Boolean))
+  in
+  (List.join (List.map pref.history ~f:(fun call ->
+      (collect_ctxt_list call.call_context) @
+      (collect_ctxt_list call.ret_context)))) @
+  (match pref.tip_calls with
+   | hd :: _ -> (collect_ctxt_list hd.call_context)
+   | [] -> failwith "Must have at least one tip call.")
+
+let extract_leaks ccontexts =
+  let leak_map =
+    List.fold ccontexts ~init:String.Map.empty ~f:(fun acc {ret_name;application;_} ->
+        match application with
+        | Apply (fname,args) ->
+          let args = List.map args ~f:render_tterm in
+          let spec = String.Map.find_exn Fs.fun_types fname in
+          let ret_name = match ret_name with Some name -> name | None -> "" in
+          List.fold spec.Fs.leaks ~init:acc ~f:(fun acc l ->
+              l ret_name args acc)
+        | _ -> failwith "call context application must be Apply")
+  in
+  String.Map.data leak_map
+
+let rec get_relevant_segment pref =
+  match List.findi pref.history ~f:(fun _ call ->
+      String.equal call.fun_name "loop_invariant_consume") with
+  | Some (pos,_) ->
+    let tail_len = (List.length pref.history) - pos - 1 in
+    get_relevant_segment
+      {history = List.sub pref.history ~pos:(pos + 1) ~len:tail_len;
+       tip_calls = pref.tip_calls;}
+  | None -> pref
+
+let build_ir fin =
+  let pref = get_relevant_segment
+      (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
+  let preamble = preamble ^
+                 "void to_verify()\
+                  /*@ requires true; @*/ \
+                  /*@ ensures true; @*/\n{\n" in
+  let export_point = "export_point" in
+  let free_vars = (get_vars pref (name_gen "arg")) in
+  let (hist_calls,tip_call) = extract_calls_info pref in
+  let leaks = extract_leaks
+      ((List.map hist_calls ~f:(fun hc -> hc.context))@[tip_call.context]) in
+  let cmplxs = !allocated_complex_vals in
+  let tmps = !allocated_tmp_vals in
+  let context_assumptions = collect_context pref in
+  let arguments = !allocated_args in
+  {preamble;free_vars;arguments;tmps;
+   cmplxs;context_assumptions;hist_calls;tip_call;
+   leaks;export_point}
+
+let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
+  let head = (if is_assert then "assert" else "assume") in
+  match out_val.v with
+  | Struct (_, fields) ->
+    (*TODO: check that the types of Str (_,fts)
+      are the same as in fields*)
+    String.concat (List.map fields ~f:(fun {name;value} ->
+      render_eq_sttmt ~is_assert (out_arg ^ "." ^ name) value))
+  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
+         (render_tterm out_val) ^ ");\n"
+
 let render_post_statements call ~is_tip =
   let sttmts = List.map call.args ~f:(fun arg ->
       if arg.is_ptr then
@@ -557,31 +655,6 @@ let render_post_statements call ~is_tip =
      else
        "") in
   (String.concat sttmts) ^ ret_post_asserts
-
-let compose_args_post_conditions call =
-  List.filter_map call.args ~f:(fun arg ->
-      match arg.pointee with
-      | Some ptee -> assert arg.is_ptr;
-        begin
-          match ptee.after with
-          | Some v -> assert (not ptee.is_fun_ptr);
-            let out_arg =
-              let key =Sexp.to_string arg.value.full in
-              match String.Map.find !allocated_args key with
-              | Some out_arg -> out_arg
-              | None -> failwith ("unknown argument " ^ key)
-            in
-            Some {name=out_arg.name;
-                  value=(get_struct_val_value v out_arg.value.t)}
-          | None -> assert ptee.is_fun_ptr;
-            None
-        end
-      | None -> assert (not arg.is_ptr);
-        None)
-
-let extract_tip_ret_post_conditions call =
-  List.map call.ret_context ~f:(fun sttmt ->
-      get_sexp_value sttmt Boolean)
 
 let render_fcall_preamble context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
@@ -671,55 +744,37 @@ let render_tip_fun_calls {context;results} export_point =
    | [] -> failwith "must be at least one tip call"
    | _ -> failwith "more than two outcomes are not supported.") ^ "\n"
 
-let get_ret_val call =
-  match call.ret with
-  | Some ret ->
-    let t = get_fun_ret_type call.fun_name in
-    get_struct_val_value ret.value t
-  | None -> {v=Undef;t=Unknown}
 
-let extract_common_call_context call (ret_name:string option) args =
-  let ret_type = get_fun_ret_type call.fun_name in
-  let arg_names = List.map args ~f:render_tterm in
-  let pre_lemmas = compose_fcall_preamble call arg_names in
-  let application = Apply (call.fun_name,args) in
-  let post_lemmas = compose_post_lemmas call ret_name arg_names in
-  {pre_lemmas;application;post_lemmas;ret_name;ret_type}
+let rec render_assignment var =
+  match var.value.v with
+  | Struct (_, fvals) ->
+    (*TODO: make sure that the var_value.t is also Str .*)
+    String.concat ~sep:"\n"
+      (List.map fvals
+         ~f:(fun {name;value} -> render_assignment
+                {name=(var.name ^ "." ^ name);value} ^ ";"))
+  | Undef -> ""
+  | _ -> var.name ^ " = " ^ (render_tterm var.value)
 
-let extract_hist_call_context call rname_gen =
-  let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
-    else Some rname_gen#generate in
-  let args = extract_fun_args call in
-  let args_post_conditions = compose_args_post_conditions call in
-  {context=extract_common_call_context call ret_name args;
-   result={args_post_conditions;ret_val=get_ret_val call;
-           post_statements=[]}}
+let render_vars_declarations ( vars : var_spec list ) =
+  String.concat ~sep:"\n"
+    (List.map vars ~f:(fun v ->
+         match v.value.t with
+         | Unknown | Sunknown | Uunknown ->
+           "//" ^ ttype_to_str v.value.t ^ " " ^ v.name ^ ";"
+         | _ ->
+           ttype_to_str v.value.t ^ " " ^ v.name ^ ";")) ^ "\n"
 
-let tip_calls_context calls rname_gen =
-  let call = List.hd_exn calls in
-  let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
-    else Some rname_gen#generate in
-  let args = extract_fun_args call in
-  let context = extract_common_call_context call ret_name args in
-  let results = List.map calls ~f:(fun call ->
-      let args_post_conditions = compose_args_post_conditions call in
-      {args_post_conditions;
-       ret_val=get_ret_val call;
-       post_statements=(extract_tip_ret_post_conditions call);})
-  in
-  {context;results}
+let render_fun_call_preamble call args =
+  let pre_lemmas =
+    match String.Map.find Fs.fun_types call.fun_name with
+    | Some t -> (String.concat ~sep:"\n"
+                   (List.map t.Fs.lemmas_before ~f:(fun l -> l args)))
+    | None -> failwith "" in
+  pre_lemmas ^ "\n"
 
 let render_hist_calls hist_funs =
   String.concat ~sep:"\n" (List.map hist_funs ~f:render_hist_fun_call)
-
-let extract_calls_info tpref =
-  let rez_gen = name_gen "rez" in
-  let hist_funs =
-    (List.map tpref.history ~f:(fun call ->
-         extract_hist_call_context call rez_gen))
-  in
-  let tip_calls = tip_calls_context tpref.tip_calls rez_gen in
-  hist_funs, tip_calls
 
 let render_cmplexes cmplxes =
   String.concat ~sep:"\n" (List.map (String.Map.data cmplxes) ~f:(fun var ->
@@ -734,47 +789,12 @@ let render_tmps tmps =
           ttype_to_str tmp.value.t ^ " " ^ tmp.name ^ " = " ^
           render_tterm tmp.value ^ ";")) ^ "\n"
 
-let collect_context pref =
-  let collect_ctxt_list l = List.map l ~f:(fun e ->
-      (get_sexp_value e Boolean))
-  in
-  (List.join (List.map pref.history ~f:(fun call ->
-      (collect_ctxt_list call.call_context) @
-      (collect_ctxt_list call.ret_context)))) @
-  (match pref.tip_calls with
-   | hd :: _ -> (collect_ctxt_list hd.call_context)
-   | [] -> failwith "Must have at least one tip call.")
-
 let render_context_assumptions assumptions  =
   String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
     "//@ assume(" ^ (render_tterm t) ^ ");")) ^ "\n"
 
-let rec get_relevant_segment pref =
-  match List.findi pref.history ~f:(fun _ call ->
-      String.equal call.fun_name "loop_invariant_consume") with
-  | Some (pos,_) ->
-    let tail_len = (List.length pref.history) - pos - 1 in
-    get_relevant_segment
-      {history = List.sub pref.history ~pos:(pos + 1) ~len:tail_len;
-       tip_calls = pref.tip_calls;}
-  | None -> pref
-
 let render_leaks leaks =
   String.concat ~sep:"\n" leaks ^ "\n"
-
-let extract_leaks ccontexts =
-  let leak_map =
-    List.fold ccontexts ~init:String.Map.empty ~f:(fun acc {ret_name;application;_} ->
-        match application with
-        | Apply (fname,args) ->
-          let args = List.map args ~f:render_tterm in
-          let spec = String.Map.find_exn Fs.fun_types fname in
-          let ret_name = match ret_name with Some name -> name | None -> "" in
-          List.fold spec.Fs.leaks ~init:acc ~f:(fun acc l ->
-              l ret_name args acc)
-        | _ -> failwith "call context application must be Apply")
-  in
-  String.Map.data leak_map
 
 let render_allocated_args args =
   String.concat ~sep:"\n"
@@ -791,26 +811,6 @@ let render_args_assignments args =
   String.concat ~sep:"\n"
     (List.map (String.Map.data args) ~f:(fun arg ->
        render_assignment arg ^ ";"))
-
-let build_ir fin =
-  let pref = get_relevant_segment
-      (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
-  let preamble = preamble ^
-                 "void to_verify()\
-                  /*@ requires true; @*/ \
-                  /*@ ensures true; @*/\n{\n" in
-  let export_point = "export_point" in
-  let free_vars = (get_vars pref (name_gen "arg")) in
-  let (hist_calls,tip_call) = extract_calls_info pref in
-  let leaks = extract_leaks
-      ((List.map hist_calls ~f:(fun hc -> hc.context))@[tip_call.context]) in
-  let cmplxs = !allocated_complex_vals in
-  let tmps = !allocated_tmp_vals in
-  let context_assumptions = collect_context pref in
-  let arguments = !allocated_args in
-  {preamble;free_vars;arguments;tmps;
-   cmplxs;context_assumptions;hist_calls;tip_call;
-   leaks;export_point}
 
 let prepare_tasks ir =
   List.map ir.tip_call.results ~f:(fun result ->
