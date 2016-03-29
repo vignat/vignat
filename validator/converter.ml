@@ -772,7 +772,7 @@ let extract_leaks ccontexts =
           let ret_name = match ret_name with Some name -> name | None -> "" in
           List.fold spec.Fs.leaks ~init:acc ~f:(fun acc l ->
               l ret_name args acc)
-        | _ -> failwith "call context applicatio must be Apply")
+        | _ -> failwith "call context application must be Apply")
   in
   String.Map.data leak_map
 
