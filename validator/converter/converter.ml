@@ -762,12 +762,19 @@ let rec get_relevant_segment pref =
 let render_leaks leaks =
   String.concat ~sep:"\n" leaks ^ "\n"
 
-let extract_leaks pref =
-  List.join
-    (List.map ((List.hd_exn pref.tip_calls)::pref.history) ~f:(fun call ->
-         match String.Map.find Fs.fun_types call.fun_name with
-         | Some t -> t.Fs.leaks
-         | None -> failwith ("unknown function " ^ call.fun_name)))
+let extract_leaks ccontexts =
+  let leak_map =
+    List.fold ccontexts ~init:String.Map.empty ~f:(fun acc {ret_name;application;_} ->
+        match application with
+        | Apply (fname,args) ->
+          let args = List.map args ~f:render_tterm in
+          let spec = String.Map.find_exn Fs.fun_types fname in
+          let ret_name = match ret_name with Some name -> name | None -> "" in
+          List.fold spec.Fs.leaks ~init:acc ~f:(fun acc l ->
+              l ret_name args acc)
+        | _ -> failwith "call context applicatio must be Apply")
+  in
+  String.Map.data leak_map
 
 let render_allocated_args args =
   String.concat ~sep:"\n"
@@ -795,7 +802,8 @@ let build_ir fin =
   let export_point = "export_point" in
   let free_vars = (get_vars pref (name_gen "arg")) in
   let (hist_calls,tip_call) = extract_calls_info pref in
-  let leaks = extract_leaks pref in
+  let leaks = extract_leaks
+      ((List.map hist_calls ~f:(fun hc -> hc.context))@[tip_call.context]) in
   let cmplxs = !allocated_complex_vals in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in

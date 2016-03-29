@@ -3,9 +3,22 @@ open Ir
 
 type lemma = (string -> string list -> string)
 type blemma = (string list -> string)
+type leak_updater = (string -> string list ->
+                     string String.Map.t -> string String.Map.t)
 
 let tx_l str = (fun _ _ -> "/*@ " ^ str ^ " @*/" )
 let tx_bl str = (fun _ -> "/*@ " ^ str ^ " @*/" )
+
+
+let leak str ?(id=str) = (fun _ _ leaks ->
+    String.Map.add leaks ~key:id ~data:("/*@ leak " ^ str ^ ";@*/"))
+
+let on_rez_nz_leak str ?(id=str) = (fun rez_var _ leaks ->
+    String.Map.add leaks ~key:id ~data:("/*@ if(" ^ rez_var ^
+                                        "!=0) leak " ^ str ^ ";@*/"))
+
+let remove_leak id = (fun _ _ leaks ->
+    String.Map.remove leaks id)
 
 let on_rez_nonzero str = (fun rez_var _ ->
     "/*@ if(" ^ rez_var ^ "!=0) " ^ str ^ "@*/")
@@ -26,7 +39,7 @@ let gen_get_fp map_name =
 
 type fun_spec = {ret_type: ttype; arg_types: ttype list;
                  lemmas_before: blemma list; lemmas_after: lemma list;
-                 leaks: string list;}
+                 leaks: leak_updater list;}
 
 let dmap_struct = Str ( "DoubleMap", [] )
 let dchain_struct = Str ( "DoubleChain", [] )
@@ -65,7 +78,7 @@ let fun_types =
                     arg_types = [];
                     lemmas_before = [];
                     lemmas_after = [];
-                    leaks = ["//@ leak last_time(_);"];};
+                    leaks = [leak "last_time(_)" ~id:"last_time"];};
      "dmap_allocate", {ret_type = Sint32;
                        arg_types =
                          [Sint32;Sint32;Ptr (Ctm "map_keys_equality");
@@ -91,7 +104,8 @@ let fun_types =
                          tx_bl "close pred_arg4(nat_flow_p);"];
                        lemmas_after = [];
                        leaks = [
-                         "//@ leak dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_);";];};
+                         on_rez_nz_leak "dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_)"
+                           ~id:"dmappingp";];};
      "dmap_set_entry_condition", {ret_type = Void;
                                   arg_types = [Ptr (Ctm "entry_condition")];
                                   lemmas_before = [];
@@ -102,7 +116,8 @@ let fun_types =
                          lemmas_before = [];
                          lemmas_after = [];
                          leaks = [
-                         "//@ leak double_chainp(_,_,_);";];};
+                           on_rez_nz_leak "double_chainp(_,_,_)"
+                             ~id:"double_chainp";];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct)];
@@ -114,7 +129,10 @@ let fun_types =
                                      List.nth_exn args 0 ^ ", *" ^
                                      List.nth_exn args 1 ^ "); @*/")];
                                 lemmas_after = [];
-                                leaks = [];};
+                                leaks = [
+                                  remove_leak "dmappingp";
+                                  remove_leak "double_chainp";
+                                  remove_leak "last_time";];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct)];
@@ -123,10 +141,12 @@ let fun_types =
                                   tx_l "open evproc_loop_invariant(?mp, ?chp);";
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);"];
                                 leaks = [
-                                  "//@ leak last_time(_);";
-                                  "//@ leak dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_);";
-                                  "//@ leak double_chainp(_,_,_);";
-                                  "//@ leak dmap_dchain_coherent(_,_);"];};
+                                  leak "last_time(_)" ~id:"last_time";
+                                  leak "dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_)"
+                                    ~id:"dmappingp";
+                                  leak "double_chainp(_,_,_)"
+                                    ~id:"double_chainp";
+                                  leak "dmap_dchain_coherent(_,_)"];};
      "loop_enumeration_begin", {ret_type = Void;
                                 arg_types = [Sint32];
                                 lemmas_before = [];
@@ -175,6 +195,7 @@ let fun_types =
                          last_index_key := Ext;
                          last_indexing_succ_ret_var := ret_var;
                          "");
+                      on_rez_nonzero "open nat_flow_p(_,_,_,_);";
                     ];
                     leaks = [];};
      "dmap_get_a", {ret_type = Sint32;
@@ -340,7 +361,7 @@ let fun_types =
                         }@*/");
                   ];
                   leaks = [
-                    "//@ leak nat_flow_p(_,_,_,_);"];};
+                    leak "nat_flow_p(_,_,_,_)"];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         lemmas_before = [];
@@ -362,8 +383,7 @@ let fun_types =
                              ", _);\n\
                               @*/")];
                         leaks = [
-                          "//@ leak flw_p(_,_);";
-                          "//@ leak nat_flow_p(_,_,_,_);"];};
+                          leak "flw_p(_,_)";];};
      "expire_items", {ret_type = Sint32;
                       arg_types = [Ptr dchain_struct;
                                    Ptr dmap_struct;
