@@ -136,7 +136,11 @@ int dmap_get_a/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, vp, rp, cap, map) &*&
             kp1(key, k1) &*&
             (dmap_has_k1_fp(m, k1) ?
-             (result == 1 &*& *index |-> dmap_get_k1_fp(m, k1)) :
+             (result == 1 &*&
+              *index |-> ?ind &*&
+              ind == dmap_get_k1_fp(m, k1) &*&
+              rp(k1, dmap_get_k2_by_idx_fp(m,ind),
+                 dmap_get_val_fp(m,ind), ind)) :
              (result == 0 &*& *index |-> i)); @*/
 int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?vp, ?rp, ?cap, map) &*&
@@ -145,7 +149,11 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index);
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, vp, rp, cap, map) &*&
             kp2(key, k2) &*&
             (dmap_has_k2_fp(m, k2) ?
-             (result == 1 &*& *index |-> dmap_get_k2_fp(m, k2)) :
+             (result == 1 &*&
+              *index |-> ?ind &*&
+              ind == dmap_get_k2_fp(m, k2) &*&
+              rp(dmap_get_k1_by_idx_fp(m,ind),
+                 k2, dmap_get_val_fp(m, ind), ind)) :
              (result == 0 &*& *index |-> i)); @*/
 int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?vp, ?rp, ?cap, map) &*&
@@ -164,11 +172,7 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index, void* val
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?vp, ?rp, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true; @*/ //Should also require memory access here
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, vp, rp, cap, map) &*&
-            vp(value_out, dmap_get_val_fp(m, index)) &*&
-            rp(dmap_get_k1_by_idx_fp(m, index),
-               dmap_get_k2_by_idx_fp(m, index),
-               dmap_get_val_fp(m, index),
-               index); @*/
+            vp(value_out, dmap_get_val_fp(m, index)); @*/
 
 int dmap_erase(struct DoubleMap* map, int index);
 //^^^ never called, no contract for you.

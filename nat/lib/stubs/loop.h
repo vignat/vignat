@@ -5,6 +5,9 @@
 #include "lib/containers/double-map.h"
 #include "lib/flow.h"
 
+// TODO: this is taken from rte_stubs.h. Make sure they are always equivalent (haha)
+#define RTE_MAX_ETHPORTS (1024)
+
 //@ #include "lib/predicates.gh"
 
 /*@
@@ -22,7 +25,8 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp) =
           double_chainp(?ch, ?index_range, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
           last_time(?t) &*&
-          index_range == capacity;
+          index_range == capacity &*&
+          capacity == RTE_MAX_ETHPORTS;
 
 lemma void coherent_dmap_used_dchain_allocated(dmap<int_k,ext_k,flw> m, dchain ch, int idx);
 requires dmap_dchain_coherent(m, ch) &*& dmap_index_used_fp(m, idx) == true;
