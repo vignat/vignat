@@ -1,5 +1,4 @@
 open Core.Std
-open Parser_util
 open Ir
 
 let rec term_depth = function
@@ -154,15 +153,6 @@ let simplify ass_list keep_these =
   let ass_list = (get_meaningful_equalities eqs) @ ass_list in
   remove_trues ass_list
 
-let load_n_simplify_assumptions fname importants =
-  let important_ids = List.map importants ~f:(fun x -> Id x) in
-  let assumptions_lists = parse_file fname in
-  let assumptions_lists = List.map assumptions_lists
-      ~f:(fun assumptions -> simplify assumptions important_ids)
-  in
-  List.map assumptions_lists
-    ~f:(fun assumptions -> take_relevant assumptions importants)
-
 let get_all_ids assumptions =
   (List.map assumptions ~f:get_ids_from_tterm) |>
   List.join |>
@@ -283,42 +273,7 @@ let canonicalize statements =
   in
   List.map statements ~f:canonicalize1
 
-let () =
-  let tasks = List.t_of_sexp Ir.task_of_sexp (Sexp.load_sexp "./tasks.sexp") in
-  let compatible = List.for_all tasks ~f:(fun task ->
-      printf "running compatibility check\n";
-      let _ = (* locate the line to dump VeriFast assumptions *)
-        Sys.command ("sed -n '/" ^ task.export_point ^ "/=' " ^
-                     task.filename ^ " > export_lino.int ")
-      in
-      let export_lino = String.strip (In_channel.read_all "export_lino.int") in
-      let _ =
-        Sys.command ( "~/proj/verifast-1757/bin/verifast -c -I ../../nat " ^
-                      " -exportpoint " ^ export_lino ^
-                      " -context_export_file bcf.txt " ^
-                      task.filename )
-      in
-      let interesting = List.join (List.map task.exists_such
-                                     ~f:get_ids_from_tterm) in
-      let target_executions =
-        load_n_simplify_assumptions "bcf.txt" interesting in
-      let exists_such = canonicalize task.exists_such in
-      printf "Checking compatibility of these assertions:\n";
-      print_assumption_list exists_such;
-      List.exists target_executions ~f:(fun target_assumptions ->
-          printf "Given the following context:\n";
-          print_assumption_list target_assumptions;
-          match can_be_congruent target_assumptions exists_such with
-          | Some assignments ->
-            printf "congruent: \n";
-            List.iter assignments ~f:(fun (var,value) ->
-                printf "%s := %s\n" var (render_term value));
-            true
-          | None -> printf "Not congruent\n";
-            false))
-  in
-  if compatible then
-      printf "All statements are compatible.\n"
-  else
-    printf "Some statements can not be proven compatible.\n";
+let induce_symbolic_assignments ir assumptions =
+  ignore assumptions;
+  ir
 

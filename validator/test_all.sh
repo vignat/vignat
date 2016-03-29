@@ -10,10 +10,10 @@ NOPROVE=0
 SYNTAX=0
 PARSER=0
 TYPE=0
-corebuild converter.byte
+corebuild -use-menhir validator.byte
 for f in $KLEE_OUT_DIR/call-pre*.txt; do
     echo file: $f
-    ./converter.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE | tee report.txt
+    ./validator.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE | tee report.txt
     if grep -q "0 errors found" report.txt; then
         SUCC=$((SUCC+1))
     fi
