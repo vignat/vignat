@@ -107,8 +107,26 @@ let render_2tip_post_assertions res1 res2 ret_name =
 let render_export_point name =
   "int " ^ name ^ ";\n"
 
-let render_tip_fun_calls {context;results} export_point =
+let rec render_assignment var =
+  match var.value.v with
+  | Struct (_, fvals) ->
+    (*TODO: make sure that the var_value.t is also Str .*)
+    String.concat ~sep:"\n"
+      (List.map fvals
+         ~f:(fun {name;value} ->
+             render_assignment {name=(var.name ^ "." ^ name);value} ^ ";"))
+  | Undef -> ""
+  | _ -> var.name ^ " = " ^ (render_tterm var.value)
+
+let render_assignments args =
+  String.concat ~sep:"\n"
+    (List.map (String.Map.data args) ~f:(fun arg ->
+       render_assignment arg ^ ";"))
+
+let render_tip_fun_call {context;results} export_point free_vars =
   (render_fcall_preamble context) ^
+  "//The legibility of these assignments is ensured by analysis.ml\n" ^
+  (render_assignments free_vars) ^ "\n" ^
   (render_export_point export_point) ^
   (match results with
    | result :: [] ->
@@ -119,17 +137,6 @@ let render_tip_fun_calls {context;results} export_point =
    | [] -> failwith "must be at least one tip call"
    | _ -> failwith "more than two outcomes are not supported.") ^ "\n"
 
-
-let rec render_assignment var =
-  match var.value.v with
-  | Struct (_, fvals) ->
-    (*TODO: make sure that the var_value.t is also Str .*)
-    String.concat ~sep:"\n"
-      (List.map fvals
-         ~f:(fun {name;value} -> render_assignment
-                {name=(var.name ^ "." ^ name);value} ^ ";"))
-  | Undef -> ""
-  | _ -> var.name ^ " = " ^ (render_tterm var.value)
 
 let render_vars_declarations ( vars : var_spec list ) =
   String.concat ~sep:"\n"
@@ -169,11 +176,6 @@ let render_allocated_args args =
        ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
                        (spec.name) ^ ";")) ^ "\n"
 
-let render_args_assignments args =
-  String.concat ~sep:"\n"
-    (List.map (String.Map.data args) ~f:(fun arg ->
-       render_assignment arg ^ ";"))
-
 let render_ir ir fout =
   Out_channel.with_file fout ~f:(fun cout ->
       Out_channel.output_string cout ir.preamble;
@@ -184,9 +186,10 @@ let render_ir ir fout =
       Out_channel.output_string cout (render_context_assumptions
                                         ir.context_assumptions);
       Out_channel.output_string cout (render_tmps ir.tmps);
-      Out_channel.output_string cout (render_args_assignments ir.arguments);
+      Out_channel.output_string cout (render_assignments ir.arguments);
       Out_channel.output_string cout (render_hist_calls ir.hist_calls);
-      Out_channel.output_string cout (render_tip_fun_calls
-                                        ir.tip_call ir.export_point);
+      Out_channel.output_string cout (render_tip_fun_call
+                                        ir.tip_call ir.export_point
+                                        ir.free_vars);
       Out_channel.output_string cout (render_leaks ir.leaks);
       Out_channel.output_string cout "}\n")

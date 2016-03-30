@@ -95,45 +95,34 @@ let get_ids_from_tterm tterm =
 let index_assumptions (ass_list:tterm list) =
   List.fold ass_list ~init:String.Map.empty ~f:(fun acc ass ->
       let ids = get_ids_from_tterm ass in
+      let ass_with_ids = (ass,ids) in
       List.fold ids ~init:acc ~f:(fun acc id ->
           String.Map.add acc ~key:id
             ~data:(match String.Map.find acc id with
-                | Some ass_list -> ass::ass_list
-                | None -> [ass])))
+                | Some ass_list -> ass_with_ids::ass_list
+                | None -> [ass_with_ids])))
 
 let take_relevant (ass_list:tterm list) interesting_ids =
   let map = index_assumptions ass_list in
-  if not (List.exists interesting_ids ~f:(String.Map.mem map)) then
-    failwith ((String.concat interesting_ids) ^ " is never mentioned in this assumption list")
-  else
-    let retreive_relevant_terms id =
-      match String.Map.find map id with
-      | Some l -> l
-      | None -> []
+  let interesting_ids = String.Set.of_list interesting_ids in
+  let rec take_relevant_impl interesting_ids processed =
+    let relevant_asses =
+      List.join (List.map (String.Set.to_list interesting_ids) ~f:(fun id ->
+        match String.Map.find map id with
+        | Some asses_list -> asses_list
+        | None -> []))
     in
-    let rec take_relevant id processed =
-      if String.Set.mem processed id then ([],processed)
-      else
-        let processed = String.Set.add processed id in
-        let rele_terms = retreive_relevant_terms id in
-        let rele_ids =
-          List.dedup ~compare:String.compare
-            (List.join (List.map rele_terms ~f:get_ids_from_tterm))
-        in
-        let (deep_terms, procd) =
-          List.fold rele_ids ~init:([],processed)
-            ~f:(fun (acc,procd) id ->
-                let (terms,procd) = take_relevant id procd in
-                (terms@acc,procd))
-        in
-        (rele_terms@deep_terms, procd)
+    let new_ids = String.Set.diff
+        (String.Set.of_list (List.join (List.map relevant_asses ~f:(fun (_,ids) -> ids))))
+        processed
     in
-    let take_relevant_list ids =
-      fst (List.fold ids ~init:([],String.Set.empty) ~f:(fun (terms,procd) id ->
-          let (id_terms,procd) = take_relevant id procd in
-          (id_terms @ terms,procd)))
-    in
-    List.dedup (take_relevant_list interesting_ids)
+    let relevant_asses = (List.map relevant_asses ~f:(fun (ass,_) -> ass)) in
+    if (String.Set.is_empty new_ids) then relevant_asses
+    else
+      (take_relevant_impl new_ids (String.Set.union interesting_ids processed))@
+      relevant_asses
+  in
+  List.dedup (take_relevant_impl interesting_ids String.Set.empty)
 
 let simplify ass_list keep_these =
   let remove_double_negation a =
@@ -273,7 +262,69 @@ let canonicalize statements =
   in
   List.map statements ~f:canonicalize1
 
-let induce_symbolic_assignments ir assumptions =
-  ignore assumptions;
-  ir
+let prepare_assertions tip_res tip_ret_name tip_ret_type =
+  let exists_such =
+    (List.map tip_res.args_post_conditions
+       ~f:(fun spec -> {v=Bop (Eq,{v=Id spec.name;t=Unknown},
+                               spec.value);
+                        t=Boolean})) @
+    tip_res.post_statements
+  in
+  match tip_ret_name with
+  | Some ret_name ->
+    {v=Bop (Eq,{v=Id ret_name;t=tip_ret_type},
+            tip_res.ret_val);t=Boolean} :: exists_such
+  | None -> exists_such
+
+let apply_assignments assignments ir =
+  {ir with
+   free_vars = List.fold assignments ~init:ir.free_vars
+       ~f:(fun acc (name,value) ->
+           let prev = String.Map.find_exn acc name in
+           String.Map.add acc ~key:name
+             ~data:{name;value={t=prev.value.t;v=value}})}
+
+let apply_assignments_to_statements assignments statements =
+  List.fold assignments ~init:statements
+    ~f:(fun acc (name,value) ->
+        replace_term_in_tterms (Id name) value acc)
+
+let find_assignments assumptions assertions vars =
+  List.join (List.map vars ~f:(fun var ->
+      let assumptions = take_relevant assumptions [var] in
+      let assertions = take_relevant assertions [var] in
+      if List.is_empty assumptions then
+        match assertions with
+        | {v=Bop (Eq, {v=Id lhs;_}, rhs);_}::_
+          when lhs = var ->
+          [(var,rhs.v)]
+        | {v=Bop (Eq, lhs, {v=Id rhs;_});_}::_
+          when rhs = var ->
+          [(var,lhs.v)]
+        | _ -> []
+      else
+        []
+    ))
+
+let induce_symbolic_assignments ir executions =
+  let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
+  let free_vars = List.map fr_var_names ~f:(fun name -> Id name) in
+  let assignments = List.fold ir.tip_call.results ~init:[] ~f:(fun acc res ->
+      let assertions = prepare_assertions res
+          ir.tip_call.context.ret_name
+          ir.tip_call.context.ret_type
+      in
+      let assertions = take_relevant assertions fr_var_names in
+      let assertions = apply_assignments_to_statements acc assertions in
+      List.fold executions ~init:acc ~f:(fun acc assumptions ->
+          let vars = String.Set.to_list
+              (String.Set.diff (String.Set.of_list fr_var_names)
+                 (String.Set.of_list (List.map acc ~f:fst)))
+          in
+          let assumptions = take_relevant assumptions vars in
+          let assumptions = apply_assignments_to_statements acc assumptions in
+          let assumptions = simplify assumptions free_vars in
+          (find_assignments assumptions assertions vars)@acc))
+  in
+  apply_assignments assignments ir
 
