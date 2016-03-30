@@ -35,7 +35,7 @@ let validate_prefix fin fout =
       Render.render_ir ir fout;
       match Verifier.verify_file fout with
       | Verifier.Valid -> printf "Valid.\n"
-      | Verifier.Invalid cause -> printf "Cannot validate: %s\n" cause
+      | Verifier.Invalid cause -> printf "Failed: %s\n" cause
     end
 
 let () =

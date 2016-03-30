@@ -13,30 +13,35 @@ TYPE=0
 corebuild -use-menhir validator.byte
 for f in $KLEE_OUT_DIR/call-pre*.txt; do
     echo file: $f
-    ./validator.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE | tee report.txt
+    ./validator.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE > report.txt
     if grep -q "0 errors found" report.txt; then
         SUCC=$((SUCC+1))
-    fi
-    if grep -q "Assertion might not hold" report.txt; then
-        DIFFICULT=$((DIFFICULT+1))
-    fi
-    if grep -q "No matching heap chunks" report.txt; then
-        NOCHUNKS=$((NOCHUNKS+1))
-    fi
-    if grep -q "Function leaks heap chunks" report.txt; then
-        LEAKS=$((LEAKS+1))
-    fi
-    if grep -q "Cannot prove" report.txt; then
-        NOPROVE=$((NOPROVE+1))
-    fi
-    if grep -q "No such variable, constructor, regular function," report.txt; then
-        SYNTAX=$((SYNTAX+1))
-    fi
-    if grep -q "Parse error." report.txt; then
-        PARSER=$((PARSER+1))
-    fi
-    if grep -q "Type mismatch." report.txt; then
-        TYPE=$((TYPE+1))
+    else
+        if grep -q "Assertion might not hold" report.txt; then
+            DIFFICULT=$((DIFFICULT+1))
+        fi
+        if grep -q "No matching heap chunks" report.txt; then
+            NOCHUNKS=$((NOCHUNKS+1))
+        fi
+        if grep -q "Function leaks heap chunks" report.txt; then
+            LEAKS=$((LEAKS+1))
+        fi
+        if grep -q "Cannot prove" report.txt; then
+            NOPROVE=$((NOPROVE+1))
+        fi
+        if grep -q "No such variable, constructor, regular function," report.txt; then
+            SYNTAX=$((SYNTAX+1))
+        fi
+        if grep -q "Parse error." report.txt; then
+            PARSER=$((PARSER+1))
+        fi
+        if grep -q "Type mismatch." report.txt; then
+            TYPE=$((TYPE+1))
+        fi
+        cat report.txt
+        echo "To reproduce:\n"
+        echo "corebuild -use-menhir validator.byte && ./validator.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE"
+        echo ""
     fi
     TOT=$((TOT+1))
 done
