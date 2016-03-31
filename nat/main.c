@@ -69,6 +69,10 @@
 #  define LOG_ADD(...) printf(__VA_ARGS__)
 #endif //KLEE_VERIFICATION
 
+#ifdef KLEE_VERIFICATION
+uint32_t starting_time;
+#endif
+
 #define MAX_PKT_BURST     32
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 
@@ -442,7 +446,7 @@ main_loop(__attribute__((unused)) void *dummy)
     }
 
 #ifdef KLEE_VERIFICATION
-    loop_iteration_begin(get_dmap_pp(), get_dchain_pp());
+    loop_iteration_begin(get_dmap_pp(), get_dchain_pp(), starting_time);
 #else //KLEE_VERIFICATION
     while (1) 
 #endif //KLEE_VERIFICATION
@@ -516,7 +520,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #endif//KLEE_VERIFICATION
     }
 #ifdef KLEE_VERIFICATION
-    loop_iteration_end(get_dmap_pp(), get_dchain_pp());
+    loop_iteration_end(get_dmap_pp(), get_dchain_pp(), current_time());
 #endif//KLEE_VERIFICATION
     return 0;
 }
@@ -888,7 +892,7 @@ main(int argc, char **argv)
     nb_rx_queues = 0;
 
 #ifdef KLEE_VERIFICATION
-    start_time();
+    starting_time = start_time();
 #endif //KLEE_VERIFICATION
 
     /* initialize all ports */

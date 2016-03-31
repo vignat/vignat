@@ -5,9 +5,6 @@
 #include "lib/containers/double-map.h"
 #include "lib/flow.h"
 
-// TODO: this is taken from rte_stubs.h. Make sure they are always equivalent (haha)
-#define RTE_MAX_ETHPORTS (1024)
-
 //@ #include "lib/predicates.gh"
 
 /*@
@@ -19,14 +16,15 @@ fixpoint int dochain_index_range(dchain ch);
 predicate nat_flow_p(int_k ik, ext_k ek, flw fl, int index) =
    flow_p(fl, ik, ek) &*& ext_k_get_esp(ek) == 2747 + index;
 
-predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp) =
+predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
+                                uint32_t time) =
           dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, flw_p, nat_flow_p,
                                      ?capacity, mp) &*&
           double_chainp(?ch, ?index_range, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
-          last_time(?t) &*&
+          last_time(time) &*&
           index_range == capacity &*&
-          capacity == RTE_MAX_ETHPORTS;
+          capacity == MAX_FLOWS;
 
 lemma void coherent_dmap_used_dchain_allocated(dmap<int_k,ext_k,flw> m, dchain ch, int idx);
 requires dmap_dchain_coherent(m, ch) &*& dmap_index_used_fp(m, idx) == true;
@@ -60,17 +58,22 @@ ensures dmappingp<int_k,ext_k,flw>(m, a, b, c, d, cap, f) &*&
         dmap_size_fp(m) < cap;
 @*/
 
-void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch);
-//@ requires *m |-> ?mp &*& *ch |-> ?chp &*& evproc_loop_invariant(mp, chp);
+void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
+                            uint32_t time);
+//@ requires *m |-> ?mp &*& *ch |-> ?chp &*& evproc_loop_invariant(mp, chp, time);
 //@ ensures *m |-> mp &*& *ch |-> chp;
 
-void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch);
-//@ requires *m |-> ?mp &*& *ch |-> ?chp;
-//@ ensures *m |-> mp &*& *ch |-> chp &*& evproc_loop_invariant(mp, chp);
+void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
+                            uint32_t *time);
+//@ requires *m |-> ?mp &*& *ch |-> ?chp &*& *time |-> ?t;
+/*@ ensures *m |-> mp &*& *ch |-> chp &*& *time |-> t &*&
+            evproc_loop_invariant(mp, chp, t); @*/
 
-void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch);
+void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
+                          uint32_t time);
 
-void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch);
+void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
+                        uint32_t time);
 
 void loop_enumeration_begin(int cnt);
 //@ requires true;

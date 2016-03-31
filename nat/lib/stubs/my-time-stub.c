@@ -5,10 +5,11 @@
 uint32_t starting_time = 0;
 uint32_t last_time = 0;
 
-void start_time(void) {
+uint32_t start_time(void) {
     klee_trace_ret();
     starting_time = klee_int("starting_time");
     last_time = starting_time;
+    return last_time;
 }
 
 uint32_t current_time(void) {

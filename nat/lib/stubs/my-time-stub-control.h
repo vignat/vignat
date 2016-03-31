@@ -5,9 +5,9 @@
 
 //@ #include "lib/predicates.gh"
 
-void start_time(void);
+uint32_t start_time(void);
 //@ requires true;
-//@ ensures last_time(?t);
+//@ ensures last_time(result);
 
 uint32_t get_start_time(void);
 

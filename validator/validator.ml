@@ -34,7 +34,7 @@ let validate_prefix fin fout =
       let ir = Analysis.induce_symbolic_assignments ir vf_assumptions in
       Render.render_ir ir fout;
       match Verifier.verify_file fout with
-      | Verifier.Valid -> printf "Valid.\n"
+      | Verifier.Valid -> printf "\\/alid.\n"
       | Verifier.Invalid cause -> printf "Failed: %s\n" cause
     end
 

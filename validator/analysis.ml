@@ -69,7 +69,7 @@ let replace_with_equalities ass_list eqs keep_these =
 
 let print_assumption_list al =
   List.iter al ~f:(fun ass ->
-      printf "%s\n" (render_term ass.v))
+      printf "%s\n" (render_tterm ass))
 
 let get_ids_from_tterm tterm =
   let rec impl = function
@@ -117,12 +117,17 @@ let take_relevant (ass_list:tterm list) interesting_ids =
         processed
     in
     let relevant_asses = (List.map relevant_asses ~f:(fun (ass,_) -> ass)) in
-    if (String.Set.is_empty new_ids) then relevant_asses
+    if (String.Set.is_empty new_ids) then (relevant_asses,processed)
     else
-      (take_relevant_impl new_ids (String.Set.union interesting_ids processed))@
-      relevant_asses
+      let (relevant_sttmts,relevant_ids) =
+        take_relevant_impl new_ids (String.Set.union interesting_ids processed)
+      in
+      (relevant_sttmts@relevant_asses,relevant_ids)
   in
-  List.dedup (take_relevant_impl interesting_ids String.Set.empty)
+  let (relevant_sttmts,relevant_ids) =
+    take_relevant_impl interesting_ids String.Set.empty
+  in
+  (List.dedup relevant_sttmts,String.Set.to_list relevant_ids)
 
 let simplify ass_list keep_these =
   let remove_double_negation a =
@@ -258,6 +263,8 @@ let canonicalize statements =
     match sttmt with
     | {v=Bop (Eq,{v=Bool false;_},rhs);t} ->
       {v=Not rhs;t}
+    | {v=Bop (Ge,lhs,rhs);t} -> {v=Bop(Le,rhs,lhs);t}
+    | {v=Bop (Gt,lhs,rhs);t} -> {v=Bop(Lt,rhs,lhs);t}
     | _ -> sttmt
   in
   List.map statements ~f:canonicalize1
@@ -291,17 +298,26 @@ let apply_assignments_to_statements assignments statements =
 
 let find_assignments assumptions assertions vars =
   List.join (List.map vars ~f:(fun var ->
-      let assumptions = take_relevant assumptions [var] in
-      let assertions = take_relevant assertions [var] in
+      let (assertions,rel_ids) = take_relevant assertions [var] in
+      let (assumptions,_) = take_relevant assumptions rel_ids in
+      printf "searching for %s:{\n given:\n" var;
+      List.iter assumptions ~f:(fun x -> printf "%s\n" (render_tterm x));
+      printf "such that:\n";
+      List.iter assertions ~f:(fun x -> printf "%s\n" (render_tterm x));
+      printf "}\n";
       if List.is_empty assumptions then
-        match assertions with
-        | {v=Bop (Eq, {v=Id lhs;_}, rhs);_}::_
+        let opt_assignment =
+          List.find_map assertions ~f:(fun assertion ->
+        match assertion with
+        | {v=Bop (Eq, {v=Id lhs;_}, rhs);_}
           when lhs = var ->
-          [(var,rhs.v)]
-        | {v=Bop (Eq, lhs, {v=Id rhs;_});_}::_
+          Some (var,rhs.v)
+        | {v=Bop (Eq, lhs, {v=Id rhs;_});_}
           when rhs = var ->
-          [(var,lhs.v)]
-        | _ -> []
+          Some (var,lhs.v)
+        | _ -> None)
+        in
+        match opt_assignment with Some x -> [x] | None -> []
       else
         []
     ))
@@ -314,16 +330,16 @@ let induce_symbolic_assignments ir executions =
           ir.tip_call.context.ret_name
           ir.tip_call.context.ret_type
       in
-      let assertions = take_relevant assertions fr_var_names in
       let assertions = apply_assignments_to_statements acc assertions in
+      let assertions = canonicalize assertions in
       List.fold executions ~init:acc ~f:(fun acc assumptions ->
           let vars = String.Set.to_list
               (String.Set.diff (String.Set.of_list fr_var_names)
                  (String.Set.of_list (List.map acc ~f:fst)))
           in
-          let assumptions = take_relevant assumptions vars in
           let assumptions = apply_assignments_to_statements acc assumptions in
           let assumptions = simplify assumptions free_vars in
+          let assumptions = canonicalize assumptions in
           (find_assignments assumptions assertions vars)@acc))
   in
   apply_assignments assignments ir
