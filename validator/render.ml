@@ -87,7 +87,7 @@ let render_2tip_post_assertions res1 res2 ret_name =
               res2_assertions,res1_assertions
           in
           "if (" ^ (render_tterm sttmt) ^ ") {\n" ^
-          pos_sttmts ^ "} else {\n" ^
+          pos_sttmts ^ "\n} else {\n" ^
           neg_sttmts ^ "}\n"
         end
       | None -> failwith "Tip calls non-differentiated by ret, nor \
@@ -123,10 +123,18 @@ let render_assignments args =
     (List.map (String.Map.data args) ~f:(fun arg ->
        render_assignment arg ^ ";"))
 
+let render_equality_assumptions args =
+  String.concat ~sep:"\n"
+    (List.map (String.Map.data args) ~f:(fun arg ->
+         match arg.value.v with
+         | Undef -> ""
+         | _ -> "//@ assume(" ^ arg.name ^ " == "
+                ^ (render_tterm arg.value) ^ ");"))
+
 let render_tip_fun_call {context;results} export_point free_vars =
   (render_fcall_preamble context) ^
   "//The legibility of these assignments is ensured by analysis.ml\n" ^
-  (render_assignments free_vars) ^ "\n" ^
+  (render_equality_assumptions free_vars) ^ "\n" ^
   (render_export_point export_point) ^
   (match results with
    | result :: [] ->

@@ -1,6 +1,12 @@
 open Core.Std
 open Ir
 
+let log str =
+  if true then ()
+  else print_string str
+
+let lprintf fmt = ksprintf log fmt
+
 let rec term_depth = function
   | Bop (_,lhs,rhs) ->
     1 + max (term_depth lhs.v) (term_depth rhs.v)
@@ -23,6 +29,7 @@ let rec term_depth = function
     1 + term_depth tterm.v
   | Undef -> 0
 
+(*TODO: remove this as dead code*)
 let choose_simpler t1 t2 keep_these =
   let contain_any term =
     List.exists keep_these ~f:(fun k -> term_contains_term term k)
@@ -54,22 +61,25 @@ let get_meaningful_equalities eqs =
         end
       | _ -> failwith "only equalities here")
 
+let synonimize_term_in_tterms a b tterms =
+  List.fold tterms ~init:tterms ~f:(fun acc tterm ->
+      let acc =
+        if tterm_contains_term tterm a then
+          (replace_term_in_tterm a b tterm)::acc
+        else acc
+      in
+      if tterm_contains_term tterm b then
+        (replace_term_in_tterm b a tterm)::acc
+      else acc)
+
+
 let replace_with_equalities ass_list eqs keep_these =
   List.fold eqs ~init:ass_list
     ~f:(fun acc eq ->
          match eq.v with
          | Bop(Eq,lhs,rhs) ->
-           begin
-             match choose_simpler lhs.v rhs.v keep_these with
-             | Some (new_t,old_t) ->
-               replace_term_in_tterms old_t new_t acc
-             | None -> acc
-           end
+           synonimize_term_in_tterms lhs.v rhs.v acc
          | _ -> failwith "eqs must contain only equalities")
-
-let print_assumption_list al =
-  List.iter al ~f:(fun ass ->
-      printf "%s\n" (render_tterm ass))
 
 let get_ids_from_tterm tterm =
   let rec impl = function
@@ -238,7 +248,7 @@ let can_be_congruent given test_set =
       | ([],hd::tl) -> (hd,tl)
       | ([],[]) -> ({v=Bool true;t=Boolean},[])
     in
-    printf "checking %s\n" (render_tterm next_test);
+    lprintf "checking %s\n" (render_tterm next_test);
     match next_test with
     | {v=Bool true;t=_} -> Some []
     | _ ->
@@ -296,31 +306,29 @@ let apply_assignments_to_statements assignments statements =
     ~f:(fun acc (name,value) ->
         replace_term_in_tterms (Id name) value acc)
 
+let find_assignment assumptions assertions var =
+  lprintf "searching for %s:{\n given:\n" var;
+  List.iter assumptions ~f:(fun x -> lprintf "%s\n" (render_tterm x));
+  lprintf "such that:\n";
+  List.iter assertions ~f:(fun x -> lprintf "%s\n" (render_tterm x));
+  lprintf "}\n";
+  List.find_map assertions ~f:(fun assertion ->
+      match assertion with
+      | {v=Bop (Eq, {v=Id lhs;_}, rhs);_}
+        when lhs = var ->
+        Some (var,rhs.v)
+      | {v=Bop (Eq, lhs, {v=Id rhs;_});_}
+        when rhs = var ->
+        Some (var,lhs.v)
+      | _ -> None)
+
 let find_assignments assumptions assertions vars =
   List.join (List.map vars ~f:(fun var ->
       let (assertions,rel_ids) = take_relevant assertions [var] in
       let (assumptions,_) = take_relevant assumptions rel_ids in
-      printf "searching for %s:{\n given:\n" var;
-      List.iter assumptions ~f:(fun x -> printf "%s\n" (render_tterm x));
-      printf "such that:\n";
-      List.iter assertions ~f:(fun x -> printf "%s\n" (render_tterm x));
-      printf "}\n";
-      if List.is_empty assumptions then
-        let opt_assignment =
-          List.find_map assertions ~f:(fun assertion ->
-        match assertion with
-        | {v=Bop (Eq, {v=Id lhs;_}, rhs);_}
-          when lhs = var ->
-          Some (var,rhs.v)
-        | {v=Bop (Eq, lhs, {v=Id rhs;_});_}
-          when rhs = var ->
-          Some (var,lhs.v)
-        | _ -> None)
-        in
-        match opt_assignment with Some x -> [x] | None -> []
-      else
-        []
-    ))
+      match find_assignment assumptions assertions var with
+      | Some assignment -> [assignment]
+      | None -> []))
 
 let induce_symbolic_assignments ir executions =
   let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
@@ -342,5 +350,19 @@ let induce_symbolic_assignments ir executions =
           let assumptions = canonicalize assumptions in
           (find_assignments assumptions assertions vars)@acc))
   in
-  apply_assignments assignments ir
-
+  let justified_assignments = List.filter assignments ~f:(fun (var,value) ->
+      lprintf "justifying assignment %s = %s\n" var (render_term value);
+      let valid = List.for_all executions ~f:(fun assumptions ->
+          let (assumptions,_) = take_relevant assumptions [var] in
+          let assumptions = simplify assumptions [var] in
+          let assumptions = canonicalize assumptions in
+          let mod_assumptions = replace_term_in_tterms (Id var) value assumptions in
+          List.for_all mod_assumptions ~f:(fun mod_assumption ->
+              List.exists assumptions
+                ~f:(fun assumption ->
+                    term_eq assumption.v mod_assumption.v)))
+      in
+      lprintf "%s\n" (if valid then "justified" else "unjustified");
+      valid)
+  in
+  apply_assignments justified_assignments ir;
