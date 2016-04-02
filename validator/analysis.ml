@@ -7,42 +7,6 @@ let log str =
 
 let lprintf fmt = ksprintf log fmt
 
-let rec term_depth = function
-  | Bop (_,lhs,rhs) ->
-    1 + max (term_depth lhs.v) (term_depth rhs.v)
-  | Apply (_,args) ->
-    1 + List.fold args ~init:0
-      ~f:(fun acc arg -> max acc (term_depth arg.v))
-  | Id _ -> 1
-  | Struct (_,fields) ->
-    List.fold fields ~init:0 ~f:(fun acc field ->
-        max acc (term_depth field.value.v))
-  | Int _ -> 0
-  | Bool _ -> 0
-  | Not t -> 1 + term_depth t.v
-  | Str_idx (term,_) ->
-    1 + term_depth term.v
-  | Deref term -> 1 + term_depth term.v
-  | Fptr _ -> 0
-  | Addr tterm -> 1 + term_depth tterm.v
-  | Cast (_,tterm) ->
-    1 + term_depth tterm.v
-  | Undef -> 0
-
-(*TODO: remove this as dead code*)
-let choose_simpler t1 t2 keep_these =
-  let contain_any term =
-    List.exists keep_these ~f:(fun k -> term_contains_term term k)
-  in
-  match contain_any t1, contain_any t2 with
-  | true, true -> None
-  | true, false -> Some (t1,t2)
-  | false, true -> Some (t2,t1)
-  | false, false ->
-    if (term_depth t1) < (term_depth t2)
-    then Some (t1,t2)
-    else Some (t2,t1)
-
 let extract_equalities ass_list =
   List.partition_tf ass_list ~f:(function {v=Bop(Eq,_,_);t=_} -> true | _ -> false)
 
@@ -72,8 +36,7 @@ let synonimize_term_in_tterms a b tterms =
         (replace_term_in_tterm b a tterm)::acc
       else acc)
 
-
-let replace_with_equalities ass_list eqs keep_these =
+let synonimize_by_equalities ass_list eqs =
   List.fold eqs ~init:ass_list
     ~f:(fun acc eq ->
          match eq.v with
@@ -139,7 +102,7 @@ let take_relevant (ass_list:tterm list) interesting_ids =
   in
   (List.dedup relevant_sttmts,String.Set.to_list relevant_ids)
 
-let simplify ass_list keep_these =
+let simplify ass_list =
   let remove_double_negation a =
     a |> call_recursively_on_tterm (fun term ->
         match term with
@@ -153,25 +116,9 @@ let simplify ass_list keep_these =
   let (eqs,non_eq_assumptions) = (extract_equalities ass_list) in
   let eqs = remove_trivial_eqs eqs in
   let ass_list = non_eq_assumptions in
-  let ass_list = replace_with_equalities ass_list eqs keep_these in
+  let ass_list = synonimize_by_equalities ass_list eqs in
   let ass_list = (get_meaningful_equalities eqs) @ ass_list in
   remove_trues ass_list
-
-let get_all_ids assumptions =
-  (List.map assumptions ~f:get_ids_from_tterm) |>
-  List.join |>
-  String.Set.of_list
-
-let find_congruent_assumption target heap =
-  match target with (*TODO: differentiate known/unknown ids*)
-  | Bop (op,{v=Id lhs;t=_},{v=Id rhs;t=_}) ->
-    List.find_map heap ~f:(function
-        | {v=Bop (aop,{v=Id alhs;t=t1},{v=Id arhs;t=t2});t=_}
-          when op = aop ->
-          Some [{v=(Bop (Eq,{v=Id lhs;t=t1},{v=Id alhs;t=t1}));t=Boolean};
-                {v=(Bop (Eq,{v=Id rhs;t=t2},{v=Id arhs;t=t2}));t=Boolean}]
-        | _ -> None)
-  | _ -> None
 
 let not_stronger op1 op2 =
   if op1=op2 then true else
@@ -181,92 +128,6 @@ let not_stronger op1 op2 =
     | _,_ -> false
 
 type assignment = (string*term)
-
-let is_congruent given test : assignment list option =
-  let given_ids = get_all_ids given in
-  let unbound_ids =
-    String.Set.diff (String.Set.of_list (get_ids_from_tterm test))
-      given_ids
-  in
-  match test with
-  | {v=Bop (Eq,{v=Id lhs;t=_},{v=Id rhs;t=_});_} ->
-    let lhs_unbound = String.Set.mem unbound_ids lhs in
-    let rhs_unbound = String.Set.mem unbound_ids rhs in
-    begin
-      match lhs_unbound,rhs_unbound with
-      | true,true -> Some [lhs,Id rhs]
-      | true,false -> Some [lhs,Id rhs]
-      | false,true -> Some [rhs,Id lhs]
-      | false,false -> if String.equal lhs rhs then Some []
-        else if tterms_contain_term given test.v then Some []
-        else None
-    end
-  | {v=Bop (op,{v=Id lhs;t=_},{v=Id rhs;t=_});t=_} ->
-    List.find_map given ~f:(function
-        | {v=Bop (aop,{v=Id alhs;t=_},{v=Id arhs;t=_});t=_}
-          when not_stronger op aop ->
-          let lhs_unbound = String.Set.mem unbound_ids lhs in
-          let rhs_unbound = String.Set.mem unbound_ids rhs in
-          begin
-            match lhs_unbound,rhs_unbound with
-            | true,true -> Some [lhs,Id alhs;rhs,Id arhs]
-            | true,false ->
-              if String.equal rhs arhs then
-                Some [lhs,Id alhs]
-              else
-                None
-            | false,true ->
-              if String.equal lhs alhs then
-                Some [rhs,Id arhs]
-              else
-                None
-            | false,false -> if String.equal lhs alhs && String.equal rhs arhs then
-                Some []
-              else
-                None
-          end
-        | _ -> None)
-  | {v=Bop (op, {v;_}, {v=Id rhs;_});_} ->
-    if String.Set.mem unbound_ids rhs then Some []
-    else
-      List.find_map given ~f:(function
-          | {v=Bop (aop, {v=av;_}, {v=Id arhs;_});_}
-            when not_stronger op aop ->
-            if String.equal arhs rhs &&
-               term_eq v av then Some [] else None
-          | _ -> None)
-  | _ -> if List.exists given ~f:(fun ass -> term_eq test.v ass.v) then Some [] else None
-
-let can_be_congruent given test_set =
-  let rec impl given test_set : assignment list option =
-    let (next_test,rest) =
-      let given_ids = get_all_ids given in
-      match List.partition_tf test_set ~f:(fun ass ->
-          List.exists (get_ids_from_tterm ass) ~f:(String.Set.mem given_ids))
-      with
-      | (ass::tl,rest) -> (ass,tl@rest)
-      | ([],hd::tl) -> (hd,tl)
-      | ([],[]) -> ({v=Bool true;t=Boolean},[])
-    in
-    lprintf "checking %s\n" (render_tterm next_test);
-    match next_test with
-    | {v=Bool true;t=_} -> Some []
-    | _ ->
-      match is_congruent given next_test with
-      | Some assignments ->
-        let test_left =
-          List.map rest ~f:(fun assumption ->
-              List.fold assignments ~init:assumption ~f:(fun acc (name,term) ->
-                  replace_term_in_tterm (Id name) term acc))
-        in
-        begin
-          match impl (next_test::given) test_left with
-          | Some assigns -> Some (assigns@assignments)
-          | None -> None
-        end
-      | None -> None
-  in
-  impl given test_set
 
 let canonicalize statements =
   let canonicalize1 sttmt =
@@ -339,7 +200,7 @@ let is_assignment_justified var value executions =
   lprintf "justifying assignment %s = %s\n" var (render_term value);
   let valid = List.for_all executions ~f:(fun assumptions ->
       let (assumptions,_) = take_relevant assumptions [var] in
-      let assumptions = simplify assumptions [var] in
+      let assumptions = simplify assumptions in
       let assumptions = canonicalize assumptions in
       let mod_assumptions = replace_term_in_tterms (Id var) value assumptions in
       List.for_all mod_assumptions ~f:(fun mod_assumption ->
@@ -359,7 +220,6 @@ let expand_conjunctions sttmts =
 
 let induce_symbolic_assignments ir executions =
   let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
-  let free_vars = List.map fr_var_names ~f:(fun name -> Id name) in
   let assignments = List.fold ir.tip_call.results ~init:[] ~f:(fun acc res ->
       let assertions = prepare_assertions res
           ir.tip_call.context.ret_name
@@ -374,7 +234,7 @@ let induce_symbolic_assignments ir executions =
                  (String.Set.of_list (List.map acc ~f:fst)))
           in
           let assumptions = apply_assignments_to_statements acc assumptions in
-          let assumptions = simplify assumptions free_vars in
+          let assumptions = simplify assumptions in
           let assumptions = canonicalize assumptions in
           (find_assignments assumptions assertions vars)@acc))
   in
