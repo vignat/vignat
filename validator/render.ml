@@ -100,7 +100,7 @@ let render_2tip_post_assertions res1 res2 ret_name =
       | None -> failwith "this can't be true!"
     in
     "if (" ^ rname ^ " == " ^ (render_tterm res1.ret_val) ^ ") {\n" ^
-    (render_post_sttmts ~is_assert:true res1) ^ "} else {\n" ^
+    (render_post_sttmts ~is_assert:true res1) ^ "\n} else {\n" ^
     (render_post_sttmts ~is_assert:true res2) ^ "\n" ^
     (render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val) ^ "}\n"
 

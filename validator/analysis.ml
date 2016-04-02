@@ -320,6 +320,11 @@ let find_assignment assumptions assertions var =
       | {v=Bop (Eq, lhs, {v=Id rhs;_});_}
         when rhs = var ->
         Some (var,lhs.v)
+      | {v=Bop (Le, {v=Int lhs;_}, {v=Id rhs;_});_}
+        when rhs = var -> (* TODO: preoritize this assignments
+                             less than the above ones*)
+        lprintf "exploiting inequality: %d <= %s\n" lhs rhs;
+        Some (var,Int lhs)
       | _ -> None)
 
 let find_assignments assumptions assertions vars =
@@ -330,6 +335,28 @@ let find_assignments assumptions assertions vars =
       | Some assignment -> [assignment]
       | None -> []))
 
+let is_assignment_justified var value executions =
+  lprintf "justifying assignment %s = %s\n" var (render_term value);
+  let valid = List.for_all executions ~f:(fun assumptions ->
+      let (assumptions,_) = take_relevant assumptions [var] in
+      let assumptions = simplify assumptions [var] in
+      let assumptions = canonicalize assumptions in
+      let mod_assumptions = replace_term_in_tterms (Id var) value assumptions in
+      List.for_all mod_assumptions ~f:(fun mod_assumption ->
+          List.exists assumptions
+            ~f:(fun assumption ->
+                term_eq assumption.v mod_assumption.v)))
+  in
+  lprintf "%s\n" (if valid then "justified" else "unjustified");
+  valid
+
+let expand_conjunctions sttmts =
+  let rec expand_sttmt = function
+    | {v=Bop (And,lhs,rhs);_} -> (expand_sttmt lhs)@(expand_sttmt rhs)
+    | x -> [x]
+  in
+  List.join (List.map sttmts ~f:expand_sttmt)
+
 let induce_symbolic_assignments ir executions =
   let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
   let free_vars = List.map fr_var_names ~f:(fun name -> Id name) in
@@ -338,6 +365,7 @@ let induce_symbolic_assignments ir executions =
           ir.tip_call.context.ret_name
           ir.tip_call.context.ret_type
       in
+      let assertions = expand_conjunctions assertions in
       let assertions = apply_assignments_to_statements acc assertions in
       let assertions = canonicalize assertions in
       List.fold executions ~init:acc ~f:(fun acc assumptions ->
@@ -351,18 +379,6 @@ let induce_symbolic_assignments ir executions =
           (find_assignments assumptions assertions vars)@acc))
   in
   let justified_assignments = List.filter assignments ~f:(fun (var,value) ->
-      lprintf "justifying assignment %s = %s\n" var (render_term value);
-      let valid = List.for_all executions ~f:(fun assumptions ->
-          let (assumptions,_) = take_relevant assumptions [var] in
-          let assumptions = simplify assumptions [var] in
-          let assumptions = canonicalize assumptions in
-          let mod_assumptions = replace_term_in_tterms (Id var) value assumptions in
-          List.for_all mod_assumptions ~f:(fun mod_assumption ->
-              List.exists assumptions
-                ~f:(fun assumption ->
-                    term_eq assumption.v mod_assumption.v)))
-      in
-      lprintf "%s\n" (if valid then "justified" else "unjustified");
-      valid)
+      is_assignment_justified var value executions)
   in
   apply_assignments justified_assignments ir;

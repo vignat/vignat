@@ -198,7 +198,8 @@ let fun_types =
                          last_index_key := Ext;
                          last_indexing_succ_ret_var := ret_var;
                          "");
-                      on_rez_nonzero "open nat_flow_p(_,_,_,_);";
+                      on_rez_nonzero "{open nat_flow_p(_,_,_,_);\n\
+                                      open flow_p(_,_,_);}";
                     ];
                     leaks = [];};
      "dmap_get_a", {ret_type = Sint32;
@@ -239,6 +240,8 @@ let fun_types =
                          last_index_key := Sint32;
                          last_indexing_succ_ret_var := ret_var;
                          "");
+                      on_rez_nonzero "{open nat_flow_p(_,_,_,_);\n\
+                                      open flow_p(_,_,_);}";
                     ];
                     leaks = [];};
      "dmap_put", {ret_type = Sint32;
