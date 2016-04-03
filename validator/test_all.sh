@@ -49,7 +49,7 @@ validate_file() {
     SRC_FNAME="${UNIQUE_PREFIX}.c"
     VALID_RESULT="${UNIQUE_PREFIX}.validator_result"
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
-    CMD1="./validator.byte $FNAME $SRC_FNAME $UNIQUE_PREFIX"
+    CMD1="./validator.byte $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST"
     CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
     echo "$CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
     $CMD1 > $VALID_RESULT && $CMD2 > $VERIF_RESULT
@@ -65,8 +65,8 @@ command -v $VERIFAST >/dev/null 2>&1 ||
     { echo >&2 "I require custom VeriFast in the PATH.  Aborting."; exit 1; }
 
 corebuild -use-menhir validator.byte
-rm -rf $WORK_DIR
-mkdir $WORK_DIR
+mkdir -p $WORK_DIR
+rm -f $REPORT_FNAME
 
 FILES=$KLEE_OUT_DIR/call-pre*.txt
 
