@@ -1,5 +1,5 @@
 #!/bin/bash
-VERIFAST="verifast"
+if [ -z $VERIFAST ]; then VERIFAST="verifast"; fi
 KLEE_OUT_DIR=$1
 WORK_DIR=$2
 REPORT_FNAME="${WORK_DIR}/report.txt"
@@ -61,6 +61,8 @@ if [ -z "$WORK_DIR" ]; then
     echo "Please set working dir - the second param"
     exit 1;
 fi
+command -v $VERIFAST >/dev/null 2>&1 ||
+    { echo >&2 "I require custom VeriFast in the PATH.  Aborting."; exit 1; }
 
 corebuild -use-menhir validator.byte
 rm -rf $WORK_DIR
