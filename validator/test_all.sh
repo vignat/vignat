@@ -1,49 +1,104 @@
-VERIFAST="$HOME/Downloads/verifast-15.11/bin/verifast"
-TMP_FILE="aaa.c"
+#!/bin/bash
+VERIFAST="verifast"
 KLEE_OUT_DIR=$1
-SUCC=0
-TOT=0
-DIFFICULT=0
-NOCHUNKS=0
-LEAKS=0
-NOPROVE=0
-SYNTAX=0
-PARSER=0
-TYPE=0
-corebuild -use-menhir validator.byte
-for f in $KLEE_OUT_DIR/call-pre*.txt; do
-    echo file: $f
-    ./validator.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE > report.txt
-    if grep -q "0 errors found" report.txt; then
-        SUCC=$((SUCC+1))
-    else
-        if grep -q "Assertion might not hold" report.txt; then
-            DIFFICULT=$((DIFFICULT+1))
-        fi
-        if grep -q "No matching heap chunks" report.txt; then
-            NOCHUNKS=$((NOCHUNKS+1))
-        fi
-        if grep -q "Function leaks heap chunks" report.txt; then
-            LEAKS=$((LEAKS+1))
-        fi
-        if grep -q "Cannot prove" report.txt; then
-            NOPROVE=$((NOPROVE+1))
-        fi
-        if grep -q "No such variable, constructor, regular function," report.txt; then
-            SYNTAX=$((SYNTAX+1))
-        fi
-        if grep -q "Parse error." report.txt; then
-            PARSER=$((PARSER+1))
-        fi
-        if grep -q "Type mismatch." report.txt; then
-            TYPE=$((TYPE+1))
-        fi
-        cat report.txt
-        echo "To reproduce:\n"
-        echo "corebuild -use-menhir validator.byte && ./validator.byte $f $TMP_FILE && $VERIFAST -c -I ../nat $TMP_FILE"
-        echo ""
-    fi
-    TOT=$((TOT+1))
-done
+WORK_DIR=$2
+REPORT_FNAME="${WORK_DIR}/report.txt"
+SPEC_DIR="../nat"
 
-echo "total: $TOT success: $SUCC difficult: $DIFFICULT no chunks: $NOCHUNKS cannot prove: $NOPROVE leaks: $LEAKS syntax err: $SYNTAX type mismatch $TYPE parse errs: $PARSER"
+analyze_result() {
+    RESULT=$1
+    FNAME=$2
+    if grep -q "0 errors found" $RESULT; then
+        echo $FNAME success >> $REPORT_FNAME
+    else
+        if grep -q "Assertion might not hold" $RESULT; then
+            echo $FNAME assertion fail >> $REPORT_FNAME
+        fi
+        if grep -q "No matching heap chunks" $RESULT; then
+            echo $FNAME nochunks fail >> $REPORT_FNAME
+        fi
+        if grep -q "Function leaks heap chunks" $RESULT; then
+            echo $FNAME leak fail >> $REPORT_FNAME
+        fi
+        if grep -q "Cannot prove" $RESULT; then
+            echo $FNAME unproven fail >> $REPORT_FNAME
+        fi
+        if grep -q "No such variable, constructor, regular function," $RESULT; then
+            echo $FNAME syntax fail >> $REPORT_FNAME
+        fi
+        if grep -q "Parse error." $RESULT; then
+            echo $FNAME parser fail >> $REPORT_FNAME
+        fi
+        if grep -q "Type mismatch." $RESULT; then
+            echo $FNAME type fail >> $REPORT_FNAME
+        fi
+        cat $RESULT
+    fi
+}
+
+show_result(){
+    FNAME=$1
+    RESULT=$2
+    PROCESSED=$(cat $REPORT_FNAME | wc -l)
+    echo "[${PROCESSED}/${TOT_FILES}] $FNAME : $(cat $VALID_RESULT)"
+}
+
+validate_file() {
+    FNAME=$1
+    UNIQUE_PREFIX="${WORK_DIR}/$(echo $FNAME | egrep -o '[[:digit:]]{6}' | head -n1)"
+    SRC_FNAME="${UNIQUE_PREFIX}.c"
+    VALID_RESULT="${UNIQUE_PREFIX}.validator_result"
+    VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
+    CMD1="./validator.byte $FNAME $SRC_FNAME $UNIQUE_PREFIX"
+    CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
+    echo "$CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
+    $CMD1 > $VALID_RESULT && $CMD2 > $VERIF_RESULT
+    analyze_result $VERIF_RESULT $FNAME
+    show_result $FNAME $(cat $VALID_RESULT)
+}
+
+if [ -z "$WORK_DIR" ]; then
+    echo "Please set working dir - the second param"
+    exit 1;
+fi
+
+corebuild -use-menhir validator.byte
+rm -rf $WORK_DIR
+mkdir $WORK_DIR
+
+FILES=$KLEE_OUT_DIR/call-pre*.txt
+
+TOT_FILES=$(ls -l $FILES | wc -l)
+
+export -f validate_file
+export -f analyze_result
+export -f show_result
+
+export WORK_DIR
+export REPORT_FNAME
+export VERIFAST
+export TOT_FILES
+export SPEC_DIR
+
+parallel validate_file ::: $KLEE_OUT_DIR/call-pre*.txt
+
+TOT=$(cat $REPORT_FNAME | wc -l)
+SUCC=$(grep -c "success" $REPORT_FNAME)
+ASSERT=$(grep -c "assertion fail" $REPORT_FNAME)
+NOCHUNKS=$(grep -c "nochunks fail" $REPORT_FNAME)
+LEAK=$(grep -c "leak fail" $REPORT_FNAME)
+UNPROVEN=$(grep -c "unproven fail" $REPORT_FNAME)
+SYNTAX=$(grep -c "syntax fail" $REPORT_FNAME)
+PARSER=$(grep -c "parser fail" $REPORT_FNAME)
+TYPE=$(grep -c "type fail" $REPORT_FNAME)
+
+echo "Test completed."
+echo "total: $TOT"
+echo "success: $SUCC"
+echo "assertion: $ASSERT"
+echo "no chunks: $NOCHUNKS"
+echo "cannot prove: $UNPROVEN"
+echo "leaks: $LEAK"
+echo "syntax err: $SYNTAX"
+echo "type mismatch $TYPE"
+echo "parse errs: $PARSER"
