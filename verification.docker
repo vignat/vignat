@@ -10,10 +10,16 @@ RUN echo "deb http://llvm.org/apt/trusty/ llvm-toolchain-trusty-3.4 main" >> /et
     wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | apt-key add -
 
 # Install the principal body of required packages
+# Note the linux-headers-x.xx.x-xx-generic package. It may differ in your case.
+# the version number seem to change randomly from time to time. It is required
+# for DPDK build.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget build-essential libpcap-dev \
     linux-headers-3.13.0-74-generic libglib2.0-dev \
+    linux-headers-3.13.0-35-generic \
     tcpdump \
+    parallel \
+    software-properties-common \
     clang-3.4 llvm-3.4 llvm-3.4-dev llvm-3.4-tools libcap-dev git \
     subversion cmake make libboost-program-options-dev \
     python3 python3-dev python3-pip perl flex bison libncurses-dev \
@@ -26,6 +32,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mv /usr/sbin/tcpdump /usr/bin/tcpdump
 # ^^ last line to avoid the apparmor issue for running
 # libcrypto.so in --privileged
+
+# Set-up OPAM for ocaml corebuild util and the Core library
+RUN add-apt-repository ppa:avsm/ppa && apt-get update && apt-get install -y m4 ocaml opam && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# And install those libraries
+RUN opam init -a -y && \
+    eval `opam config env` && \
+    opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
 
 # Create the main directory where all the work will take place
 RUN mkdir /work
@@ -48,8 +64,8 @@ ENV RTE_SDK=/work/dpdk \
 WORKDIR /work
 
 # Download and build STP
-RUN git clone https://github.com/stp/minisat.git && \
-    git clone https://github.com/stp/stp.git && \
+RUN git clone --depth 1 https://github.com/stp/minisat.git && \
+    git clone --depth 1 https://github.com/stp/stp.git && \
     cd minisat && \
     mkdir build && \
     cd build && \
@@ -62,23 +78,28 @@ RUN git clone https://github.com/stp/minisat.git && \
 # RUN ulimit -s unlimited
 
 # Download and build uCLibc
-RUN git clone https://github.com/klee/klee-uclibc.git && \
+RUN git clone --depth 1 https://github.com/klee/klee-uclibc.git && \
     cd klee-uclibc && \
     ./configure --make-llvm-lib && \
     make -j8
 
 # Download and build Klee
-RUN git clone https://github.com/necto/klee && \
+RUN git clone --depth 1 https://github.com/necto/klee && \
     cd klee && \
     ./configure --with-stp=/work/stp/build --with-uclibc=/work/klee-uclibc --enable-posix-runtime && \
     make -j8
 
-ENV PATH=/work/klee/Release+Asserts/bin:$PATH \
+# Download and build VeriFast
+RUN git clone --depth 1 https://github.com/necto/verifast -b export_path_conditions && \
+    cd verifast/src && \
+    make -j8 verifast
+
+ENV PATH=/work/verifast/bin:/work/klee/Release+Asserts/bin:$PATH \
     KLEE_INCLUDE=/work/klee/include
 
-RUN mkdir /work/nat
-COPY *.h *.c Makefile /work/nat/
-COPY containers/ /work/nat/containers/
-WORKDIR /work/nat
-#RUN make verify
+COPY nat /work/nat
+COPY validator /work/validator
+WORKDIR /work
+#RUN cd nat && make verify
+#RUN cd validator && ./test_all.sh ../nat/klee-last aaa
 

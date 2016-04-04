@@ -82,6 +82,8 @@ export VERIFAST
 export TOT_FILES
 export SPEC_DIR
 
+# executing this file on a container looses the $SHELL value in parallel
+export SHELL=/bin/bash
 parallel validate_file ::: $KLEE_OUT_DIR/call-pre*.txt
 
 TOT=$(cat $REPORT_FNAME | wc -l)
