@@ -21,3 +21,4 @@ bench/rexport.tmpl
 bench/perfplot.png
 nat/build
 TAGS
+.vagrant
