@@ -42,7 +42,7 @@ int dchain_expire_one_index(struct DoubleChain* chain,
                             int* index_out, uint32_t time) {
   int has_ind = dchain_impl_get_oldest_index(chain->cells, index_out);
   if (has_ind) {
-    if (chain->timestamps[*index_out] > time) {
+    if (chain->timestamps[*index_out] < time) {
       return dchain_impl_free_index(chain->cells, *index_out);
     }
   }

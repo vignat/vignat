@@ -95,9 +95,10 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
 }
 
 int dmap_put(struct DoubleMap* map, void* value, int index) {
-  void* key_a = (uint8_t*)value + map->key_a_offset;
-  void* key_b = (uint8_t*)value + map->key_b_offset;
-  memcpy(map->values + index*map->value_size, value, map->value_size);
+  void* my_value = map->values + index*map->value_size;
+  memcpy(my_value, value, map->value_size);
+  void* key_a = (uint8_t*)my_value + map->key_a_offset;
+  void* key_b = (uint8_t*)my_value + map->key_b_offset;
   int ret = dmap_impl_put(map->bbs_a, map->kps_a, map->khs_a,
                           map->inds_a, key_a,
                           hash(key_a, map->key_a_size),
