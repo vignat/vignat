@@ -27,13 +27,15 @@ Vagrant.configure(2) do |config|
   config.vm.define :server do |srv|
     srv.vm.hostname = "ext-serv"
     srv.vm.network "private_network", ip: "192.168.33.10"
+    srv.vm.provision "shell", path: "server.sh"
   end
 
   config.vm.define :nat do |nat|
     nat.vm.hostname = "nat"
     nat.vm.network "private_network", ip: "192.168.33.2"
     nat.vm.network "private_network", ip: "192.168.40.2"
-    config.vm.provider "virtualbox" do |v|
+    nat.vm.provision "shell", path: "nat.sh"
+    nat.vm.provider "virtualbox" do |v|
       v.memory = 2048
     end
   end
@@ -41,6 +43,7 @@ Vagrant.configure(2) do |config|
   config.vm.define :client do |cl|
     cl.vm.hostname = "int-clnt"
     cl.vm.network "private_network", ip: "192.168.40.5"
+    cl.vm.provision "shell", path: "client.sh"
   end
 
   # Create a private network, which allows host-only access to the machine
