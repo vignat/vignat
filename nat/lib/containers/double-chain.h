@@ -68,6 +68,19 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
              double_chainp(ch, index, chain)); @*/
 int dchain_expire_one_index(struct DoubleChain* chain,
                             int* index_out, uint32_t time);
-//^^^ Never call this funciton in this application -  no contract here.
+/*@ requires double_chainp(?ch, ?index_range, chain) &*&
+             *index_out |-> ?io; @*/
+/*@ ensures (dchain_is_empty_fp(ch) ?
+             (double_chainp(ch, index_range, chain) &*&
+              *index_out |-> io &*&
+              result == 0) :
+             (dchain_get_oldest_time_fp(ch) < time ?
+              (*index_out |-> ?oi &*&
+               dchain_get_oldest_index_fp(ch) == oi &*&
+               double_chainp(dchain_remove_index_fp(ch, oi), index_range, chain) &*&
+               result == 1) :
+              (double_chainp(ch, index_range, chain) &*&
+               *index_out |-> io &*&
+               result == 0))); @*/
 
 #endif //_DOUBLE_CHAIN_H_INCLUDED_

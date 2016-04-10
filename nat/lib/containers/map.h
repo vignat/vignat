@@ -1,8 +1,6 @@
 #ifndef _MAP_H_INCLUDED_
 #define _MAP_H_INCLUDED_
 
-//#define MAP_CAPACITY (1024)
-
 typedef int map_keys_equality/*@<K>(predicate (void*, K) keyp) @*/(void* k1, void* k2);
 //@ requires keyp(k1, ?kk1) &*& keyp(k2, ?kk2);
 //@ ensures keyp(k1, kk1) &*& keyp(k2, kk2) &*& (0 == result ? (kk1 != kk2) : (kk1 == kk2));

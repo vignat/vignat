@@ -3,8 +3,6 @@
 
 #include "map.h"
 
-//#define DMAP_IMPL_CAPACITY (1024)
-
 void dmap_impl_init(int* bbs1, map_keys_equality* eq1,
                     int* bbs2, map_keys_equality* eq2,
                     int capacity);
