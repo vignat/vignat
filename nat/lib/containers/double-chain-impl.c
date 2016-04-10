@@ -1,6 +1,6 @@
 #include "double-chain-impl.h"
 
-enum {
+enum DCHAIN_ENUM {
     ALLOC_LIST_HEAD = 0,
     FREE_LIST_HEAD = 1,
     INDEX_SHIFT = DCHAIN_RESERVED
