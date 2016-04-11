@@ -104,8 +104,10 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
     return -1;
 }
 
-void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq, int capacity) {
-  (void)eq;
+void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
+                                void** keyps, int* khs, int* vals,
+                                int capacity) {
+  (void)eq; (void)keyps; (void)khs; (void)vals;
   int i = 0;
   for (; i < capacity; ++i) {
     busybits[i] = 0;

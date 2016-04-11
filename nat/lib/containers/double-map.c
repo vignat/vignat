@@ -2,14 +2,6 @@
 #include <stdint.h>
 #include <string.h>
 #include "double-map.h"
-#include "double-map-impl.h"
-
-/*
-#if DMAP_IMPL_CAPACITY < capacity
-#  error "The implementation dmap capacity is "
-"insufficient for the declared interface capacity."
-#endif
-*/
 
 struct DoubleMap {
   int key_a_offset;
@@ -74,8 +66,11 @@ int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
   if (NULL == ((**map_out).khs_b  = malloc(sizeof(int)  *capacity))) return 0;
   if (NULL == ((**map_out).inds_b = malloc(sizeof(int)  *capacity))) return 0;
 
-  dmap_impl_init((**map_out).bbs_a, (**map_out).eq_a,
-                 (**map_out).bbs_b, (**map_out).eq_b,
+  map_initialize((**map_out).bbs_a, (**map_out).eq_a,
+                 (**map_out).kps_a, (**map_out).khs_a, (**map_out).inds_a,
+                 (**map_out).capacity);
+  map_initialize((**map_out).bbs_b, (**map_out).eq_b,
+                 (**map_out).kps_b, (**map_out).khs_b, (**map_out).inds_b,
                  (**map_out).capacity);
 
   (**map_out).n_vals = 0;
@@ -83,15 +78,15 @@ int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
 }
 
 int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
-  return dmap_impl_get(map->bbs_a, map->kps_a, map->khs_a, map->inds_a, key,
-                       hash(key, map->key_a_size), map->eq_a, index,
-                       map->capacity);
+  return map_get(map->bbs_a, map->kps_a, map->khs_a, map->inds_a, key,
+                 map->eq_a, hash(key, map->key_a_size), index,
+                 map->capacity);
 }
 
 int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
-  return dmap_impl_get(map->bbs_b, map->kps_b, map->khs_b, map->inds_b, key,
-                       hash(key, map->key_b_size), map->eq_b, index,
-                       map->capacity);
+  return map_get(map->bbs_b, map->kps_b, map->khs_b, map->inds_b, key,
+                 map->eq_b, hash(key, map->key_b_size), index,
+                 map->capacity);
 }
 
 int dmap_put(struct DoubleMap* map, void* value, int index) {
@@ -99,13 +94,14 @@ int dmap_put(struct DoubleMap* map, void* value, int index) {
   memcpy(my_value, value, map->value_size);
   void* key_a = (uint8_t*)my_value + map->key_a_offset;
   void* key_b = (uint8_t*)my_value + map->key_b_offset;
-  int ret = dmap_impl_put(map->bbs_a, map->kps_a, map->khs_a,
-                          map->inds_a, key_a,
-                          hash(key_a, map->key_a_size),
-                          map->bbs_b, map->kps_b, map->khs_b,
-                          map->inds_b, key_b,
-                          hash(key_b, map->key_b_size),
-                          index, map->capacity);
+  int ret = map_put(map->bbs_a, map->kps_a, map->khs_a,
+                    map->inds_a, key_a,
+                    hash(key_a, map->key_a_size),
+                    index, map->capacity) &&
+    map_put(map->bbs_b, map->kps_b, map->khs_b,
+            map->inds_b, key_b,
+            hash(key_b, map->key_b_size),
+            index, map->capacity);
   if (ret) ++map->n_vals;
   return ret;
 }
@@ -113,11 +109,12 @@ int dmap_put(struct DoubleMap* map, void* value, int index) {
 int dmap_erase(struct DoubleMap* map, int index) {
   void* key_a = map->values + index*map->value_size + map->key_a_offset;
   void* key_b = map->values + index*map->value_size + map->key_b_offset;
-  int ret = dmap_impl_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
-                            map->eq_a, hash(key_a, map->key_a_size),
-                            map->bbs_b, map->kps_b, map->khs_b, key_b,
-                            map->eq_b, hash(key_b, map->key_b_size),
-                            map->capacity);
+  int ret = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
+                      map->eq_a, hash(key_a, map->key_a_size),
+                      map->capacity) &&
+    map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
+              map->eq_b, hash(key_b, map->key_b_size),
+              map->capacity);
   if (ret) --map->n_vals;
   return ret;
 }

@@ -39,15 +39,16 @@ typedef int map_keys_equality/*@<K>(predicate (void*, K) keyp) @*/(void* k1, voi
  * int_key/ext_key that are much bigger than a 32bit integer.
  */
 void map_initialize/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
+                                 void** keyps, int* khs, int* vals,
                                  int capacity);
 /*@ requires exists<kt>(_) &*&
              exists<fixpoint (kt,int)>(?hash) &*&
              [_]is_map_keys_equality<kt>(cmp, ?keyp) &*&
              pred_arg2<kt, int>(?recp) &*&
              ints(busybits, capacity, ?bbs) &*&
-             pointers(?keyps, capacity, ?kplist) &*&
-             ints(?vals, capacity, ?vallist) &*&
-             ints(?khs, capacity, ?khlist); @*/
+             pointers(keyps, capacity, ?kplist) &*&
+             ints(vals, capacity, ?vallist) &*&
+             ints(khs, capacity, ?khlist); @*/
 /*@ ensures mapping<kt>(empty_map_fp(), keyp, recp, hash,
                         capacity, busybits, keyps,
                         khs, vals); @*/

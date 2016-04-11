@@ -18,7 +18,7 @@ key_b_offset: key_b {...};
 
 struct DoubleMap;
 /*@
-  inductive dmap<t1,t2,vt> = dmap(list<t1>, list<t2>, list<int>, list<vt>, int);
+  inductive dmap<t1,t2,vt> = dmap(list<t1>, list<t2>, list<int>, list<vt>);
 
   predicate dmappingp<t1,t2,vt>(dmap<t1,t2,vt> m,
                                 predicate (void*,t1) keyp1,
@@ -103,10 +103,6 @@ struct DoubleMap;
           k2 == dmap_get_k2_by_idx_fp(dmap_put_fp(m, k1, k2, index, v), index);
   @*/
 
-/*@ predicate pred_arg4<t1,t2,t3,t4>(predicate (t1,t2,t3,t4) p) = true;
-    predicate pred_arg2<t1,t2>(predicate (t1,t2) p) = true;
-  @*/
-
 //TODO: rewrite the valp such that it takes the list<char> image of the memory
 // and k1, k2. This way I can then easily copy it with memcpy. 
 int dmap_allocate/*@ <K1,K2,V> @*/
@@ -119,10 +115,10 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              [_]is_map_keys_equality<K2>(eq_b, ?keyp2) &*&
              pred_arg2<void*, V>(?valp) &*&
              pred_arg4<K1,K2,V,int>(?recp) &*&
-             pointer(map_out, ?old_map_out) &*&
+             *map_out |-> ?old_map_out &*&
              0 < key_a_size &*& 0 < key_b_size &*& 0 < value_size; @*/
 /*@ ensures result == 0 ?
-            (pointer(map_out, old_map_out)) :
+            (map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&
              result == 1 &*&
              dmappingp<K1,K2,V>(empty_dmap_fp(), keyp1,
