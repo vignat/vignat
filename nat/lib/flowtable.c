@@ -157,7 +157,7 @@ int allocate_flowtables(uint8_t nb_ports) {
                          offsetof(struct flow, ik), int_key_eq,
                          sizeof(struct ext_key),
                          offsetof(struct flow, ek), ext_key_eq,
-                         sizeof(struct flow), MAX_FLOWS,
+                         sizeof(struct flow), flow_cpy, MAX_FLOWS,
                          &flow_map);
 }
 

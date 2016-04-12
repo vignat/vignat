@@ -10,6 +10,8 @@ struct DoubleMap {
   int key_b_size;
   int value_size;
 
+  uq_value_copy* cpy;
+
   uint8_t *values;
 
   int *bbs_a;
@@ -43,7 +45,7 @@ uint32_t hash(void* keyp, int key_size)
 
 int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
                   int key_b_size, int key_b_offset, map_keys_equality* eq_b,
-                  int value_size, int capacity,
+                  int value_size, uq_value_copy* v_cpy, int capacity,
                   struct DoubleMap** map_out) {
   if (NULL == (*map_out = malloc(sizeof(struct DoubleMap)))) return 0;
 
@@ -54,6 +56,7 @@ int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
   (**map_out).key_b_offset = key_b_offset;
   (**map_out).eq_b = eq_b;
   (**map_out).value_size = value_size;
+  (**map_out).cpy = v_cpy;
   (**map_out).capacity = capacity;
 
   if (NULL == ((**map_out).values = malloc(value_size   *capacity))) return 0;
@@ -91,7 +94,7 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
 
 int dmap_put(struct DoubleMap* map, void* value, int index) {
   void* my_value = map->values + index*map->value_size;
-  memcpy(my_value, value, map->value_size);
+  map->cpy(my_value, value);
   void* key_a = (uint8_t*)my_value + map->key_a_offset;
   void* key_b = (uint8_t*)my_value + map->key_b_offset;
   int ret = map_put(map->bbs_a, map->kps_a, map->khs_a,
@@ -120,7 +123,7 @@ int dmap_erase(struct DoubleMap* map, int index) {
 }
 
 void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
-  memcpy(value_out, map->values + index*map->value_size, map->value_size);
+  map->cpy(value_out, map->values + index*map->value_size);
 }
 
 int dmap_size(struct DoubleMap* map) {

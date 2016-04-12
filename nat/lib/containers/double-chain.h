@@ -37,6 +37,15 @@ struct DoubleChain;
   requires length(dchain_get_expired_indexes_fp(ch, time)) > 0;
   ensures dchain_out_of_space_fp(dchain_expire_old_indexes_fp(ch, time))
           == false;
+
+  lemma void index_range_of_empty(int ir);
+  requires 0 < ir;
+  ensures dchain_index_range_fp(empty_dchain_fp(ir)) == ir;
+
+  lemma void expire_preserves_index_range(dchain ch, uint32_t time);
+  requires true;
+  ensures dchain_index_range_fp(dchain_expire_old_indexes_fp(ch, time)) ==
+          dchain_index_range_fp(ch);
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);

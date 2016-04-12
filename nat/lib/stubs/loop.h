@@ -20,10 +20,10 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
                                 uint32_t time) =
           dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, flw_p, nat_flow_p,
                                      ?capacity, mp) &*&
-          double_chainp(?ch, ?index_range, chp) &*&
+          double_chainp(?ch, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
           last_time(time) &*&
-          index_range == capacity &*&
+          dchain_index_range_fp(ch) == capacity &*&
           capacity == MAX_FLOWS;
 
 lemma void coherent_dmap_used_dchain_allocated(dmap<int_k,ext_k,flw> m, dchain ch, int idx);

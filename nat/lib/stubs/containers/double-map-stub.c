@@ -61,6 +61,7 @@ int dmap_allocate(int key_a_size,
                   int key_b_offset,
                   map_keys_equality eq_b,
                   int value_size,
+                  uq_value_copy v_cpy,
                   int capacity,
                   struct DoubleMap** map_out) {
   klee_trace_ret();
@@ -71,6 +72,7 @@ int dmap_allocate(int key_a_size,
   klee_trace_param_i32(key_b_offset, "key_b_offset");
   klee_trace_param_fptr(eq_b, "eq_b");
   klee_trace_param_i32(value_size, "value_size");
+  klee_trace_param_fptr(v_cpy, "v_cpy");
   klee_trace_param_i32(capacity, "capacity");
   klee_trace_param_ptr(map_out, sizeof(struct DoubleMap*), "map_out");
 

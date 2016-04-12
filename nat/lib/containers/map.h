@@ -11,7 +11,7 @@ typedef int map_keys_equality/*@<K>(predicate (void*, K) keyp) @*/(void* k1, voi
   @*/
 
 /*@
-  inductive map<kt> = dmap(list<kt>, list<int>);
+  inductive map<kt> = mapc(list<kt>, list<int>);
 
   predicate mapping<kt>(map<kt> m,
                         predicate (void*, kt) keyp,

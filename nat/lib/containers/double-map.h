@@ -16,6 +16,10 @@ key_b_offset: key_b {...};
   };
  */
 
+typedef void uq_value_copy/*@<K>(predicate (void*, K) vp, int size) @*/(char* dst, void* src);
+//@ requires vp(src, ?v) &*& dst[0..size] |-> _;
+//@ ensures vp(src, v) &*& vp(dst, v);
+
 struct DoubleMap;
 /*@
   inductive dmap<t1,t2,vt> = dmap(list<t1>, list<t2>, list<int>, list<vt>);
@@ -108,17 +112,17 @@ struct DoubleMap;
 int dmap_allocate/*@ <K1,K2,V> @*/
                  (int key_a_size, int key_a_offset, map_keys_equality* eq_a,
                   int key_b_size, int key_b_offset, map_keys_equality* eq_b,
-                  int value_size, int capacity,
+                  int value_size, uq_value_copy* v_cpy, int capacity,
                   struct DoubleMap** map_out);
 /*@ requires exists<pair<pair<K1,K2>,V > >(pair(pair(_, _), _)) &*&
              [_]is_map_keys_equality<K1>(eq_a, ?keyp1) &*&
              [_]is_map_keys_equality<K2>(eq_b, ?keyp2) &*&
-             pred_arg2<void*, V>(?valp) &*&
+             [_]is_uq_value_copy<V>(v_cpy, ?valp, value_size) &*&
              pred_arg4<K1,K2,V,int>(?recp) &*&
              *map_out |-> ?old_map_out &*&
              0 < key_a_size &*& 0 < key_b_size &*& 0 < value_size; @*/
 /*@ ensures result == 0 ?
-            (map_out |-> old_map_out) :
+            (*map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&
              result == 1 &*&
              dmappingp<K1,K2,V>(empty_dmap_fp(), keyp1,

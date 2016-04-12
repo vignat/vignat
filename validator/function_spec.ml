@@ -83,7 +83,8 @@ let fun_types =
                        arg_types =
                          [Sint32;Sint32;Ptr (Ctm "map_keys_equality");
                           Sint32;Sint32;Ptr (Ctm "map_keys_equality");
-                          Sint32;Sint32;Ptr (Ptr dmap_struct)];
+                          Sint32; Ptr (Ctm "uq_value_copy");Sint32;
+                          Ptr (Ptr dmap_struct)];
                        lemmas_before = [
                          tx_bl "produce_function_pointer_chunk \
                                 map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
@@ -95,12 +96,21 @@ let fun_types =
                                 {\
                                 call();\
                                 }";
+                         (fun args ->
+                            "/*@\
+                             assume(sizeof(struct flow) == " ^
+                            (List.nth_exn args 6) ^ ");\n@*/ " ^
+                             "/*@ produce_function_pointer_chunk \
+                             uq_value_copy<flw>(flow_cpy)\
+                             (flw_p, " ^ (List.nth_exn args 6) ^ ")(a,b)\
+                             {\
+                             call();\
+                             }@*/");
                          tx_bl "close exists<pair<pair<int_k, ext_k>, flw > >\
                                 (pair(pair(ikc(0,0,0,0,0,0), ekc(0,0,0,0,0,0)),\
                                       flwc(ikc(0,0,0,0,0,0),\
                                            ekc(0,0,0,0,0,0),\
                                            0,0,0,0,0,0,0,0,0)));";
-                         tx_bl "close pred_arg2<void*, flw>(flw_p);";
                          tx_bl "close pred_arg4(nat_flow_p);"];
                        lemmas_after = [];
                        leaks = [
@@ -116,7 +126,7 @@ let fun_types =
                          lemmas_before = [];
                          lemmas_after = [];
                          leaks = [
-                           on_rez_nz_leak "double_chainp(_,_,_)"
+                           on_rez_nz_leak "double_chainp(_,_)"
                              ~id:"double_chainp";];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
@@ -124,7 +134,8 @@ let fun_types =
                                              Uint32];
                                 lemmas_before = [
                                   tx_bl "close dmap_dchain_coherent\
-                                         (empty_dmap_fp(), empty_dchain_fp());";
+                                         (empty_dmap_fp(), empty_dchain_fp(1024));";
+                                  tx_bl "index_range_of_empty(1024);";
                                   (fun args ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
@@ -147,7 +158,7 @@ let fun_types =
                                   leak "last_time(_)" ~id:"last_time";
                                   leak "dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_)"
                                     ~id:"dmappingp";
-                                  leak "double_chainp(_,_,_)"
+                                  leak "double_chainp(_,_)"
                                     ~id:"double_chainp";
                                   leak "dmap_dchain_coherent(_,_)"];};
      "loop_enumeration_begin", {ret_type = Void;
@@ -409,9 +420,11 @@ let fun_types =
                             }@*/");
                         (fun args ->
                            "/*@ {\n\
-                            assert double_chainp(?cur_chain, _, " ^
+                            assert double_chainp(?cur_chain, " ^
                            (List.nth_exn args 0) ^
                            ");\n\
+                            expire_preserves_index_range(cur_chain," ^
+                           (List.nth_exn args 2) ^ ");\n
                            length_nonnegative(\
                             dchain_get_expired_indexes_fp(cur_chain, " ^
                            (List.nth_exn args 2) ^ "));\n\

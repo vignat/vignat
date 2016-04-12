@@ -170,5 +170,8 @@ int int_key_eq(void* a, void* b);
 int ext_key_eq(void* a, void* b);
 //@ requires ext_k_p(a, ?ak) &*& ext_k_p(b, ?bk);
 //@ ensures ext_k_p(a, ak) &*& ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+void flow_cpy(char* dst, void* src);
+//@ requires flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
+//@ ensures flw_p(src, f) &*& flw_p((void*)dst, f);
 
 #endif //_FLOW_H_INCLUDED_

@@ -68,3 +68,8 @@ int int_key_eq(void* a, void* b) {
 int ext_key_eq(void* a, void* b) {
   return memcmp(a, b, sizeof(struct ext_key)) == 0;
 }
+
+
+void flow_cpy(char* dst, void* src) {
+  memcpy(dst, src, sizeof(struct flow));
+}
