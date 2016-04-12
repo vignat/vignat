@@ -29,14 +29,15 @@
 
 static
 int loop(int k, int capacity)
-//@ requires true;
+//@ requires 0 < capacity &*& 2*capacity < INT_MAX;
 /*@ ensures 0 <= result &*& result < capacity &*&
             result == loop_fp(k, capacity); @*/
 {
   int g = k%capacity;
-  //@ div_mod(g, k, CAPACITY);
+  //@ div_mod(g, k, capacity);
+  //@ assert(2*capacity< INT_MAX);
   int res = (g + capacity)%capacity;
-  //@ div_mod_gt_0(res, g + CAPACITY, CAPACITY);
+  //@ div_mod_gt_0(res, g + capacity, capacity);
   return res;
 }
 
@@ -106,7 +107,19 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
 
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                 void** keyps, int* khs, int* vals,
-                                int capacity) {
+                                int capacity)
+  /*@ requires exists<kt>(_) &*&
+               exists<fixpoint (kt,int)>(?hash) &*&
+               [_]is_map_keys_equality<kt>(eq, ?keyp) &*&
+               pred_arg2<kt, int>(?recp) &*&
+               ints(busybits, capacity, ?bbs) &*&
+               pointers(keyps, capacity, ?kplist) &*&
+               ints(vals, capacity, ?vallist) &*&
+               ints(khs, capacity, ?khlist); @*/
+  /*@ ensures mapping<kt>(empty_map_fp(), keyp, recp, hash,
+                          capacity, busybits, keyps,
+                          khs, vals); @*/
+{
   (void)eq; (void)keyps; (void)khs; (void)vals;
   int i = 0;
   for (; i < capacity; ++i) {
@@ -117,6 +130,21 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
 int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                         void* keyp, map_keys_equality* eq, int hash, int* value,
                         int capacity)
+/*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
+                         keyps, k_hashes, values) &*&
+             kp(keyp, ?k) &*&
+             hsh(k) == hash &*&
+             *value |-> ?v; @*/
+/*@ ensures mapping<kt>(m, kp, recp, hsh, capacity, busybits,
+                        keyps, k_hashes, values) &*&
+            kp(keyp, k) &*&
+            (map_has_fp(m, k) ?
+             (result == 1 &*&
+              *value |-> v &*&
+              v == map_get_fp(m, k) &*&
+              recp(k, v)):
+             (result == 0 &*&
+              *value |-> v)); @*/
 {
     int start = loop(hash, capacity);
     int index = find_key(busybits, keyps, k_hashes, start,
@@ -132,6 +160,21 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
 int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                         void* keyp, int hash, int value,
                         int capacity)
+/*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
+                         keyps, k_hashes, values) &*&
+             kp(keyp, ?k) &*& recp(k, value) &*&
+             hsh(k) == hash &*&
+             false == map_has_fp(m, k); @*/
+/*@ ensures kp(keyp, k) &*& recp(k, value) &*&
+            (map_size_fp(m) < capacity ?
+             (result == 1 &*&
+              mapping<kt>(map_put_fp(m, k, value), kp, recp,
+                          hsh,
+                          capacity, busybits,
+                          keyps, k_hashes, values)) :
+             (result == 0 &*&
+              mapping<kt>(m, kp, recp, hsh, capacity, busybits,
+                          keyps, k_hashes, values))); @*/
 {
     int start = loop(hash, capacity);
     int index = find_empty(busybits, start, capacity);
@@ -149,6 +192,18 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
 
 int map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, void* keyp,
                           map_keys_equality* eq, int hash, int capacity)
+/*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
+                         keyps, k_hashes, ?values) &*&
+             kp(keyp, ?k) &*&
+             hsh(k) == hash; @*/
+/*@ ensures kp(keyp, k) &*&
+            (map_has_fp(m, k) ?
+            (result == 1 &*&
+             mapping<kt>(map_erase_fp(m, k), kp, recp, hsh,
+                         capacity, busybits, keyps, k_hashes, values)) :
+            (result == 0 &*&
+            mapping<kt>(m, kp, recp, hsh,
+                        capacity, busybits, keyps, k_hashes, values))); @*/
 {
     int start = loop(hash, capacity);
     int index = find_key(busybits, keyps, k_hashes, start,
@@ -162,6 +217,11 @@ int map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, void* keyp
 }
 
 int map_size/*@ <kt> @*/(int* busybits, int capacity)
+/*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
+                         ?keyps, ?k_hashes, ?values); @*/
+/*@ ensures mapping<kt>(m, kp, recp, hsh, capacity, busybits,
+                        keyps, k_hashes, values) &*&
+            result == map_size_fp(m);@*/
 {
     int s = 0;
     int i = 0;
