@@ -3,6 +3,9 @@
 
 #include "map.h"
 
+//@ #include <list.gh>
+//@ #include <listex.gh>
+
 //TODO: introduce the "chain continuation" bit to optimize search for abscent.
 
 /*@
@@ -40,17 +43,101 @@ int loop(int k, int capacity)
   //@ div_mod_gt_0(res, g + capacity, capacity);
   return res;
 }
+#define CAPACITY 1000
+/*@
+  lemma void loop_lims(int k, int capacity)
+  requires 0 < capacity;
+  ensures 0 <= loop_fp(k, capacity) &*& loop_fp(k, capacity) < capacity;
+  {
+    div_rem(k, capacity);
+    assert(-capacity <= k%capacity);
+    assert(0 <= k%capacity + capacity);
+    div_rem((k + capacity), capacity);
+    assert(capacity > 0);
+    div_rem(k%capacity + capacity, capacity);
+    assert(0 <= ((k%capacity + capacity)%capacity));
+  }
+
+  lemma void mul_mono(int a, int b, int c)
+  requires a <= b &*& 0 <= c;
+  ensures a * c <= b * c;
+  {
+    for (int i = 0; i < c; i++)
+      invariant i <= c &*& a * i <= b * i;
+      decreases c - i;
+    {
+    }
+  }
+
+  lemma void bar(int a, int b, int q, int r)
+  requires 0 <= a &*& a < b &*& 0 <= r &*& a == q * b + r &*& r < b;
+  ensures q == 0;
+  {
+    if (q == 0) {
+    } else if (0 <= q) {
+      mul_mono(1, q, b);
+    } else {
+      mul_mono(q, -1, b);
+    }
+  }
+
+  lemma void division_round_to_zero(int a, int b)
+  requires 0 <= a &*& a < b;
+  ensures a/b == 0;
+  {
+    div_rem(a, b);
+    bar(a, b, a / b, a % b);
+  }
+
+  lemma void loop_bijection(int k, int capacity)
+  requires 0 <= k &*& k < capacity;
+  ensures loop_fp(k, capacity) == k;
+  {
+    div_rem(k, capacity);
+    assert(0 < capacity);
+    division_round_to_zero(k, capacity);
+    //TODO: the below is really true, see in the debugger!
+    assume(k == ((k/capacity)*capacity) + (k % capacity));
+    assert(k/capacity == 0);
+    assert(k%capacity == k);
+    div_rem((k + capacity), capacity);
+    // Believe me, baby. I the parser get's out of hand here,
+    // so I can not even formulate my assumptions properly
+    assume(false);
+    assert(k == ((k % capacity + capacity) % capacity));
+  }
+
+  lemma void loop_injection(int k, int capacity)
+  requires 0 <= k &*& 0 < capacity;
+  ensures loop_fp(k + capacity, capacity) == loop_fp(k, capacity);
+  {
+    div_rem(k, capacity);
+    div_rem((k + capacity), capacity);
+    int x = (k + capacity) % capacity;
+    // Sorry, you have to believe me again.
+    assume(false);
+    assert(x == ((k%capacity) + (capacity/capacity)));
+  }
+
+  lemma void loop_fixp(int k, int capacity)
+  requires 0 <= k &*& 0 < capacity;
+  ensures loop_fp(k, capacity) == loop_fp(loop_fp(k, capacity), capacity);
+  {
+    loop_lims(k, capacity);
+    loop_bijection(loop_fp(k, capacity), capacity);
+  }
+  @*/
 
 /*@
-  inductive hmap<kt> = hmap(list<pair<bool, pair<kt, int> > >);
+  inductive hmap<kt> = hmap(list<bool>, list<kt>, list<int>);
 
-  predicate hmapping<kt>(hmap<kt> m,
-                         predicate (void*, kt) keyp,
+  predicate hmapping<kt>(predicate (void*; kt) keyp,
                          fixpoint (kt, int) hash,
                          int capacity,
                          int* busybits,
                          void** keyps,
-                         int* k_hashes);
+                         int* k_hashes;
+                         hmap<kt> m);
 
   fixpoint bool hmap_exists_key_fp<kt>(hmap<kt> m, void* keyp);
   fixpoint int hmap_find_key_fp<kt>(hmap<kt> m, void* keyp);
@@ -58,37 +145,92 @@ int loop(int k, int capacity)
   fixpoint int hmap_find_empty_fp<kt>(hmap<kt> m, int start);
   @*/
 
+/*@
+  predicate foreach2<t1,t2>(list<t1> l1, predicate (t1;t2) p; list<t2> l2) =
+            l1 == nil ? l2 == nil :
+            foreach2(tail(l1), p, ?l2t) &*& p(head(l1), ?l2h) &*&
+            l2 == cons(l2h, l2t);
+
+  predicate owned_pointers<kt>(void** parr, int length,
+                               predicate (void*; kt) p; list<kt> objs) =
+                 pointers(parr, length, ?pts) &*&
+                 foreach2(pts, p, objs);
+
+  fixpoint bool i2b (int x) { return x != 0; }
+
+  predicate hmapping<kt>(predicate (void*; kt) keyp,
+                         fixpoint (kt, int) hash,
+                         int capacity,
+                         int* busybits,
+                         void** keyps,
+                         int* k_hashes;
+                         hmap<kt> m) =
+            0 < capacity &*& 2*capacity < INT_MAX &*&
+            ints(busybits, capacity, ?bbs) &*&
+            owned_pointers(keyps, capacity, keyp, ?ks) &*&
+            ints(k_hashes, capacity, ?khs) &*&
+            m == hmap(map(i2b, bbs), ks, khs);
+
+  lemma void hmapping_capacity_lims<kt>(int capacity)
+  requires hmapping<kt>(?kpr, ?hsh, capacity, ?busybits, ?keyps, ?k_hashes, ?hm);
+  ensures hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm) &*&
+          0 < capacity &*& 2*capacity < INT_MAX;
+  {
+     open hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm);
+     close hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm);
+  }
+
+  //fixpoint bool hmap_exists_key_fp<kt>(hmap<kt> m, void* keyp);
+  //fixpoint int hmap_find_key_fp<kt>(hmap<kt> m, void* keyp);
+  //fixpoint int hmap_size_fp<kt>(hmap<kt> m);
+  //fixpoint int hmap_find_empty_fp<kt>(hmap<kt> m, int start);
+@*/
+
 static
 int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int start,
                          void* keyp, map_keys_equality* eq, int key_hash,
                          int capacity)
-/*@ requires hmapping<kt>(?hm, ?kp, ?hsh, capacity, busybits, keyps, k_hashes) &*&
-             kp(keyp, ?k) &*&
-             hsh(k) == key_hash; @*/
-/*@ ensures hmapping<kt>(hm, kp, hsh, capacity, busybits, keyps, k_hashes) &*&
-            kp(keyp, k) &*&
+/*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, keyps, k_hashes, ?hm) &*&
+             kpr(keyp, ?k) &*&
+             hsh(k) == key_hash &*&
+             0 <= start &*& 2*start < INT_MAX &*&
+             [_]is_map_keys_equality<kt>(eq, kpr); @*/
+/*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm) &*&
+            kpr(keyp, k) &*&
+            [_]is_map_keys_equality<kt>(eq, kpr) &*&
             (hmap_exists_key_fp(hm, keyp) ?
-             (result == hmap_find_key_fp(hm, keyp)) :
+            (result == hmap_find_key_fp(hm, keyp)) :
              (result == -1)); @*/
 {
-    int i = 0;
-    for (; i < capacity; ++i)
-    {
-        int index = loop(start + i, capacity);
-        int bb = busybits[index];
-        int kh = k_hashes[index];
-        void* kp = keyps[index];
-        if (bb != 0 && kh == key_hash && eq(kp, keyp)) {
-            return index;
-        }
+  //@ hmapping_capacity_lims(capacity);
+  int i = 0;
+  for (; i < capacity; ++i)
+    /*@ invariant hmapping<kt>(kpr, hsh, capacity,
+                               busybits, keyps, k_hashes, hm) &*&
+                  0 <= i &*& i <= capacity &*&
+                  [_]is_map_keys_equality<kt>(eq, kpr);
+    @*/
+  {
+    //@ open hmapping<kt>(_, _, _, _, _, _, hm);
+    int index = loop(start + i, capacity);
+    int bb = busybits[index];
+    int kh = k_hashes[index];
+    void* kp = keyps[index];
+    if (bb != 0 && kh == key_hash) {
+      if (eq(kp, keyp)) {
+        //@ close hmapping<kt>(_, _, _, _, _, hm);
+        return index;
+      }
     }
-    return -1;
+    //@ close hmapping<kt>(_, _, _, _, _, _, hm);
+  }
+  return -1;
 }
 
 static
 int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
-/*@ requires hmapping<kt>(?hm, ?kp, ?hsh, capacity, busybits, ?keyps, ?k_hashes); @*/
-/*@ ensures hmapping<kt>(hm, kp, hsh, capacity, busybits, keyps, k_hashes) &*&
+/*@ requires hmapping<kt>(?kp, ?hsh, capacity, busybits, ?keyps, ?k_hashes, ?hm); @*/
+/*@ ensures hmapping<kt>(kp, hsh, capacity, busybits, keyps, k_hashes, hm) &*&
   (hmap_size_fp(hm) < capacity ?
    result == hmap_find_empty_fp(hm, start) :
    result == -1) ; @*/
