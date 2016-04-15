@@ -251,8 +251,20 @@ int loop(int k, int capacity)
     switch(m) { case hmap(ks, khs): return ks; }
   }
 
-  fixpoint int hmap_size_fp<kt>(hmap<kt> m);
-  fixpoint int hmap_find_empty_fp<kt>(hmap<kt> m, int start);
+  fixpoint int ks_size_fp<kt>(list<option<kt> > ks) {
+    switch(ks) {
+      case nil: return 0;
+      case cons(h,t): return (h == none ? 0 : 1) + ks_size_fp(t);
+    }
+  }
+
+  fixpoint int hmap_size_fp<kt>(hmap<kt> m) {
+    return ks_size_fp(hmap_ks_fp(m));
+  }
+
+  fixpoint bool hmap_empty_cell_fp<kt>(hmap<kt> m, int index) {
+    return (nth(index, hmap_ks_fp(m)) == none);
+  }
 
   fixpoint int ks_find_key_fp<kt>(list<option<kt> > ks, kt k, int acc) {
     switch(ks) {
@@ -480,9 +492,6 @@ int loop(int k, int capacity)
      close hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm);
   }
 
-  //fixpoint int hmap_size_fp<kt>(hmap<kt> m);
-  //fixpoint int hmap_find_empty_fp<kt>(hmap<kt> m, int start);
-
   lemma void no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
   requires true == no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
            0 <= m &*& m < length(ks) &*&
@@ -684,24 +693,114 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int start,
   return -1;
 }
 
-static
-int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
-/*@ requires hmapping<kt>(?kp, ?hsh, capacity, busybits, ?keyps, ?k_hashes, ?hm); @*/
-/*@ ensures hmapping<kt>(kp, hsh, capacity, busybits, keyps, k_hashes, hm) &*&
-  (hmap_size_fp(hm) < capacity ?
-   result == hmap_find_empty_fp(hm, start) :
-   result == -1) ; @*/
-{
-    int i = 0;
-    for (; i < capacity; ++i)
-    {
-        int index = loop(start + i, capacity);
-        int bb = busybits[index];
-        if (0 == bb) {
-            return index;
+/*@
+  lemma void ks_size_limits<kt>(list<option<kt> > ks)
+  requires true;
+  ensures 0 <= ks_size_fp(ks) &*& ks_size_fp(ks) <= length(ks);
+  {
+    switch(ks) {
+      case nil: return;
+      case cons(h,t):
+        ks_size_limits(t);
+    }
+  }
+
+  lemma void zero_bbs_is_for_empty<kt>(list<int> bbs,
+                                       list<option<kt> > ks, int i)
+  requires pred_mapping(?kps, bbs, ?kpr, ks) &*& nth(i, bbs) == 0 &*&
+           0 <= i &*& i < length(bbs);
+  ensures pred_mapping(kps, bbs, kpr, ks) &*& nth(i, ks) == none &*&
+          ks_size_fp(ks) < length(ks);
+  {
+    open pred_mapping(kps, bbs, kpr, ks);
+    switch(bbs) {
+      case nil: break;
+      case cons(h,t):
+        if (i == 0) {
+          assert(head(ks) == none);
+          ks_size_limits(tail(ks));
+        } else {
+          nth_cons(i, t, h);
+          zero_bbs_is_for_empty(t, tail(ks), i-1);
         }
     }
-    return -1;
+    close pred_mapping(kps, bbs, kpr, ks);
+  }
+
+  fixpoint bool cell_busy<kt>(option<kt> x) { return x != none; }
+
+  lemma void bb_nonzero_cell_busy<kt>(list<int> bbs, list<option<kt> > ks, int i)
+  requires pred_mapping(?kps, bbs, ?kp, ks) &*& nth(i, bbs) != 0 &*&
+           0 <= i &*& i < length(bbs);
+  ensures pred_mapping(kps, bbs, kp, ks) &*& true == cell_busy(nth(i, ks));
+  {
+    open pred_mapping(kps, bbs, kp, ks);
+    switch(bbs) {
+      case nil: break;
+      case cons(h,t):
+      if (i == 0) {
+      } else {
+        nth_cons(i, t, h);
+        bb_nonzero_cell_busy(t, tail(ks), i-1);
+      }
+    }
+    close pred_mapping(kps, bbs, kp, ks);
+  }
+
+  lemma void full_size<kt>(list<option<kt> > ks)
+  requires true == up_to(nat_of_int(length(ks)), (nthProp)(ks, cell_busy));
+  ensures ks_size_fp(ks) == length(ks);
+  {
+    switch(ks) {
+      case nil: return;
+      case cons(h,t):
+        up_to_nth_uncons(h, t, cell_busy);
+        full_size(t);
+    }
+  }
+  @*/
+
+static
+int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
+/*@ requires hmapping<kt>(?kp, ?hsh, capacity, busybits, ?keyps, ?k_hashes, ?hm) &*&
+             0 <= start &*& 2*start < INT_MAX; @*/
+/*@ ensures hmapping<kt>(kp, hsh, capacity, busybits, keyps, k_hashes, hm) &*&
+            (hmap_size_fp(hm) < capacity ?
+             true == hmap_empty_cell_fp(hm, result) :
+             result == -1) ; @*/
+{
+  //@ open hmapping(_, _, _, _, _, _, hm);
+  //@ assert pred_mapping(?kps, ?bbs, kp, ?ks);
+  //@ assert hm == hmap(ks, ?khs);
+  int i = 0;
+  for (; i < capacity; ++i)
+    /*@ invariant pred_mapping(kps, bbs, kp, ks) &*&
+                  ints(busybits, capacity, bbs) &*&
+                  ints(k_hashes, capacity, khs) &*&
+                  pointers(keyps, capacity, kps) &*&
+                  0 <= i &*& i <= capacity &*&
+                  true == up_to(nat_of_int(i),
+                                (byLoopNthProp)(ks, cell_busy,
+                                                capacity, start));
+      @*/
+  {
+    //@ pred_mapping_same_len(bbs, ks);
+    int index = loop(start + i, capacity);
+    int bb = busybits[index];
+    if (0 == bb) {
+      //@ zero_bbs_is_for_empty(bbs, ks, index);
+      //@ close hmapping<kt>(kp, hsh, capacity, busybits, keyps, k_hashes, hm);
+      return index;
+    }
+    //@ bb_nonzero_cell_busy(bbs, ks, index);
+    //@ assert(true == cell_busy(nth(loop_fp(i+start,capacity), ks)));
+    //@ assert(nat_of_int(i+1) == succ(nat_of_int(i)));
+  }
+  //@ pred_mapping_same_len(bbs, ks);
+  //@ by_loop_for_all(ks, cell_busy, start, capacity, nat_of_int(capacity));
+  //@ full_size(ks);
+  //@ close hmapping<kt>(kp, hsh, capacity, busybits, keyps, k_hashes, hm);
+  return -1;
 }
 
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
