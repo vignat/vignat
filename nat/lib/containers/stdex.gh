@@ -166,4 +166,11 @@ ensures lst == update(index, nth(index, lst), lst);
   }
 }
 
+fixpoint t get_some<t>(option<t> x) {
+  switch(x) {
+    case none: return default_value<t>();
+    case some(v): return v;
+  }
+}
+
 #endif

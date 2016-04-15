@@ -175,10 +175,51 @@ int loop(int k, int capacity)
     }
   }
 
+  fixpoint bool shiftNthProp<t>(list<t> arr, fixpoint (t, bool) prop,
+                                int shift, int index) {
+    return nthProp(arr, prop, shift + index);
+  }
+
+  lemma void shift_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
+                              int shift, int inlen, nat outlen)
+  requires length(arr) == inlen &*& 0 <= shift &*&
+           shift + int_of_nat(outlen) <= inlen &*&
+           true == up_to(nat_of_int(inlen), (nthProp)(arr, prop));
+  ensures true == up_to(outlen, (shiftNthProp)(arr, prop, shift));
+  {
+    switch(outlen) {
+      case zero: return;
+      case succ(len):
+        shift_for_all(arr, prop, shift, inlen, len);
+        up_to_covers_x(nat_of_int(inlen), (nthProp)(arr, prop),
+                       int_of_nat(len)+shift);
+    }
+  }
+
+  lemma void shift_for_append<t>(list<t> l1, list<t> l2,
+                                 fixpoint (t, bool) prop,
+                                 nat outlen)
+  requires true == up_to(nat_of_int(length(l2)),
+                         (shiftNthProp)(append(l1,l2), prop, length(l1))) &*&
+           int_of_nat(outlen) <= length(l2);
+  ensures true == up_to(outlen, (nthProp)(l2, prop));
+  {
+    switch(outlen) {
+      case zero: return;
+      case succ(len):
+        shift_for_append(l1, l2, prop, len);
+        up_to_covers_x(nat_of_int(length(l2)),
+                       (shiftNthProp)(append(l1,l2), prop, length(l1)),
+                       int_of_nat(len));
+        nth_append_r(l1, l2, int_of_nat(len));
+    }
+  }
+
   lemma void by_loop_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
                                 int shift, int capacity, nat outlen)
   requires length(arr) == capacity &*& int_of_nat(outlen) <= capacity &*&
-           true == up_to(nat_of_int(capacity), (byLoopNthProp)(arr, prop, capacity, shift));
+           true == up_to(nat_of_int(capacity),
+                         (byLoopNthProp)(arr, prop, capacity, shift));
   ensures true == up_to(outlen, (nthProp)(arr, prop));
   {
     switch(outlen) {
@@ -249,13 +290,6 @@ int loop(int k, int capacity)
       case nil: return false;
       case cons(h,t):
         return no_dups(t) && (h == none || !(mem(h, t)));
-    }
-  }
-
-  fixpoint t get_some<t>(option<t> x) {
-    switch(x) {
-      case none: return default_value<t>();
-      case some(v): return v;
     }
   }
 
@@ -554,13 +588,16 @@ int loop(int k, int capacity)
 @*/
 
 /*@
+
   lemma void up_to_nth_uncons<kt>(kt hd, list<kt> tl, fixpoint (kt, bool) prop)
   requires true == up_to(succ(nat_of_int(length(tl))),
                          (nthProp)(cons(hd,tl), prop));
   ensures true == up_to(nat_of_int(length(tl)), (nthProp)(tl, prop)) &*&
           true == prop(hd);
   {
-    assume(false);//TODO
+    shift_for_all(cons(hd,tl), prop, 1, length(tl)+1, nat_of_int(length(tl)));
+    shift_for_append(cons(hd,nil), tl, prop, nat_of_int(length(tl)));
+    up_to_covers_x(nat_of_int(length(tl)+1), (nthProp)(cons(hd,tl), prop), 0);
   }
 
   lemma void no_key_found<kt>(list<option<kt> > ks, kt k)
