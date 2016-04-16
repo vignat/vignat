@@ -24,8 +24,12 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
                         int* values);
 
   fixpoint map<kt> empty_map_fp<kt>() { return mapc(nil, nil); }
-  fixpoint int map_get_fp<kt>(map<kt> m, kt key);
-  fixpoint bool map_has_fp<kt>(map<kt> m, kt key);
+  fixpoint int map_get_fp<kt>(map<kt> m, kt key) {
+    switch(m) { case mapc(keys, vals): return nth(index_of(key, keys), vals); }
+  }
+  fixpoint bool map_has_fp<kt>(map<kt> m, kt key) {
+    switch(m) { case mapc(keys, vals): return mem(key, keys); }
+  }
   fixpoint map<kt> map_put_fp<kt>(map<kt> m, kt key, int val);
   fixpoint map<kt> map_erase_fp<kt>(map<kt> m, kt key);
   fixpoint int map_size_fp<kt>(map<kt> m);
@@ -61,11 +65,13 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
 /*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, values) &*&
              kp(keyp, ?k) &*&
+             [?fr]is_map_keys_equality(eq, kp) &*&
              hsh(k) == hash &*&
              *value |-> ?v; @*/
 /*@ ensures mapping<kt>(m, kp, recp, hsh, capacity, busybits,
                         keyps, k_hashes, values) &*&
             kp(keyp, k) &*&
+            [fr]is_map_keys_equality(eq, kp) &*&
             (map_has_fp(m, k) ?
              (result == 1 &*&
               *value |-> v &*&

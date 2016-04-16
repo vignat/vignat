@@ -1,0 +1,143 @@
+#ifndef _MODULO_GH_INCLUDED_
+#define _MODULO_GH_INCLUDED_
+
+#include "nth_prop.gh"
+
+  lemma void div_mod(int g, int k, int l)
+  requires g == (k % l) &*& l > 0;
+  ensures (-l <= g) &*& (g < l);
+  {
+    div_rem(k, l);
+  }
+
+  lemma void div_mod_gt_0(int mod, int div, int whole)
+  requires mod == (div % whole) &*& whole > 0 &*& div >= 0;
+  ensures (0 <= mod) &*& (mod < whole);
+  {
+    div_rem(div, whole);
+  }
+
+  fixpoint int loop_fp(int k, int capacity) {
+    return ((k%capacity + capacity)%capacity);
+  }
+
+  lemma void loop_lims(int k, int capacity)
+  requires 0 < capacity;
+  ensures 0 <= loop_fp(k, capacity) &*& loop_fp(k, capacity) < capacity;
+  {
+    div_rem(k, capacity);
+    assert(-capacity <= k%capacity);
+    assert(0 <= k%capacity + capacity);
+    div_rem((k + capacity), capacity);
+    assert(capacity > 0);
+    div_rem(k%capacity + capacity, capacity);
+    assert(0 <= ((k%capacity + capacity)%capacity));
+  }
+
+  lemma void mul_mono(int a, int b, int c)
+  requires a <= b &*& 0 <= c;
+  ensures a * c <= b * c;
+  {
+    for (int i = 0; i < c; i++)
+      invariant i <= c &*& a * i <= b * i;
+      decreases c - i;
+    {
+    }
+  }
+
+  lemma void bar(int a, int b, int q, int r)
+  requires 0 <= a &*& a < b &*& 0 <= r &*& a == q * b + r &*& r < b;
+  ensures q == 0;
+  {
+    if (q == 0) {
+    } else if (0 <= q) {
+      mul_mono(1, q, b);
+    } else {
+      mul_mono(q, -1, b);
+    }
+  }
+
+  lemma void division_round_to_zero(int a, int b)
+  requires 0 <= a &*& a < b;
+  ensures a/b == 0;
+  {
+    div_rem(a, b);
+    bar(a, b, a / b, a % b);
+  }
+
+  lemma void loop_bijection(int k, int capacity)
+  requires 0 <= k &*& k < capacity;
+  ensures loop_fp(k, capacity) == k;
+  {
+    div_rem(k, capacity);
+    assert(0 < capacity);
+    division_round_to_zero(k, capacity);
+    //TODO: the below is really true, see in the debugger!
+    assume(k == ((k/capacity)*capacity) + (k % capacity));
+    assert(k/capacity == 0);
+    assert(k%capacity == k);
+    div_rem((k + capacity), capacity);
+    // Believe me, baby. I the parser get's out of hand here,
+    // so I can not even formulate my assumptions properly
+    assume(false);
+    assert(k == ((k % capacity + capacity) % capacity));
+  }
+
+  lemma void loop_injection(int k, int capacity)
+  requires 0 <= k &*& 0 < capacity;
+  ensures loop_fp(k + capacity, capacity) == loop_fp(k, capacity);
+  {
+    div_rem(k, capacity);
+    div_rem((k + capacity), capacity);
+    int x = (k + capacity) % capacity;
+    // Sorry, you have to believe me again.
+    assume(false);
+    assert(x == ((k%capacity) + (capacity/capacity)));
+  }
+
+  lemma void loop_fixp(int k, int capacity)
+  requires 0 <= k &*& 0 < capacity;
+  ensures loop_fp(k, capacity) == loop_fp(loop_fp(k, capacity), capacity);
+  {
+    loop_lims(k, capacity);
+    loop_bijection(loop_fp(k, capacity), capacity);
+  }
+
+  lemma int loop_shift_inv(int x, int y, int capacity)
+  requires 0 <= x &*& x < capacity;
+  ensures 0 <= result &*& result < capacity &*&
+          loop_fp(result + y, capacity) == x;
+  {
+    int z = loop_fp(x - y, capacity);
+    // TODO:
+    assume(false);
+    if (z == 0) return 0;
+    else return capacity - z;
+  }
+
+  fixpoint bool byLoopNthProp<t>(list<t> arr, fixpoint (t, bool) prop,
+                                 int cap, int shift, int index) {
+    return nthProp(arr, prop, loop_fp(index + shift, cap));
+  }
+
+  lemma void by_loop_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
+                                int shift, int capacity, nat outlen)
+  requires length(arr) == capacity &*& int_of_nat(outlen) <= capacity &*&
+           true == up_to(nat_of_int(capacity),
+                         (byLoopNthProp)(arr, prop, capacity, shift));
+  ensures true == up_to(outlen, (nthProp)(arr, prop));
+  {
+    switch(outlen) {
+      case zero: return;
+      case succ(len):
+        by_loop_for_all(arr, prop, shift, capacity, len);
+        int orig = loop_shift_inv(int_of_nat(len), shift, capacity);
+        up_to_covers_x(nat_of_int(capacity),
+                      (byLoopNthProp)(arr, prop, capacity, shift),
+                      orig);
+        assert(true == byLoopNthProp(arr, prop, capacity, shift, orig));
+        assert(true == nthProp(arr, prop, int_of_nat(len)));
+    }
+  }
+
+#endif//_MODULO_GH_INCLUDED_

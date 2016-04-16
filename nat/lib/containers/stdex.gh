@@ -188,6 +188,34 @@ ensures drop(n+1, lst) == tail(drop(n, lst));
   }
 }
 
+  lemma void reverse_cons<t>(t head, list<t> tail)
+  requires true;
+  ensures reverse(cons(head, tail)) == append(reverse(tail), cons(head, nil));
+  {
+    reverse_append(reverse(tail), cons(head, nil));
+  }
+
+  lemma void append_reverse_take_cons<t>(int n, t head, list<t> tail,
+                                         list<t> tt)
+  requires 0 < n;
+  ensures append(reverse(take(n-1, tail)), cons(head, tt)) ==
+          append(reverse(take(n,cons(head, tail))), tt);
+  {
+    reverse_cons(head, take(n-1, tail));
+    append_assoc(reverse(take(n-1, tail)), cons(head, nil), tt);
+  }
+
+  lemma void append_reverse_tail_cons_head<t>(list<t> l1, list<t> l2)
+  requires l1 != nil;
+  ensures append(reverse(tail(l1)), cons(head(l1), l2)) ==
+          append(reverse(l1), l2);
+  {
+    reverse_cons(head(l1), tail(l1));
+    cons_head_tail(l1);
+    append_assoc(reverse(tail(l1)), cons(head(l1), nil), l2);
+  }
+
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

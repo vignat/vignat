@@ -7,30 +7,10 @@
 //@ #include <listex.gh>
 //@ #include <nat.gh>
 //@ #include "stdex.gh"
+//@ #include "nth_prop.gh"
+//@ #include "modulo.gh"
 
 //TODO: introduce the "chain continuation" bit to optimize search for abscent.
-
-/*@
-  lemma void div_mod(int g, int k, int l)
-  requires g == (k % l) &*& l > 0;
-  ensures (-l <= g) &*& (g < l);
-  {
-  div_rem(k, l);
-  }
-  @*/
-
-/*@
-  lemma void div_mod_gt_0(int mod, int div, int whole)
-  requires mod == (div % whole) &*& whole > 0 &*& div >= 0;
-  ensures (0 <= mod) &*& (mod < whole);
-  {
-  div_rem(div, whole);
-  }
-  @*/
-/*@
-  fixpoint int loop_fp(int k, int capacity)
-  { return ((k%capacity + capacity)%capacity); }
-  @*/
 
 static
 int loop(int k, int capacity)
@@ -45,196 +25,6 @@ int loop(int k, int capacity)
   //@ div_mod_gt_0(res, g + capacity, capacity);
   return res;
 }
-#define CAPACITY 1000
-/*@
-  lemma void loop_lims(int k, int capacity)
-  requires 0 < capacity;
-  ensures 0 <= loop_fp(k, capacity) &*& loop_fp(k, capacity) < capacity;
-  {
-    div_rem(k, capacity);
-    assert(-capacity <= k%capacity);
-    assert(0 <= k%capacity + capacity);
-    div_rem((k + capacity), capacity);
-    assert(capacity > 0);
-    div_rem(k%capacity + capacity, capacity);
-    assert(0 <= ((k%capacity + capacity)%capacity));
-  }
-
-  lemma void mul_mono(int a, int b, int c)
-  requires a <= b &*& 0 <= c;
-  ensures a * c <= b * c;
-  {
-    for (int i = 0; i < c; i++)
-      invariant i <= c &*& a * i <= b * i;
-      decreases c - i;
-    {
-    }
-  }
-
-  lemma void bar(int a, int b, int q, int r)
-  requires 0 <= a &*& a < b &*& 0 <= r &*& a == q * b + r &*& r < b;
-  ensures q == 0;
-  {
-    if (q == 0) {
-    } else if (0 <= q) {
-      mul_mono(1, q, b);
-    } else {
-      mul_mono(q, -1, b);
-    }
-  }
-
-  lemma void division_round_to_zero(int a, int b)
-  requires 0 <= a &*& a < b;
-  ensures a/b == 0;
-  {
-    div_rem(a, b);
-    bar(a, b, a / b, a % b);
-  }
-
-  lemma void loop_bijection(int k, int capacity)
-  requires 0 <= k &*& k < capacity;
-  ensures loop_fp(k, capacity) == k;
-  {
-    div_rem(k, capacity);
-    assert(0 < capacity);
-    division_round_to_zero(k, capacity);
-    //TODO: the below is really true, see in the debugger!
-    assume(k == ((k/capacity)*capacity) + (k % capacity));
-    assert(k/capacity == 0);
-    assert(k%capacity == k);
-    div_rem((k + capacity), capacity);
-    // Believe me, baby. I the parser get's out of hand here,
-    // so I can not even formulate my assumptions properly
-    assume(false);
-    assert(k == ((k % capacity + capacity) % capacity));
-  }
-
-  lemma void loop_injection(int k, int capacity)
-  requires 0 <= k &*& 0 < capacity;
-  ensures loop_fp(k + capacity, capacity) == loop_fp(k, capacity);
-  {
-    div_rem(k, capacity);
-    div_rem((k + capacity), capacity);
-    int x = (k + capacity) % capacity;
-    // Sorry, you have to believe me again.
-    assume(false);
-    assert(x == ((k%capacity) + (capacity/capacity)));
-  }
-
-  lemma void loop_fixp(int k, int capacity)
-  requires 0 <= k &*& 0 < capacity;
-  ensures loop_fp(k, capacity) == loop_fp(loop_fp(k, capacity), capacity);
-  {
-    loop_lims(k, capacity);
-    loop_bijection(loop_fp(k, capacity), capacity);
-  }
-
-  lemma int loop_shift_inv(int x, int y, int capacity)
-  requires 0 <= x &*& x < capacity;
-  ensures 0 <= result &*& result < capacity &*&
-          loop_fp(result + y, capacity) == x;
-  {
-    int z = loop_fp(x - y, capacity);
-    // TODO:
-    assume(false);
-    if (z == 0) return 0;
-    else return capacity - z;
-  }
-  @*/
-
-// nth_prop:
-/*@
-  fixpoint bool nthProp<t>(list<t> arr, fixpoint (t, bool) prop, int index) {
-    return prop(nth(index, arr));
-  }
-
-  fixpoint bool up_to(nat n, fixpoint (int, bool) prop) {
-    switch(n) {
-      case zero: return true;
-      case succ(m): return prop(int_of_nat(m)) && up_to(m, prop);
-    }
-  }
-
-  fixpoint bool byLoopNthProp<t>(list<t> arr, fixpoint (t, bool) prop,
-                                  int cap, int shift, int index) {
-    return nthProp(arr, prop, loop_fp(index + shift, cap));
-  }
-
-  lemma void up_to_covers_x(nat n, fixpoint (int, bool) prop, int x)
-  requires true == up_to(n, prop) &*& 0 <= x &*& x < int_of_nat(n);
-  ensures true == prop(x);
-  {
-    switch(n) {
-      case zero: return;
-      case succ(m):
-        if (x == int_of_nat(m)) {
-          return;
-        } else {
-          up_to_covers_x(m, prop, x);
-        }
-    }
-  }
-
-  fixpoint bool shiftNthProp<t>(list<t> arr, fixpoint (t, bool) prop,
-                                int shift, int index) {
-    return nthProp(arr, prop, shift + index);
-  }
-
-  lemma void shift_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
-                              int shift, int inlen, nat outlen)
-  requires length(arr) == inlen &*& 0 <= shift &*&
-           shift + int_of_nat(outlen) <= inlen &*&
-           true == up_to(nat_of_int(inlen), (nthProp)(arr, prop));
-  ensures true == up_to(outlen, (shiftNthProp)(arr, prop, shift));
-  {
-    switch(outlen) {
-      case zero: return;
-      case succ(len):
-        shift_for_all(arr, prop, shift, inlen, len);
-        up_to_covers_x(nat_of_int(inlen), (nthProp)(arr, prop),
-                       int_of_nat(len)+shift);
-    }
-  }
-
-  lemma void shift_for_append<t>(list<t> l1, list<t> l2,
-                                 fixpoint (t, bool) prop,
-                                 nat outlen)
-  requires true == up_to(nat_of_int(length(l2)),
-                         (shiftNthProp)(append(l1,l2), prop, length(l1))) &*&
-           int_of_nat(outlen) <= length(l2);
-  ensures true == up_to(outlen, (nthProp)(l2, prop));
-  {
-    switch(outlen) {
-      case zero: return;
-      case succ(len):
-        shift_for_append(l1, l2, prop, len);
-        up_to_covers_x(nat_of_int(length(l2)),
-                       (shiftNthProp)(append(l1,l2), prop, length(l1)),
-                       int_of_nat(len));
-        nth_append_r(l1, l2, int_of_nat(len));
-    }
-  }
-
-  lemma void by_loop_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
-                                int shift, int capacity, nat outlen)
-  requires length(arr) == capacity &*& int_of_nat(outlen) <= capacity &*&
-           true == up_to(nat_of_int(capacity),
-                         (byLoopNthProp)(arr, prop, capacity, shift));
-  ensures true == up_to(outlen, (nthProp)(arr, prop));
-  {
-    switch(outlen) {
-      case zero: return;
-      case succ(len):
-        by_loop_for_all(arr, prop, shift, capacity, len);
-        int orig = loop_shift_inv(int_of_nat(len), shift, capacity);
-        up_to_covers_x(nat_of_int(capacity),
-                      (byLoopNthProp)(arr, prop, capacity, shift),
-                      orig);
-        assert(true == byLoopNthProp(arr, prop, capacity, shift, orig));
-        assert(true == nthProp(arr, prop, int_of_nat(len)));
-    }
-  }
-  @*/
 
 /*@
   inductive hmap<kt> = hmap(list<option<kt> >, list<int>);
@@ -332,7 +122,8 @@ int loop(int k, int capacity)
             true == no_dups(ks) &*&
             true == hash_list(ks, khs, hash) &*&
             m == hmap(ks, khs);
-
+@*/
+/*@
   lemma void pred_mapping_same_len<t>(list<int> bbs, list<option<t> > ks)
   requires pred_mapping(?pts, bbs, ?pred, ks);
   ensures pred_mapping(pts, bbs, pred, ks) &*&
@@ -347,23 +138,6 @@ int loop(int k, int capacity)
         pred_mapping_same_len(t, tail(ks));
     }
     close pred_mapping(pts, bbs, pred, ks);
-  }
-
-  lemma void reverse_cons<t>(t head, list<t> tail)
-  requires true;
-  ensures reverse(cons(head, tail)) == append(reverse(tail), cons(head, nil));
-  {
-    reverse_append(reverse(tail), cons(head, nil));
-  }
-
-  lemma void append_reverse_take_cons<t>(int n, t head, list<t> tail,
-                                         list<t> tt)
-  requires 0 < n;
-  ensures append(reverse(take(n-1, tail)), cons(head, tt)) ==
-          append(reverse(take(n,cons(head, tail))), tt);
-  {
-    reverse_cons(head, take(n-1, tail));
-    append_assoc(reverse(take(n-1, tail)), cons(head, nil), tt);
   }
 
   lemma kt extract_pred_for_key<kt>(list<void*> kps_b,
@@ -411,16 +185,6 @@ int loop(int k, int capacity)
             }
         }
     }
-  }
-
-  lemma void append_reverse_tail_cons_head<t>(list<t> l1, list<t> l2)
-  requires l1 != nil;
-  ensures append(reverse(tail(l1)), cons(head(l1), l2)) ==
-          append(reverse(l1), l2);
-  {
-    reverse_cons(head(l1), tail(l1));
-    cons_head_tail(l1);
-    append_assoc(reverse(tail(l1)), cons(head(l1), nil), l2);
   }
 
   lemma void reconstruct_pred_mapping<kt>(list<void*> kps1,
@@ -481,15 +245,6 @@ int loop(int k, int capacity)
                              drop(n, kps),
                              drop(n, bbs),
                              drop(n, ks));
-  }
-
-  lemma void hmapping_capacity_lims<kt>(int capacity)
-  requires hmapping<kt>(?kpr, ?hsh, capacity, ?busybits, ?keyps, ?k_hashes, ?hm);
-  ensures hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm) &*&
-          0 < capacity &*& 2*capacity < INT_MAX;
-  {
-     open hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm);
-     close hmapping<kt>(kpr, hsh, capacity, busybits, keyps, k_hashes, hm);
   }
 
   lemma void no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
@@ -622,6 +377,7 @@ int loop(int k, int capacity)
   }
 @*/
 
+
 static
 int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int start,
                          void* keyp, map_keys_equality* eq, int key_hash,
@@ -638,7 +394,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int start,
             (result == hmap_find_key_fp(hm, k)) :
              (result == -1)); @*/
 {
-  //@ hmapping_capacity_lims(capacity);
   //@ open hmapping(_, _, _, _, _, _, hm);
   //@ assert pred_mapping(?kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
@@ -1037,11 +792,13 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
 /*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, values) &*&
              kp(keyp, ?k) &*&
+             [?fr]is_map_keys_equality(eq, kp) &*&
              hsh(k) == hash &*&
              *value |-> ?v; @*/
 /*@ ensures mapping<kt>(m, kp, recp, hsh, capacity, busybits,
                         keyps, k_hashes, values) &*&
             kp(keyp, k) &*&
+            [fr]is_map_keys_equality(eq, kp) &*&
             (map_has_fp(m, k) ?
              (result == 1 &*&
               *value |-> v &*&
@@ -1050,15 +807,20 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
              (result == 0 &*&
               *value |-> v)); @*/
 {
-    int start = loop(hash, capacity);
-    int index = find_key(busybits, keyps, k_hashes, start,
-                         keyp, eq, hash, capacity);
-    if (-1 == index)
-    {
-        return 0;
-    }
-    *value = values[index];
-    return 1;
+  //@ open mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, ?hm);
+  int start = loop(hash, capacity);
+  //@ close hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, hm);
+  int index = find_key(busybits, keyps, k_hashes, start,
+                       keyp, eq, hash, capacity);
+  if (-1 == index)
+  {
+    //@ close mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+    return 0;
+  }
+  *value = values[index];
+  //@ close mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  return 1;
 }
 
 int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
