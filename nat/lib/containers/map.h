@@ -1,7 +1,7 @@
 #ifndef _MAP_H_INCLUDED_
 #define _MAP_H_INCLUDED_
 
-typedef int map_keys_equality/*@<K>(predicate (void*, K) keyp) @*/(void* k1, void* k2);
+typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, void* k2);
 //@ requires keyp(k1, ?kk1) &*& keyp(k2, ?kk2);
 //@ ensures keyp(k1, kk1) &*& keyp(k2, kk2) &*& (0 == result ? (kk1 != kk2) : (kk1 == kk2));
 
@@ -14,16 +14,16 @@ typedef int map_keys_equality/*@<K>(predicate (void*, K) keyp) @*/(void* k1, voi
   inductive map<kt> = mapc(list<kt>, list<int>);
 
   predicate mapping<kt>(map<kt> m,
-                        predicate (void*, kt) keyp,
+                        predicate (void*;kt) keyp,
                         predicate (kt,int) recp,
                         fixpoint (kt,int) hash,
                         int capacity,
                         int* busybits,
                         void** keyps,
-                        int* k_hashts,
+                        int* k_hashes,
                         int* values);
 
-  fixpoint map<kt> empty_map_fp<kt>();
+  fixpoint map<kt> empty_map_fp<kt>() { return mapc(nil, nil); }
   fixpoint int map_get_fp<kt>(map<kt> m, kt key);
   fixpoint bool map_has_fp<kt>(map<kt> m, kt key);
   fixpoint map<kt> map_put_fp<kt>(map<kt> m, kt key, int val);
@@ -43,15 +43,17 @@ void map_initialize/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
                                  int capacity);
 /*@ requires exists<kt>(_) &*&
              exists<fixpoint (kt,int)>(?hash) &*&
-             [_]is_map_keys_equality<kt>(cmp, ?keyp) &*&
+             [?fr]is_map_keys_equality<kt>(cmp, ?keyp) &*&
              pred_arg2<kt, int>(?recp) &*&
              ints(busybits, capacity, ?bbs) &*&
              pointers(keyps, capacity, ?kplist) &*&
              ints(vals, capacity, ?vallist) &*&
-             ints(khs, capacity, ?khlist); @*/
+             ints(khs, capacity, ?khlist) &*&
+             0 < capacity &*& 2*capacity < INT_MAX; @*/
 /*@ ensures mapping<kt>(empty_map_fp(), keyp, recp, hash,
                         capacity, busybits, keyps,
-                        khs, vals); @*/
+                        khs, vals) &*&
+            [fr]is_map_keys_equality<kt>(cmp, keyp); @*/
 
 int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                         void* keyp, map_keys_equality* eq, int hash, int* value,

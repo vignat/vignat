@@ -299,7 +299,7 @@ int loop(int k, int capacity)
 
   fixpoint bool no_dups<t>(list<option<t> > l) {
     switch(l) {
-      case nil: return false;
+      case nil: return true;
       case cons(h,t):
         return no_dups(t) && (h == none || !(mem(h, t)));
     }
@@ -803,26 +803,232 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
   return -1;
 }
 
+/*@
+  fixpoint list<int> zero_list_fp(nat len) {
+    switch(len) {
+      case zero: return nil;
+      case succ(x): return cons(0, zero_list_fp(x));
+    }
+  }
+
+  fixpoint list<option<kt> > none_list_fp<kt>(nat len) {
+    switch(len) {
+      case zero: return nil;
+      case succ(l): return cons(none,none_list_fp(l));
+    }
+  }
+
+  lemma void move_int(int* data, int i, int len)
+  requires ints(data, i, ?l1) &*& ints(data + i, len - i, ?l2) &*&
+           i < len;
+  ensures ints(data, i + 1, append(l1,cons(head(l2),nil))) &*&
+          ints(data + i + 1, len - i - 1, tail(l2));
+  {
+    open(ints(data, i, l1));
+    switch(l1) {
+      case nil:
+        open(ints(data, len-i, l2));
+        close(ints(data, 1, cons(head(l2),nil)));
+      case cons(h,t):
+        move_int(data+1, i-1, len-1);
+    }
+    close(ints(data, i+1, append(l1, cons(head(l2),nil))));
+  }
+
+  lemma void extend_zero_list(nat len, int extra)
+  requires true;
+  ensures update(int_of_nat(len), 0,
+                 append(zero_list_fp(len), cons(extra,nil))) ==
+          zero_list_fp(succ(len));
+  {
+    switch(len) {
+      case zero: return;
+      case succ(l):
+        extend_zero_list(l, extra);
+    }
+  }
+
+  fixpoint hmap<kt> empty_hmap_fp<kt>(int capacity, list<int> hashes) {
+    return hmap(none_list_fp<kt>(nat_of_int(capacity)),
+                hashes);
+  }
+
+  lemma void nat_len_of_non_nil<t>(t h, list<t> t)
+  requires true;
+  ensures nat_of_int(length(cons(h, t)) - 1) == nat_of_int(length(t)) &*&
+          nat_of_int(length(cons(h, t))) == succ(nat_of_int(length(t)));
+  {
+    int l = length(cons(h,t));
+    assert(0 < l);
+    switch(nat_of_int(l)) {
+      case zero:
+        note(int_of_nat(zero) == l);
+        assert(false);
+        return;
+      case succ(lll):
+        assert(nat_of_int(l) == succ(lll));
+        assert(nat_of_int(int_of_nat(lll) + 1) == succ(nat_of_int(int_of_nat(lll))));
+        assert(nat_of_int(int_of_nat(lll) + 1) == nat_of_int(l));
+        assert(int_of_nat(nat_of_int(int_of_nat(lll) + 1)) == int_of_nat(nat_of_int(l)));
+        assert(int_of_nat(lll) + 1 == l);
+        assert(nat_of_int(int_of_nat(lll)) == nat_of_int(l-1));
+        assert(lll == nat_of_int(l-1));
+        return;
+    }
+  }
+
+  lemma void produce_pred_mapping<kt>(list<int> hashes,
+                                      predicate (void*; kt) kp,
+                                      list<void*> pts)
+  requires length(hashes) == length(pts);
+  ensures pred_mapping(pts, zero_list_fp(nat_of_int(length(pts))),
+                       kp, none_list_fp<kt>(nat_of_int(length(pts))));
+  {
+    switch(pts) {
+      case nil:
+        close pred_mapping(pts, zero_list_fp(nat_of_int(length(pts))),
+                           kp, none_list_fp<kt>(nat_of_int(length(pts))));
+        return;
+      case cons(pth,ptt):
+        switch(hashes) {
+          case nil: break;
+          case cons(hh,ht): break;
+        }
+        assert(hashes != nil);
+        produce_pred_mapping(tail(hashes), kp, ptt);
+        nat_len_of_non_nil(pth,ptt);
+        close pred_mapping(pts, zero_list_fp(nat_of_int(length(pts))),
+                           kp, none_list_fp<kt>(nat_of_int(length(pts))));
+        return;
+    }
+  }
+
+  lemma void confirm_no_dups_on_nones<kt>(nat len)
+  requires true;
+  ensures true == no_dups(none_list_fp(len));
+  {
+    switch(len) {
+      case zero:
+        return;
+      case succ(l): confirm_no_dups_on_nones(l);
+    }
+  }
+
+  lemma void confirm_hash_list_for_nones<kt>(list<int> hashes,
+                                             fixpoint (kt,int) hash)
+  requires true;
+  ensures true == hash_list(none_list_fp(nat_of_int(length(hashes))),
+                            hashes, hash);
+  {
+    switch(hashes) {
+      case nil:
+        return;
+      case cons(h,t):
+        confirm_hash_list_for_nones(t, hash);
+        nat_len_of_non_nil(h,t);
+        assert(tail(none_list_fp(nat_of_int(length(hashes)))) ==
+               none_list_fp(nat_of_int(length(t))));
+        return;
+    }
+  }
+  @*/
+
+/*@
+  predicate key_vals<kt>(list<option<kt> > key_arr, list<int> val_arr;
+                         list<kt> keys, list<int> vals) =
+      switch (key_arr) {
+        case nil: return val_arr == nil &*& keys == nil &*& vals == nil;
+        case cons(key,tail):
+          return switch(key) {
+            case none: return key_vals(tail, tail(val_arr), keys, vals);
+            case some(k): return key_vals(tail, tail(val_arr),
+                                          ?keys_tail, ?vals_tail) &*&
+                                 keys == cons(k, keys_tail) &*&
+                                 vals == cons(head(val_arr), vals_tail);
+          };
+      };
+  //TODO: reformulate as a precise predicate.
+  predicate mapping<kt>(map<kt> m,
+                        predicate (void*;kt) keyp,
+                        predicate (kt,int) recp,
+                        fixpoint (kt,int) hash,
+                        int capacity,
+                        int* busybits,
+                        void** keyps,
+                        int* k_hashes,
+                        int* values) =
+     hmapping<kt>(keyp, hash, capacity, busybits, keyps, k_hashes, ?hm) &*&
+     ints(values, capacity, ?val_arr) &*&
+     key_vals<kt>(hmap_ks_fp(hm), val_arr, ?keys, ?vals) &*&
+     m == mapc(keys, vals);
+  @*/
+
+/*@
+  lemma void produce_empty_key_vals<kt>(list<int> val_arr)
+  requires true;
+  ensures key_vals<kt>(none_list_fp(nat_of_int(length(val_arr))),
+                       val_arr, nil, nil);
+  {
+    switch(val_arr) {
+      case nil: return;
+      case cons(vh,vt):
+        produce_empty_key_vals(vt);
+        nat_len_of_non_nil(vh,vt);
+        close key_vals(none_list_fp(nat_of_int(length(val_arr))),
+                       val_arr, nil, nil);
+        return;
+    }
+  }
+
+  @*/
+
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                 void** keyps, int* khs, int* vals,
                                 int capacity)
   /*@ requires exists<kt>(_) &*&
                exists<fixpoint (kt,int)>(?hash) &*&
-               [_]is_map_keys_equality<kt>(eq, ?keyp) &*&
+               [?fr]is_map_keys_equality<kt>(eq, ?keyp) &*&
                pred_arg2<kt, int>(?recp) &*&
                ints(busybits, capacity, ?bbs) &*&
                pointers(keyps, capacity, ?kplist) &*&
                ints(vals, capacity, ?vallist) &*&
-               ints(khs, capacity, ?khlist); @*/
+               ints(khs, capacity, ?khlist) &*&
+               0 < capacity &*& 2*capacity < INT_MAX; @*/
   /*@ ensures mapping<kt>(empty_map_fp(), keyp, recp, hash,
                           capacity, busybits, keyps,
-                          khs, vals); @*/
+                          khs, vals) &*&
+              [fr]is_map_keys_equality<kt>(eq, keyp); @*/
 {
-  (void)eq; (void)keyps; (void)khs; (void)vals;
+  //@ open exists<kt>(_);
+  //@ open exists<fixpoint (kt,int)>(_);
+  //@ open pred_arg2<kt,int>(_);
   int i = 0;
-  for (; i < capacity; ++i) {
+  for (; i < capacity; ++i)
+    /*@ invariant [fr]is_map_keys_equality<kt>(eq, keyp) &*&
+                  ints(busybits, i, zero_list_fp(nat_of_int(i))) &*&
+                  ints(busybits + i, capacity - i, drop(i,bbs)) &*&
+                  pointers(keyps, capacity, kplist) &*&
+                  ints(vals, capacity, vallist) &*&
+                  ints(khs, capacity, khlist) &*&
+                  0 < capacity &*& 2*capacity < INT_MAX &*&
+                  0 <= i &*& i <= capacity;
+      @*/
+  {
+    //@ move_int(busybits, i, capacity);
+    //@ extend_zero_list(nat_of_int(i), head(drop(i,bbs)));
     busybits[i] = 0;
+    //@ assert(succ(nat_of_int(i)) == nat_of_int(i+1));
+    //@ tail_drop(bbs, i);
   }
+  //@ assert(i == capacity);
+  //@ assert(drop(i,bbs) == nil);
+  //@ open(ints(busybits + i, capacity - i, drop(i,bbs)));
+  //@ produce_pred_mapping<kt>(khlist, keyp, kplist);
+  //@ confirm_no_dups_on_nones<kt>(nat_of_int(capacity));
+  //@ confirm_hash_list_for_nones(khlist, hash);
+  //@ close hmapping<kt>(keyp, hash, capacity, busybits, keyps, khs, empty_hmap_fp<kt>(capacity, khlist));
+  //@ produce_empty_key_vals<kt>(vallist);
+  //@ close mapping(empty_map_fp(), keyp, recp, hash, capacity, busybits, keyps, khs, vals);
 }
 
 int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,

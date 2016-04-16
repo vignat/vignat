@@ -173,4 +173,26 @@ fixpoint t get_some<t>(option<t> x) {
   }
 }
 
+lemma void tail_drop<t>(list<t> lst, int n)
+requires 0 <= n &*& n < length(lst);
+ensures drop(n+1, lst) == tail(drop(n, lst));
+{
+  switch(lst) {
+    case nil: return;
+    case cons(h,t):
+      if (n == 0) {
+        return;
+      } else {
+        tail_drop(t, n-1);
+      }
+  }
+}
+
+// Workaround for unmindful Redux solver.
+// See https://github.com/verifast/verifast/issues/19
+lemma void note(bool b)
+requires b;
+ensures b;
+{}
+
 #endif
