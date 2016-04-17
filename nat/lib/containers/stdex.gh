@@ -125,7 +125,7 @@ ensures length(lst) == 1 + length(tail(lst));
 }
 
 lemma void update_tail_tail_update<T>(T lhead, list<T> ltail, int index, T val)
-requires index > 0;
+requires 0 < index;
 ensures tail(update(index, val, cons(lhead, ltail))) == update(index - 1, val, ltail);
 {
   switch(ltail) {
@@ -141,15 +141,15 @@ ensures tail(update(index, val, cons(lhead, ltail))) == update(index - 1, val, l
   }
 }
 
-lemma void update_0_tail<T>(list<T> lst, T val)
-requires lst != nil;
-ensures tail(update(0, val, lst)) == tail(lst);
-{
-  switch(lst){
-    case nil: return;
-    case cons(h, t): return;
+  lemma void tail_of_update_0<t>(list<t> lst, t val)
+  requires lst != nil;
+  ensures tail(lst) == tail(update(0, val, lst));
+  {
+    switch(lst) {
+      case nil: break;
+      case cons(h,t): break;
+    }
   }
-}
 
 lemma void update_id<T>(int index, list<T> lst)
 requires true;
@@ -165,6 +165,50 @@ ensures lst == update(index, nth(index, lst), lst);
       return;
   }
 }
+
+  lemma void update_non_nil<t>(list<t> lst, int n, t val)
+  requires lst != nil;
+  ensures update(n, val, lst) != nil;
+  {
+    switch(lst) {
+      case nil: break;
+      case cons(h,t): break;
+    }
+  }
+
+  lemma void head_update_0<t>(t val, list<t> lst)
+  requires lst != nil;
+  ensures head(update(0, val, lst)) == val;
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+    }
+  }
+
+  lemma void head_update_nonzero<t>(int n, t val, list<t> lst)
+  requires 0 < n;
+  ensures head(update(n, val, lst)) == head(lst);
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+    }
+  }
+
+  lemma void update_irrelevant_cell<t>(t vsearch, int n, t vnew, list<t> l)
+  requires false == mem(vsearch, l) &*& vsearch != vnew;
+  ensures false == mem(vsearch, update(n, vnew, l));
+  {
+    switch(l) {
+      case nil: break;
+      case cons(h,t):
+        if (n == 0) {
+        } else {
+          update_irrelevant_cell(vsearch, n-1, vnew, t);
+        }
+    }
+  }
 
 fixpoint t get_some<t>(option<t> x) {
   switch(x) {
@@ -214,7 +258,6 @@ ensures drop(n+1, lst) == tail(drop(n, lst));
     cons_head_tail(l1);
     append_assoc(reverse(tail(l1)), cons(head(l1), nil), l2);
   }
-
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19

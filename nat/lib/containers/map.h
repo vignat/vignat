@@ -41,9 +41,22 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
     }
   }
 
-  fixpoint list<pair<kt,int> > map_put_fp<kt>(list<pair<kt,int> > m, kt key, int val);
-  fixpoint list<pair<kt,int> > map_erase_fp<kt>(list<pair<kt,int> > m, kt key);
-  fixpoint int map_size_fp<kt>(list<pair<kt,int> > m);
+  fixpoint list<pair<kt,int> > map_put_fp<kt>(list<pair<kt,int> > m,
+                                              kt key, int val) {
+    return cons(pair(key,val), m);
+  }
+
+  fixpoint list<pair<kt,int> > map_erase_fp<kt>(list<pair<kt,int> > m, kt key) {
+    switch(m) {
+      case nil: return nil;
+      case cons(h,t):
+        return fst(h) == key ? t : cons(h, map_erase_fp(t, key));
+    }
+  }
+
+  fixpoint int map_size_fp<kt>(list<pair<kt,int> > m) {
+    return length(m);
+  }
   @*/
 
 /**
@@ -99,7 +112,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
              kp(keyp, ?k) &*& true == recp(k, value) &*&
              hsh(k) == hash &*&
              false == map_has_fp(m, k); @*/
-/*@ ensures kp(keyp, k) &*& true == recp(k, value) &*&
+/*@ ensures true == recp(k, value) &*&
             (map_size_fp(m) < capacity ?
              (result == 1 &*&
               mapping<kt>(map_put_fp(m, k, value), kp, recp,
@@ -107,6 +120,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                           capacity, busybits,
                           keyps, k_hashes, values)) :
              (result == 0 &*&
+              kp(keyp, k) &*&
               mapping<kt>(m, kp, recp, hsh, capacity, busybits,
                           keyps, k_hashes, values))); @*/
 
