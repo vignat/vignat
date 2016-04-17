@@ -11,11 +11,11 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
   @*/
 
 /*@
-  inductive map<kt> = mapc(list<kt>, list<int>);
+  // map<kt> = list<pair<kt,int> >;
 
-  predicate mapping<kt>(map<kt> m,
+  predicate mapping<kt>(list<pair<kt,int> > m,
                         predicate (void*;kt) keyp,
-                        predicate (kt,int) recp,
+                        fixpoint (kt,int,bool) recp,
                         fixpoint (kt,int) hash,
                         int capacity,
                         int* busybits,
@@ -23,16 +23,27 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
                         int* k_hashes,
                         int* values);
 
-  fixpoint map<kt> empty_map_fp<kt>() { return mapc(nil, nil); }
-  fixpoint int map_get_fp<kt>(map<kt> m, kt key) {
-    switch(m) { case mapc(keys, vals): return nth(index_of(key, keys), vals); }
+  fixpoint list<pair<kt,int> > empty_map_fp<kt>() { return nil; }
+
+  fixpoint int map_get_fp<kt>(list<pair<kt,int> > m, kt key) {
+    switch(m) {
+      case nil: return default_value<int>();
+      case cons(h,t):
+        return (fst(h) == key ? snd(h) : map_get_fp(t, key));
+    }
   }
-  fixpoint bool map_has_fp<kt>(map<kt> m, kt key) {
-    switch(m) { case mapc(keys, vals): return mem(key, keys); }
+
+  fixpoint bool map_has_fp<kt>(list<pair<kt,int> > m, kt key) {
+    switch(m) {
+      case nil: return false;
+      case cons(h,t):
+        return (fst(h) == key) || map_has_fp(t, key);
+    }
   }
-  fixpoint map<kt> map_put_fp<kt>(map<kt> m, kt key, int val);
-  fixpoint map<kt> map_erase_fp<kt>(map<kt> m, kt key);
-  fixpoint int map_size_fp<kt>(map<kt> m);
+
+  fixpoint list<pair<kt,int> > map_put_fp<kt>(list<pair<kt,int> > m, kt key, int val);
+  fixpoint list<pair<kt,int> > map_erase_fp<kt>(list<pair<kt,int> > m, kt key);
+  fixpoint int map_size_fp<kt>(list<pair<kt,int> > m);
   @*/
 
 /**
@@ -48,7 +59,7 @@ void map_initialize/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
 /*@ requires exists<kt>(_) &*&
              exists<fixpoint (kt,int)>(?hash) &*&
              [?fr]is_map_keys_equality<kt>(cmp, ?keyp) &*&
-             pred_arg2<kt, int>(?recp) &*&
+             exists<fixpoint(kt,int,bool)>(?recp) &*&
              ints(busybits, capacity, ?bbs) &*&
              pointers(keyps, capacity, ?kplist) &*&
              ints(vals, capacity, ?vallist) &*&
@@ -74,9 +85,9 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
             [fr]is_map_keys_equality(eq, kp) &*&
             (map_has_fp(m, k) ?
              (result == 1 &*&
-              *value |-> v &*&
-              v == map_get_fp(m, k) &*&
-              recp(k, v)):
+              *value |-> ?nv &*&
+              nv == map_get_fp(m, k) &*&
+              true == recp(k, nv)):
              (result == 0 &*&
               *value |-> v)); @*/
 
@@ -85,10 +96,10 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                         int capacity);
 /*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, values) &*&
-             kp(keyp, ?k) &*& recp(k, value) &*&
+             kp(keyp, ?k) &*& true == recp(k, value) &*&
              hsh(k) == hash &*&
              false == map_has_fp(m, k); @*/
-/*@ ensures kp(keyp, k) &*& recp(k, value) &*&
+/*@ ensures kp(keyp, k) &*& true == recp(k, value) &*&
             (map_size_fp(m) < capacity ?
              (result == 1 &*&
               mapping<kt>(map_put_fp(m, k, value), kp, recp,

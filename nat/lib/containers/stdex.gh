@@ -28,7 +28,7 @@ ensures nth(0, lst) == head(lst);
 }
   
 lemma void nth_cons<T>(int n, list<T> lst, T head)
-requires n > 0;
+requires 0 < n;
 ensures nth(n-1, lst) == nth(n, cons(head, lst));
 {
     switch(lst) {
