@@ -414,6 +414,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int start,
                                 (byLoopNthProp)(ks, (not_my_key)(k),
                                                 capacity, start));
     @*/
+    //@ decreases capacity - i;
   {
     //@ pred_mapping_same_len(bbs, ks);
     int index = loop(start + i, capacity);
@@ -541,6 +542,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
                                 (byLoopNthProp)(ks, cell_busy,
                                                 capacity, start));
       @*/
+    //@ decreases capacity - i;
   {
     //@ pred_mapping_same_len(bbs, ks);
     int index = loop(start + i, capacity);
@@ -794,6 +796,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                   0 < capacity &*& 2*capacity < INT_MAX &*&
                   0 <= i &*& i <= capacity;
       @*/
+    //@ decreases capacity - i;
   {
     //@ move_int(busybits, i, capacity);
     //@ extend_zero_list(nat_of_int(i), head(drop(i,bbs)));
@@ -1759,6 +1762,7 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
                   count(take(i, bbs), nonzero) == s &*&
                   0 <= s &*& s <= i;
       @*/
+    //@ decreases capacity - i;
   {
     //@ add_bit_to_nonzero_count(bbs, i, s);
     if (busybits[i] != 0)
