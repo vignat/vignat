@@ -124,16 +124,21 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
               mapping<kt>(m, kp, recp, hsh, capacity, busybits,
                           keyps, k_hashes, values))); @*/
 
+//TODO: Keep track of the key pointers, in order to preserve the pointer value
+// when releasing it with map_erase.
 int map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* key_hashes,
                           void* keyp, map_keys_equality* eq, int hash,
                           int capacity);
 /*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, key_hashes, ?values) &*&
              kp(keyp, ?k) &*&
+             [?fr]is_map_keys_equality<kt>(eq, kp) &*&
              hsh(k) == hash; @*/
 /*@ ensures kp(keyp, k) &*&
+            [fr]is_map_keys_equality<kt>(eq, kp) &*&
             (map_has_fp(m, k) ?
              (result == 1 &*&
+              kp(?freep, k) &*&
               mapping<kt>(map_erase_fp(m, k), kp, recp, hsh,
                           capacity, busybits, keyps, key_hashes, values)) :
              (result == 0 &*&

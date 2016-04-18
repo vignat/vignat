@@ -217,6 +217,16 @@ fixpoint t get_some<t>(option<t> x) {
   }
 }
 
+lemma void some_get_some<t>(option<t> x)
+requires x != none;
+ensures some(get_some(x)) == x;
+{
+  switch(x) {
+    case none: break;
+    case some(v): break;
+  }
+}
+
 lemma void tail_drop<t>(list<t> lst, int n)
 requires 0 <= n &*& n < length(lst);
 ensures drop(n+1, lst) == tail(drop(n, lst));

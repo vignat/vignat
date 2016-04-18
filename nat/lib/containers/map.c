@@ -70,6 +70,12 @@ int loop(int k, int capacity)
     }
   }
 
+  fixpoint hmap<kt> hmap_rem_key_fp<kt>(hmap<kt> m, int i) {
+    switch(m) { case hmap(ks, khs):
+      return hmap(update(i, none, ks), khs);
+    }
+  }
+
   @*/
 
 /*@
@@ -1397,30 +1403,294 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
   return 1;
 }
 
+/*@
+  lemma void hmap_rem_preserves_pred_mapping<kt>(list<char*> kps, list<int> bbs,
+                                                 predicate (void*;kt) keyp,
+                                                 list<option<kt> > ks,
+                                                 int i)
+  requires pred_mapping(kps, bbs, keyp, ks) &*& 0 <= i &*& nth(i, ks) == some(?k);
+  ensures pred_mapping(kps, update(i, 0, bbs), keyp, update(i, none, ks)) &*&
+          keyp(nth(i, kps), k);
+  {
+    open pred_mapping(kps, bbs, keyp, ks);
+    switch(bbs) {
+      case nil: break;
+      case cons(bbh, bbt):
+        cons_head_tail(ks);
+        cons_head_tail(kps);
+        if (i == 0) {
+        } else {
+          hmap_rem_preserves_pred_mapping(tail(kps), bbt, keyp, tail(ks), i-1);
+          nth_cons(i, tail(ks), head(ks));
+          nth_cons(i, tail(kps), head(kps));
+        }
+    }
+    close pred_mapping(kps, update(i, 0, bbs), keyp, update(i, none, ks));
+  }
+
+
+  lemma void rem_preserves_no_mem<kt>(list<option<kt> > ks, kt k, int i)
+  requires false == mem(some(k), ks);
+  ensures false == mem(some(k), update(i, none, ks));
+  {
+    switch(ks) {
+      case nil: break;
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          rem_preserves_no_mem(t, k, i-1);
+        }
+    }
+  }
+
+  lemma void hmap_rem_preserves_no_dups<kt>(list<option<kt> > ks, int i)
+  requires true == no_dups(ks) &*& 0 <= i;
+  ensures true == no_dups(update(i, none, ks));
+  {
+    switch(ks) {
+     case nil: return;
+     case cons(h,t):
+       if (i == 0) {
+       } else {
+         hmap_rem_preserves_no_dups(t, i-1);
+         if (h == none){
+         } else {
+           assert(false == mem(h, t));
+           some_get_some(h);
+           rem_preserves_no_mem(t, get_some(h), i-1);
+         }
+       }
+       return;
+    }
+  }
+
+  lemma void hmap_rem_preserves_hash_list<kt>(list<option<kt> > vals,
+                                              list<int> hashes,
+                                              fixpoint (kt, int) hash,
+                                              int i)
+  requires true == hash_list(vals, hashes, hash) &*& 0 <= i;
+  ensures true == hash_list(update(i, none, vals), hashes, hash);
+  {
+    switch(vals){
+      case nil: break;
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          hmap_rem_preserves_hash_list(t, tail(hashes), hash, i-1);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_erase_preserves_rec_props<kt>(list<pair<kt,int> > m,
+                                               fixpoint(kt,int,bool) recp,
+                                               kt k)
+  requires true == rec_props(recp, m);
+  ensures true == rec_props(recp, map_erase_fp(m, k));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        if (fst(h) == k) {
+        } else {
+          map_erase_preserves_rec_props(t, recp, k);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_has_not_mem_not<kt>(list<pair<kt,int> > m,
+                                     kt k, int v)
+  requires false == map_has_fp(m, k);
+  ensures false == mem(pair(k,v), m);
+  {
+    switch(m){
+      case nil: break;
+      case cons(h,t):
+        map_has_not_mem_not(t, k, v);
+    }
+  }
+
+  lemma void map_no_dups_has_that_pair<kt>(pair<kt,int> mh,
+                                           list<pair<kt,int> > mt,
+                                           kt k, int v)
+  requires true == no_dup_keys(cons(mh,mt)) &*&
+           true == mem(pair(k,v), cons(mh,mt)) &*&
+           fst(mh) == k;
+  ensures mh == pair(k,v);
+  {
+    if (mh != pair(k,v)) {
+      assert(false == map_has_fp(mt, fst(mh)));
+      map_has_not_mem_not(mt, k, v);
+    }
+  }
+
+  lemma void map_erase_that_key<kt>(list<pair<kt, int> > m,
+                                    kt k, int v)
+  requires true == no_dup_keys(m) &*& true == mem(pair(k, v), m);
+  ensures map_erase_fp(m, k) == remove(pair(k, v), m);
+  {
+    switch(m) {
+      case nil: break;
+      case cons(h,t):
+        if (fst(h) == k) {
+          map_no_dups_has_that_pair(h, t, k, v);
+          assert(h == pair(k,v));
+        } else {
+          map_erase_that_key(t, k, v);
+        }
+    }
+  }
+
+  lemma void map_erase_unrelated_key<kt>(list<pair<kt,int> > m,
+                                         pair<kt,int> kv1, kt k2)
+  requires fst(kv1) != k2;
+  ensures mem(kv1, m) == mem(kv1, map_erase_fp(m, k2)) &*&
+          remove(kv1, map_erase_fp(m, k2)) == map_erase_fp(remove(kv1, m), k2);
+  {
+    switch(m) {
+      case nil: break;
+      case cons(h,t):
+        if (h == kv1) {
+        } else {
+          if (fst(h) == k2) {
+          } else {
+            map_erase_unrelated_key(t, kv1, k2);
+          }
+        }
+    }
+  }
+
+  lemma void map_erase_remove_unrelated<kt>(list<pair<kt,int> > m,
+                                            pair<kt,int> kv1, kt k2)
+  requires fst(kv1) != k2;
+  ensures remove(kv1, map_erase_fp(m, k2)) == map_erase_fp(remove(kv1, m), k2);
+  {
+    switch(m) {
+      case nil: break;
+      case cons(h,t):
+        if (h == kv1) {
+        } else {
+          if (fst(h) == k2) {
+          } else {
+            map_erase_remove_unrelated(t, kv1, k2);
+          }
+        }
+    }
+  }
+
+  lemma void ks_rem_map_erase_coherent<kt>(list<option<kt> > ks,
+                                           list<pair<kt, int> > m,
+                                           int i, kt k)
+  requires key_vals(ks, ?vals, m) &*& nth(i, ks) == some(k) &*&
+           true == no_dup_keys(m) &*& true == no_dups(ks) &*&
+           0 <= i &*& i < length(ks);
+  ensures key_vals(update(i, none, ks), vals, map_erase_fp(m, k));
+  {
+    switch(ks) {
+      case nil:
+        open key_vals(ks, vals, m);
+        close key_vals(update(i, none, ks), vals, map_erase_fp(m, k));
+        break;
+      case cons(h,t):
+        open key_vals(ks, vals, m);
+        if (i == 0) {
+          tail_of_update_0(ks, none);
+          assert(h == some(k));
+          assert(true == mem(pair(k, head(vals)), m));
+          map_erase_that_key(m, k, head(vals));
+          assert(map_erase_fp(m, k) == remove(pair(k, head(vals)), m));
+        } else {
+          if (h == none) {
+            ks_rem_map_erase_coherent(t, m, i-1, k);
+          } else {
+            hmap2map_no_key(t, remove(pair(get_some(h), head(vals)), m),
+                            get_some(h));
+            remove_unique_no_dups(m, pair(get_some(h), head(vals)));
+            ks_rem_map_erase_coherent(t, remove(pair(get_some(h),
+                                                     head(vals)), m),
+                                      i-1, k);
+
+            map_erase_unrelated_key(m, pair(get_some(h), head(vals)), k);
+            update_tail_tail_update(h, t, i, none);
+          }
+        }
+        close key_vals(update(i, none, ks), vals, map_erase_fp(m, k));
+    }
+  }
+
+  lemma void hmap_ks_hmap_rm<kt>(hmap<kt> hm, int i)
+  requires true;
+  ensures hmap_ks_fp(hmap_rem_key_fp(hm, i)) == update(i, none, hmap_ks_fp(hm));
+  {
+    switch(hm) {
+      case hmap(ks, khs): break;
+    }
+  }
+
+  lemma void hmap_rem_map_erase_coherent<kt>(hmap<kt> hm,
+                                             list<pair<kt, int> > m,
+                                             int i, kt k)
+  requires key_vals(hmap_ks_fp(hm), ?vals, m) &*&
+           nth(i, hmap_ks_fp(hm)) == some(k) &*&
+           true == no_dups(hmap_ks_fp(hm)) &*&
+           0 <= i &*& i < length(hmap_ks_fp(hm));
+  ensures key_vals(hmap_ks_fp(hmap_rem_key_fp(hm, i)),
+                   vals, map_erase_fp(m, k));
+  {
+     map_no_dups(hmap_ks_fp(hm), m);
+     hmap_ks_hmap_rm(hm, i);
+     ks_rem_map_erase_coherent(hmap_ks_fp(hm), m, i, k);
+  }
+  @*/
+
 int map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, void* keyp,
                           map_keys_equality* eq, int hash, int capacity)
 /*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, ?values) &*&
              kp(keyp, ?k) &*&
+             [?fr]is_map_keys_equality<kt>(eq, kp) &*&
              hsh(k) == hash; @*/
 /*@ ensures kp(keyp, k) &*&
+            [fr]is_map_keys_equality<kt>(eq, kp) &*&
             (map_has_fp(m, k) ?
             (result == 1 &*&
+             kp(?freep, k) &*&
              mapping<kt>(map_erase_fp(m, k), kp, recp, hsh,
                          capacity, busybits, keyps, k_hashes, values)) :
             (result == 0 &*&
-            mapping<kt>(m, kp, recp, hsh,
-                        capacity, busybits, keyps, k_hashes, values))); @*/
+             mapping<kt>(m, kp, recp, hsh,
+                         capacity, busybits, keyps, k_hashes, values))); @*/
 {
-    int start = loop(hash, capacity);
-    int index = find_key(busybits, keyps, k_hashes, start,
-                         keyp, eq, hash, capacity);
-    if (-1 == index)
-    {
-        return 0;
-    }
-    busybits[index] = 0;
-    return 1;
+  //@ open mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, ?hm);
+  int start = loop(hash, capacity);
+  //@ close hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, hm);
+  int index = find_key(busybits, keyps, k_hashes, start,
+                       keyp, eq, hash, capacity);
+  //@ hmap_exists_iff_map_has(hm, m, k);
+  if (-1 == index)
+  {
+    //@ close mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+    return 0;
+  }
+  //@ hmapping_ks_capacity(hm, capacity);
+  //@ assert(index < capacity);
+  //@ open hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, hm);
+  //@ assert(pred_mapping(?kps, ?bbs, kp, ?ks));
+  //@ assert(ints(k_hashes, capacity, ?khs));
+  busybits[index] = 0;
+  //@ mem_nth_index_of(some(k), ks);
+  //@ hmap_rem_preserves_pred_mapping(kps, bbs, kp, ks, index);
+  //@ hmap_rem_preserves_no_dups(ks, index);
+  //@ hmap_rem_preserves_hash_list(ks, khs, hsh, index);
+  //@ close hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, hmap_rem_key_fp(hm, index));
+  //@ map_erase_preserves_rec_props(m, recp, k);
+  //@ hmap_rem_map_erase_coherent(hm, m, index, k);
+  //@ close mapping(map_erase_fp(m, k), kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  return 1;
 }
 
 int map_size/*@ <kt> @*/(int* busybits, int capacity)
