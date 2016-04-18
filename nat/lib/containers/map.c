@@ -1693,6 +1693,44 @@ int map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, void* keyp
   return 1;
 }
 
+/*@
+  fixpoint bool nonzero(int x) { return x != 0; }
+
+  lemma void add_bit_to_nonzero_count(list<int> bbs, int i, int s)
+  requires s == count(take(i, bbs), nonzero) &*& 0 <= i &*& i < length(bbs);
+  ensures nth(i, bbs) == 0 ?
+           s == count(take(i+1, bbs), nonzero) :
+           s+1 == count(take(i+1, bbs), nonzero);
+  {
+    switch(bbs) {
+      case nil: break;
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          if (h == 0) {
+            add_bit_to_nonzero_count(t, i-1, s);
+          } else {
+            add_bit_to_nonzero_count(t, i-1, s-1);
+          }
+        }
+    }
+  }
+
+  lemma void nonzero_count_is_ks_size<kt>(list<int> bbs, list<option<kt> > ks)
+  requires pred_mapping(?kps, bbs, ?pred, ks);
+  ensures pred_mapping(kps, bbs, pred, ks) &*&
+          count(bbs, nonzero) == ks_size_fp(ks);
+  {
+    open pred_mapping(kps, bbs, pred, ks);
+    switch(bbs) {
+      case nil: break;
+      case cons(h,t):
+        nonzero_count_is_ks_size(t, tail(ks));
+    }
+    close pred_mapping(kps, bbs, pred, ks);
+  }
+  @*/
+
 int map_size/*@ <kt> @*/(int* busybits, int capacity)
 /*@ requires mapping<kt>(?m, ?kp, ?recp, ?hsh, capacity, busybits,
                          ?keyps, ?k_hashes, ?values); @*/
@@ -1700,14 +1738,38 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
                         keyps, k_hashes, values) &*&
             result == map_size_fp(m);@*/
 {
-    int s = 0;
-    int i = 0;
-    for (; i < capacity; ++i)
+  //@ open mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, ?hm);
+  //@ assert ints(busybits, capacity, ?bbs);
+  //@ assert pointers(keyps, capacity, ?kps);
+  //@ assert ints(k_hashes, capacity, ?khs);
+  //@ assert pred_mapping(kps, bbs, kp, ?ks);
+  int s = 0;
+  int i = 0;
+  for (; i < capacity; ++i)
+    /*@ invariant 0 <= i &*& i <= capacity &*&
+                  0 < capacity &*& 2*capacity < INT_MAX &*&
+                  ints(busybits, capacity, bbs) &*&
+                  pointers(keyps, capacity, kps) &*&
+                  ints(k_hashes, capacity, khs) &*&
+                  pred_mapping(kps, bbs, kp, ks) &*&
+                  true == no_dups(ks) &*&
+                  true == hash_list(ks, khs, hsh) &*&
+                  hm == hmap(ks, khs) &*&
+                  count(take(i, bbs), nonzero) == s &*&
+                  0 <= s &*& s <= i;
+      @*/
+  {
+    //@ add_bit_to_nonzero_count(bbs, i, s);
+    if (busybits[i] != 0)
     {
-        if (busybits[i] != 0)
-        {
-            ++s;
-        }
+      ++s;
     }
-    return s;
+  }
+  //@ nonzero_count_is_ks_size(bbs, ks);
+  //@ assert(s == hmap_size_fp(hm));
+  //@ hmap_map_size(hm, m);
+  //@ close hmapping(kp, hsh, capacity, busybits, keyps, k_hashes, hm);
+  //@ close mapping(m, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  return s;
 }
