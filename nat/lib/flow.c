@@ -69,6 +69,30 @@ int ext_key_eq(void* a, void* b) {
   return memcmp(a, b, sizeof(struct ext_key)) == 0;
 }
 
+int int_key_hash(void* key) {
+  struct int_key* ik = key;
+  return ik->int_src_port ^ ik->dst_port ^ ik->int_src_ip ^
+         ik->dst_ip ^ ik->int_device_id ^ ik->protocol;
+}
+
+int ext_key_hash(void* key) {
+  struct ext_key* ek = key;
+  return ek->ext_src_port ^ ek->dst_port ^ ek->ext_src_ip ^
+         ek->dst_ip ^ ek->ext_device_id ^ ek->protocol;
+}
+
+void flow_extract_keys(void* flwp, void** ikpp, void** ekpp)
+{
+  struct flow* fp = flwp;
+  *ikpp = &flwp->ik;
+  *ekpp = &flwp->ek;
+}
+
+void flow_pack_keys(void* flwp, void* ikp, void* ekp)
+{
+  /* do nothing */
+}
+
 
 void flow_cpy(char* dst, void* src) {
   memcpy(dst, src, sizeof(struct flow));

@@ -4,10 +4,6 @@
 #include "double-map.h"
 
 struct DoubleMap {
-  int key_a_offset;
-  int key_a_size;
-  int key_b_offset;
-  int key_b_size;
   int value_size;
 
   uq_value_copy* cpy;
@@ -19,44 +15,39 @@ struct DoubleMap {
   int *khs_a;
   int *inds_a;
   map_keys_equality *eq_a;
+  map_key_hash *hsh_a;
 
   int *bbs_b;
   void **kps_b;
   int *khs_b;
   int *inds_b;
   map_keys_equality *eq_b;
+  map_key_hash *hsh_b;
+  dmap_extract_keys *exk;
+  dmap_pack_keys *pk;
 
   int n_vals;
   int capacity;
 };
 
-static
-uint32_t hash(void* keyp, int key_size)
-{
-  uint32_t* slice = (uint32_t*)keyp;
-  int n = key_size*sizeof(uint8_t)/sizeof(uint32_t);
-  uint32_t rez = 0;
-  for (--n; n >= 0; --n)
-    {
-      rez ^= slice[n];
-    }
-  return rez;
-}
-
-int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
-                  int key_b_size, int key_b_offset, map_keys_equality* eq_b,
-                  int value_size, uq_value_copy* v_cpy, int capacity,
+int dmap_allocate/*@ <K1,K2,V> @*/
+                 (map_keys_equality* eq_a, map_key_hash* hsh_a,
+                  map_keys_equality* eq_b, map_key_hash* hsh_b,
+                  int value_size, uq_value_copy* v_cpy,
+                  dmap_extract_keys* dexk,
+                  dmap_pack_keys* dpk,
+                  int capacity,
                   struct DoubleMap** map_out) {
   if (NULL == (*map_out = malloc(sizeof(struct DoubleMap)))) return 0;
 
-  (**map_out).key_a_size = key_a_size;
-  (**map_out).key_a_offset = key_a_offset;
   (**map_out).eq_a = eq_a;
-  (**map_out).key_b_size = key_b_size;
-  (**map_out).key_b_offset = key_b_offset;
+  (**map_out).hsh_a = hsh_a;
   (**map_out).eq_b = eq_b;
+  (**map_out).hsh_b = hsh_b;
   (**map_out).value_size = value_size;
   (**map_out).cpy = v_cpy;
+  (**map_out).exk = dexk;
+  (**map_out).pk = dpk;
   (**map_out).capacity = capacity;
 
   if (NULL == ((**map_out).values = malloc(value_size   *capacity))) return 0;
@@ -82,41 +73,41 @@ int dmap_allocate(int key_a_size, int key_a_offset, map_keys_equality* eq_a,
 
 int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   return map_get(map->bbs_a, map->kps_a, map->khs_a, map->inds_a, key,
-                 map->eq_a, hash(key, map->key_a_size), index,
+                 map->eq_a, map->hsh_a(key), index,
                  map->capacity);
 }
 
 int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   return map_get(map->bbs_b, map->kps_b, map->khs_b, map->inds_b, key,
-                 map->eq_b, hash(key, map->key_b_size), index,
+                 map->eq_b, map->hsh_b(key), index,
                  map->capacity);
 }
 
 int dmap_put(struct DoubleMap* map, void* value, int index) {
   void* my_value = map->values + index*map->value_size;
   map->cpy(my_value, value);
-  void* key_a = (uint8_t*)my_value + map->key_a_offset;
-  void* key_b = (uint8_t*)my_value + map->key_b_offset;
+  void* key_a = 0;
+  void* key_b = 0;
+  map->exk(my_value, &key_a, &key_b);
   int ret = map_put(map->bbs_a, map->kps_a, map->khs_a,
                     map->inds_a, key_a,
-                    hash(key_a, map->key_a_size),
+                    map->hsh_a(key_a),
                     index, map->capacity) &&
     map_put(map->bbs_b, map->kps_b, map->khs_b,
             map->inds_b, key_b,
-            hash(key_b, map->key_b_size),
+            map->hsh_b(key_b),
             index, map->capacity);
   if (ret) ++map->n_vals;
   return ret;
 }
 
 int dmap_erase(struct DoubleMap* map, int index) {
-  void* key_a = map->values + index*map->value_size + map->key_a_offset;
-  void* key_b = map->values + index*map->value_size + map->key_b_offset;
+  map->exk(map->values + index*map->value_size, &key_a, &key_b);
   int ret = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
-                      map->eq_a, hash(key_a, map->key_a_size),
+                      map->eq_a, map->hsh_a(key_a),
                       map->capacity) &&
     map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
-              map->eq_b, hash(key_b, map->key_b_size),
+              map->eq_b, map->hsh_b(key_b),
               map->capacity);
   if (ret) --map->n_vals;
   return ret;

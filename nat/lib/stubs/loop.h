@@ -14,12 +14,14 @@ predicate dmap_dchain_coherent(dmap<int_k,ext_k,flw> m, dchain ch) = true;
 fixpoint int dochain_index_range(dchain ch);
 
 predicate nat_flow_p(int_k ik, ext_k ek, flw fl, int index) =
-   flow_p(fl, ik, ek) &*& ext_k_get_esp(ek) == 2747 + index;
+    flw_get_ik(fl) == ik &*& flw_get_ek(fl) == ek &*&
+    ext_k_get_esp(ek) == 2747 + index;
+
 
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
                                 uint32_t time) =
-          dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, flw_p, nat_flow_p,
-                                     ?capacity, mp) &*&
+          dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, int_hash, ext_hash,
+                                     flw_p, nat_flow_p, ?capacity, mp) &*&
           double_chainp(?ch, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
           last_time(time) &*&
@@ -50,10 +52,10 @@ ensures dmap_dchain_coherent(dmap_put_fp(m, k1, k2,
                              dchain_take_next_index_fp(ch));
 
 lemma void coherent_dchain_non_out_of_space_map_nonfull(dmap<int_k,ext_k,flw> m, dchain ch);
-requires dmappingp<int_k,ext_k,flw>(m, ?a, ?b, ?c, ?d, ?cap, ?f) &*&
+requires dmappingp<int_k,ext_k,flw>(m, ?a, ?b, ?c, ?d, ?e, ?g, ?cap, ?f) &*&
          dmap_dchain_coherent(m, ch) &*&
          dchain_out_of_space_fp(ch) == false;
-ensures dmappingp<int_k,ext_k,flw>(m, a, b, c, d, cap, f) &*&
+ensures dmappingp<int_k,ext_k,flw>(m, a, b, c, d, e, g, cap, f) &*&
         dmap_dchain_coherent(m, ch) &*&
         dmap_size_fp(m) < cap;
 @*/
