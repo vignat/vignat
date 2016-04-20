@@ -62,11 +62,27 @@ void log_flow(const struct flow *f) {
 }
 
 int int_key_eq(void* a, void* b) {
-  return memcmp(a, b, sizeof(struct int_key)) == 0;
+  struct int_key* k1 = a;
+  struct int_key* k2 = b;
+  return
+    (k1->int_src_port  == k2->int_src_port) &
+    (k1->dst_port      == k2->dst_port) &
+    (k1->int_src_ip    == k2->int_src_ip) &
+    (k1->dst_ip        == k2->dst_ip) &
+    (k1->int_device_id == k2->int_device_id) &
+    (k1->protocol      == k2->protocol);
 }
 
 int ext_key_eq(void* a, void* b) {
-  return memcmp(a, b, sizeof(struct ext_key)) == 0;
+  struct ext_key* k1 = a;
+  struct ext_key* k2 = b;
+  return
+    (k1->ext_src_port  == k2->ext_src_port) &
+    (k1->dst_port      == k2->dst_port) &
+    (k1->ext_src_ip    == k2->ext_src_ip) &
+    (k1->dst_ip        == k2->dst_ip) &
+    (k1->ext_device_id == k2->ext_device_id) &
+    (k1->protocol      == k2->protocol);
 }
 
 int int_key_hash(void* key) {
@@ -84,12 +100,13 @@ int ext_key_hash(void* key) {
 void flow_extract_keys(void* flwp, void** ikpp, void** ekpp)
 {
   struct flow* fp = flwp;
-  *ikpp = &flwp->ik;
-  *ekpp = &flwp->ek;
+  *ikpp = &fp->ik;
+  *ekpp = &fp->ek;
 }
 
 void flow_pack_keys(void* flwp, void* ikp, void* ekp)
 {
+  (void)flwp; (void)ikp; (void)ekp;
   /* do nothing */
 }
 

@@ -102,6 +102,8 @@ int dmap_put(struct DoubleMap* map, void* value, int index) {
 }
 
 int dmap_erase(struct DoubleMap* map, int index) {
+  void* key_a = 0;
+  void* key_b = 0;
   map->exk(map->values + index*map->value_size, &key_a, &key_b);
   int ret = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
                       map->eq_a, map->hsh_a(key_a),

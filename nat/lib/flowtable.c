@@ -153,9 +153,7 @@ int allocate_flowtables(uint8_t nb_ports) {
                     flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr),
                     flow_nests, sizeof(flow_nests)/sizeof(struct nested_field_descr));
 #endif //KLEE_VERIFICATION
-    return dmap_allocate(sizeof(struct int_key),
-                         int_key_eq, int_key_hash,
-                         sizeof(struct ext_key),
+    return dmap_allocate(int_key_eq, int_key_hash,
                          ext_key_eq, ext_key_hash,
                          sizeof(struct flow), flow_cpy,
                          flow_extract_keys,

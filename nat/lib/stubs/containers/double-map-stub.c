@@ -7,9 +7,7 @@
 #define prealloc_size (256)
 
 int key_a_size_g = 0;
-int key_a_offset_g = 0;
 int key_b_size_g = 0;
-int key_b_offset_g = 0;
 int value_size_g = 0;
 
 //uint8_t key_a[prealloc_size];
@@ -31,9 +29,26 @@ int key_a_field_count = 0,
   value_field_count = 0,
   value_nests_count = 0;
 
+map_keys_equality* eq_a_g = 0;
+map_keys_equality* eq_b_g = 0;
+dmap_extract_keys* dexk_g = 0;
+dmap_pack_keys* dpk_g = 0;
+
 void dmap_set_entry_condition(entry_condition* c) {
   klee_trace_param_fptr(c, "c");
   ent_cond = c;
+}
+
+int calculate_str_size(struct str_field_descr* descr, int len) {
+  int rez = 0;
+  int sum = 0;
+  for (int i = 0; i < len; ++i) {
+    sum += descr[i].width;
+    if (descr[i].offset + descr[i].width > rez)
+      rez = descr[i].offset + descr[i].width;
+  }
+  klee_assert(rez == sum);
+  return rez;
 }
 
 void dmap_set_layout(struct str_field_descr* key_a_field_, int key_a_count_,
@@ -52,12 +67,12 @@ void dmap_set_layout(struct str_field_descr* key_a_field_, int key_a_count_,
   key_b_field_count = key_b_count_;
   value_field_count = value_count_;
   value_nests_count = value_nests_count_;
+  key_a_size_g = calculate_str_size(key_a_field_, key_a_count_);
+  key_b_size_g = calculate_str_size(key_b_field_, key_b_count_);
 }
 
-int dmap_allocate(int key_a_size,
-                  map_keys_equality eq_a,
+int dmap_allocate(map_keys_equality eq_a,
                   map_key_hash hsh_a,
-                  int key_b_size,
                   map_keys_equality eq_b,
                   map_key_hash hsh_b,
                   int value_size,
@@ -67,10 +82,8 @@ int dmap_allocate(int key_a_size,
                   int capacity,
                   struct DoubleMap** map_out) {
   klee_trace_ret();
-  klee_trace_param_i32(key_a_size, "key_a_size");
   klee_trace_param_fptr(eq_a, "eq_a");
   klee_trace_param_fptr(hsh_a, "hsh_a");
-  klee_trace_param_i32(key_b_size, "key_b_size");
   klee_trace_param_fptr(eq_b, "eq_b");
   klee_trace_param_fptr(hsh_b, "hsh_b");
   klee_trace_param_i32(value_size, "value_size");
@@ -80,17 +93,18 @@ int dmap_allocate(int key_a_size,
   klee_trace_param_i32(capacity, "capacity");
   klee_trace_param_ptr(map_out, sizeof(struct DoubleMap*), "map_out");
 
+  eq_a_g = eq_a;
+  eq_b_g = eq_b;
+  dexk_g = dexk;
+  dpk_g = dpk;
+
   allocation_succeeded = klee_int("dmap_allocation_succeeded");
   if (allocation_succeeded) {
     klee_make_symbolic(&allocated_map_ptr, sizeof(struct DoubleMap*),
                        "allocated_map_do_not_dereference");
     *map_out = allocated_map_ptr;
 
-    klee_assert(key_a_size < prealloc_size);
-    klee_assert(key_b_size < prealloc_size);
     klee_assert(value_size < prealloc_size);
-    klee_assert(key_a_offset + key_a_size < value_size);
-    klee_assert(key_b_offset + key_b_size < value_size);
 
     //No need to allocate keys separately, since we know that
     //the keys are stored in the value
@@ -105,10 +119,6 @@ int dmap_allocate(int key_a_size,
     klee_assume(0 <= allocated_index);
     klee_assume(allocated_index < capacity);
 
-    key_a_size_g = key_a_size;
-    key_a_offset_g = key_a_offset;
-    key_b_size_g = key_b_size;
-    key_b_offset_g = key_b_offset;
     value_size_g = value_size;
     // Do not assume the ent_cond here, because depending on what comes next,
     // we may change the key_a, key_b or value. we assume the condition after
@@ -117,7 +127,7 @@ int dmap_allocate(int key_a_size,
   }
   return 0;
 }
-
+#include "lib/flow.h"
 int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
@@ -137,11 +147,14 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    memcpy(value + key_a_offset_g, key, key_a_size_g);
+    void *key_a = 0;
+    void *key_b = 0;
+    dexk_g(value, &key_a, &key_b);
+    klee_assume(eq_a_g(key_a, key));
     if (ent_cond)
-      klee_assume(ent_cond(value + key_a_offset_g,
-                           value + key_b_offset_g,
+      klee_assume(ent_cond(key_a, key_b,
                            allocated_index, value));
+    dpk_g(value, key_a, key_b);
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -168,10 +181,13 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    memcpy(value + key_b_offset_g, key, key_b_size_g);
-    if (ent_cond) klee_assume(ent_cond(value + key_a_offset_g,
-                                       value + key_b_offset_g,
+    void *key_a = 0;
+    void *key_b = 0;
+    dexk_g(value, &key_a, &key_b);
+    klee_assume(eq_b_g(key_b, key));
+    if (ent_cond) klee_assume(ent_cond(key_a, key_b,
                                        allocated_index, value));
+    dpk_g(value, key_a, key_b);
     entry_claimed = 1;
     *index = allocated_index;
     return 1;
@@ -212,12 +228,15 @@ int dmap_put(struct DoubleMap* map, void* value_, int index) {
     klee_assert(allocated_index == index);
   }
   memcpy(value, value_, value_size_g);
+  void* key_a = 0;
+  void* key_b = 0;
+  dexk_g(value, &key_a, &key_b);
   // This must be provided by the caller, since it his responsibility
   // to fulfill the value by the same index:
-  klee_assert(ent_cond == NULL || ent_cond(value + key_a_offset_g,
-                                           value + key_b_offset_g,
+  klee_assert(ent_cond == NULL || ent_cond(key_a, key_b,
                                            index,
                                            value));
+  dpk_g(value, key_a, key_b);
   entry_claimed = 1;
   allocated_index = index;
   return 1;
