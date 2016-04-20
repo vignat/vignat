@@ -14,15 +14,15 @@ typedef int map_key_hash/*@ <K>(predicate (void*; K) keyp,
 //@ requires keyp(k1, ?kk1);
 //@ ensures keyp(k1, kk1) &*& result == hash(kk1);
 
-typedef void uq_value_copy/*@<K>(predicate (void*; K) vp, int size) @*/(char* dst, void* src);
+typedef void uq_value_copy/*@<K>(predicate (void*, K) vp, int size) @*/(char* dst, void* src);
 //@ requires vp(src, ?v) &*& dst[0..size] |-> _;
 //@ ensures vp(src, v) &*& vp(dst, v);
 
 typedef void dmap_extract_keys/*@ <K1,K2,V>
                                 (predicate (void*; K1) keyp1,
                                  predicate (void*; K2) keyp2,
-                                 predicate (void*; V) full_valp,
-                                 predicate (void*; V) bare_valp,
+                                 predicate (void*, V) full_valp,
+                                 predicate (void*, V) bare_valp,
                                  fixpoint (void*, void*, void*, bool)
                                    right_offsets,
                                  fixpoint (V,K1) vk1,
@@ -39,8 +39,8 @@ typedef void dmap_extract_keys/*@ <K1,K2,V>
 typedef void dmap_pack_keys/*@ <K1,K2,V>
                              (predicate (void*; K1) keyp1,
                               predicate (void*; K2) keyp2,
-                              predicate (void*; V) full_valp,
-                              predicate (void*; V) bare_valp,
+                              predicate (void*, V) full_valp,
+                              predicate (void*, V) bare_valp,
                               fixpoint (void*, void*, void*, bool)
                                 right_offsets,
                               fixpoint (V,K1) vk1,
@@ -58,8 +58,8 @@ struct DoubleMap;
   inductive dmap<t1,t2,vt> = dmap(list<t1>, list<t2>, list<int>, list<vt>);
 
   predicate dmappingp<t1,t2,vt>(dmap<t1,t2,vt> m,
-                                predicate (void*,t1) keyp1,
-                                predicate (void*,t2) keyp2,
+                                predicate (void*;t1) keyp1,
+                                predicate (void*;t2) keyp2,
                                 fixpoint (t1,int) hsh1,
                                 fixpoint (t2,int) hsh2,
                                 predicate (void*,vt) full_vp,
@@ -193,7 +193,8 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              [_]is_dmap_pack_keys(dpk, keyp1, keyp2, fvp, bvp, rof, vk1, vk2) &*&
              exists<fixpoint(K1,K2,V,int,bool)>(?recp) &*&
              *map_out |-> ?old_map_out &*&
-             0 < value_size; @*/
+             0 < value_size &*& value_size < 4096 &*&
+             0 < capacity &*& capacity < 4096; @*/
 /*@ ensures result == 0 ?
             (*map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&

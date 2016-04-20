@@ -69,8 +69,7 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
 void map_initialize/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
                                  void** keyps, int* khs, int* vals,
                                  int capacity);
-/*@ requires exists<kt>(_) &*&
-             exists<fixpoint (kt,int)>(?hash) &*&
+/*@ requires exists<pair<kt,fixpoint (kt,int)> >(pair(_,?hash)) &*&
              [?fr]is_map_keys_equality<kt>(cmp, ?keyp) &*&
              exists<fixpoint(kt,int,bool)>(?recp) &*&
              ints(busybits, capacity, ?bbs) &*&

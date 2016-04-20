@@ -768,8 +768,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                 void** keyps, int* khs, int* vals,
                                 int capacity)
-  /*@ requires exists<kt>(_) &*&
-               exists<fixpoint (kt,int)>(?hash) &*&
+  /*@ requires exists<pair<kt,fixpoint (kt,int)> >(pair(_,?hash)) &*&
                [?fr]is_map_keys_equality<kt>(eq, ?keyp) &*&
                exists<fixpoint (kt,int,bool)>(?recp) &*&
                ints(busybits, capacity, ?bbs) &*&
@@ -782,8 +781,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                           khs, vals) &*&
               [fr]is_map_keys_equality<kt>(eq, keyp); @*/
 {
-  //@ open exists<kt>(_);
-  //@ open exists<fixpoint (kt,int)>(_);
+  //@ open exists(pair(_,_));
   //@ open exists<fixpoint (kt,int,bool)>(_);
   int i = 0;
   for (; i < capacity; ++i)
