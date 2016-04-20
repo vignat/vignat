@@ -247,7 +247,8 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index);
              fvp(value, ?v) &*& true == rp(vk1(v), vk2(v), v, index) &*&
              false == dmap_index_used_fp(m, index) &*&
              false == dmap_has_k1_fp(m, vk1(v)) &*&
-             false == dmap_has_k2_fp(m, vk2(v)); @*/
+             false == dmap_has_k2_fp(m, vk2(v)) &*&
+             0 <= index &*& index < cap; @*/
 /*@ ensures (dmap_size_fp(m) < cap ?
              (result == 1 &*&
               dmappingp<K1,K2,V>(dmap_put_fp(m, vk1(v), vk2(v), index, v),
@@ -266,7 +267,8 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
                                 ?fvp, ?bvp, ?rof, ?vsz,
                                 ?vk1, ?vk2, ?rp, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true &*&
-             value_out[0..vsz] |-> _; @*/
+             value_out[0..vsz] |-> _ &*&
+             0 <= index &*& index < cap; @*/
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
                                fvp, bvp, rof, vsz,
                                vk1, vk2, rp, cap, map) &*&
@@ -276,7 +278,8 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
                                 ?vk1, ?vk2, ?rp, ?cap, map) &*&
-             dmap_index_used_fp(m, index) == true; @*/
+             dmap_index_used_fp(m, index) == true &*&
+             0 <= index &*& index < cap; @*/
 /*@ ensures (dmap_index_used_fp(m, index) ?
              (result == 1 &*&
               dmappingp<K1,K2,V>(dmap_erase_fp(m, index),
