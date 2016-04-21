@@ -42,7 +42,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = nat
 
 # all source are stored in SRCS-y
-SRCS-y := main.c lib/flowtable.c lib/flowmanager.c lib/flow.c lib/containers/map.c lib/containers/double-chain.c lib/containers/double-chain-impl.c lib/containers/double-map.c lib/expirator.c lib/my-time.c
+SRCS-y := main.c lib/flowtable.c lib/flowmanager.c lib/flow.c lib/flow-log.c lib/containers/map.c lib/containers/double-chain.c lib/containers/double-chain-impl.c lib/containers/double-map.c lib/expirator.c lib/my-time.c
 
 CFLAGS += $(USER_FLAGS)
 CFLAGS += $(WERROR_FLAGS)
@@ -57,6 +57,6 @@ endif
 include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
-	clang-3.4 -DKLEE_VERIFICATION main.c lib/stubs/rte_stubs.c lib/flowtable.c lib/flowmanager.c lib/flow.c lib/stubs/loop-stub.c lib/stubs/containers/double-chain-stub.c lib/stubs/expirator-stub.c lib/stubs/my-time-stub.c lib/stubs/containers/double-map-stub.c $(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c -I . -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include -c -g -emit-llvm
-	llvm-link-3.4 rte_stubs.bc main.bc flowtable.bc flowmanager.bc flow.bc double-chain-stub.bc expirator-stub.bc loop-stub.bc my-time-stub.bc double-map-stub.bc cmdline_parse*addr.bc -o veri.bc
+	clang-3.4 -DKLEE_VERIFICATION main.c lib/stubs/rte_stubs.c lib/flowtable.c lib/flowmanager.c lib/flow.c lib/flow-log.c lib/stubs/loop-stub.c lib/stubs/containers/double-chain-stub.c lib/stubs/expirator-stub.c lib/stubs/my-time-stub.c lib/stubs/containers/double-map-stub.c $(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c -I . -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include -c -g -emit-llvm
+	llvm-link-3.4 rte_stubs.bc main.bc flowtable.bc flowmanager.bc flow.bc flow-log.bc double-chain-stub.bc expirator-stub.bc loop-stub.bc my-time-stub.bc double-map-stub.bc cmdline_parse*addr.bc -o veri.bc
 	klee --libc=uclibc --posix-runtime veri.bc -p 0x3 --wan 1

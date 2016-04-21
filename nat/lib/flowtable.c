@@ -13,12 +13,6 @@
 #  include "stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
 
-/*
-#if MAX_FLOWS > DMAP_CAPACITY
-#  error "The map static capacity is insufficient for this number of flows"
-#endif
-*/
-
 #ifdef KLEE_VERIFICATION
 #  define LOG(...)
 #  define LOG_ADD(...)
@@ -31,7 +25,7 @@
 struct DoubleMap *flow_map;
 
 void get_flow(int index, struct flow* flow_out) {
-  dmap_get_value(flow_map, index, flow_out);
+  dmap_get_value(flow_map, index, (char*)flow_out);
 }
 
 struct DoubleMap *get_flow_table(void) {

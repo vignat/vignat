@@ -781,6 +781,8 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                           khs, vals) &*&
               [fr]is_map_keys_equality<kt>(eq, keyp); @*/
 {
+  //FIXME: verifast do not understand this
+  //idiom: (void)eq;(void)keyps;(void)khs;(void)vals;
   //@ open exists(pair(_,_));
   //@ open exists<fixpoint (kt,int,bool)>(_);
   int i = 0;
