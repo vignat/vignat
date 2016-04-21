@@ -16,27 +16,27 @@ struct dchain_cell {
  * the order matters.
  * It is supposed to store the ordered sequence, and support moving any
  * element to the top.
- * 
- * The lists are organized as follows:
- *       +-----------+   +---+   +-------------------+   +-----
- *       |           V   |   V   |                   V   |    
- *  [    .] [. + .] {    .} {    .} {. + .} {. + .} {    .} ....
- *           ^   ^   ^   ^           ^   ^   ^   ^
- *           |   |   |   |           |   |   |   |
- *           |   +---+   +-----------+   +---+   +-------------
- *           +-------------------------------------------------
  *
- * Where {    .} is an "free" list cell, and {. + .} is an "occupied" list cell,
+ * The lists are organized as follows:
+ *              +----+   +---+   +-------------------+   +-----
+ *              |    V   |   V   |                   V   |
+ *  [. + .][    .]  {    .} {    .} {. + .} {. + .} {    .} ....
+ *   ^   ^                           ^   ^   ^   ^
+ *   |   |                           |   |   |   |
+ *   |   +---------------------------+   +---+   +-------------
+ *   +---------------------------------------------------------
+ *
+ * Where {    .} is an "free" list cell, and {. + .} is an "alloc" list cell,
  * and dots represent prev/next fields.
  * [] - denote the special cells - the ones that are always kept in the
  * corresponding lists.
- * Empty "free" and "allocated" lists look like this:
+ * Empty "alloc" and "free" lists look like this:
  *
- *  +---+    +---+
- *  |   V    V   V
- * [    .]  [. + .]
+ *   +---+   +---+
+ *   V   V   V   |
+ *  [. + .] [    .]
  *
- * , or cells[0].next == 0 && cells[0].prev == 0 for the "alloc" list, and
+ * , i.e. cells[0].next == 0 && cells[0].prev == 0 for the "alloc" list, and
  * cells[1].next == 1 for the free list.
  * For any cell in the "alloc" list, 'prev' and 'next' fields must be different.
  * Any cell in the "free" list, in contrast, have 'prev' and 'next' equal;
@@ -71,16 +71,53 @@ struct dchain_cell {
   predicate dchainip(dchaini ch,
                      struct dchain_cell * cells);
 
-  fixpoint dchaini empty_dchaini_fp(int index_range);
-  fixpoint bool dchaini_out_of_space_fp(dchaini ch);
-  fixpoint int dchaini_get_next_index_fp(dchaini ch);
-  fixpoint dchaini dchaini_take_next_index_fp(dchaini ch);
-  fixpoint dchaini dchaini_rejuvenate_fp(dchaini ch, int index);
-  fixpoint bool dchaini_allocated_index_fp(dchaini ch, int index);
-  fixpoint bool dchaini_is_empty_fp(dchaini ch);
-  fixpoint int dchaini_get_oldest_index_fp(dchaini ch);
-  fixpoint dchaini dchaini_remove_index_fp(dchaini ch, int index);
-  fixpoint int dchaini_irange_fp(dchaini ch);
+  fixpoint dchaini empty_dchaini_fp(int index_range) {
+    return dchaini(nil, index_range);
+  }
+
+  fixpoint bool dchaini_out_of_space_fp(dchaini ch) {
+    switch(ch) { case dchaini(alist, size):
+      return length(alist) == size;
+    }
+  }
+
+  fixpoint bool dchaini_allocated_fp(dchaini ch, int idx) {
+    switch(ch) { case dchaini(alist, size):
+      return mem(idx, alist);
+    }
+  }
+
+  fixpoint dchaini dchaini_allocate_fp(dchaini ch, int idx) {
+    switch(ch) { case dchaini(alist, size):
+      return dchaini(cons(idx,alist), size);
+    }
+  }
+
+  fixpoint dchaini dchaini_rejuvenate_fp(dchaini ch, int index) {
+    switch(ch) { case dchaini(alist, size):
+      return dchaini(cons(index, remove(index, alist)), size);
+    }
+  }
+
+  fixpoint bool dchaini_is_empty_fp(dchaini ch) {
+    switch(ch) { case dchaini(alist, size): return alist == nil; }
+  }
+
+  fixpoint int dchaini_get_oldest_index_fp(dchaini ch) {
+    switch(ch) { case dchaini(alist, size):
+      return nth(length(alist) - 1, alist);
+    }
+  }
+
+  fixpoint dchaini dchaini_remove_fp(dchaini ch, int index) {
+    switch(ch) { case dchaini(alist, size):
+      return dchaini(remove(index, alist), size);
+    }
+  }
+
+  fixpoint int dchaini_irange_fp(dchaini ch) {
+    switch(ch) { case dchaini(alist, size): return size; }
+  }
   @*/
 
 void dchain_impl_init(struct dchain_cell *cells, int index_range);
@@ -91,16 +128,18 @@ void dchain_impl_init(struct dchain_cell *cells, int index_range);
 int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index);
 /*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
 /*@ ensures (dchaini_out_of_space_fp(dc) ?
-             (dchainip(dc, cells) &*& *index |-> i &*& result == 0) :
-             (dchainip(dchaini_take_next_index_fp(dc), cells) &*&
-              *index |-> dchaini_get_next_index_fp(dc) &*&
-              result == 1)); @*/
+             (result == 0 &*&
+              dchainip(dc, cells) &*& *index |-> i &*& result == 0) :
+             (result == 1 &*&
+              *index |-> ?ni &*&
+              false == dchaini_allocated_fp(dc, ni) &*&
+              dchainip(dchaini_allocate_fp(dc, ni), cells))); @*/
 
 int dchain_impl_free_index(struct dchain_cell *cells, int index);
 /*@ requires dchainip(?dc, cells) &*&
              0 <= index &*& index < dchaini_irange_fp(dc); @*/
-/*@ ensures (dchaini_allocated_index_fp(dc, index) ?
-             (dchainip(dchaini_remove_index_fp(dc, index), cells) &*&
+/*@ ensures (dchaini_allocated_fp(dc, index) ?
+             (dchainip(dchaini_remove_fp(dc, index), cells) &*&
               result == 1) :
              (dchainip(dc, cells) &*&
               result == 0)); @*/
@@ -113,10 +152,11 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index);
               result == 0) :
              (*index |-> dchaini_get_oldest_index_fp(dc) &*&
               result == 1)); @*/
+
 int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index);
 /*@ requires dchainip(?dc, cells) &*&
              0 <= index &*& index < dchaini_irange_fp(dc); @*/
-/*@ ensures (dchaini_allocated_index_fp(dc, index) ?
+/*@ ensures (dchaini_allocated_fp(dc, index) ?
              (dchainip(dchaini_rejuvenate_fp(dc, index), cells) &*&
               result == 1) :
              (dchainip(dc, cells) &*&

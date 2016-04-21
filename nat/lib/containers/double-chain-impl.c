@@ -6,23 +6,91 @@ enum DCHAIN_ENUM {
     INDEX_SHIFT = DCHAIN_RESERVED
 };
 
+/*@
 
-void dchain_impl_init(struct dchain_cell *cells, int size) {
-    cells[ALLOC_LIST_HEAD].prev = 0;
-    cells[ALLOC_LIST_HEAD].next = 0;
-    int i = INDEX_SHIFT;
-    cells[FREE_LIST_HEAD].next = i;
-    cells[FREE_LIST_HEAD].prev = cells[FREE_LIST_HEAD].next;
-    while (i < (size + INDEX_SHIFT - 1)) {
-        cells[i].next = i+1;
-        cells[i].prev = cells[i].next;
-        ++i;
+  inductive fcell = fcell(int, int);
+  inductive bcell = bcell(int, int, int);
+
+  fixpoint int get_bcell_ind(bcell bc) {
+    switch(bc) { case bcell(ind,prev,next): return ind; }
+  }
+
+  fixpoint list<fcell> free_list_fp(list<dcell> arr, int start_index) {
+    switch(arr) {
+      case nil: return nil;
+      case cons(h,t):
+        return (dchain_cell_get_prev(h) == dchain_cell_get_next(h) ?
+                cons(fcell(start_index, dchain_cell_get_next(h)),
+                     free_list_fp(t, start_index+1)) :
+                free_list_fp(t, start_index+1));
     }
-    cells[i].next = FREE_LIST_HEAD;
+  }
+
+  fixpoint list<bcell> busy_list_fp(list<dcell> arr, int start_index) {
+    switch(arr) {
+      case nil: return nil;
+      case cons(h,t):
+        return (dchain_cell_get_prev(h) != dchain_cell_get_next(h) ?
+                cons(bcell(start_index, dchain_cell_get_prev(h),
+                           dchain_cell_get_next(h)),
+                     busy_list_fp(t, start_index+1)) :
+                busy_list_fp(t, start_index+1));
+    }
+  }
+
+  fixpoint list<int> get_indexes_fp(list<bcell> bls) {
+    switch(bls) {
+      case nil: return nil;
+      case cons(h,t):
+        return cons(get_bcell_ind(h), get_indexes_fp(t));
+    }
+  }
+
+  predicate dchainip(dchaini ch,
+                     struct dchain_cell * cells) =
+    switch(ch) { case dchaini(allocd, size):
+      return
+        INDEX_SHIFT < size &*&
+        dcellsp(cells, size, ?cls) &*&
+        allocd == get_indexes_fp(busy_list_fp(cls,0));
+    };
+  @*/
+
+void dchain_impl_init(struct dchain_cell *cells, int size)
+/*@ requires 0 < size &*&
+             dcellsp(cells, size + DCHAIN_RESERVED, _); @*/
+/*@ ensures dchainip(empty_dchaini_fp(size), cells); @*/
+{
+  struct dchain_cell* al_head = cells + ALLOC_LIST_HEAD;
+  al_head->prev = 0;
+  al_head->next = 0;
+  int i = INDEX_SHIFT;
+  //@ open dcellsp(cells, size + 2, _);
+  //@ open dcellsp(cells+1, size + 1, _);
+  struct dchain_cell* fl_head = cells + FREE_LIST_HEAD;
+  fl_head->next = i;
+  fl_head->prev = fl_head->next;
+  cells[FREE_LIST_HEAD].next = i;
+  cells[FREE_LIST_HEAD].prev = cells[FREE_LIST_HEAD].next;
+  while (i < (size + INDEX_SHIFT - 1)) {
+    cells[i].next = i+1;
     cells[i].prev = cells[i].next;
+    ++i;
+  }
+  cells[i].next = FREE_LIST_HEAD;
+  cells[i].prev = cells[i].next;
 }
 
-int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index) {
+int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
+/*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
+/*@ ensures (dchaini_out_of_space_fp(dc) ?
+             (result == 0 &*&
+              dchainip(dc, cells) &*& *index |-> i &*& result == 0) :
+             (result == 1 &*&
+              *index |-> ?ni &*&
+              false == dchaini_allocated_fp(dc, ni) &*&
+              dchainip(dchaini_allocate_fp(dc, ni), cells))); @*/
+{
     /* No more empty cells. */
     if (cells[FREE_LIST_HEAD].next == FREE_LIST_HEAD)
         return 0;
@@ -40,7 +108,15 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index) {
     return 1;
 }
 
-int dchain_impl_free_index(struct dchain_cell *cells, int index) {
+int dchain_impl_free_index(struct dchain_cell *cells, int index)
+/*@ requires dchainip(?dc, cells) &*&
+             0 <= index &*& index < dchaini_irange_fp(dc); @*/
+/*@ ensures (dchaini_allocated_fp(dc, index) ?
+             (dchainip(dchaini_remove_fp(dc, index), cells) &*&
+              result == 1) :
+             (dchainip(dc, cells) &*&
+              result == 0)); @*/
+{
     int freed = index + INDEX_SHIFT;
     /* The index is already free. */
     if (cells[freed].next == cells[freed].prev)
@@ -57,7 +133,15 @@ int dchain_impl_free_index(struct dchain_cell *cells, int index) {
     return 1;
 }
 
-int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index) {
+int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
+/*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
+/*@ ensures dchainip(dc, cells) &*&
+            (dchaini_is_empty_fp(dc) ?
+             (*index |-> i &*&
+              result == 0) :
+             (*index |-> dchaini_get_oldest_index_fp(dc) &*&
+              result == 1)); @*/
+{
     /* No allocated indexes. */
     if (cells[ALLOC_LIST_HEAD].next == cells[ALLOC_LIST_HEAD].prev)
         return 0;
@@ -65,7 +149,15 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index) {
     return 1;
 }
 
-int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index) {
+int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
+/*@ requires dchainip(?dc, cells) &*&
+             0 <= index &*& index < dchaini_irange_fp(dc); @*/
+/*@ ensures (dchaini_allocated_fp(dc, index) ?
+             (dchainip(dchaini_rejuvenate_fp(dc, index), cells) &*&
+              result == 1) :
+             (dchainip(dc, cells) &*&
+              result == 0)); @*/
+{
     int lifted = index + INDEX_SHIFT;
     /* The index is not allocated. */
     if (cells[lifted].next == cells[lifted].prev)
