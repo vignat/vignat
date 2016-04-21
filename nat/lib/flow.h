@@ -64,15 +64,15 @@ void log_flow(const struct flow *f);
   switch(k) {case ikc(x46, x47, x48, x49, x50, ret): return ret;}
   }
 
-  predicate int_k_p(struct int_key* kp, int_k k) =
-    kp->int_src_port |-> int_k_get_isp(k) &*&
-    kp->dst_port |-> int_k_get_dp(k) &*&
-    kp->int_src_ip |-> int_k_get_isip(k) &*&
-    kp->dst_ip |-> int_k_get_dip(k) &*&
-    kp->int_device_id |-> int_k_get_idid(k) &*&
-    kp->protocol |-> int_k_get_prtc(k);
+  predicate int_k_p(struct int_key* kp; int_k k) =
+    kp->int_src_port |-> ?isp &*&
+    kp->dst_port |-> ?dp &*&
+    kp->int_src_ip |-> ?isip &*&
+    kp->dst_ip |-> ?dip &*&
+    kp->int_device_id |-> ?idid &*&
+    kp->protocol |-> ?prtc &*&
+    k == ikc(isp, dp, isip, dip, idid, prtc);
 
-  
   inductive ext_k = ekc(int, int, int, int, int, int);
   fixpoint int ext_k_get_esp(ext_k k) {
   switch(k) {case ekc(ret, x1, x2, x3, x4, x5): return ret;}
@@ -93,13 +93,14 @@ void log_flow(const struct flow *f);
   switch(k) {case ekc(x46, x47, x48, x49, x50, ret): return ret;}
   }
 
-  predicate ext_k_p(struct ext_key* kp, ext_k k) =
-    kp->ext_src_port |-> ext_k_get_esp(k) &*&
-    kp->dst_port |-> ext_k_get_dp(k) &*&
-    kp->ext_src_ip |-> ext_k_get_esip(k) &*&
-    kp->dst_ip |-> ext_k_get_dip(k) &*&
-    kp->ext_device_id |-> ext_k_get_edid(k) &*&
-    kp->protocol |-> ext_k_get_prtc(k);
+  predicate ext_k_p(struct ext_key* kp; ext_k k) =
+    kp->ext_src_port |-> ?esp &*&
+    kp->dst_port |-> ?dp &*&
+    kp->ext_src_ip |-> ?esip &*&
+    kp->dst_ip |-> ?dip &*&
+    kp->ext_device_id |-> ?edid &*&
+    kp->protocol |-> ?prtc &*&
+    k == ekc(esp, dp, esip, dip, edid, prtc);
 
   inductive flw = flwc(int_k, ext_k, int, int, int,
                        int, int, int, int, int, int);
@@ -158,10 +159,19 @@ void log_flow(const struct flow *f);
     fp->ext_device_id |-> flw_get_edid(f) &*&
     fp->protocol |-> flw_get_prtc(f);
 
-  predicate flw_p(struct flow* fp, flw f) =
-    flow_p(fp, f) &*&
-    int_k_p(&fp->ik, flw_get_ik(f)) &*&
-    ext_k_p(&fp->ek, flw_get_ek(f));
+  predicate flw_p(struct flow* fp; flw f) =
+    int_k_p(&fp->ik, ?ik) &*&
+    ext_k_p(&fp->ek, ?ek) &*&
+    fp->int_src_port |-> ?isp &*&
+    fp->ext_src_port |-> ?esp &*&
+    fp->dst_port |-> ?dp &*&
+    fp->int_src_ip |-> ?isip &*&
+    fp->ext_src_ip |-> ?esip &*&
+    fp->dst_ip |-> ?dip &*&
+    fp->int_device_id |-> ?idid &*&
+    fp->ext_device_id |-> ?edid &*&
+    fp->protocol |-> ?prtc &*&
+    f == flwc(ik, ek, isp, esp, dp, isip, esip, dip, idid, edid, prtc);
 
   fixpoint bool flow_keys_offsets_fp(struct flow* fp,
                                      struct int_key* ik,
@@ -170,13 +180,13 @@ void log_flow(const struct flow *f);
   }
 
   fixpoint int int_hash(int_k ik) {
-    switch(ik) {case ikc(x1, x2, x3, x4, x5, x6, x7, x8):
-                     return x1^x2^x3^x4^x5^x6^x7;}
+    switch(ik) {case ikc(x1, x2, x3, x4, x5, x6):
+                     return x1^x2^x3^x4^x5^x6;}
   }
 
   fixpoint int ext_hash(ext_k ek) {
-    switch(ek) {case ekc(x1, x2, x3, x4, x5, x6, x7, x8):
-                      return x1^x2^x3^x4^x5^x6^x7;}
+    switch(ek) {case ekc(x1, x2, x3, x4, x5, x6):
+                      return x1^x2^x3^x4^x5^x6;}
   }
   @*/
 
@@ -194,14 +204,11 @@ int ext_key_hash(void* ek);
 //@ requires ext_k_p(ek, ?k);
 //@ ensures ext_k_p(ek, k) &*& result == ext_hash(k);
 
-void flow_cpy(char* dst, void* src);
-//@ requires flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
-//@ ensures flw_p(src, f) &*& flw_p((void*)dst, f);
-
 void flow_extract_keys(void* flwp, void** ikpp, void** ekpp);
 //@ requires flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
 /*@ ensures flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&
             int_k_p(ikp, ?ik) &*& ext_k_p(ekp, ?ek) &*&
+            true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
             ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
 
 void flow_pack_keys(void* flwp, void* ikp, void* ekp);
@@ -209,5 +216,9 @@ void flow_pack_keys(void* flwp, void* ikp, void* ekp);
              true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
              ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
 //@ ensures flw_p(flwp, flw);
+
+void flow_cpy(char* dst, void* src);
+//@ requires flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
+//@ ensures flw_p(src, f) &*& flw_p((void*)dst, f);
 
 #endif //_FLOW_H_INCLUDED_

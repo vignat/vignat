@@ -32,7 +32,7 @@ typedef void dmap_extract_keys/*@ <K1,K2,V>
 //@ requires full_valp(vp, ?v) &*& *kpp1 |-> _ &*& *kpp2 |-> _;
 /*@ ensures bare_valp(vp, v) &*& *kpp1 |-> ?kp1 &*& *kpp2 |-> ?kp2 &*&
             keyp1(kp1, ?k1) &*& keyp2(kp2, ?k2) &*&
-            true == right_offsets(kp1, kp2, vp) &*&
+            true == right_offsets(vp, kp1, kp2) &*&
             k1 == vk1(v) &*&
             k2 == vk2(v); @*/
 
@@ -48,7 +48,7 @@ typedef void dmap_pack_keys/*@ <K1,K2,V>
                            @*/
                            (void* vp, void* kp1, void* kp2);
 /*@ requires bare_valp(vp, ?v) &*& keyp1(kp1, ?k1) &*& keyp2(kp2, ?k2) &*&
-             true == right_offsets(kp1, kp2, vp) &*&
+             true == right_offsets(vp, kp1, kp2) &*&
              k1 == vk1(v) &*&
              k2 == vk2(v); @*/
 //@ ensures full_valp(vp, v);

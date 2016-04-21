@@ -2,6 +2,7 @@
 if [ -z $VERIFAST ]; then VERIFAST="verifast"; fi
 KLEE_OUT_DIR=$1
 WORK_DIR=$2
+SINGLE_TEST=$3
 REPORT_FNAME="${WORK_DIR}/report.txt"
 SPEC_DIR="../nat"
 
@@ -51,7 +52,7 @@ validate_file() {
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
     CMD1="./validator.byte $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST"
     CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
-    echo "$CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
+    echo "corebuild -use-menhir validator.byte && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
     $CMD1 > $VALID_RESULT && $CMD2 > $VERIF_RESULT
     analyze_result $VERIF_RESULT $FNAME
     show_result $FNAME $(cat $VALID_RESULT)
@@ -84,7 +85,11 @@ export SPEC_DIR
 
 # executing this file on a container looses the $SHELL value in parallel
 export SHELL=/bin/bash
-parallel validate_file ::: $KLEE_OUT_DIR/call-pre*.txt
+if [ -z "$SINGLE_TEST" ]; then
+    parallel validate_file ::: $KLEE_OUT_DIR/call-pre*.txt
+else
+    validate_file $KLEE_OUT_DIR/call-prefix00000$SINGLE_TEST.txt
+fi
 
 TOT=$(cat $REPORT_FNAME | wc -l)
 SUCC=$(grep -c "success" $REPORT_FNAME)

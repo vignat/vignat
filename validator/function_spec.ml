@@ -81,9 +81,11 @@ let fun_types =
                     leaks = [leak "last_time(_)" ~id:"last_time"];};
      "dmap_allocate", {ret_type = Sint32;
                        arg_types =
-                         [Sint32;Sint32;Ptr (Ctm "map_keys_equality");
-                          Sint32;Sint32;Ptr (Ctm "map_keys_equality");
-                          Sint32; Ptr (Ctm "uq_value_copy");Sint32;
+                         [Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
+                          Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
+                          Sint32; Ptr (Ctm "uq_value_copy");
+                          Ptr (Ctm "dmap_extract_keys"); Ptr (Ctm "dmap_pack_keys");
+                          Sint32;
                           Ptr (Ptr dmap_struct)];
                        lemmas_before = [
                          tx_bl "produce_function_pointer_chunk \
@@ -92,17 +94,49 @@ let fun_types =
                                 call();\
                                 }";
                          tx_bl "produce_function_pointer_chunk \
+                                map_key_hash<int_k>(int_key_hash)\
+                                (int_k_p, int_hash)(a)\
+                                {\
+                                call();\
+                                }";
+                         tx_bl "produce_function_pointer_chunk \
                                 map_keys_equality<ext_k>(ext_key_eq)(ext_k_p)(a, b)\
+                                {\
+                                call();\
+                                }";
+                         tx_bl "produce_function_pointer_chunk \
+                                map_key_hash<ext_k>(ext_key_hash)\
+                                (ext_k_p, ext_hash)(a)\
+                                {\
+                                call();\
+                                }";
+                         tx_bl "produce_function_pointer_chunk \
+                                dmap_extract_keys<int_k,ext_k,flw>\
+                                (flow_extract_keys)\
+                                (int_k_p, ext_k_p, flw_p, flow_p,\
+                                 flow_keys_offsets_fp,\
+                                 flw_get_ik,\
+                                 flw_get_ek)(a, b, c)\
+                                {\
+                                call();\
+                                }";
+                         tx_bl "produce_function_pointer_chunk \
+                                dmap_pack_keys<int_k,ext_k,flw>\
+                                (flow_pack_keys)\
+                                (int_k_p, ext_k_p, flw_p, flow_p,\
+                                 flow_keys_offsets_fp,\
+                                 flw_get_ik,\
+                                 flw_get_ek)(a, b, c)\
                                 {\
                                 call();\
                                 }";
                          (fun args ->
                             "/*@\
                              assume(sizeof(struct flow) == " ^
-                            (List.nth_exn args 6) ^ ");\n@*/ " ^
+                            (List.nth_exn args 4) ^ ");\n@*/ " ^
                              "/*@ produce_function_pointer_chunk \
                              uq_value_copy<flw>(flow_cpy)\
-                             (flw_p, " ^ (List.nth_exn args 6) ^ ")(a,b)\
+                             (flw_p, " ^ (List.nth_exn args 4) ^ ")(a,b)\
                              {\
                              call();\
                              }@*/");
@@ -111,7 +145,7 @@ let fun_types =
                                       flwc(ikc(0,0,0,0,0,0),\
                                            ekc(0,0,0,0,0,0),\
                                            0,0,0,0,0,0,0,0,0)));";
-                         tx_bl "close pred_arg4(nat_flow_p);"];
+                         tx_bl "close exists(nat_flow_fp);"];
                        lemmas_after = [];
                        leaks = [
                          on_rez_nz_leak "dmappingp<int_k, ext_k, flw>(_,_,_,_,_,_,_)"
@@ -209,8 +243,7 @@ let fun_types =
                          last_index_key := Ext;
                          last_indexing_succ_ret_var := ret_var;
                          "");
-                      on_rez_nonzero "{open nat_flow_p(_,_,_,_);\n\
-                                      open flow_p(_,_,_);}";
+                      on_rez_nonzero "{open flow_p(_,_,_);}";
                     ];
                     leaks = [];};
      "dmap_get_a", {ret_type = Sint32;
@@ -251,8 +284,7 @@ let fun_types =
                          last_index_key := Sint32;
                          last_indexing_succ_ret_var := ret_var;
                          "");
-                      on_rez_nonzero "{open nat_flow_p(_,_,_,_);\n\
-                                      open flow_p(_,_,_);}";
+                      on_rez_nonzero "{open flow_p(_,_,_);}";
                     ];
                     leaks = [];};
      "dmap_put", {ret_type = Sint32;
@@ -279,18 +311,6 @@ let fun_types =
                                user_buf0_30, cmplx1, user_buf0_23),\
                                ekc(tmp1, user_buf0_36, 184789184,\
                                user_buf0_30, 1, user_buf0_23));@*/");
-                    (fun _ -> "/*@ close nat_flow_p \
-                               (ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                               user_buf0_30, cmplx1, user_buf0_23),\
-                               ekc(tmp1, user_buf0_36, 184789184,\
-                               user_buf0_30, 1, user_buf0_23),\
-                               flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                               user_buf0_30, cmplx1, user_buf0_23),\
-                               ekc(tmp1, user_buf0_36, 184789184,\
-                               user_buf0_30, 1, user_buf0_23),\
-                               user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\
-                               184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                               new_index_0);@*/");
                     (fun args -> "/*@{\n\
                                   assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                                   _,_,_,_,_," ^ (List.nth_exn args 0) ^
@@ -311,7 +331,6 @@ let fun_types =
                                   flw value = dmap_get_val_fp(cur_map, index);\n\
                                   dmap_get_by_index_rp(cur_map, index);\n\
                                   dmap_get_by_k2_invertible(cur_map, ek);\n\
-                                  open nat_flow_p(_, _, value, index);\n\
                                   assert(index == new_index_0);\n\
                                   assert(true == dmap_index_used_fp(cur_map, new_index_0));\n\
                                   coherent_dmap_used_dchain_allocated(cur_map,\
@@ -377,8 +396,7 @@ let fun_types =
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23));\
                         }@*/");
                   ];
-                  leaks = [
-                    leak "nat_flow_p(_,_,_,_)"];};
+                  leaks = [];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         lemmas_before = [];
