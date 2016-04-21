@@ -768,23 +768,24 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                 void** keyps, int* khs, int* vals,
                                 int capacity)
-  /*@ requires exists<pair<kt,fixpoint (kt,int)> >(pair(_,?hash)) &*&
-               [?fr]is_map_keys_equality<kt>(eq, ?keyp) &*&
-               exists<fixpoint (kt,int,bool)>(?recp) &*&
-               ints(busybits, capacity, ?bbs) &*&
-               pointers(keyps, capacity, ?kplist) &*&
-               ints(vals, capacity, ?vallist) &*&
-               ints(khs, capacity, ?khlist) &*&
-               0 < capacity &*& 2*capacity < INT_MAX; @*/
-  /*@ ensures mapping<kt>(empty_map_fp(), keyp, recp, hash,
-                          capacity, busybits, keyps,
-                          khs, vals) &*&
-              [fr]is_map_keys_equality<kt>(eq, keyp); @*/
+/*@ requires map_key_type<kt>(_) &*& map_key_hash<kt>(?hash) &*&
+             [?fr]is_map_keys_equality<kt>(eq, ?keyp) &*&
+             map_record_property<kt>(?recp) &*&
+             ints(busybits, capacity, ?bbs) &*&
+             pointers(keyps, capacity, ?kplist) &*&
+             ints(vals, capacity, ?vallist) &*&
+             ints(khs, capacity, ?khlist) &*&
+             0 < capacity &*& 2*capacity < INT_MAX; @*/
+/*@ ensures mapping<kt>(empty_map_fp(), keyp, recp, hash,
+                        capacity, busybits, keyps,
+                        khs, vals) &*&
+            [fr]is_map_keys_equality<kt>(eq, keyp); @*/
 {
   //FIXME: verifast do not understand this
   //idiom: (void)eq;(void)keyps;(void)khs;(void)vals;
-  //@ open exists(pair(_,_));
-  //@ open exists<fixpoint (kt,int,bool)>(_);
+  //@ open map_key_type(_);
+  //@ open map_key_hash<kt>(_);
+  //@ open map_record_property(_);
   int i = 0;
   for (; i < capacity; ++i)
     /*@ invariant [fr]is_map_keys_equality<kt>(eq, keyp) &*&
