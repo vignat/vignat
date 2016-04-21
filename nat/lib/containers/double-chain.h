@@ -15,11 +15,10 @@ struct DoubleChain;
   fixpoint bool dchain_out_of_space_fp(dchain ch);
   fixpoint int dchain_index_range_fp(dchain ch);
 
-  fixpoint int dchain_get_next_index_fp(dchain ch);
-  fixpoint dchain dchain_take_next_index_fp(dchain ch);
+  fixpoint dchain dchain_allocate_fp(dchain ch, int index);
 
   fixpoint dchain dchain_rejuvenate_fp(dchain ch, int index, uint32_t time);
-  fixpoint bool dchain_allocated_index_fp(dchain ch, int index);
+  fixpoint bool dchain_allocated_fp(dchain ch, int index);
 
   fixpoint bool dchain_is_empty_fp(dchain ch);
   fixpoint int dchain_get_oldest_index_fp(dchain ch);
@@ -28,10 +27,6 @@ struct DoubleChain;
 
   fixpoint dchain dchain_expire_old_indexes_fp(dchain ch, uint32_t time);
   fixpoint list<int> dchain_get_expired_indexes_fp(dchain ch, uint32_t time);
-
-  lemma void dchain_next_index_not_allocated(dchain ch);
-  requires true;
-  ensures false == dchain_allocated_index_fp(ch, dchain_get_next_index_fp(ch));
 
   lemma void expire_old_dchain_nonfull(dchain ch, uint32_t time);
   requires length(dchain_get_expired_indexes_fp(ch, time)) > 0;
@@ -62,16 +57,16 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
 /*@ ensures dchain_out_of_space_fp(ch) ?
             (result == 0 &*& *index_out |-> i &*&
              double_chainp(ch, chain)) :
-            (result == 1 &*& *index_out |-> ?io &*&
-             io == dchain_get_next_index_fp(ch) &*&
-             0 <= io &*& io < dchain_index_range_fp(ch) &*&
-             double_chainp(dchain_take_next_index_fp(ch), chain)); @*/
+            (result == 1 &*& *index_out |-> ?in &*&
+             false == dchain_allocated_fp(ch, in) &*&
+             0 <= in &*& in < dchain_index_range_fp(ch) &*&
+             double_chainp(dchain_allocate_fp(ch, in), chain)); @*/
 
 int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time);
 /*@ requires double_chainp(?ch, chain) &*&
              0 <= index &*& index < dchain_index_range_fp(ch); @*/
-/*@ ensures dchain_allocated_index_fp(ch, index) ?
+/*@ ensures dchain_allocated_fp(ch, index) ?
             (result == 1 &*&
              double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
             (result == 0 &*&
