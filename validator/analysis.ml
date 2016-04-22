@@ -2,7 +2,7 @@ open Core.Std
 open Ir
 
 let log str =
-  if true then ()
+  if false then ()
   else print_string str
 
 let lprintf fmt = ksprintf log fmt
@@ -102,7 +102,46 @@ let take_relevant (ass_list:tterm list) interesting_ids =
   in
   (List.dedup relevant_sttmts,String.Set.to_list relevant_ids)
 
-let simplify ass_list =
+let tterm_weight tterm = String.length (render_tterm tterm)
+
+let reduce_by_eqs (sttmts: tterm list) (eqs: tterm list) keep =
+  List.fold eqs ~init:sttmts
+    ~f:(fun acc eq ->
+         match eq.v with
+         | Bop(Eq,lhs,rhs) ->
+           let (light,heavy) =
+             if (tterm_weight lhs) > (tterm_weight rhs) ||
+                is_constt rhs ||
+                List.exists keep ~f:(tterm_contains_term rhs)
+             then
+               (rhs,lhs)
+             else
+               (lhs,rhs)
+           in
+           replace_term_in_tterms heavy.v light.v acc
+         | _ -> failwith "eqs must contain only equalities")
+
+let rec expand_struct_eq sttmt : tterm list =
+  match sttmt.v with
+  | Bop(Eq,{v=Struct(ln,lfds);t=lt},{v=Struct(rn,rfds);t=rt}) ->
+    assert(ln = rn && lt = rt);
+    List.join
+      (List.map2_exn lfds rfds ~f:(fun lfd rfd ->
+           assert(lfd.name = rfd.name);
+           expand_struct_eq({v=Bop(Eq,lfd.value,rfd.value);t=sttmt.t})))
+  | Bop(Eq,{v=Struct(_,fds);t=_},rhs) ->
+    List.join
+      (List.map fds ~f:(fun fd ->
+           expand_struct_eq
+             ({v=Bop(Eq,fd.value,{v=Str_idx(rhs,fd.name);t=fd.value.t});t=sttmt.t})))
+  | Bop(Eq,lhs,{v=Struct(name,fds);t=rt}) ->
+    expand_struct_eq {v=Bop(Eq,{v=Struct(name,fds);t=rt},lhs);t=sttmt.t}
+  | _ -> [sttmt]
+
+let expand_struct_eqs sttmts =
+  List.join (List.map sttmts ~f:expand_struct_eq)
+
+let simplify ass_list keep =
   let remove_double_negation a =
     a |> call_recursively_on_tterm (fun term ->
         match term with
@@ -116,7 +155,9 @@ let simplify ass_list =
   let (eqs,non_eq_assumptions) = (extract_equalities ass_list) in
   let eqs = remove_trivial_eqs eqs in
   let ass_list = non_eq_assumptions in
-  let ass_list = synonimize_by_equalities ass_list eqs in
+  let eqs = expand_struct_eqs eqs in
+  let ass_list = (*synonimize_by_equalities ass_list eqs*)
+    reduce_by_eqs ass_list eqs keep in
   let ass_list = (get_meaningful_equalities eqs) @ ass_list in
   remove_trues ass_list
 
@@ -200,9 +241,13 @@ let is_assignment_justified var value executions =
   lprintf "justifying assignment %s = %s\n" var (render_term value);
   let valid = List.for_all executions ~f:(fun assumptions ->
       let (assumptions,_) = take_relevant assumptions [var] in
-      let assumptions = simplify assumptions in
+      let assumptions = simplify assumptions [Id var] in
       let assumptions = canonicalize assumptions in
       let mod_assumptions = replace_term_in_tterms (Id var) value assumptions in
+      lprintf "comparing:\n";
+      List.iter assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass));
+      lprintf "with\n";
+      List.iter mod_assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass));
       List.for_all mod_assumptions ~f:(fun mod_assumption ->
           List.exists assumptions
             ~f:(fun assumption ->
@@ -220,12 +265,15 @@ let expand_conjunctions sttmts =
 
 let induce_symbolic_assignments ir executions =
   let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
+  lprintf "free vars: \n";
+  List.iter fr_var_names ~f:(fun vn -> lprintf "%s\n" vn);
   let assignments = List.fold ir.tip_call.results ~init:[] ~f:(fun acc res ->
       let assertions = prepare_assertions res
           ir.tip_call.context.ret_name
           ir.tip_call.context.ret_type
       in
       let assertions = expand_conjunctions assertions in
+      let assertions = expand_struct_eqs assertions in
       let assertions = apply_assignments_to_statements acc assertions in
       let assertions = canonicalize assertions in
       List.fold executions ~init:acc ~f:(fun acc assumptions ->
@@ -233,8 +281,9 @@ let induce_symbolic_assignments ir executions =
               (String.Set.diff (String.Set.of_list fr_var_names)
                  (String.Set.of_list (List.map acc ~f:fst)))
           in
+          let var_ids = List.map vars ~f:(fun name -> Id name) in
           let assumptions = apply_assignments_to_statements acc assumptions in
-          let assumptions = simplify assumptions in
+          let assumptions = simplify assumptions var_ids in
           let assumptions = canonicalize assumptions in
           (find_assignments assumptions assertions vars)@acc))
   in

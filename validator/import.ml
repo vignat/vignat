@@ -352,9 +352,12 @@ let rec get_sexp_value exp t =
 
 let rec get_struct_val_value valu t =
   match t with
-  | Str (strname, fields) -> begin match get_var_name_of_sexp valu.full with
-    | Some name -> {v=Id name;t}
-    | None ->
+  | Str (strname, fields) ->
+    begin
+    (*   match get_var_name_of_sexp valu.full with *)
+    (* | Some name -> {v=Id name;t} *)
+    (* | None -> <^^^ this was working a while ago, may be it should be
+       left somewhere *)
       let fields = List.map2_exn valu.break_down fields
           ~f:(fun {fname;value} (name,t) ->
               assert(String.equal name fname);

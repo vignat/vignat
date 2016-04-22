@@ -171,6 +171,8 @@ void log_flow(const struct flow *f);
     fp->int_device_id |-> ?idid &*&
     fp->ext_device_id |-> ?edid &*&
     fp->protocol |-> ?prtc &*&
+    ik == ikc(isp, dp, isip, dip, idid, prtc) &*&
+    ek == ekc(esp, dp, esip, dip, edid, prtc) &*&
     f == flwc(ik, ek, isp, esp, dp, isip, esip, dip, idid, edid, prtc);
 
   fixpoint bool flow_keys_offsets_fp(struct flow* fp,

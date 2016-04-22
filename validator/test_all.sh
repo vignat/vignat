@@ -50,6 +50,7 @@ validate_file() {
     SRC_FNAME="${UNIQUE_PREFIX}.c"
     VALID_RESULT="${UNIQUE_PREFIX}.validator_result"
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
+    cp $FNAME $UNIQUE_PREFIX.src
     CMD1="./validator.byte $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST"
     CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
     echo "corebuild -use-menhir validator.byte && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
@@ -88,7 +89,8 @@ export SHELL=/bin/bash
 if [ -z "$SINGLE_TEST" ]; then
     parallel validate_file ::: $KLEE_OUT_DIR/call-pre*.txt
 else
-    validate_file $KLEE_OUT_DIR/call-prefix00000$SINGLE_TEST.txt
+    PADDED=`printf %06d $SINGLE_TEST`
+    validate_file $KLEE_OUT_DIR/call-prefix$PADDED.txt
 fi
 
 TOT=$(cat $REPORT_FNAME | wc -l)

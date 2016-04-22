@@ -177,6 +177,34 @@ struct DoubleMap;
           v == dmap_get_val_fp(dmap_put_fp(m, k1, k2, index, v), index) &*&
           k1 == dmap_get_k1_by_idx_fp(dmap_put_fp(m, k1, k2, index, v), index) &*&
           k2 == dmap_get_k2_by_idx_fp(dmap_put_fp(m, k1, k2, index, v), index);
+
+  lemma void dmap_get_k1_get_val<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k);
+  requires dmappingp<t1,t2,vt>(m,
+                               ?kp1, ?kp2, ?hsh1, ?hsh2,
+                               ?fvp, ?bvp, ?rof, ?vsz,
+                               ?vk1, ?vk2, ?recp1, ?recp2, ?cap, ?mp) &*&
+           true == dmap_has_k1_fp(m, k);
+  ensures dmappingp<t1,t2,vt>(m,
+                              kp1, kp2, hsh1, hsh2,
+                              fvp, bvp, rof, vsz,
+                              vk1, vk2, recp1, recp2, cap, mp) &*&
+          vk1(dmap_get_val_fp(m, dmap_get_k1_fp(m, k))) == k &*&
+          true == recp2(vk2(dmap_get_val_fp(m, dmap_get_k1_fp(m, k))), dmap_get_k1_fp(m,k)) &*&
+          true == recp1(k, dmap_get_k1_fp(m,k));
+
+  lemma void dmap_get_k2_get_val<t1,t2,vt>(dmap<t1,t2,vt> m, t2 k);
+  requires dmappingp<t1,t2,vt>(m,
+                               ?kp1, ?kp2, ?hsh1, ?hsh2,
+                               ?fvp, ?bvp, ?rof, ?vsz,
+                               ?vk1, ?vk2, ?recp1, ?recp2, ?cap, ?mp) &*&
+           true == dmap_has_k2_fp(m, k);
+  ensures dmappingp<t1,t2,vt>(m,
+                              kp1, kp2, hsh1, hsh2,
+                              fvp, bvp, rof, vsz,
+                              vk1, vk2, recp1, recp2, cap, mp) &*&
+          vk2(dmap_get_val_fp(m, dmap_get_k2_fp(m, k))) == k &*&
+          true == recp1(vk1(dmap_get_val_fp(m, dmap_get_k2_fp(m, k))), dmap_get_k2_fp(m,k)) &*&
+          true == recp2(k, dmap_get_k2_fp(m,k));
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;
@@ -273,12 +301,12 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index);
             fvp(value, v);@*/
 
 void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
-                                     char* value_out);
+                                     void* value_out);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
                                 ?vk1, ?vk2, ?rp1, ?rp2, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true &*&
-             value_out[0..vsz] |-> _ &*&
+             fvp(value_out, _) &*&
              0 <= index &*& index < cap; @*/
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
                                fvp, bvp, rof, vsz,

@@ -361,12 +361,12 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
 }
 
 void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
-                                     char* value_out)
+                                     void* value_out)
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
                                 ?vk1, ?vk2, ?rp1, ?rp2, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true &*&
-             value_out[0..vsz] |-> _ &*&
+             fvp(value_out, _) &*&
              0 <= index &*& index < cap; @*/
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
                                fvp, bvp, rof, vsz,

@@ -13,6 +13,7 @@ open Ir
 %token RCBR
 %token BANG
 %token <Ir.bop> BOP
+%token AT
 %token EOF
 
 %right BOP BANG
@@ -40,9 +41,18 @@ term:
   | b = BOOL                             { Bool b }
   | i = INT                              { Int i }
   | i = ID                               { Id i }
+  | AT; f = at_apply                     { f }
   | f = ID; LPAREN; al = arg_list; RPAREN
                     { Apply (f, al) }
   ;
+
+at_apply:
+  | LPAREN; AT; f = at_apply; COMMA; al = arg_list; RPAREN;
+                    { match f with
+                      | Apply(f, args) -> Apply(f, (args@al))
+                      | _ -> Apply("Error", [])
+                    }
+  | f = ID { Apply (f, []) }
 
 tterm:
   | tr = term {{v=tr;t=Unknown}}

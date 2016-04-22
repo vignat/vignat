@@ -240,3 +240,20 @@ and tterm_contains_term super sub =
 and tterms_contain_term supers sub =
   List.exists supers ~f:(fun sup -> tterm_contains_term sup sub)
 
+let rec is_const term =
+  match term with
+  | Bop (_,lhs,rhs) -> (is_constt lhs) && (is_constt rhs)
+  | Apply (_,args) -> List.for_all args ~f:is_constt
+  | Id _ -> false
+  | Struct (_,fields) -> List.for_all fields
+                           ~f:(fun field -> is_constt field.value)
+  | Int _ -> true
+  | Bool _ -> true
+  | Not t -> is_constt t
+  | Str_idx (tterm,_) -> is_constt tterm
+  | Deref tterm -> is_constt tterm
+  | Fptr _ -> true
+  | Addr tterm -> is_constt tterm
+  | Cast (_,tterm) -> is_constt tterm
+  | Undef -> true
+and is_constt tterm = is_const tterm.v

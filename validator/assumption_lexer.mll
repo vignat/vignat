@@ -38,5 +38,6 @@ rule read =
        | '-'     {BOP Ir.Sub}
        | '+'     {BOP Ir.Add}
        | '!'     {BANG}
+       | '@'     {AT}
        | _       {raise (SyntaxError ("Unexpected char: " ^ (Lexing.lexeme lexbuf)))}
        | eof     {EOF}

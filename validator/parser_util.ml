@@ -9,10 +9,10 @@ let print_position outx lexbuf =
 let parse_with_error lexbuf =
   try Assumption_parser.execution_list Assumption_lexer.read lexbuf with
   | Assumption_lexer.SyntaxError msg ->
-    fprintf stderr "%a:%s" print_position lexbuf msg;
+    fprintf stderr "%a:%s\n" print_position lexbuf msg;
     []
   | Assumption_parser.Error ->
-    fprintf stderr "%a: parser error" print_position lexbuf;
+    fprintf stderr "%a: parser error\n" print_position lexbuf;
     exit(-1)
 
 let parse_file filename =

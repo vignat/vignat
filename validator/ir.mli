@@ -110,3 +110,5 @@ val call_recursively_on_tterm : (term -> term option) -> tterm -> tterm
 val term_contains_term : term -> term -> bool
 val tterm_contains_term : tterm -> term -> bool
 val tterms_contain_term : tterm list -> term -> bool
+val is_const : term -> bool
+val is_constt : tterm -> bool
