@@ -417,7 +417,9 @@ let fun_types =
                               open flw_p(" ^ (List.nth_exn args 2) ^
                              ", _);\n\
                               @*/");
-                          tx_l "open int_k_p(_,_);"];
+                          tx_l "open int_k_p(_,_);";
+                          tx_l "open ext_k_p(_,_);";
+                        ];
                         leaks = [];};
      "expire_items", {ret_type = Sint32;
                       arg_types = [Ptr dchain_struct;
@@ -475,6 +477,9 @@ let fun_types =
                                       "/*@ if (" ^ reg_var ^ " != 0) {\n" ^
                                       "assert dmap_dchain_coherent(_,?ch);\n" ^
                                       "rejuvenate_preserves_coherent(map, ch, " ^
+                                      (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
+                                      ");\n\
+                                       rejuvenate_preserves_index_range(ch," ^
                                       (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
                                       ");\n}@*/");];
                                  leaks = [];}

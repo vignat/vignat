@@ -41,6 +41,13 @@ struct DoubleChain;
   requires true;
   ensures dchain_index_range_fp(dchain_expire_old_indexes_fp(ch, time)) ==
           dchain_index_range_fp(ch);
+
+  lemma void rejuvenate_preserves_index_range(dchain ch, int index,
+                                              uint32_t time);
+  requires true;
+  ensures dchain_index_range_fp(dchain_rejuvenate_fp(ch, index, time)) ==
+          dchain_index_range_fp(ch);
+
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
