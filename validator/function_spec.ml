@@ -390,7 +390,8 @@ let fun_types =
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23));\
+                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
+                        new_index_0);\
                         }@*/");
                   ]
                   ;
@@ -417,8 +418,7 @@ let fun_types =
                              ", _);\n\
                               @*/");
                           tx_l "open int_k_p(_,_);"];
-                        leaks = [
-                          leak "flw_p(_,_)";];};
+                        leaks = [];};
      "expire_items", {ret_type = Sint32;
                       arg_types = [Ptr dchain_struct;
                                    Ptr dmap_struct;

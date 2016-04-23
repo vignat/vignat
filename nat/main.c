@@ -343,6 +343,10 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
         int flow_exists = get_flow_by_int_key(&key, current_time(), &f);
         if (!flow_exists) {
           LOG( "adding flow: ");
+#ifdef KLEE_VERIFICATION
+          klee_note(0 <= portid);
+          klee_note(portid < RTE_MAX_ETHPORTS);
+#endif //KLEE_VERIFICATION
           if (!allocate_flow(&key, current_time(), &f)) {
             if (0 == expire_flows(current_time())) {
               LOG("No space for the flow, dropping.");

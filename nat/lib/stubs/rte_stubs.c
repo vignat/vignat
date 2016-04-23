@@ -1,5 +1,4 @@
 #include <klee/klee.h>
-#include <assert.h>
 #include <string.h>
 #include "rte_stubs.h"
 

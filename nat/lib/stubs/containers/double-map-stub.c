@@ -255,7 +255,7 @@ int dmap_erase(struct DoubleMap* map, int index) {
   return 0;
 }
 
-void dmap_get_value(struct DoubleMap* map, int index, char* value_out) {
+void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
