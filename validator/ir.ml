@@ -188,9 +188,7 @@ and replace_term_in_tterms old_t new_t tterm_list =
   List.map tterm_list ~f:(replace_term_in_tterm old_t new_t)
 
 let rec call_recursively_on_tterm f tterm =
-  match f tterm.v with
-  | Some tt -> call_recursively_on_tterm f {v=tt;t=tterm.t}
-  | None ->
+  let tterm =
     {v= begin
         match tterm.v with
         | Bop (op,lhs,rhs) ->
@@ -211,7 +209,10 @@ let rec call_recursively_on_tterm f tterm =
         | Cast (ctype,tt) -> Cast (ctype,call_recursively_on_tterm f tt)
         | Undef -> Undef
       end;
-     t=tterm.t}
+     t=tterm.t} in
+  match f tterm.v with
+  | Some tt -> {v=tt;t=tterm.t}
+  | None -> tterm
 
 
 let rec term_contains_term super sub =

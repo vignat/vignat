@@ -149,15 +149,18 @@ void log_flow(const struct flow *f);
                        x6, x7, x8, x9, ret): return ret;}
   }
   predicate flow_p(struct flow* fp, flw f) =
-    fp->int_src_port |-> flw_get_isp(f) &*&
-    fp->ext_src_port |-> flw_get_esp(f) &*&
-    fp->dst_port |-> flw_get_dp(f) &*&
-    fp->int_src_ip |-> flw_get_isip(f) &*&
-    fp->ext_src_ip |-> flw_get_esip(f) &*&
-    fp->dst_ip |-> flw_get_dip(f) &*&
-    fp->int_device_id |-> flw_get_idid(f) &*&
-    fp->ext_device_id |-> flw_get_edid(f) &*&
-    fp->protocol |-> flw_get_prtc(f);
+    fp->int_src_port |-> ?isp &*&
+    fp->ext_src_port |-> ?esp &*&
+    fp->dst_port |-> ?dp &*&
+    fp->int_src_ip |-> ?isip &*&
+    fp->ext_src_ip |-> ?esip &*&
+    fp->dst_ip |-> ?dip &*&
+    fp->int_device_id |-> ?idid &*&
+    fp->ext_device_id |-> ?edid &*&
+    fp->protocol |-> ?prtc &*&
+    f == flwc(ikc(isp, dp, isip, dip, idid, prtc),
+              ekc(esp, dp, esip, dip, edid, prtc),
+              isp, esp, dp, isip, esip, dip, idid, edid, prtc);
 
   predicate flw_p(struct flow* fp; flw f) =
     int_k_p(&fp->ik, ?ik) &*&

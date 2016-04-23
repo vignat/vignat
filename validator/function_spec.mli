@@ -35,3 +35,4 @@ val ext_key_struct : Ir.ttype
 val int_key_struct : Ir.ttype
 val flw_struct : Ir.ttype
 val fun_types : fun_spec Core.Std.String.Map.t
+val fixpoints : Ir.tterm Core.Std.String.Map.t

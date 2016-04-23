@@ -315,23 +315,6 @@ let fun_types =
                      cmplx1, user_buf0_23), ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23), user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\
                      184789184, user_buf0_30, cmplx1, 1, user_buf0_23));@*/");
-                    (fun _ -> "/*@ close flow_p(flwc(ikc(user_buf0_34, user_buf0_36,\
-                               user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\
-                               ekc(tmp1, user_buf0_36, 184789184,\
-                               user_buf0_30, 1, user_buf0_23),\
-                               user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\
-                               184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                               ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                               user_buf0_30, cmplx1, user_buf0_23),\
-                               ekc(tmp1, user_buf0_36, 184789184,\
-                               user_buf0_30, 1, user_buf0_23));@*/");
-                    (fun args -> "/*@{\n\
-                                  assert dmappingp<int_k,ext_k,flw>(?cur_map,\
-                                  _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
-                                 ");\n\
-                                 assert dmap_dchain_coherent(cur_map, ?cur_ch);\n\
-                                 dchain_next_index_not_allocated(cur_ch);\n\
-                                  }@*/");
                     (fun args -> "/*@{\n\
                                   assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                                   _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
@@ -496,3 +479,36 @@ let fun_types =
                                       ");\n}@*/");];
                                  leaks = [];}
     ]
+
+let fixpoints =
+  String.Map.of_alist_exn [
+    "nat_int_fp", {v=Bop(And,
+                         {v=Bop(Le,{v=Int 0;t=Sint32},{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown});t=Unknown},
+                         {v=Bop(Lt,{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown},
+                                {v=Int 2;t=Sint32});t=Unknown});t=Boolean};
+    "ikc", {v=Struct ("int_k",
+                      [{name="isp";value={v=Id "Arg0";t=Unknown}};
+                       {name="dp";value={v=Id "Arg1";t=Unknown}};
+                       {name="isip";value={v=Id "Arg2";t=Unknown}};
+                       {name="dip";value={v=Id "Arg3";t=Unknown}};
+                       {name="idid";value={v=Id "Arg4";t=Unknown}};
+                       {name="prtc";value={v=Id "Arg5";t=Unknown}}]);
+           t=Unknown};
+    "integer", {v=Bop(Eq,{v=Id "Arg0";t=Unknown},{v=Id "Arg1";t=Unknown});t=Boolean};
+    "flow_int_device_id", {v=Bop(Eq,{v=Str_idx({v=Id "Arg0";t=Unknown},"int_device_id");t=Unknown},
+                                {v=Id "Arg1";t=Unknown}); t=Boolean};
+    "flwc", {v=Struct ("flw",
+                       [{name="ik";value={v=Id "Arg0";t=Unknown}};
+                        {name="ek";value={v=Id "Arg1";t=Unknown}};
+                        {name="isp";value={v=Id "Arg2";t=Unknown}};
+                        {name="esp";value={v=Id "Arg3";t=Unknown}};
+                        {name="dp";value={v=Id "Arg4";t=Unknown}};
+                        {name="isip";value={v=Id "Arg5";t=Unknown}};
+                        {name="esip";value={v=Id "Arg6";t=Unknown}};
+                        {name="dip";value={v=Id "Arg7";t=Unknown}};
+                        {name="idid";value={v=Id "Arg8";t=Unknown}};
+                        {name="edid";value={v=Id "Arg9";t=Unknown}};
+                        {name="prtc";value={v=Id "Arg10";t=Unknown}};
+                       ]);t=Unknown};
+    "flw_get_ik", {v=Str_idx({v=Id "Arg0";t=Unknown},"ik");t=Unknown};
+  ]

@@ -33,6 +33,12 @@ analyze_result() {
         if grep -q "Type mismatch." $RESULT; then
             echo $FNAME type fail >> $REPORT_FNAME
         fi
+        if grep -q "Wrong number of arguments" $RESULT; then
+            echo $FNAME spec fail >> $REPORT_FNAME
+        fi
+        if grep -q "No such function" $RESULT; then
+            echo $FNAME spec fail >> $REPORT_FNAME
+        fi
         cat $RESULT
     fi
 }
@@ -102,6 +108,7 @@ UNPROVEN=$(grep -c "unproven fail" $REPORT_FNAME)
 SYNTAX=$(grep -c "syntax fail" $REPORT_FNAME)
 PARSER=$(grep -c "parser fail" $REPORT_FNAME)
 TYPE=$(grep -c "type fail" $REPORT_FNAME)
+SPEC=$(grep -c "spec fail" $REPORT_FNAME)
 
 echo "Test completed."
 echo "total: $TOT"
@@ -113,3 +120,4 @@ echo "leaks: $LEAK"
 echo "syntax err: $SYNTAX"
 echo "type mismatch $TYPE"
 echo "parse errs: $PARSER"
+echo "spec errs: $SPEC"
