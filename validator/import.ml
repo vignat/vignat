@@ -432,9 +432,9 @@ let get_vars tpref arg_name_gen =
                     ~f:get_vars) in
   tip_vars
 
-let compose_fcall_preamble call args =
+let compose_fcall_preamble call args tmp_gen =
   match String.Map.find Fs.fun_types call.fun_name with
-  | Some t -> (List.map t.Fs.lemmas_before ~f:(fun l -> l args))
+  | Some t -> (List.map t.Fs.lemmas_before ~f:(fun l -> l args tmp_gen))
   | None -> failwith ("function not found " ^ call.fun_name)
 
 let extract_fun_args call =
@@ -465,13 +465,13 @@ let extract_fun_args call =
           else
             get_struct_val_value arg.value a_type))
 
-let compose_post_lemmas call ret_name args =
+let compose_post_lemmas call ret_name args tmp_gen =
   let ret_name = match ret_name with
     | Some ret_name -> ret_name
     | None -> ""
   in
   match String.Map.find Fs.fun_types call.fun_name with
-  | Some t -> List.map t.Fs.lemmas_after ~f:(fun l -> l ret_name args)
+  | Some t -> List.map t.Fs.lemmas_after ~f:(fun l -> l ret_name args tmp_gen)
   | None -> failwith ("unknown function " ^ call.fun_name)
 
 let compose_args_post_conditions call =
@@ -506,20 +506,25 @@ let get_ret_val call =
     get_struct_val_value ret.value t
   | None -> {v=Undef;t=Unknown}
 
-let extract_common_call_context call (ret_name:string option) args =
+let gen_unique_tmp_name unique_postfix prefix =
+  prefix ^ unique_postfix
+
+let extract_common_call_context call ret_name args unique_postfix =
+  let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type call.fun_name in
   let arg_names = List.map args ~f:render_tterm in
-  let pre_lemmas = compose_fcall_preamble call arg_names in
+  let pre_lemmas = compose_fcall_preamble call arg_names tmp_gen in
   let application = Apply (call.fun_name,args) in
-  let post_lemmas = compose_post_lemmas call ret_name arg_names in
+  let post_lemmas = compose_post_lemmas call ret_name arg_names tmp_gen in
   {pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
-let extract_hist_call_context call rname_gen =
+let extract_hist_call_context call rname_gen index =
   let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
     else Some rname_gen#generate in
   let args = extract_fun_args call in
   let args_post_conditions = compose_args_post_conditions call in
-  {context=extract_common_call_context call ret_name args;
+  {context=extract_common_call_context call ret_name args
+       (string_of_int index);
    result={args_post_conditions;ret_val=get_ret_val call;
            post_statements=[]}}
 
@@ -528,7 +533,7 @@ let tip_calls_context calls rname_gen =
   let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
     else Some rname_gen#generate in
   let args = extract_fun_args call in
-  let context = extract_common_call_context call ret_name args in
+  let context = extract_common_call_context call ret_name args "tip" in
   let results = List.map calls ~f:(fun call ->
       let args_post_conditions = compose_args_post_conditions call in
       {args_post_conditions;
@@ -540,8 +545,8 @@ let tip_calls_context calls rname_gen =
 let extract_calls_info tpref =
   let rez_gen = name_gen "rez" in
   let hist_funs =
-    (List.map tpref.history ~f:(fun call ->
-         extract_hist_call_context call rez_gen))
+    (List.mapi tpref.history ~f:(fun ind call ->
+         extract_hist_call_context call rez_gen ind))
   in
   let tip_calls = tip_calls_context tpref.tip_calls rez_gen in
   hist_funs, tip_calls

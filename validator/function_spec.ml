@@ -1,13 +1,13 @@
 open Core.Std
 open Ir
 
-type lemma = (string -> string list -> string)
-type blemma = (string list -> string)
+type lemma = (string -> string list -> (string -> string) -> string)
+type blemma = (string list -> (string -> string) -> string)
 type leak_updater = (string -> string list ->
                      string String.Map.t -> string String.Map.t)
 
-let tx_l str = (fun _ _ -> "/*@ " ^ str ^ " @*/" )
-let tx_bl str = (fun _ -> "/*@ " ^ str ^ " @*/" )
+let tx_l str = (fun _ _ _ -> "/*@ " ^ str ^ " @*/" )
+let tx_bl str = (fun _ _ -> "/*@ " ^ str ^ " @*/" )
 
 
 let leak str ?(id=str) = (fun _ _ leaks ->
@@ -20,11 +20,11 @@ let on_rez_nz_leak str ?(id=str) = (fun rez_var _ leaks ->
 let remove_leak id = (fun _ _ leaks ->
     String.Map.remove leaks id)
 
-let on_rez_nonzero str = (fun rez_var _ ->
+let on_rez_nonzero str = (fun rez_var _ _ ->
     "/*@ if(" ^ rez_var ^ "!=0) " ^ str ^ "@*/")
 
-let on_rez_nz f = (fun rez_var args ->
-    "/*@ if(" ^ rez_var ^ "!=0) " ^ (f args) ^ " @*/")
+let on_rez_nz f = (fun rez_var args tmp_gen ->
+    "/*@ if(" ^ rez_var ^ "!=0) " ^ (f args tmp_gen) ^ " @*/")
 
 type map_key = Sint32 | Ext
 
@@ -130,7 +130,7 @@ let fun_types =
                                 {\
                                 call();\
                                 }";
-                         (fun args ->
+                         (fun args _ ->
                             "/*@\
                              assume(sizeof(struct flow) == " ^
                             (List.nth_exn args 4) ^ ");\n@*/ " ^
@@ -171,7 +171,7 @@ let fun_types =
                                 lemmas_before = [
                                   tx_bl "empty_dmap_dchain_coherent(1024);";
                                   tx_bl "index_range_of_empty(1024);";
-                                  (fun args ->
+                                  (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
                                      List.nth_exn args 1 ^ ", " ^
@@ -215,28 +215,28 @@ let fun_types =
                     lemmas_after = [
                       tx_l "open (ext_k_p(_,_));";
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                            "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                             _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                            ");\n " ^
                            "dmap_get_k2_gives_used(cur_map, ekc(user_buf0_36, user_buf0_34, \
                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                            "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                             _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                            ");\n " ^
                            "dmap_get_k2_limits(cur_map, ekc(user_buf0_36, user_buf0_34, \
                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                         "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                          _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                         ");\n " ^
                         "dmap_get_k2_get_val(cur_map,ekc(user_buf0_36, user_buf0_34, \
                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                            "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                             _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                            ");\n " ^
@@ -245,7 +245,7 @@ let fun_types =
                             (cur_map, cur_ch, \
                             dmap_get_k2_fp(cur_map, ekc(user_buf0_36, user_buf0_34, \
                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));\n}");
-                      (fun ret_var _ ->
+                      (fun ret_var _ _ ->
                          last_index_gotten :=
                            "ekc(user_buf0_36, user_buf0_34, \
                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)";
@@ -262,28 +262,28 @@ let fun_types =
                     lemmas_after = [
                       tx_l "open (int_k_p(_,_));";
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                            "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                             _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                            ");\n " ^
                            "dmap_get_k1_gives_used(cur_map, ikc(user_buf0_34, user_buf0_36, \
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                            "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                             _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                            ");\n " ^
                            "dmap_get_k1_limits(cur_map, ikc(user_buf0_34, user_buf0_36, \
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                         "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                          _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                         ");\n " ^
                         "dmap_get_k1_get_val(cur_map, ikc(user_buf0_34, user_buf0_36, \
                          user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
-                        (fun args ->
+                        (fun args _ ->
                            "{\n assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                             _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                            ");\n " ^
@@ -292,7 +292,7 @@ let fun_types =
                             (cur_map, cur_ch, \
                             dmap_get_k1_fp(cur_map, ikc(user_buf0_34, user_buf0_36, \
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));\n}");
-                      (fun ret_var _ ->
+                      (fun ret_var _ _ ->
                          last_index_gotten :=
                            "ikc(user_buf0_34, user_buf0_36, \
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
@@ -304,18 +304,18 @@ let fun_types =
      "dmap_put", {ret_type = Sint32;
                   arg_types = [Ptr dmap_struct; Ptr flw_struct; Sint32;];
                   lemmas_before = [
-                    (fun args -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
+                    (fun args _ -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
                     ".ik, ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
                      user_buf0_30, cmplx1, user_buf0_23));@*/");
-                    (fun args -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
+                    (fun args _ -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
                     ".ek, ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23));@*/");
-                    (fun args -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
+                    (fun args _ -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
                     ", flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26, user_buf0_30,\
                      cmplx1, user_buf0_23), ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23), user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\
                      184789184, user_buf0_30, cmplx1, 1, user_buf0_23));@*/");
-                    (fun args -> "/*@{\n\
+                    (fun args _ -> "/*@{\n\
                                   assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                                   _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
                                  ");\n\
@@ -336,7 +336,7 @@ let fun_types =
                                   assert(false);\n\
                                   }\n\
                                   }@*/");
-                    (fun args ->
+                    (fun args _ ->
                     "/*@{\n\
                      assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                      _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
@@ -346,7 +346,7 @@ let fun_types =
                      coherent_dmap_used_dchain_allocated(cur_map, cur_ch, new_index_0);\n\
                      }\n\
                      }@*/");
-                    (fun args ->
+                    (fun args _ ->
                        "//@assert dmappingp<int_k,ext_k,flw>(?map_before_put,\
                         _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^ ");\n");
                     tx_bl "{\n\
@@ -358,7 +358,7 @@ let fun_types =
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
                     tx_l "open ext_k_p(_,_);";
-                    (fun ret_var _ ->
+                    (fun ret_var _ _ ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
                         dmap_put_get(map_before_put,\
@@ -375,7 +375,7 @@ let fun_types =
                         new_index_0);\n\
                         }@*/"
                     );
-                    (fun ret_var _ ->
+                    (fun ret_var _ _ ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
                        assert dmap_dchain_coherent(map_before_put, ?cur_ch);\n\
@@ -400,7 +400,7 @@ let fun_types =
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         lemmas_before = [];
                         lemmas_after = [
-                          (fun _ args ->
+                          (fun _ args _ ->
                              "/*@{ " ^
                              "assert dmappingp<int_k,ext_k,flw>(?cur_map,\
                               _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^
@@ -412,7 +412,7 @@ let fun_types =
                              ");\n\
                               }}@*/");
                           tx_l "assert(0 <= cmplx1 && cmplx1 < RTE_NUM_DEVICES);";
-                          (fun _ args ->
+                          (fun _ args _ ->
                              "/*@\
                               open flw_p(" ^ (List.nth_exn args 2) ^
                              ", _);\n\
@@ -426,7 +426,7 @@ let fun_types =
                                    Ptr dmap_struct;
                                    Uint32;];
                       lemmas_before = [
-                        (fun args ->
+                        (fun args _ ->
                            if String.equal !last_index_gotten "" then ""
                            else
                            "/*@ {\n" ^
@@ -438,7 +438,7 @@ let fun_types =
                             dchain_get_expired_indexes_fp(cur_chain, " ^ (List.nth_exn args 2) ^
                            "));\n\
                             }@*/");
-                        (fun args ->
+                        (fun args _ ->
                            "/*@ {\n\
                             assert double_chainp(?cur_chain, " ^
                            (List.nth_exn args 0) ^
@@ -457,7 +457,7 @@ let fun_types =
                             }} @*/");
                         ];
                       lemmas_after = [
-                        (fun _ args ->
+                        (fun _ args _ ->
                            "/*@ {\n" ^
                            "assert dmap_dchain_coherent(?mmmmap, ?ccchhhh);\n\
                             expire_preserves_coherent(mmmmap, ccchhhh, " ^
@@ -467,16 +467,17 @@ let fun_types =
      "dchain_allocate_new_index", {ret_type = Sint32;
                                    arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];
                                    lemmas_before = [
-                                     (fun args ->
+                                     (fun args tmp ->
                                         "//@ assert double_chainp(\
-                                         ?chain_before_alloc, " ^
+                                         ?" ^ (tmp "chain_before_alloc") ^ ", " ^
                                         (List.nth_exn args 0) ^
                                         ");\n ");];
                                    lemmas_after = [
                                      on_rez_nz
-                                       (fun args ->
-                                          "{\n allocate_preserves_index_range\
-                                           (chain_before_alloc, *" ^
+                                       (fun args tmp ->
+                                          "{\n allocate_preserves_index_range(" ^
+                                          (tmp "chain_before_alloc") ^
+                                          ", *" ^
                                           (List.nth_exn args 1) ^
                                           ");\n}");
                                    ];
@@ -485,7 +486,7 @@ let fun_types =
                                  arg_types = [Ptr dchain_struct; Sint32; Uint32;];
                                  lemmas_before = [];
                                  lemmas_after = [
-                                   (fun reg_var args ->
+                                   (fun reg_var args _ ->
                                       "/*@ if (" ^ reg_var ^ " != 0) {\n" ^
                                       "assert dmap_dchain_coherent(?cur_map,?ch);\n" ^
                                       "rejuvenate_preserves_coherent(cur_map, ch, " ^
