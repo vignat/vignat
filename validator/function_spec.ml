@@ -466,8 +466,20 @@ let fun_types =
                       leaks = [];};
      "dchain_allocate_new_index", {ret_type = Sint32;
                                    arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];
-                                   lemmas_before = [];
-                                   lemmas_after = [];
+                                   lemmas_before = [
+                                     (fun args ->
+                                        "//@ assert double_chainp(\
+                                         ?chain_before_alloc, " ^
+                                        (List.nth_exn args 0) ^
+                                        ");\n ");];
+                                   lemmas_after = [
+                                     on_rez_nz
+                                       (fun args ->
+                                          "{\n allocate_preserves_index_range\
+                                           (chain_before_alloc, *" ^
+                                          (List.nth_exn args 1) ^
+                                          ");\n}");
+                                   ];
                                    leaks = [];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
                                  arg_types = [Ptr dchain_struct; Sint32; Uint32;];
@@ -475,8 +487,8 @@ let fun_types =
                                  lemmas_after = [
                                    (fun reg_var args ->
                                       "/*@ if (" ^ reg_var ^ " != 0) {\n" ^
-                                      "assert dmap_dchain_coherent(_,?ch);\n" ^
-                                      "rejuvenate_preserves_coherent(map, ch, " ^
+                                      "assert dmap_dchain_coherent(?cur_map,?ch);\n" ^
+                                      "rejuvenate_preserves_coherent(cur_map, ch, " ^
                                       (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
                                       ");\n\
                                        rejuvenate_preserves_index_range(ch," ^
