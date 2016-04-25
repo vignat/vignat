@@ -1,17 +1,140 @@
 open Core.Std
 open Ir
 
+let no_log = true
+
 let log str =
-  if true then ()
-  else print_string str
+  if no_log then ()
+  (* else print_string str *)
+  else Out_channel.with_file ~append:true "analysis.log" ~f:(fun f ->
+      Out_channel.output_string f str)
+
+let start_log () =
+  if no_log then ()
+  else Out_channel.with_file "analysis.log" ~f:(fun f -> ())
 
 let lprintf fmt = ksprintf log fmt
+
+let lprint_list lst =
+  List.iter lst ~f:(fun vn -> lprintf "%s\n" vn)
+
+let canonicalize_in_place statements =
+  let rec canonicalize1 sttmt =
+    match sttmt with
+    | {v=Bop (Eq,{v=Bool false;_},rhs);t} ->
+      {v=Not rhs;t}
+    | {v=Bop (Eq,lhs,{v=Bool false;_});t} ->
+      {v=Not lhs;t}
+    | {v=Bop (Eq,{v=Bool true;_},rhs);t} ->
+      canonicalize1 rhs
+    | {v=Bop (Eq,lhs,{v=Bool true;_});t} ->
+      canonicalize1 lhs
+    | {v=Bop (Ge,lhs,rhs);t} -> {v=Bop(Le,rhs,lhs);t}
+    | {v=Bop (Gt,lhs,rhs);t} -> {v=Bop(Lt,rhs,lhs);t}
+    | _ -> sttmt
+  in
+  List.map statements ~f:canonicalize1
+
+let expand_conjunctions sttmts =
+  let rec expand_sttmt = function
+    | {v=Bop (And,lhs,rhs);_} -> (expand_sttmt lhs)@(expand_sttmt rhs)
+    | x -> [x]
+  in
+  List.join (List.map sttmts ~f:expand_sttmt)
+
+let rec expand_struct_eq sttmt : tterm list =
+  match sttmt.v with
+  | Bop(Eq,{v=Struct(_,fds);t=_},rhs) ->
+    List.join
+      (List.map fds ~f:(fun fd ->
+           expand_struct_eq
+             ({v=Bop(Eq,fd.value,{v=Str_idx(rhs,fd.name);t=fd.value.t});t=sttmt.t})))
+  | Bop(Eq,lhs,{v=Struct(name,fds);t=rt}) ->
+    expand_struct_eq {v=Bop(Eq,{v=Struct(name,fds);t=rt},lhs);t=sttmt.t}
+  | _ -> [sttmt]
+
+let expand_struct_eqs sttmts =
+  List.join (List.map sttmts ~f:expand_struct_eq)
+
+let expand_fixpoints_in_tterm tterm =
+  let rec impl tterm =
+    match tterm with
+    | Apply (fname,args) ->
+      begin
+        match String.Map.find Function_spec.fixpoints fname with
+        | Some body ->
+          Some (List.foldi args ~init:body
+                  ~f:(fun i acc arg ->
+                      replace_term_in_tterm (Id (sprintf "Arg%d" i))
+                        arg.v acc)).v
+        | None -> None
+      end
+    | _ -> None
+  in
+  call_recursively_on_tterm impl tterm
+
+let remove_double_negation sttmt =
+  sttmt |> call_recursively_on_tterm (fun term ->
+      match term with
+      | Not {v=Not tt;t=_} -> Some tt.v
+      | _ -> None)
+
+let remove_trues sttmts =
+  List.filter sttmts ~f:(function {v=Bool true;t=_} -> false | _ -> true)
+
+let expand_fixpoints sttmts =
+  List.map sttmts ~f:expand_fixpoints_in_tterm
+
+let reduce_struct_idxes sttmt =
+  sttmt |> call_recursively_on_tterm (function
+      | Str_idx ({v=Struct(_,fields);t=_}, field) ->
+        Some (List.find_exn fields ~f:(fun {name;value} ->
+          name = field)).value.v
+      | _ -> None
+    )
+
+(* Transform statement list to a canonical form,
+   breaking down conjunctions, inlining function definitions,
+   and breaking structures into separate fields. *)
+let canonicalize sttmts =
+  sttmts |>
+  remove_trues |>
+  canonicalize_in_place |>
+  expand_fixpoints |> (*May introduce conjunctions and negations.*)
+  List.map ~f:remove_double_negation |>
+  expand_conjunctions |>
+  expand_struct_eqs |>
+  List.map ~f:reduce_struct_idxes
 
 let extract_equalities ass_list =
   List.partition_tf ass_list ~f:(function {v=Bop(Eq,_,_);t=_} -> true | _ -> false)
 
 let remove_trivial_eqs eqs =
-  List.filter eqs ~f:(function {v=Bop(Eq,lhs,rhs);t=_} -> not (term_eq lhs.v rhs.v) | _ -> true)
+  List.filter eqs ~f:(function
+        {v=Bop(Eq,lhs,rhs);t=_} -> not (term_eq lhs.v rhs.v)
+      | _ -> true)
+
+let tterm_weight tterm = String.length (render_tterm tterm)
+
+let reduce_by_eqs (eqs: tterm list) keep (sttmts: tterm list) =
+  List.fold eqs ~init:sttmts
+    ~f:(fun acc eq ->
+         match eq.v with
+         | Bop(Eq,lhs,rhs) ->
+           let (light,heavy) =
+             if (tterm_weight lhs) > (tterm_weight rhs) ||
+                is_constt rhs ||
+                List.exists keep ~f:(tterm_contains_term rhs)
+             then
+               (rhs,lhs)
+             else
+               (lhs,rhs)
+           in
+           if (tterm_weight light) - (tterm_weight heavy) < 10 then
+             replace_term_in_tterms heavy.v light.v acc
+           else
+             acc
+         | _ -> failwith "eqs must contain only equalities")
 
 (* The equalities that do not reduce to a simple variable renaming:
    anything except (a = b).*)
@@ -25,24 +148,11 @@ let get_meaningful_equalities eqs =
         end
       | _ -> failwith "only equalities here")
 
-let synonimize_term_in_tterms a b tterms =
-  List.fold tterms ~init:tterms ~f:(fun acc tterm ->
-      let acc =
-        if tterm_contains_term tterm a then
-          (replace_term_in_tterm a b tterm)::acc
-        else acc
-      in
-      if tterm_contains_term tterm b then
-        (replace_term_in_tterm b a tterm)::acc
-      else acc)
-
-let synonimize_by_equalities ass_list eqs =
-  List.fold eqs ~init:ass_list
-    ~f:(fun acc eq ->
-         match eq.v with
-         | Bop(Eq,lhs,rhs) ->
-           synonimize_term_in_tterms lhs.v rhs.v acc
-         | _ -> failwith "eqs must contain only equalities")
+let reduce_by_equalities vars sttmts =
+  let (eqs,other) = extract_equalities sttmts in
+  let eqs = remove_trivial_eqs eqs in
+  ((get_meaningful_equalities eqs)@other) |>
+  reduce_by_eqs eqs vars
 
 let get_ids_from_tterm tterm =
   let rec impl = function
@@ -102,79 +212,27 @@ let take_relevant (ass_list:tterm list) interesting_ids =
   in
   (List.dedup relevant_sttmts,String.Set.to_list relevant_ids)
 
-let tterm_weight tterm = String.length (render_tterm tterm)
+(*---- here ----*)
 
-let reduce_by_eqs (sttmts: tterm list) (eqs: tterm list) keep =
-  List.fold eqs ~init:sttmts
+(* let synonimize_term_in_tterms a b tterms =
+  List.fold tterms ~init:tterms ~f:(fun acc tterm ->
+      let acc =
+        if tterm_contains_term tterm a then
+          (replace_term_in_tterm a b tterm)::acc
+        else acc
+      in
+      if tterm_contains_term tterm b then
+        (replace_term_in_tterm b a tterm)::acc
+      else acc)
+
+let synonimize_by_equalities ass_list eqs =
+  List.fold eqs ~init:ass_list
     ~f:(fun acc eq ->
          match eq.v with
          | Bop(Eq,lhs,rhs) ->
-           let (light,heavy) =
-             if (tterm_weight lhs) > (tterm_weight rhs) ||
-                is_constt rhs ||
-                List.exists keep ~f:(tterm_contains_term rhs)
-             then
-               (rhs,lhs)
-             else
-               (lhs,rhs)
-           in
-           if (tterm_weight light) - (tterm_weight heavy) < 10 then
-             replace_term_in_tterms heavy.v light.v acc
-           else
-             acc
+           synonimize_term_in_tterms lhs.v rhs.v acc
          | _ -> failwith "eqs must contain only equalities")
-
-let rec expand_struct_eq sttmt : tterm list =
-  match sttmt.v with
-  | Bop(Eq,{v=Struct(_,fds);t=_},rhs) ->
-    List.join
-      (List.map fds ~f:(fun fd ->
-           expand_struct_eq
-             ({v=Bop(Eq,fd.value,{v=Str_idx(rhs,fd.name);t=fd.value.t});t=sttmt.t})))
-  | Bop(Eq,lhs,{v=Struct(name,fds);t=rt}) ->
-    expand_struct_eq {v=Bop(Eq,{v=Struct(name,fds);t=rt},lhs);t=sttmt.t}
-  | _ -> [sttmt]
-
-let expand_struct_eqs sttmts =
-  List.join (List.map sttmts ~f:expand_struct_eq)
-
-let reduce_struct_idxes_in_tterm sttmt =
-  sttmt |> call_recursively_on_tterm (function
-      | Str_idx ({v=Struct(_,fields);t=_}, field) ->
-        Some (List.find_exn fields ~f:(fun {name;value} ->
-          name = field)).value.v
-      | _ -> None
-    )
-
-let reduce_struct_idxes sttmts =
-  List.map sttmts ~f:reduce_struct_idxes_in_tterm
-
-let simplify ass_list keep =
-  let remove_double_negation a =
-    a |> call_recursively_on_tterm (fun term ->
-        match term with
-        | Not {v=Not tt;t=_} -> Some tt.v
-        | _ -> None)
-  in
-  let remove_true_eq al =
-    List.map al ~f:(function {v=Bop(Eq,{v=Bool true;t=_},x);t=_} -> x
-                           | x -> x) in
-  let remove_trues al =
-    List.filter al ~f:(function {v=Bool true;t=_} -> false | _ -> true)
-  in
-  let ass_list = remove_true_eq ass_list in
-  let ass_list = List.map ass_list ~f:remove_double_negation in
-  let ass_list = reduce_struct_idxes ass_list in
-  let (eqs,non_eq_assumptions) = (extract_equalities ass_list) in
-  let eqs = remove_trivial_eqs eqs in
-  let ass_list = non_eq_assumptions in
-  let eqs = expand_struct_eqs eqs in
-  let eqs = reduce_struct_idxes eqs in
-  let ass_list = (*synonimize_by_equalities ass_list eqs*)
-    reduce_by_eqs ass_list eqs keep in
-  let eqs = reduce_by_eqs eqs eqs keep in
-  let ass_list = (get_meaningful_equalities eqs) @ ass_list in
-  remove_trues ass_list
+*)
 
 let not_stronger op1 op2 =
   if op1=op2 then true else
@@ -182,19 +240,6 @@ let not_stronger op1 op2 =
     | Le,Lt -> true
     | Ge,Gt -> true
     | _,_ -> false
-
-type assignment = (string*term)
-
-let canonicalize statements =
-  let canonicalize1 sttmt =
-    match sttmt with
-    | {v=Bop (Eq,{v=Bool false;_},rhs);t} ->
-      {v=Not rhs;t}
-    | {v=Bop (Ge,lhs,rhs);t} -> {v=Bop(Le,rhs,lhs);t}
-    | {v=Bop (Gt,lhs,rhs);t} -> {v=Bop(Lt,rhs,lhs);t}
-    | _ -> sttmt
-  in
-  List.map statements ~f:canonicalize1
 
 let prepare_assertions tip_res tip_ret_name tip_ret_type =
   let exists_such =
@@ -244,7 +289,7 @@ let find_assignment assumptions assertions var =
         Some (var,Int lhs)
       | _ -> None)
 
-let find_assignments assumptions assertions vars =
+let guess_assignments assumptions assertions vars =
   List.join (List.map vars ~f:(fun var ->
       let (assertions,rel_ids) = take_relevant assertions [var] in
       let (assumptions,_) = take_relevant assumptions rel_ids in
@@ -252,41 +297,15 @@ let find_assignments assumptions assertions vars =
       | Some assignment -> [assignment]
       | None -> []))
 
-let expand_conjunctions sttmts =
-  let rec expand_sttmt = function
-    | {v=Bop (And,lhs,rhs);_} -> (expand_sttmt lhs)@(expand_sttmt rhs)
-    | x -> [x]
-  in
-  List.join (List.map sttmts ~f:expand_sttmt)
-
-let expand_fixpoints_in_tterm tterm =
-  let rec impl tterm =
-    match tterm with
-    | Apply (fname,args) ->
-      begin
-        match String.Map.find Function_spec.fixpoints fname with
-        | Some body ->
-          Some (List.foldi args ~init:body
-                  ~f:(fun i acc arg ->
-                      replace_term_in_tterm (Id (sprintf "Arg%d" i))
-                        arg.v acc)).v
-        | None -> None
-      end
-    | _ -> None
-  in
-  call_recursively_on_tterm impl tterm
-
-let expand_fixpoints sttmts =
-  List.map sttmts ~f:expand_fixpoints_in_tterm
-
 let is_assignment_justified var value executions =
   lprintf "justifying assignment %s = %s\n" var (render_term value);
   let valid = List.for_all executions ~f:(fun assumptions ->
-      let (assumptions,_) = take_relevant assumptions [var] in
-      let assumptions = expand_fixpoints assumptions in
-      let assumptions = simplify assumptions [Id var] in
-      let assumptions = canonicalize assumptions in
-      let mod_assumptions = replace_term_in_tterms (Id var) value assumptions in
+      let assumptions = take_relevant assumptions [var] |> fst |>
+                        canonicalize |>
+                        reduce_by_equalities [Id var]
+      in
+      let mod_assumptions =
+        replace_term_in_tterms (Id var) value assumptions in
       lprintf "comparing:\n";
       List.iter assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass));
       lprintf "with\n";
@@ -300,30 +319,41 @@ let is_assignment_justified var value executions =
   valid
 
 let induce_symbolic_assignments ir executions =
+  start_log ();
   let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
   lprintf "free vars: \n";
-  List.iter fr_var_names ~f:(fun vn -> lprintf "%s\n" vn);
-  let assignments = List.fold ir.tip_call.results ~init:[] ~f:(fun acc res ->
-      let assertions = prepare_assertions res
-          ir.tip_call.context.ret_name
-          ir.tip_call.context.ret_type
-      in
-      let assertions = expand_conjunctions assertions in
-      let assertions = expand_struct_eqs assertions in
-      let assertions = apply_assignments_to_statements acc assertions in
-      let assertions = canonicalize assertions in
-      List.fold executions ~init:acc ~f:(fun acc assumptions ->
-          let vars = String.Set.to_list
-              (String.Set.diff (String.Set.of_list fr_var_names)
-                 (String.Set.of_list (List.map acc ~f:fst)))
-          in
-          let var_ids = List.map vars ~f:(fun name -> Id name) in
-          let assumptions = expand_fixpoints assumptions in
-          let assumptions = apply_assignments_to_statements acc assumptions in
-          let assumptions = simplify assumptions var_ids in
-          let assumptions = canonicalize assumptions in
-          (find_assignments assumptions assertions vars)@acc))
+  lprint_list fr_var_names;
+  let assertion_lists = List.map ir.tip_call.results ~f:(fun result ->
+      (prepare_assertions result
+         ir.tip_call.context.ret_name
+         ir.tip_call.context.ret_type) |>
+      canonicalize)
   in
+  let assignments = List.fold assertion_lists ~init:[]
+      ~f:(fun assignments assertions ->
+          lprintf "working with assertions:\n";
+          lprint_list (List.map assertions ~f:render_tterm);
+          List.fold executions ~init:assignments
+            ~f:(fun assignments assumptions ->
+                let vars = String.Set.to_list
+                    (String.Set.diff (String.Set.of_list fr_var_names)
+                       (String.Set.of_list (List.map assignments ~f:fst)))
+                in
+                let var_ids = List.map vars ~f:(fun name -> Id name) in
+                let assumptions = assumptions |> canonicalize |>
+                                  reduce_by_equalities var_ids
+                in
+                lprintf "assuming assignments:\n";
+                lprint_list (List.map assignments
+                               ~f:(fun a -> (fst a) ^ " = " ^
+                                            (render_term (snd a))));
+                lprintf "working with assumptions:\n";
+                lprint_list (List.map assumptions ~f:render_tterm);
+                lprintf "|-|-|- vars:\n";
+                lprint_list vars;
+                assignments@(guess_assignments assumptions assertions vars)))
+  in
+  lprintf "\n\n JUSTIFYING \n\n";
   let justified_assignments = List.filter assignments ~f:(fun (var,value) ->
       is_assignment_justified var value executions)
   in
