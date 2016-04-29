@@ -6,7 +6,9 @@ let validate_prefix fin fout intermediate_pref verifast_bin =
   let lino_fname = intermediate_pref ^ ".lino.int" in
   let export_out_fname = intermediate_pref ^ ".export.stdout" in
   let verify_out_fname = intermediate_pref ^ ".verify.stdout" in
+  let ir_fname = intermediate_pref ^ ".ir" in
   let ir = Import.build_ir fin in
+  Out_channel.write_all ir_fname ~data:(Sexp.to_string (sexp_of_ir ir));
   Render.render_ir ir fout;
   match Verifier.verify_file verifast_bin fout verify_out_fname with
   | Verifier.Valid -> printf "Valid.\n"

@@ -504,6 +504,23 @@ let fixpoints =
                          {v=Bop(Le,{v=Int 0;t=Sint32},{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown});t=Unknown},
                          {v=Bop(Lt,{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown},
                                 {v=Int 2;t=Sint32});t=Unknown});t=Boolean};
+    "nat_ext_fp", {v=Bop(And,
+                         {v=Bop(And,
+                                {v=Bop(Le,
+                                       {v=Int 0;t=Sint32},
+                                       {v=Str_idx({v=Id "Arg0";t=Unknown},"edid");t=Unknown});
+                                 t=Unknown},
+                                {v=Bop(Lt,
+                                       {v=Str_idx({v=Id "Arg0";t=Unknown},"edid");t=Unknown},
+                                       {v=Int 2;t=Sint32});t=Unknown});
+                          t=Boolean},
+                         {v=Bop(Eq,
+                                {v=Str_idx({v=Id "Arg0";t=Unknown},"edid");t=Unknown},
+                                {v=Bop(Add,
+                                       {v=Int 2747;t=Sint32},
+                                       {v=Id "Arg1";t=Unknown});t=Unknown});
+                          t=Boolean});
+                   t=Boolean};
     "ikc", {v=Struct ("int_k",
                       [{name="isp";value={v=Id "Arg0";t=Unknown}};
                        {name="dp";value={v=Id "Arg1";t=Unknown}};
@@ -512,9 +529,19 @@ let fixpoints =
                        {name="idid";value={v=Id "Arg4";t=Unknown}};
                        {name="prtc";value={v=Id "Arg5";t=Unknown}}]);
            t=Unknown};
+    "ekc", {v=Struct ("ext_k",
+                      [{name="esp";value={v=Id "Arg0";t=Unknown}};
+                       {name="dp";value={v=Id "Arg1";t=Unknown}};
+                       {name="esip";value={v=Id "Arg2";t=Unknown}};
+                       {name="dip";value={v=Id "Arg3";t=Unknown}};
+                       {name="edid";value={v=Id "Arg4";t=Unknown}};
+                       {name="prtc";value={v=Id "Arg5";t=Unknown}}]);
+           t=Unknown};
     "integer", {v=Bop(Eq,{v=Id "Arg0";t=Unknown},{v=Id "Arg1";t=Unknown});t=Boolean};
     "flow_int_device_id", {v=Bop(Eq,{v=Str_idx({v=Id "Arg0";t=Unknown},"int_device_id");t=Unknown},
-                                {v=Id "Arg1";t=Unknown}); t=Boolean};
+                                 {v=Id "Arg1";t=Unknown}); t=Boolean};
+    "flow_ext_device_id", {v=Bop(Eq,{v=Str_idx({v=Id "Arg0";t=Unknown},"ext_device_id");t=Unknown},
+                                 {v=Id "Arg1";t=Unknown}); t=Boolean};
     "flwc", {v=Struct ("flw",
                        [{name="ik";value={v=Id "Arg0";t=Unknown}};
                         {name="ek";value={v=Id "Arg1";t=Unknown}};
@@ -529,4 +556,5 @@ let fixpoints =
                         {name="prtc";value={v=Id "Arg10";t=Unknown}};
                        ]);t=Unknown};
     "flw_get_ik", {v=Str_idx({v=Id "Arg0";t=Unknown},"ik");t=Unknown};
+    "flw_get_ek", {v=Str_idx({v=Id "Arg0";t=Unknown},"ek");t=Unknown};
   ]
