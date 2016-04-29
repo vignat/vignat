@@ -17,7 +17,7 @@ val remove_leak :
   bytes -> 'a -> 'b -> 'c Core.Std.String.Map.t -> 'c Core.Std.String.Map.t
 val on_rez_nonzero : bytes -> bytes -> 'a -> 'b -> bytes
 val on_rez_nz : ('a -> 'b -> bytes) -> bytes -> 'a -> 'b -> bytes
-type map_key = Sint32 | Ext
+type map_key = Int | Ext
 val last_index_gotten : bytes ref
 val last_index_key : map_key ref
 val last_indexing_succ_ret_var : bytes ref

@@ -26,15 +26,15 @@ let on_rez_nonzero str = (fun rez_var _ _ ->
 let on_rez_nz f = (fun rez_var args tmp_gen ->
     "/*@ if(" ^ rez_var ^ "!=0) " ^ (f args tmp_gen) ^ " @*/")
 
-type map_key = Sint32 | Ext
+type map_key = Int | Ext
 
 let last_index_gotten = ref ""
-let last_index_key = ref Sint32
+let last_index_key = ref Int
 let last_indexing_succ_ret_var = ref ""
 
 let gen_get_fp map_name =
   match !last_index_key with
-  | Sint32 -> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
+  | Int-> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
   | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
 type fun_spec = {ret_type: ttype; arg_types: ttype list;
@@ -296,7 +296,7 @@ let fun_types =
                          last_index_gotten :=
                            "ikc(user_buf0_34, user_buf0_36, \
                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
-                         last_index_key := Sint32;
+                         last_index_key := Int;
                          last_indexing_succ_ret_var := ret_var;
                          "");
                     ];
