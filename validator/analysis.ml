@@ -107,9 +107,6 @@ let canonicalize sttmts =
   List.map ~f:reduce_struct_idxes |>
   List.dedup
 
-let extract_equalities ass_list =
-  List.partition_tf ass_list ~f:(function {v=Bop(Eq,_,_);t=_} -> true | _ -> false)
-
 let remove_trivial_eqs eqs =
   List.filter eqs ~f:(function
         {v=Bop(Eq,lhs,rhs);t=_} -> not (term_eq lhs.v rhs.v)
@@ -134,21 +131,6 @@ let get_replacement_pair a b keep =
       Some (a,b)
     else
       Some (b,a)
-
-let reduce_by_eqs (eqs: tterm list) keep (sttmts: tterm list) =
-  List.fold eqs ~init:sttmts
-    ~f:(fun acc eq ->
-         match eq.v with
-         | Bop(Eq,lhs,rhs) ->
-           begin
-             match get_replacement_pair lhs rhs keep with
-             | Some (replace_from, replace_to) ->
-               List.map acc ~f:(fun sttmt ->
-                   if sttmt.v = eq.v then sttmt else
-                     replace_term_in_tterm replace_from.v replace_to.v sttmt)
-             | None -> eq::acc
-           end
-         | _ -> failwith "eqs must contain only equalities")
 
 (* The equalities that are not a simple variable renaming:
    anything except (a = b).*)
@@ -178,11 +160,6 @@ let reduce_by_equalities vars sttmts =
       | _ -> (sttmt::sttmts,eqs)) ~init:([],[])
   |> fst
   |> remove_trivial_eqs
-  (* let (eqs,other) = extract_equalities sttmts in *)
-  (* let eqs = remove_trivial_eqs eqs in *)
-  (* (eqs@other) |> *)
-  (* reduce_by_eqs eqs vars |> *)
-  (* remove_trivial_eqs *)
 
 let simplify vars sttmts =
   lprintf "\n\nover vars: \n";
@@ -206,10 +183,6 @@ let simplify vars sttmts =
   lprintf "\nreduced4: \n";
   lprint_list (List.map six ~f:render_tterm);
   six
-  (* let seven = canonicalize six in *)
-  (* lprintf "\ncanonicalized4:\n"; *)
-  (* lprint_list (List.map seven ~f:render_tterm); *)
-  (* seven *)
 
 let get_ids_from_tterm tterm =
   let rec impl = function
