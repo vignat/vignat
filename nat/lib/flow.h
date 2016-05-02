@@ -184,14 +184,16 @@ void log_flow(const struct flow *f);
     return &(fp->ik) == ik && &(fp->ek) == ek;
   }
 
+  fixpoint int overflow_cast_fp(int x) { return x <= INT_MAX ? x : x - INT_MAX - 1; }
+
   fixpoint int int_hash(int_k ik) {
     switch(ik) {case ikc(x1, x2, x3, x4, x5, x6):
-                     return x1^x2^x3^x4^x5^x6;}
+                     return overflow_cast_fp(x1^x2^x3^x4^x5^x6);}
   }
 
   fixpoint int ext_hash(ext_k ek) {
     switch(ek) {case ekc(x1, x2, x3, x4, x5, x6):
-                      return x1^x2^x3^x4^x5^x6;}
+                      return overflow_cast_fp(x1^x2^x3^x4^x5^x6);}
   }
   @*/
 

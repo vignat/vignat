@@ -2,6 +2,8 @@
 #include <string.h>
 
 #include "map.h"
+#include "include_ignored_by_verifast.h"
+#include "lib/ignore.h"
 
 //@ #include <list.gh>
 //@ #include <listex.gh>
@@ -781,8 +783,10 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                         khs, vals) &*&
             [fr]is_map_keys_equality<kt>(eq, keyp); @*/
 {
-  //FIXME: verifast do not understand this
-  //idiom: (void)eq;(void)keyps;(void)khs;(void)vals;
+  IGNORE(eq);
+  IGNORE(keyps);
+  IGNORE(khs);
+  IGNORE(vals);
   //@ open map_key_type(_);
   //@ open map_key_hash<kt>(_);
   //@ open map_record_property(_);

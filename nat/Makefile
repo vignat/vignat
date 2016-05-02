@@ -46,6 +46,7 @@ SRCS-y := main.c lib/flowtable.c lib/flowmanager.c lib/flow.c lib/flow-log.c lib
 
 CFLAGS += $(USER_FLAGS)
 CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -I..
 LDFLAGS += 
 
 # workaround for a gcc bug with noreturn attribute

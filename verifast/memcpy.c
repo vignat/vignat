@@ -116,9 +116,10 @@ void* clone(void* a)
   return ret;
 }
 
+#if 0
 /*@
 
-typedef void X_to_bytes<t>(predicate (void*, t) Xp, fixpoint (t, list<char>) chars_of_X)(void* x)
+lemma void X_to_bytes<t>(predicate (void*, t) Xp, fixpoint (t, list<char>) chars_of_X)(void* x);
 requires Xp(x, ?val);
 ensures chars((void*)x, sizeof(struct A), chars_of_X(val)) &*& chars_within_limits(chars_of_X(val)) == true;
 
@@ -135,7 +136,7 @@ void* clone_gen/*@ <t> @*/(void* x, int size)
    if (ret == 0) return 0;
    return x;
 }
-
+#endif
 //@ fixpoint int haha(int x);
 
 int main ()
