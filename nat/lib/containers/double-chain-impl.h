@@ -130,7 +130,8 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index);
 /*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
 /*@ ensures (dchaini_out_of_space_fp(dc) ?
              (result == 0 &*&
-              dchainip(dc, cells) &*& *index |-> i) :
+              dchainip(dc, cells) &*&
+              *index |-> i) :
              (result == 1 &*&
               *index |-> ?ni &*&
               false == dchaini_allocated_fp(dc, ni) &*&
