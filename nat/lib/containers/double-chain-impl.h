@@ -122,6 +122,7 @@ struct dchain_cell {
 
 void dchain_impl_init(struct dchain_cell *cells, int index_range);
 /*@ requires 0 < index_range &*&
+             index_range < INT_MAX - 2 &*&
              dcellsp(cells, index_range + DCHAIN_RESERVED, _); @*/
 /*@ ensures dchainip(empty_dchaini_fp(index_range), cells); @*/
 

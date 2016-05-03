@@ -33,3 +33,13 @@ lemma void mul_bounds(int x, int xb, int y, int yb)
     mul_mono(y, yb, xb);
     assert y * xb <= yb * xb;
 }
+
+lemma void mul_subst(int x, int y, int a)
+requires x == y &*& 0 <= a;
+ensures a*x == a*y;
+{
+  for (int i = 0; i < a; i++)
+      invariant 0 <= i &*& i <= a &*& i*x == i*y;
+      decreases a-i;
+  {}
+}

@@ -219,9 +219,15 @@ void flow_pack_keys(void* flwp, void* ikp, void* ekp)
     assume(false);
   }
 
-  lemma void bytes_to_int_key(struct int_key* ik);
+  lemma void bytes_to_int_key(struct int_key* ik)
   requires chars((void*)ik, sizeof(struct int_key), ?chs);
   ensures int_k_p(ik, _);
+  {
+    assume(sizeof(struct int_key) == sizeof(uint16_t) + sizeof(uint16_t) +
+           sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint8_t));
+    chars_split((void*)ik, sizeof(uint16_t));
+    close int_key_int_src_port(ik, _);
+  }
 
   lemma void bytes_to_ext_key(void* ek);
   requires chars((void*)ek, sizeof(struct ext_key), ?chs);
