@@ -1,6 +1,7 @@
 #include "double-chain-impl.h"
 
 //@ #include <nat.gh>
+//@ #include <listex.gh>
 //@ #include "arith.gh"
 
 enum DCHAIN_ENUM {
@@ -13,9 +14,11 @@ enum DCHAIN_ENUM {
 
   predicate free_listp(list<dcell> cells, list<int> fl, int cur) =
     switch(fl) {
-      case nil: return nth(cur, cells) == dcell(1,1);
+      case nil: return ALLOC_LIST_HEAD < cur &*&
+                       nth(cur, cells) == dcell(1,1);
       case cons(h,t):
         return nth(cur, cells) == dcell(h,h) &*&
+               ALLOC_LIST_HEAD < cur &*&
                free_listp(cells, t, h);
     };
 
@@ -37,15 +40,24 @@ enum DCHAIN_ENUM {
     }
   }
 
+  fixpoint bool bounded(int bound, dcell val) {
+    return 0 <= dchain_cell_get_prev(val) &&
+                dchain_cell_get_prev(val) < bound &&
+           0 <= dchain_cell_get_next(val) &&
+                dchain_cell_get_next(val) < bound;
+  }
+
   predicate dchainip(dchaini ch,
                      struct dchain_cell * cells) =
     switch(ch) { case dchaini(allocd, size):
       return
         0 < size &*&
         dcellsp(cells, size + INDEX_SHIFT, ?cls) &*&
+        true == forall(cls, (bounded)(size+INDEX_SHIFT)) &*&
         alloc_listp(cls, ?al, 0) &*&
         free_listp(cls, ?fl, 1) &*&
-        al == shift_inds_fp(allocd, 2);
+        length(al) + length(fl) == size &*&
+        al == shift_inds_fp(allocd, INDEX_SHIFT);
     };
     @*/
 
@@ -149,6 +161,16 @@ enum DCHAIN_ENUM {
     }
   }
 
+  lemma void full_free_list_len(nat len, int cur)
+  requires true;
+  ensures length(full_free_list_fp(len, cur)) == int_of_nat(len);
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n): full_free_list_len(n, cur+1);
+    }
+  }
+
   lemma void append_append_cons_to_append_cons<t>(list<t> l1, t el, list<t> l2)
   requires true;
   ensures append(append(l1, cons(el, nil)), l2) == append(l1, cons(el, l2));
@@ -163,17 +185,24 @@ enum DCHAIN_ENUM {
   lemma void empty_dchain_produced_tail(struct dchain_cell* cells,
                                         nat len,
                                         int ind,
+                                        int size,
                                         list<dcell> pref)
   requires dcellsp(cells + ind, int_of_nat(len), empty_cells_seg(len, ind)) &*&
            dcellp(cells + ind + int_of_nat(len), dcell(1,1)) &*&
-           length(pref) == ind;
+           length(pref) == ind &*&
+           ind + int_of_nat(len) < size &*&
+           1 < size &*&
+           0 < ind &*&
+           true == forall(pref, (bounded)(size));
   ensures dcellsp(cells + ind, int_of_nat(len)+1, ?lst) &*&
-          free_listp(append(pref, lst), full_free_list_fp(len, ind+1), ind);
+          free_listp(append(pref, lst), full_free_list_fp(len, ind+1), ind) &*&
+          true == forall(append(pref, lst), (bounded)(size));
   {
     switch(len) {
       case zero:
         close dcellsp(cells + ind, 1, cons(dcell(1,1), nil));
         nth_append_r(pref, cons(dcell(1,1), nil), 0);
+        forall_append(pref, cons(dcell(1,1), nil), (bounded)(size));
         close free_listp(append(pref, cons(dcell(1,1), nil)), nil, ind);
         return;
       case succ(n):
@@ -181,7 +210,8 @@ enum DCHAIN_ENUM {
         assert dcellp(cells + ind, dcell(ind+1,ind+1));
         assert ind+1+int_of_nat(n) == ind+int_of_nat(len);
         mul_subst(ind+1+int_of_nat(n), ind+int_of_nat(len), sizeof(struct dchain_cell));
-        empty_dchain_produced_tail(cells, n, ind+1,
+        forall_append(pref, cons(dcell(ind+1,ind+1), nil), (bounded)(size));
+        empty_dchain_produced_tail(cells, n, ind+1, size,
                                    append(pref,cons(dcell(ind+1,ind+1), nil)));
         assert dcellsp(cells+ind+1, int_of_nat(n)+1, ?lst_tail);
         assert free_listp(append(append(pref, cons(dcell(ind+1,ind+1),
@@ -203,10 +233,11 @@ enum DCHAIN_ENUM {
            dcellp(cells + len + 1, dcell(1,1)) &*&
            0 < len;
   ensures dcellsp(cells, len+2, ?lst) &*&
+          true == forall(lst, (bounded)(len+2)) &*&
           free_listp(lst, full_free_list_fp(nat_of_int(len), 2), 1) &*&
           alloc_listp(lst, nil, 0);
   {
-    empty_dchain_produced_tail(cells, nat_of_int(len), 1,
+    empty_dchain_produced_tail(cells, nat_of_int(len), 1, len+2,
                                cons(dcell(0,0),nil));
     assert dcellsp(cells+1, len+1, ?lst);
     close dcellsp(cells, len+2, cons(dcell(0,0), lst));
@@ -260,8 +291,117 @@ void dchain_impl_init(struct dchain_cell *cells, int size)
   //@ mul_subst(i, size+1, sizeof(struct dchain_cell));
   //@ close dcellp(cells+size+1,dcell(1,1));
   //@ empty_dchain_produced(cells, size);
+  //@ full_free_list_len(nat_of_int(size), 2);
   //@ close dchainip(empty_dchaini_fp(size), cells);
 }
+
+/*@
+  lemma void short_circuited_free_list(list<dcell> cells, list<int> fl);
+  requires free_listp(cells, fl, 1) &*&
+           dchain_cell_get_next(nth(1, cells)) == 1;
+  ensures free_listp(cells, fl, 1) &*& fl == nil;
+
+  fixpoint list<int> dchaini_alist_fp(dchaini dc) {
+    switch(dc) { case dchaini(alist, size): return alist; }
+  }
+
+  lemma void shift_inds_len(list<int> l, int shift)
+  requires true;
+  ensures length(shift_inds_fp(l, shift)) == length(l);
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t): shift_inds_len(t, shift);
+    }
+  }
+  @*/
+
+/*@
+  lemma void extract_cell(struct dchain_cell* cells, list<dcell> cls, int i)
+  requires dcellsp(cells, ?size, cls) &*&
+           0 <= i &*& i < size;
+  ensures dcellsp(cells, i, take(i, cls)) &*& dcellp(cells+i, nth(i, cls)) &*&
+          dcellsp(cells+i+1, size - i - 1, drop(i+1, cls));
+  {
+    open dcellsp(cells, size, cls);
+    switch(cls) {
+      case nil:
+        assert(size == 0);
+        assert(0 <= i);
+        assert(i < 0);
+        return;
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          extract_cell(cells+1, t, i-1);
+        }
+    }
+    close dcellsp(cells, i, take(i, cls));
+  }
+
+  lemma void glue_cells(struct dchain_cell* cells, list<dcell> cls, int i)
+  requires 0 <= i &*& i < length(cls) &*&
+           dcellsp(cells, i, take(i, cls)) &*& dcellp(cells+i, nth(i, cls)) &*&
+           dcellsp(cells+i+1, length(cls) - i - 1, drop(i+1, cls));
+  ensures dcellsp(cells, length(cls), cls);
+  {
+    switch(cls) {
+      case nil:
+        assert(0 <= i);
+        assert(i < 0);
+        return;
+      case cons(h,t):
+        open dcellsp(cells, i, take(i, cls));
+        if (i == 0) {
+        } else {
+          glue_cells(cells+1, t, i-1);
+        }
+        close dcellsp(cells, length(cls), cls);
+    }
+  }
+
+  lemma void dcellsp_length(struct dchain_cell* cells)
+  requires dcellsp(cells, ?size, ?cls);
+  ensures dcellsp(cells, size, cls) &*& size == length(cls);
+  {
+    open dcellsp(cells, size, cls);
+    switch(cls) {
+      case nil: return;
+      case cons(h,t): dcellsp_length(cells+1);
+    }
+    close dcellsp(cells, size, cls);
+  }
+
+  lemma void forall_nth<t>(list<t> lst, fixpoint(t, bool) p, int i)
+  requires 0 <= i &*& i < length(lst) &*& true == forall(lst, p);
+  ensures true == p(nth(i, lst));
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (i == 0){}
+        else {
+          forall_nth(t, p, i-1);
+        }
+    }
+  }
+
+  lemma void free_list_above_alloc(list<dcell> cls, list<int> fl, int ind)
+  requires free_listp(cls, fl, ind);
+  ensures free_listp(cls, fl, ind) &*&
+          ALLOC_LIST_HEAD < dchain_cell_get_next(nth(ind, cls));
+  {
+    open free_listp(cls, fl, ind);
+    switch(fl) {
+      case nil: break;
+      case cons(h,t):
+        open free_listp(cls, t, h);
+        close free_listp(cls, t, h);
+     };
+     close free_listp(cls, fl, ind);
+  }
+  @*/
+
 
 int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
 /*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
@@ -278,28 +418,52 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
   //@ dcells_limits(cells);
   //@ int size = dchaini_irange_fp(dc);
   //@ assert 0 < size;
+  //@ assert dcellsp(cells, size + INDEX_SHIFT, ?cls);
+  //@ dcellsp_length(cells);
+  //@ assert free_listp(cls, ?fl, 1);
+  //@ assert alloc_listp(cls, ?al, 0);
   /* No more empty cells. */
   //@ mul_nonnegative(size, sizeof(struct dchain_cell));
-  //@ open dcellsp(cells, size+INDEX_SHIFT, _);
-  //@ open dcellsp(cells+1, size+INDEX_SHIFT-1, _);
+  // @ open dcellsp(cells, size+INDEX_SHIFT, _);
+  // @ open dcellsp(cells+1, size+INDEX_SHIFT-1, _);
+  //@ extract_cell(cells, cls, FREE_LIST_HEAD);
   struct dchain_cell* fl_head = cells + FREE_LIST_HEAD;
+  struct dchain_cell* al_head = cells + ALLOC_LIST_HEAD;
   if (fl_head->next == FREE_LIST_HEAD)
   {
-    //@ close dcellsp(cells+1, size+INDEX_SHIFT-1, _);
-    //@ close dcellsp(cells, size+INDEX_SHIFT, _);
+    //@ glue_cells(cells, cls, FREE_LIST_HEAD);
+    //@ short_circuited_free_list(cls, fl);
+    // @ close dcellsp(cells+1, size+INDEX_SHIFT-1, _);
+    // @ close dcellsp(cells, size+INDEX_SHIFT, _);
+    //@ assert(length(al) == size);
+    //@ shift_inds_len(dchaini_alist_fp(dc), INDEX_SHIFT);
+    //@ assert(length(dchaini_alist_fp(dc)) == size);
     //@ close dchainip(dc, cells);
     //@ assert true == dchaini_out_of_space_fp(dc);
     return 0;
   }
-  int allocated = cells[FREE_LIST_HEAD].next;
+  int allocated = fl_head->next;
+  //@ forall_nth(cls, (bounded)(size+INDEX_SHIFT), FREE_LIST_HEAD);
+  //@ assert 0 <= allocated &*& allocated < size + 2;
+  //@ assert FREE_LIST_HEAD != allocated;
+  //@ free_list_above_alloc(cls, fl, 1);
+  //@ mul_bounds(allocated, size+2, sizeof(struct dchain_cell), sizeof(struct dchain_cell));
+  //@ glue_cells(cells, cls, FREE_LIST_HEAD);
+  //@ extract_cell(cells, cls, FREE_LIST_HEAD);
+  //@ extract_cell(cells+INDEX_SHIFT, drop(INDEX_SHIFT,cls), allocated);
+  struct dchain_cell* allocp = cells + allocated;
   /* Extract the link from the "empty" chain. */
-  cells[FREE_LIST_HEAD].next = cells[allocated].next;
+  fl_head->next = allocp->next;
 
   /* Add the link to the "new"-end "alloc" chain. */
-  cells[allocated].next = ALLOC_LIST_HEAD;
-  cells[allocated].prev = cells[ALLOC_LIST_HEAD].prev;
-  cells[cells[ALLOC_LIST_HEAD].prev].next = allocated;
-  cells[ALLOC_LIST_HEAD].prev = allocated;
+  allocp->next = ALLOC_LIST_HEAD;
+  allocp->prev = al_head->prev;
+  //@ glue_cells(cells, take(allocated, cls), FREE_LIST_HEAD);
+  //@ glue_cells(cells, cls, allocated);
+  //@ extract_cell(cells, cls, FREE_LIST_HEAD);
+  struct dchain_cell* alloc_head_prevp = cells + al_head->prev;
+  alloc_head_prevp->next = allocated;
+  al_head->prev = allocated;
 
   *index = allocated - INDEX_SHIFT;
   return 1;
