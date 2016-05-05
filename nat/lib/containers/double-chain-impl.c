@@ -3,6 +3,7 @@
 //@ #include <nat.gh>
 //@ #include <listex.gh>
 //@ #include "arith.gh"
+//@ #include "stdex.gh"
 
 enum DCHAIN_ENUM {
     ALLOC_LIST_HEAD = 0,
@@ -12,25 +13,27 @@ enum DCHAIN_ENUM {
 
 /*@
 
-  predicate free_listp(list<dcell> cells, list<int> fl, int cur) =
+  predicate free_listp(list<dcell> cells, list<int> fl, int start, int cur) =
     switch(fl) {
-      case nil: return ALLOC_LIST_HEAD < cur &*&
-                       nth(cur, cells) == dcell(1,1);
+      case nil: return nth(cur, cells) == dcell(start,start);
       case cons(h,t):
         return nth(cur, cells) == dcell(h,h) &*&
-               ALLOC_LIST_HEAD < cur &*&
-               free_listp(cells, t, h);
+               cur != h &*&
+               free_listp(cells, t, start, h);
     };
 
-  predicate alloc_listp(list<dcell> cells, list<int> alloc, int cur) =
+  predicate alloc_listp(list<dcell> cells, list<int> alloc, int start, int cur) =
     switch(alloc) {
-      case nil: return nth(cur, cells) == dcell(?x,0) &*&
-                       cur == 0 ? x == 0 : true;
+      case nil: return nth(cur, cells) == dcell(?x,start) &*&
+                       nth(start, cells) == dcell(cur, ?y) &*&
+                       cur == start ?
+                         (x == start &*& y == cur) :
+                         (x != start &*& y != cur);
       case cons(h,t):
         return nth(cur, cells) == dcell(?x, h) &*&
                nth(h, cells) == dcell(cur, ?y) &*&
                x != h &*& y != cur &*&
-               alloc_listp(cells, t, h);
+               alloc_listp(cells, t, start, h);
     };
 
   fixpoint list<int> shift_inds_fp(list<int> inds, int shift) {
@@ -40,11 +43,25 @@ enum DCHAIN_ENUM {
     }
   }
 
-  fixpoint bool bounded(int bound, dcell val) {
+  fixpoint bool dbounded(int dbound, dcell val) {
     return 0 <= dchain_cell_get_prev(val) &&
-                dchain_cell_get_prev(val) < bound &&
+                dchain_cell_get_prev(val) < dbound &&
            0 <= dchain_cell_get_next(val) &&
-                dchain_cell_get_next(val) < bound;
+                dchain_cell_get_next(val) < dbound;
+  }
+
+  fixpoint bool lbounded(int lb, int x) {
+    return lb <= x;
+  }
+
+  fixpoint bool all_engaged(list<int> al, list<int> fl, nat size) {
+    switch(size) {
+      case zero: return true;
+      case succ(n):
+        return all_engaged(al, fl, n) &&
+              (mem(int_of_nat(n) + INDEX_SHIFT, al) ||
+               mem(int_of_nat(n) + INDEX_SHIFT, fl));
+    }
   }
 
   predicate dchainip(dchaini ch,
@@ -53,10 +70,13 @@ enum DCHAIN_ENUM {
       return
         0 < size &*&
         dcellsp(cells, size + INDEX_SHIFT, ?cls) &*&
-        true == forall(cls, (bounded)(size+INDEX_SHIFT)) &*&
-        alloc_listp(cls, ?al, 0) &*&
-        free_listp(cls, ?fl, 1) &*&
+        true == forall(cls, (dbounded)(size+INDEX_SHIFT)) &*&
+        alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD) &*&
+        free_listp(cls, ?fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*&
+        true == all_engaged(al, fl, nat_of_int(size)) &*&
         length(al) + length(fl) == size &*&
+        true == forall(al, (lbounded)(INDEX_SHIFT)) &*&
+        true == forall(fl, (lbounded)(INDEX_SHIFT)) &*&
         al == shift_inds_fp(allocd, INDEX_SHIFT);
     };
     @*/
@@ -171,14 +191,111 @@ enum DCHAIN_ENUM {
     }
   }
 
-  lemma void append_append_cons_to_append_cons<t>(list<t> l1, t el, list<t> l2)
-  requires true;
-  ensures append(append(l1, cons(el, nil)), l2) == append(l1, cons(el, l2));
+  fixpoint bool some_engaged(list<int> lst, nat from, nat to) {
+    switch(to) {
+      case zero: return true;
+      case succ(n):
+        return mem(int_of_nat(n) + INDEX_SHIFT, lst) &&
+                  (from == n ? true : some_engaged(lst, from, n));
+    }
+  }
+
+  lemma void some_engaged_over_bigger_list(nat len, nat from, nat to, int i)
+  requires true == some_engaged(full_free_list_fp(len, i+1), from, to);
+  ensures true == some_engaged(full_free_list_fp(succ(len), i), from, to);
   {
-    switch(l1) {
+    switch(to) {
+      case zero: return;
+      case succ(n):
+        if (from != n)
+          some_engaged_over_bigger_list(len, from, n, i);
+    }
+  }
+
+  lemma void consolidate_some_engaged(list<int> lst, nat from, nat to)
+  requires true == mem(int_of_nat(from) + INDEX_SHIFT, lst) &*&
+           true == some_engaged(lst, succ(from), to);
+  ensures true == some_engaged(lst, from, to);
+  {
+    switch(to) {
+      case zero: return;
+      case succ(n):
+        if (n == succ(from)) {
+          assert true == some_engaged(lst, from, to);
+          return;
+        }
+        consolidate_some_engaged(lst, from, n);
+    }
+  }
+
+  lemma void full_free_list_some_engaged(nat len, nat from, nat to, int i)
+  requires int_of_nat(from) < int_of_nat(to) &*&
+           int_of_nat(to) - int_of_nat(from) <= int_of_nat(len) &*&
+           int_of_nat(from) + INDEX_SHIFT == i;
+  ensures true == some_engaged(full_free_list_fp(len, i), from, to);
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n):
+        if (succ(from) == to) break;
+        else {
+          if (int_of_nat(succ(from)) == int_of_nat(to)) {
+            assert(nat_of_int(int_of_nat(succ(from))) ==
+                   nat_of_int(int_of_nat(to)));
+          }
+          assert int_of_nat(succ(from)) != int_of_nat(to);
+          full_free_list_some_engaged(n, succ(from), to, i+1);
+          some_engaged_over_bigger_list(n, succ(from), to, i);
+          assert true == some_engaged(full_free_list_fp(len, i), succ(from), to);
+          assert true == mem(int_of_nat(from) + INDEX_SHIFT, full_free_list_fp(len, i));
+          consolidate_some_engaged(full_free_list_fp(len, i), from, to);
+        }
+    }
+  }
+
+  lemma void some_all_engaged(list<int> lst, nat to)
+  requires true == some_engaged(lst, zero, to);
+  ensures true == all_engaged(nil, lst, to) &*&
+          true == all_engaged(lst, nil, to);
+  {
+    switch(to) {
+      case zero: return;
+      case succ(n):
+        some_all_engaged(lst, n);
+    }
+  }
+
+  lemma void full_free_list_all_engaged(nat len)
+  requires true;
+  ensures true == all_engaged(nil, full_free_list_fp(len, INDEX_SHIFT),
+                              len);
+  {
+    if (len == zero) return;
+    full_free_list_some_engaged(len, zero, len, INDEX_SHIFT);
+    some_all_engaged(full_free_list_fp(len, INDEX_SHIFT), len);
+  }
+
+  lemma void weaker_lbound(list<int> l, int lb1, int lb2)
+  requires true == forall(l, (lbounded)(lb1)) &*& lb2 < lb1;
+  ensures true == forall(l, (lbounded)(lb2));
+  {
+    switch(l) {
       case nil: return;
       case cons(h,t):
-        append_append_cons_to_append_cons(t, el, l2);
+        weaker_lbound(t, lb1, lb2);
+    }
+  }
+
+  lemma void full_free_list_all_lbounded(nat len, int lb)
+  requires true;
+  ensures true == forall(full_free_list_fp(len, lb),
+                         (lbounded)(lb));
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n):
+        full_free_list_all_lbounded(n, lb+1);
+        weaker_lbound(full_free_list_fp(n, lb+1), lb+1, lb);
     }
   }
 
@@ -193,37 +310,38 @@ enum DCHAIN_ENUM {
            ind + int_of_nat(len) < size &*&
            1 < size &*&
            0 < ind &*&
-           true == forall(pref, (bounded)(size));
+           true == forall(pref, (dbounded)(size));
   ensures dcellsp(cells + ind, int_of_nat(len)+1, ?lst) &*&
-          free_listp(append(pref, lst), full_free_list_fp(len, ind+1), ind) &*&
-          true == forall(append(pref, lst), (bounded)(size));
+          free_listp(append(pref, lst), full_free_list_fp(len, ind+1), 1, ind) &*&
+          true == forall(append(pref, lst), (dbounded)(size));
   {
     switch(len) {
       case zero:
         close dcellsp(cells + ind, 1, cons(dcell(1,1), nil));
         nth_append_r(pref, cons(dcell(1,1), nil), 0);
-        forall_append(pref, cons(dcell(1,1), nil), (bounded)(size));
-        close free_listp(append(pref, cons(dcell(1,1), nil)), nil, ind);
+        forall_append(pref, cons(dcell(1,1), nil), (dbounded)(size));
+        close free_listp(append(pref, cons(dcell(1,1), nil)), nil, 1, ind);
         return;
       case succ(n):
         open dcellsp(cells + ind, int_of_nat(len), empty_cells_seg(len, ind));
         assert dcellp(cells + ind, dcell(ind+1,ind+1));
         assert ind+1+int_of_nat(n) == ind+int_of_nat(len);
         mul_subst(ind+1+int_of_nat(n), ind+int_of_nat(len), sizeof(struct dchain_cell));
-        forall_append(pref, cons(dcell(ind+1,ind+1), nil), (bounded)(size));
+        forall_append(pref, cons(dcell(ind+1,ind+1), nil), (dbounded)(size));
         empty_dchain_produced_tail(cells, n, ind+1, size,
                                    append(pref,cons(dcell(ind+1,ind+1), nil)));
         assert dcellsp(cells+ind+1, int_of_nat(n)+1, ?lst_tail);
         assert free_listp(append(append(pref, cons(dcell(ind+1,ind+1),
                                               nil)), lst_tail),
-                          full_free_list_fp(n, ind+2), ind+1);
+                          full_free_list_fp(n, ind+2),
+                          1, ind+1);
         close dcellsp(cells+ind, int_of_nat(len)+1,
                       cons(dcell(ind+1,ind+1), lst_tail));
 
         nth_append_r(pref, cons(dcell(ind+1,ind+1), lst_tail), 0);
         append_append_cons_to_append_cons(pref, dcell(ind+1,ind+1), lst_tail);
         close free_listp(append(pref, cons(dcell(ind+1,ind+1), lst_tail)),
-                         full_free_list_fp(len, ind+1), ind);
+                         full_free_list_fp(len, ind+1), 1, ind);
     }
   }
 
@@ -233,15 +351,15 @@ enum DCHAIN_ENUM {
            dcellp(cells + len + 1, dcell(1,1)) &*&
            0 < len;
   ensures dcellsp(cells, len+2, ?lst) &*&
-          true == forall(lst, (bounded)(len+2)) &*&
-          free_listp(lst, full_free_list_fp(nat_of_int(len), 2), 1) &*&
-          alloc_listp(lst, nil, 0);
+          true == forall(lst, (dbounded)(len+2)) &*&
+          free_listp(lst, full_free_list_fp(nat_of_int(len), 2), 1, 1) &*&
+          alloc_listp(lst, nil, 0, 0);
   {
     empty_dchain_produced_tail(cells, nat_of_int(len), 1, len+2,
                                cons(dcell(0,0),nil));
     assert dcellsp(cells+1, len+1, ?lst);
     close dcellsp(cells, len+2, cons(dcell(0,0), lst));
-    close alloc_listp(cons(dcell(0,0), lst), nil, 0);
+    close alloc_listp(cons(dcell(0,0), lst), nil, 0, 0);
   }
   @*/
 
@@ -292,14 +410,24 @@ void dchain_impl_init(struct dchain_cell *cells, int size)
   //@ close dcellp(cells+size+1,dcell(1,1));
   //@ empty_dchain_produced(cells, size);
   //@ full_free_list_len(nat_of_int(size), 2);
+  //@ full_free_list_all_engaged(nat_of_int(size));
+  //@ full_free_list_all_lbounded(nat_of_int(size), INDEX_SHIFT);
   //@ close dchainip(empty_dchaini_fp(size), cells);
 }
 
 /*@
-  lemma void short_circuited_free_list(list<dcell> cells, list<int> fl);
-  requires free_listp(cells, fl, 1) &*&
-           dchain_cell_get_next(nth(1, cells)) == 1;
-  ensures free_listp(cells, fl, 1) &*& fl == nil;
+  lemma void short_circuited_free_list(list<dcell> cells, list<int> fl)
+  requires free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*&
+           nth(FREE_LIST_HEAD, cells) == dcell(_,1);
+  ensures free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*& fl == nil;
+  {
+    switch(fl) {
+      case nil: return;
+      case cons(h,t):
+        open free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+        close free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+    }
+  }
 
   fixpoint list<int> dchaini_alist_fp(dchaini dc) {
     switch(dc) { case dchaini(alist, size): return alist; }
@@ -317,29 +445,115 @@ void dchain_impl_init(struct dchain_cell *cells, int size)
   @*/
 
 /*@
-  lemma void extract_cell(struct dchain_cell* cells, list<dcell> cls, int i)
+  lemma void non_empty_free_list(list<dcell> cells, list<int> fl)
+  requires free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*&
+           dchain_cell_get_next(nth(1, cells)) != 1;
+  ensures free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*& fl != nil;
+  {
+    switch(fl) {
+      case nil:
+        open free_listp(cells, fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+        return;
+      case cons(h,t):
+        return;
+    }
+  }
+  @*/
+
+/*@
+  lemma void dcellsp_length(struct dchain_cell* cells)
+  requires dcellsp(cells, ?size, ?cls);
+  ensures dcellsp(cells, size, cls) &*& size == length(cls);
+  {
+    open dcellsp(cells, size, cls);
+    switch(cls) {
+      case nil: return;
+      case cons(h,t): dcellsp_length(cells+1);
+    }
+    close dcellsp(cells, size, cls);
+  }
+
+  lemma void extract_heads(struct dchain_cell* cells, list<dcell> cls)
+  requires dcellsp(cells, ?size, cls) &*& INDEX_SHIFT <= size;
+  ensures dcellsp(cells+INDEX_SHIFT, size-2, drop(2,cls)) &*&
+          dcellp(cells+ALLOC_LIST_HEAD, nth(ALLOC_LIST_HEAD, cls)) &*&
+          dcellp(cells+FREE_LIST_HEAD, nth(FREE_LIST_HEAD, cls));
+  {
+    open dcellsp(cells, size, cls);
+    open dcellsp(cells+1, size-1, tail(cls));
+  }
+
+  lemma void drop_add_one<t>(list<t> lst, int i)
+  requires 0 <= i &*& i < length(lst);
+  ensures drop(i, lst) == cons(nth(i, lst), drop(i + 1, lst));
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (i != 0)
+          drop_add_one(t, i-1);
+    }
+  }
+
+  lemma void attach_heads(struct dchain_cell* cells, list<dcell> cls)
+  requires dcellsp(cells+INDEX_SHIFT, length(cls)-2, drop(2,cls)) &*&
+           dcellp(cells+ALLOC_LIST_HEAD, nth(ALLOC_LIST_HEAD, cls)) &*&
+           dcellp(cells+FREE_LIST_HEAD, nth(FREE_LIST_HEAD, cls)) &*&
+           INDEX_SHIFT <= length(cls);
+  ensures dcellsp(cells, length(cls), cls);
+  {
+    drop_add_one(cls, 1);
+    close dcellsp(cells+1, length(cls)-1, drop(1,cls));
+    drop_add_one(cls, 0);
+    close dcellsp(cells, length(cls), cls);
+  }
+
+  lemma void extract_cell_body(struct dchain_cell* cells,
+                               list<dcell> cls, int i)
   requires dcellsp(cells, ?size, cls) &*&
            0 <= i &*& i < size;
-  ensures dcellsp(cells, i, take(i, cls)) &*& dcellp(cells+i, nth(i, cls)) &*&
+  ensures dcellsp(cells, i, take(i, cls)) &*&
+          dcellp(cells+i, nth(i, cls)) &*&
           dcellsp(cells+i+1, size - i - 1, drop(i+1, cls));
   {
     open dcellsp(cells, size, cls);
     switch(cls) {
       case nil:
-        assert(size == 0);
-        assert(0 <= i);
-        assert(i < 0);
         return;
       case cons(h,t):
         if (i == 0) {
         } else {
-          extract_cell(cells+1, t, i-1);
+          extract_cell_body(cells+1, t, i-1);
         }
     }
     close dcellsp(cells, i, take(i, cls));
   }
 
-  lemma void glue_cells(struct dchain_cell* cells, list<dcell> cls, int i)
+  lemma void extract_cell(struct dchain_cell* cells, list<dcell> cls, int i)
+  requires dcellsp(cells+INDEX_SHIFT, ?size, drop(INDEX_SHIFT, cls)) &*&
+           INDEX_SHIFT <= i &*& i < size + INDEX_SHIFT &*&
+           INDEX_SHIFT <= length(cls);
+  ensures dcellsp(cells+INDEX_SHIFT, i-INDEX_SHIFT,
+                  take(i-INDEX_SHIFT, drop(INDEX_SHIFT, cls))) &*&
+          dcellp(cells+i, nth(i, cls)) &*&
+          dcellsp(cells+i+1, size - i + 1,
+                  drop(i+1, cls)) &*&
+          0 <= i*sizeof(struct dchain_cell) &*&
+          i*sizeof(struct dchain_cell) <
+             (size+INDEX_SHIFT)*sizeof(struct dchain_cell);
+  {
+    dcellsp_length(cells+INDEX_SHIFT);
+    length_drop(INDEX_SHIFT, cls);
+    assert(length(cls) == size + INDEX_SHIFT);
+    extract_cell_body(cells+INDEX_SHIFT, drop(INDEX_SHIFT, cls),
+                      i - INDEX_SHIFT);
+    nth_drop(i - INDEX_SHIFT, INDEX_SHIFT, cls);
+    drop_drop(i + 1 - INDEX_SHIFT, 2, cls);
+    mul_mono_strict(i, size+INDEX_SHIFT,
+                    sizeof(struct dchain_cell));
+  }
+
+  lemma void glue_cells_body(struct dchain_cell* cells, list<dcell> cls, int i)
   requires 0 <= i &*& i < length(cls) &*&
            dcellsp(cells, i, take(i, cls)) &*& dcellp(cells+i, nth(i, cls)) &*&
            dcellsp(cells+i+1, length(cls) - i - 1, drop(i+1, cls));
@@ -354,54 +568,187 @@ void dchain_impl_init(struct dchain_cell *cells, int size)
         open dcellsp(cells, i, take(i, cls));
         if (i == 0) {
         } else {
-          glue_cells(cells+1, t, i-1);
+          glue_cells_body(cells+1, t, i-1);
         }
         close dcellsp(cells, length(cls), cls);
     }
   }
 
-  lemma void dcellsp_length(struct dchain_cell* cells)
-  requires dcellsp(cells, ?size, ?cls);
-  ensures dcellsp(cells, size, cls) &*& size == length(cls);
+  lemma void glue_cells(struct dchain_cell* cells, list<dcell> cls, int i)
+  requires INDEX_SHIFT <= i &*& i < length(cls) &*&
+           dcellsp(cells+INDEX_SHIFT, i-INDEX_SHIFT,
+                   take(i-INDEX_SHIFT, drop(INDEX_SHIFT, cls))) &*&
+           dcellp(cells+i, nth(i, cls)) &*&
+           dcellsp(cells+i+1, length(cls) - i - 1, drop(i+1, cls));
+  ensures dcellsp(cells+INDEX_SHIFT, length(cls)-INDEX_SHIFT,
+                  drop(INDEX_SHIFT, cls));
   {
-    open dcellsp(cells, size, cls);
-    switch(cls) {
-      case nil: return;
-      case cons(h,t): dcellsp_length(cells+1);
+    length_drop(INDEX_SHIFT, cls);
+    nth_drop(i - INDEX_SHIFT, INDEX_SHIFT, cls);
+    drop_drop(i + 1 - INDEX_SHIFT, 2, cls);
+    glue_cells_body(cells+INDEX_SHIFT, drop(INDEX_SHIFT, cls), i - INDEX_SHIFT);
+  }
+  @*/
+/* @
+  lemma void free_list_above_alloc(list<dcell> cls, list<int> fl, int ind)
+  requires free_listp(cls, fl, FREE_LIST_HEAD, ind);
+  ensures free_listp(cls, fl, FREE_LIST_HEAD, ind) &*&
+          ALLOC_LIST_HEAD < dchain_cell_get_next(nth(ind, cls));
+  {
+    open free_listp(cls, fl, 1, ind);
+    switch(fl) {
+      case nil: break;
+      case cons(h,t):
+        open free_listp(cls, t, 1, h);
+        close free_listp(cls, t, 1, h);
+     };
+     close free_listp(cls, fl, 1, ind);
+  }
+  @ */
+
+
+/*@
+  lemma void free_mem_symm(list<dcell> cls, list<int> fl,
+                           int x, int i, int start)
+  requires free_listp(cls, fl, start, i) &*& true == mem(x, fl);
+  ensures free_listp(cls, fl, start, i) &*&
+          dchain_cell_get_next(nth(x,cls)) ==
+          dchain_cell_get_prev(nth(x,cls));
+  {
+    switch(fl) {
+      case nil:
+        return;
+      case cons(h,t):
+        open free_listp(cls, fl, start, i);
+        if (h == x) {
+          open free_listp(cls, t, start, h);
+          close free_listp(cls, t, start, h);
+        }
+        else {
+          free_mem_symm(cls, t, x, h, start);
+        }
+        close free_listp(cls, fl, start, i);
     }
-    close dcellsp(cells, size, cls);
   }
 
-  lemma void forall_nth<t>(list<t> lst, fixpoint(t, bool) p, int i)
-  requires 0 <= i &*& i < length(lst) &*& true == forall(lst, p);
-  ensures true == p(nth(i, lst));
+  lemma void alloc_mem_asymm(list<dcell> cls, list<int> al, int x, int i, int start)
+  requires alloc_listp(cls, al, start, i) &*& true == mem(x, al);
+  ensures alloc_listp(cls, al, start, i) &*&
+          dchain_cell_get_next(nth(x, cls)) !=
+          dchain_cell_get_prev(nth(x, cls));
   {
-    switch(lst) {
-      case nil: return;
+    switch(al) {
+      case nil:
+        return;
       case cons(h,t):
-        if (i == 0){}
-        else {
-          forall_nth(t, p, i-1);
+        open alloc_listp(cls, al, start, i);
+        if (h == x) {
+          open alloc_listp(cls, t, start, h);
+          close alloc_listp(cls, t, start, h);
+        } else {
+          alloc_mem_asymm(cls, t, x, h, start);
+        }
+        close alloc_listp(cls, al, start, i);
+    }
+  }
+
+  lemma void all_engaged_and_this(list<int> al, list<int> fl, int x, nat size)
+  requires true == all_engaged(al, fl, size) &*&
+           0 <= x &*& x < int_of_nat(size);
+  ensures mem(x+INDEX_SHIFT, fl) ? true : true == mem(x+INDEX_SHIFT, al);
+  {
+    switch(size) {
+      case zero: return;
+      case succ(n):
+        if (x == int_of_nat(n)) {
+        } else {
+          all_engaged_and_this(al, fl, x, n);
         }
     }
   }
 
-  lemma void free_list_above_alloc(list<dcell> cls, list<int> fl, int ind)
-  requires free_listp(cls, fl, ind);
-  ensures free_listp(cls, fl, ind) &*&
-          ALLOC_LIST_HEAD < dchain_cell_get_next(nth(ind, cls));
+  lemma void free_alloc_disjoint(list<dcell> cls, list<int> al, list<int> fl,
+                                 int x, nat size)
+  requires free_listp(cls, fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*&
+           alloc_listp(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD) &*&
+           true == all_engaged(al, fl, size) &*&
+           INDEX_SHIFT <= x &*& x < int_of_nat(size) + INDEX_SHIFT;
+  ensures free_listp(cls, fl, FREE_LIST_HEAD, FREE_LIST_HEAD) &*&
+          alloc_listp(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD) &*&
+          mem(x, fl) != mem(x, al);
   {
-    open free_listp(cls, fl, ind);
-    switch(fl) {
-      case nil: break;
-      case cons(h,t):
-        open free_listp(cls, t, h);
-        close free_listp(cls, t, h);
-     };
-     close free_listp(cls, fl, ind);
+    if (mem(x, fl)) {
+      free_mem_symm(cls, fl, x, FREE_LIST_HEAD, FREE_LIST_HEAD);
+      if (mem(x, al)) {
+        alloc_mem_asymm(cls, al, x, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+      }
+    } else {
+      all_engaged_and_this(al, fl, x-INDEX_SHIFT, size);
+    }
   }
   @*/
 
+/*@
+  lemma void all_engaged_remove_unrelevant(list<int> al, list<int> fl,
+                                           int x, nat size)
+  requires true == all_engaged(al, fl, size) &*&
+           int_of_nat(size)+INDEX_SHIFT <= x;
+  ensures true == all_engaged(al, remove(x, fl), size) &*&
+          true == all_engaged(remove(x, al), fl, size);
+  {
+    switch(size) {
+      case zero:
+        return;
+      case succ(n):
+        all_engaged_remove_unrelevant(al, fl, x, n);
+        neq_mem_remove(int_of_nat(n)+INDEX_SHIFT, x, al);
+        neq_mem_remove(int_of_nat(n)+INDEX_SHIFT, x, fl);
+    }
+  }
+
+  lemma void all_engaged_len_lb(list<int> al, list<int> fl, nat size)
+  requires true == all_engaged(al, fl, size);
+  ensures int_of_nat(size) <= length(al) + length(fl);
+  {
+    switch(size) {
+      case zero:
+        return;
+      case succ(n):
+        int x = int_of_nat(n)+INDEX_SHIFT;
+        if (mem(x, fl)) {
+          all_engaged_remove_unrelevant(al, fl, x, n);
+          all_engaged_len_lb(al, remove(x, fl), n);
+        } else {
+          assume(false);
+        }
+    }
+  }
+  @*/
+
+/*@
+
+  lemma void shift_inds_mem(list<int> l, int shift, int x)
+  requires true;
+  ensures mem(x, shift_inds_fp(l, shift)) == mem(x-shift, l);
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (x-shift != h)
+          shift_inds_mem(t, shift, x);
+    }
+  }
+  @*/
+
+/*@
+  lemma void alloc_prev_alloc_member(list<dcell> cls, list<int> al,
+                                     int start, int x)
+  requires alloc_listp(cls, al, start, start) &*& nth(start, cls) == dcell(x,_);
+  ensures alloc_listp(cls, al, start, start) &*& true == mem(x, al);
+  {
+    assume(false);
+  }
+@*/
 
 int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
 /*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
@@ -415,57 +762,106 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
               dchainip(dchaini_allocate_fp(dc, ni), cells))); @*/
 {
   //@ open dchainip(dc, cells);
-  //@ dcells_limits(cells);
   //@ int size = dchaini_irange_fp(dc);
   //@ assert 0 < size;
   //@ assert dcellsp(cells, size + INDEX_SHIFT, ?cls);
   //@ dcellsp_length(cells);
-  //@ assert free_listp(cls, ?fl, 1);
-  //@ assert alloc_listp(cls, ?al, 0);
+  //@ assert free_listp(cls, ?fl, 1, 1);
+  //@ assert alloc_listp(cls, ?al, 0, 0);
   /* No more empty cells. */
   //@ mul_nonnegative(size, sizeof(struct dchain_cell));
-  // @ open dcellsp(cells, size+INDEX_SHIFT, _);
-  // @ open dcellsp(cells+1, size+INDEX_SHIFT-1, _);
-  //@ extract_cell(cells, cls, FREE_LIST_HEAD);
+  //@ dcells_limits(cells);
+  //@ extract_heads(cells, cls);
   struct dchain_cell* fl_head = cells + FREE_LIST_HEAD;
   struct dchain_cell* al_head = cells + ALLOC_LIST_HEAD;
-  if (fl_head->next == FREE_LIST_HEAD)
+  int allocated = fl_head->next;
+  if (allocated == FREE_LIST_HEAD)
   {
-    //@ glue_cells(cells, cls, FREE_LIST_HEAD);
+    //@ attach_heads(cells, cls);
     //@ short_circuited_free_list(cls, fl);
-    // @ close dcellsp(cells+1, size+INDEX_SHIFT-1, _);
-    // @ close dcellsp(cells, size+INDEX_SHIFT, _);
-    //@ assert(length(al) == size);
+    //@ all_engaged_len_lb(al, fl, nat_of_int(size));
+    //@ assert(size <= length(al));
     //@ shift_inds_len(dchaini_alist_fp(dc), INDEX_SHIFT);
-    //@ assert(length(dchaini_alist_fp(dc)) == size);
+    //@ assert(size <= length(dchaini_alist_fp(dc)));
     //@ close dchainip(dc, cells);
     //@ assert true == dchaini_out_of_space_fp(dc);
     return 0;
   }
-  int allocated = fl_head->next;
-  //@ forall_nth(cls, (bounded)(size+INDEX_SHIFT), FREE_LIST_HEAD);
-  //@ assert 0 <= allocated &*& allocated < size + 2;
+  //@ non_empty_free_list(cls, fl);
+  //@ open free_listp(cls, fl, 1, 1);
+  //@ assert(true == mem(allocated, fl));
+  //@ close free_listp(cls, fl, 1, 1);
+
+  //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD);
+  //@ assert 0 <= allocated &*& allocated < size + INDEX_SHIFT;
   //@ assert FREE_LIST_HEAD != allocated;
-  //@ free_list_above_alloc(cls, fl, 1);
-  //@ mul_bounds(allocated, size+2, sizeof(struct dchain_cell), sizeof(struct dchain_cell));
-  //@ glue_cells(cells, cls, FREE_LIST_HEAD);
-  //@ extract_cell(cells, cls, FREE_LIST_HEAD);
-  //@ extract_cell(cells+INDEX_SHIFT, drop(INDEX_SHIFT,cls), allocated);
+  // @ free_list_above_alloc(cls, fl, 1);
+  //@ dcells_limits(cells+INDEX_SHIFT);
+  //@ extract_cell(cells, cls, allocated);
   struct dchain_cell* allocp = cells + allocated;
   /* Extract the link from the "empty" chain. */
   fl_head->next = allocp->next;
+  fl_head->prev = fl_head->next;
 
   /* Add the link to the "new"-end "alloc" chain. */
   allocp->next = ALLOC_LIST_HEAD;
   allocp->prev = al_head->prev;
-  //@ glue_cells(cells, take(allocated, cls), FREE_LIST_HEAD);
-  //@ glue_cells(cells, cls, allocated);
-  //@ extract_cell(cells, cls, FREE_LIST_HEAD);
+  //@ dcell nalloc = dcell(dchain_cell_get_prev(nth(ALLOC_LIST_HEAD,cls)),ALLOC_LIST_HEAD);
+  //@ int allocpnext = dchain_cell_get_next(nth(allocated, cls));
+  //@ dcell n_fl_head = dcell(allocpnext,allocpnext);
+  //@ list<dcell> ncls = update(FREE_LIST_HEAD, n_fl_head, update(allocated, nalloc, cls));
+  //@ drop_update_unrelevant(INDEX_SHIFT, FREE_LIST_HEAD, n_fl_head, update(allocated, nalloc, cls));
+  //@ drop_update_relevant(INDEX_SHIFT, allocated, nalloc, cls);
+  //@ take_update_unrelevant(allocated-INDEX_SHIFT, allocated-INDEX_SHIFT, nalloc, drop(INDEX_SHIFT, cls));
+  //@ drop_update_unrelevant(allocated+1, FREE_LIST_HEAD, n_fl_head, update(allocated, nalloc, cls));
+  //@ drop_update_unrelevant(allocated+1, allocated, nalloc, cls);
+  //@ glue_cells(cells, ncls, allocated);
+  //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), ALLOC_LIST_HEAD);
+  //@ assert 0 <= al_head->prev;
+  //@ dcells_limits(cells+INDEX_SHIFT);
+  //@ int last_alloc = al_head->prev;
+  /*@ if (al_head->prev != ALLOC_LIST_HEAD)
+        if (al_head->prev != FREE_LIST_HEAD) {
+          note(0 < al_head->prev);
+          assert INDEX_SHIFT <= al_head->prev;
+          extract_cell(cells, ncls, last_alloc);
+        }
+  @*/
   struct dchain_cell* alloc_head_prevp = cells + al_head->prev;
   alloc_head_prevp->next = allocated;
   al_head->prev = allocated;
+  //@ assert(last_alloc != FREE_LIST_HEAD);
+  //@ assert true == mem(allocated, fl);
+  //@ alloc_prev_alloc_member(cls, al, ALLOC_LIST_HEAD, last_alloc);
+  //@ assert true == mem(last_alloc, al);
+  //@ if (last_alloc == allocated) { free_alloc_disjoint(cls, al, fl, allocated, nat_of_int(size));}
+  //@ assert(last_alloc != allocated);
+  //@ assume(last_alloc != allocated); //<-- TODO
+  //@ assert(nth(last_alloc, cls) == nth(last_alloc, ncls));
+  //@ dcell n_last_alloc = dcell(dchain_cell_get_prev(nth(last_alloc, cls)),allocated);
+  //@ dcell n_al_head = dcell(allocated, dchain_cell_get_next(nth(ALLOC_LIST_HEAD,cls)));
+  //@ list<dcell> rcls = update(ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
+  //@ drop_update_unrelevant(INDEX_SHIFT, ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
+  /*@ assert take(last_alloc-2, drop(2, update(ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls)))) == take(last_alloc-2, drop(2, update(last_alloc, n_last_alloc, ncls)));
+    @*/
+  //@ drop_update_relevant(INDEX_SHIFT, last_alloc, n_last_alloc, ncls);
+  //@ take_update_unrelevant(last_alloc-INDEX_SHIFT, last_alloc-INDEX_SHIFT, n_last_alloc, drop(INDEX_SHIFT, ncls));
+  //@ drop_update_unrelevant(last_alloc+1, ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
+  //@ drop_update_unrelevant(last_alloc+1, last_alloc, n_last_alloc, ncls);
+  //@ glue_cells(cells, rcls, last_alloc);
+  //@ attach_heads(cells, rcls);
 
   *index = allocated - INDEX_SHIFT;
+  //@ length_tail(fl);
+  //@ shift_inds_len(dchaini_alist_fp(dc), INDEX_SHIFT);
+  //@ assert(length(dchaini_alist_fp(dc)) != size);
+
+  //@ free_alloc_disjoint(cls, al, fl, allocated, nat_of_int(size));
+  //@ assert(false == mem(allocated, al));
+  //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, allocated);
+  //@ assert(false == mem(allocated - INDEX_SHIFT, dchaini_alist_fp(dc)));
+
+  //@ close dchainip(dchaini_allocate_fp(dc, allocated-INDEX_SHIFT), cells);
   return 1;
 }
 

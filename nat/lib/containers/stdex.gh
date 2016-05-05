@@ -116,7 +116,7 @@ ensures lst == cons(head(lst), tail(lst));
   
 lemma void length_tail<T>(list<T> lst)
 requires lst != nil;
-ensures length(lst) == 1 + length(tail(lst));
+ensures length(lst) == 1 + length(tail(lst)) &*& 0 < length(lst);
 {
     switch(lst) {
     case nil: return;
@@ -210,6 +210,53 @@ ensures lst == update(index, nth(index, lst), lst);
     }
   }
 
+lemma void drop_update_relevant<t>(int k, int i, t val, list<t> l)
+requires 0 <= k &*& k <= i &*& i < length(l);
+ensures drop(k, update(i, val, l)) == update(i-k, val, drop(k, l));
+{
+  switch(l) {
+    case nil: return;
+    case cons(h,t):
+      if (k == 0) return;
+      drop_update_relevant(k-1, i-1, val, t);
+  }
+}
+
+lemma void drop_update_unrelevant<t>(int k, int i, t val, list<t> l)
+requires 0 <= i &*& i < k;
+ensures drop(k, update(i, val, l)) == drop(k, l);
+{
+  switch(l) {
+    case nil: return;
+    case cons(h,t):
+      if (i == 0) return;
+      drop_update_unrelevant(k-1, i-1, val, t);
+  }
+}
+
+lemma void take_update_relevant<t>(int k, int i, t val, list<t> l)
+requires 0 <= i &*& i <= k &*& k < length(l);
+ensures take(k, update(i, val, l)) == update(i, val, take(k, l));
+{
+  switch(l) {
+    case nil: return;
+    case cons(h,t):
+      if (i == 0) return;
+      take_update_relevant(k-1, i-1, val, t);
+  }
+}
+lemma void take_update_unrelevant<t>(int k, int i, t val, list<t> l)
+requires 0 <= k &*& k <= i;
+ensures take(k, update(i, val, l)) == take(k, l);
+{
+  switch(l) {
+    case nil: return;
+    case cons(h,t):
+      if (k == 0) return;
+      take_update_unrelevant(k-1, i-1, val, t);
+  }
+}
+
 fixpoint t get_some<t>(option<t> x) {
   switch(x) {
     case none: return default_value<t>();
@@ -268,6 +315,46 @@ ensures drop(n+1, lst) == tail(drop(n, lst));
     cons_head_tail(l1);
     append_assoc(reverse(tail(l1)), cons(head(l1), nil), l2);
   }
+
+  lemma void append_append_cons_to_append_cons<t>(list<t> l1, t el, list<t> l2)
+  requires true;
+  ensures append(append(l1, cons(el, nil)), l2) == append(l1, cons(el, l2));
+  {
+    switch(l1) {
+      case nil: return;
+      case cons(h,t):
+        append_append_cons_to_append_cons(t, el, l2);
+    }
+  }
+
+
+  lemma void forall_nth<t>(list<t> lst, fixpoint(t, bool) p, int i)
+  requires 0 <= i &*& i < length(lst) &*& true == forall(lst, p);
+  ensures true == p(nth(i, lst));
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (i == 0){}
+        else {
+          forall_nth(t, p, i-1);
+        }
+    }
+  }
+
+  lemma void drop_drop<t>(int n, int m, list<t> l)
+  requires 0 <= n &*& 0 <= m &*& n + m <= length(l);
+  ensures drop(n, drop(m, l)) == drop(n + m, l);
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (n == 0) return;
+        if (m == 0) return;
+        drop_drop(n, m-1, t);
+    }
+  }
+
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19

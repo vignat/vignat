@@ -77,7 +77,7 @@ struct dchain_cell {
 
   fixpoint bool dchaini_out_of_space_fp(dchaini ch) {
     switch(ch) { case dchaini(alist, size):
-      return length(alist) == size;
+      return size <= length(alist);
     }
   }
 

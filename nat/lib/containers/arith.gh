@@ -23,6 +23,18 @@ lemma void mul_mono(int i, int n, int a)
     }
 }
 
+lemma void mul_mono_strict(int i, int n, int a)
+    requires 0 <= i &*& i < n &*& 0 < a;
+    ensures 0 <= i * a &*& i * a < n * a;
+{
+    mul_nonnegative(i, a);
+    for (int j = 1; j < a; j++)
+        invariant i < n &*& j <= a &*& i * j < n * j;
+        decreases a - j;
+    {
+    }
+}
+
 lemma void mul_bounds(int x, int xb, int y, int yb)
     requires 0 <= x &*& x <= xb &*& 0 <= y &*& y <= yb;
     ensures 0 <= x * y &*& x * y <= xb * yb;
