@@ -89,7 +89,7 @@ struct dchain_cell {
 
   fixpoint dchaini dchaini_allocate_fp(dchaini ch, int idx) {
     switch(ch) { case dchaini(alist, size):
-      return dchaini(cons(idx,alist), size);
+      return dchaini(append(alist, cons(idx, nil)), size);
     }
   }
 

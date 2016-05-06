@@ -245,6 +245,7 @@ ensures take(k, update(i, val, l)) == update(i, val, take(k, l));
       take_update_relevant(k-1, i-1, val, t);
   }
 }
+
 lemma void take_update_unrelevant<t>(int k, int i, t val, list<t> l)
 requires 0 <= k &*& k <= i;
 ensures take(k, update(i, val, l)) == take(k, l);
@@ -254,6 +255,30 @@ ensures take(k, update(i, val, l)) == take(k, l);
     case cons(h,t):
       if (k == 0) return;
       take_update_unrelevant(k-1, i-1, val, t);
+  }
+}
+
+lemma void forall_update<t>(list<t> lst, fixpoint(t,bool) prop, int i, t v)
+requires true == forall(lst, prop) &*& true == prop(v);
+ensures true == forall(update(i, v, lst), prop);
+{
+  switch(lst) {
+    case nil: return;
+    case cons(h,t):
+      if (i != 0) forall_update(t, prop, i-1, v);
+  }
+}
+
+lemma void update_update<t>(list<t> lst, int i, t vi, int j, t vj)
+requires i != j;
+ensures update(i, vi, update(j, vj, lst)) == update(j, vj, update(i, vi, lst));
+{
+  switch(lst) {
+    case nil: return;
+    case cons(h,t):
+      if (i == 0) return;
+      if (j == 0) return;
+      update_update(t, i-1, vi, j-1, vj);
   }
 }
 
