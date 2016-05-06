@@ -1337,35 +1337,56 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
   //@ assert 0 <= al_head->prev;
   //@ dcells_limits(cells+INDEX_SHIFT);
   //@ int last_alloc = al_head->prev;
-  /*@ if (al_head->prev != ALLOC_LIST_HEAD)
-        if (al_head->prev != FREE_LIST_HEAD) {
-          note(0 < al_head->prev);
-          assert INDEX_SHIFT <= al_head->prev;
-          extract_cell(cells, ncls, last_alloc);
-        }
-  @*/
+  //@ head_is_not_mem(al, ALLOC_LIST_HEAD, INDEX_SHIFT);
+  //@ head_is_not_mem(al, FREE_LIST_HEAD, INDEX_SHIFT);
+  //@ head_is_not_mem(fl, ALLOC_LIST_HEAD, INDEX_SHIFT);
+  //@ head_is_not_mem(fl, FREE_LIST_HEAD, INDEX_SHIFT);
+  /*@ if (al == nil) {
+        open alloc_listp(cls, nil, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+        assert last_alloc == ALLOC_LIST_HEAD;
+        close alloc_listp(cls, nil, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+      } else {
+        last_alloc_list_mem(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+        assert true == mem(last_alloc, al);
+        assert false == mem(FREE_LIST_HEAD, al);
+        assert last_alloc != FREE_LIST_HEAD;
+        assert last_alloc != ALLOC_LIST_HEAD;
+        note(0 < al_head->prev);
+        assert INDEX_SHIFT <= al_head->prev;
+        extract_cell(cells, ncls, last_alloc);
+        alloc_prev_alloc_member(cls, al, ALLOC_LIST_HEAD,
+                                last_alloc, ALLOC_LIST_HEAD);
+        assert true == mem(last_alloc, al);
+      }
+    @*/
   struct dchain_cell* alloc_head_prevp = cells + al_head->prev;
   alloc_head_prevp->next = allocated;
   al_head->prev = allocated;
   //@ assert(last_alloc != FREE_LIST_HEAD);
   //@ assert true == mem(allocated, fl);
-  //@ alloc_prev_alloc_member(cls, al, ALLOC_LIST_HEAD, last_alloc, ALLOC_LIST_HEAD);
-  //@ assert true == mem(last_alloc, al);
   //@ if (last_alloc == allocated) { free_alloc_disjoint(al, fl, allocated, nat_of_int(size));}
   //@ assert(nth(last_alloc, cls) == nth(last_alloc, ncls));
   //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), last_alloc);
-  //@ dcell n_last_alloc = dcell(dchain_cell_get_prev(nth(last_alloc, cls)),allocated);
-  //@ dcell n_al_head = dcell(allocated, dchain_cell_get_next(nth(ALLOC_LIST_HEAD,cls)));
-  //@ list<dcell> rcls = update(ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
-  //@ drop_update_unrelevant(INDEX_SHIFT, ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
-  /*@ assert take(last_alloc-2, drop(2, update(ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls)))) == take(last_alloc-2, drop(2, update(last_alloc, n_last_alloc, ncls)));
+  /*@
+    if (al == nil) {
+      dcell n_al_head = dcell(allocated, allocated);
+      list<dcell> rcls = update(ALLOC_LIST_HEAD, n_al_head, ncls);
+      drop_update_unrelevant(INDEX_SHIFT, ALLOC_LIST_HEAD, n_al_head, ncls);
+      attach_heads(cells, rcls);
+    } else {
+      dcell n_last_alloc = dcell(dchain_cell_get_prev(nth(last_alloc, cls)),allocated);
+      dcell n_al_head = dcell(allocated, dchain_cell_get_next(nth(ALLOC_LIST_HEAD,cls)));
+      list<dcell> rcls = update(ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
+      drop_update_unrelevant(INDEX_SHIFT, ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
+      drop_update_relevant(INDEX_SHIFT, last_alloc, n_last_alloc, ncls);
+      take_update_unrelevant(last_alloc-INDEX_SHIFT, last_alloc-INDEX_SHIFT, n_last_alloc, drop(INDEX_SHIFT, ncls));
+      drop_update_unrelevant(last_alloc+1, ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
+      drop_update_unrelevant(last_alloc+1, last_alloc, n_last_alloc, ncls);
+      glue_cells(cells, rcls, last_alloc);
+      attach_heads(cells, rcls);
+    }
     @*/
-  //@ drop_update_relevant(INDEX_SHIFT, last_alloc, n_last_alloc, ncls);
-  //@ take_update_unrelevant(last_alloc-INDEX_SHIFT, last_alloc-INDEX_SHIFT, n_last_alloc, drop(INDEX_SHIFT, ncls));
-  //@ drop_update_unrelevant(last_alloc+1, ALLOC_LIST_HEAD, n_al_head, update(last_alloc, n_last_alloc, ncls));
-  //@ drop_update_unrelevant(last_alloc+1, last_alloc, n_last_alloc, ncls);
-  //@ glue_cells(cells, rcls, last_alloc);
-  //@ attach_heads(cells, rcls);
+
 
   *index = allocated - INDEX_SHIFT;
   //@ length_tail(fl);
@@ -1379,92 +1400,83 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
 
   //@ assert true == dbounded(size+INDEX_SHIFT, nalloc);
   //@ assert true == dbounded(size+INDEX_SHIFT, n_fl_head);
-  //@ assert true == dbounded(size+INDEX_SHIFT, n_al_head);
-  //@ assert true == dbounded(size+INDEX_SHIFT, n_last_alloc);
-  //@ forall_update(cls, (dbounded)(size+INDEX_SHIFT), allocated, nalloc);
-  //@ forall_update(update(allocated, nalloc, cls), (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD, n_fl_head);
-  //@ forall_update(ncls, (dbounded)(size+INDEX_SHIFT), last_alloc, n_last_alloc);
-  //@ forall_update(update(last_alloc, n_last_alloc, ncls), (dbounded)(size+INDEX_SHIFT), ALLOC_LIST_HEAD, n_al_head);
-  /*
-    update(0, n_al_head,
-     update(last_alloc, n_last_alloc,
-      update(1, n_fl_head,
-       update(allocated, nalloc, cls))))
-   */
-  //@ update_update(update(allocated, nalloc, cls), 1, n_fl_head, last_alloc, n_last_alloc);
-  /*@
-    update_update(update(last_alloc, n_last_alloc,
-                   update(allocated, nalloc, cls)), 0, n_al_head, 1, n_fl_head);
-    @*/
-
-  /*
-    update(1, n_fl_head,
-     update(0, n_al_head,
-      update(last_alloc, n_last_alloc,
-       update(allocated, nalloc, cls))));
-  */
+  /*@ {
+    free_list_no_dups_head(cls, fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+    assert false == mem(allocated, tail(fl));
+    } @*/
 
   /*@
-    update_update(cls, allocated, nalloc, last_alloc, n_last_alloc);
-    @*/
-  /*
-    update(1, n_fl_head,
-     update(0, n_al_head,
-      update(allocated, nalloc,
-       update(last_alloc, n_last_alloc, cls))));
-  */
-  //@ head_is_not_mem(al, ALLOC_LIST_HEAD, INDEX_SHIFT);
-  //@ head_is_not_mem(al, FREE_LIST_HEAD, INDEX_SHIFT);
-  //@ head_is_not_mem(fl, ALLOC_LIST_HEAD, INDEX_SHIFT);
-  //@ head_is_not_mem(fl, FREE_LIST_HEAD, INDEX_SHIFT);
-  //@ insert_alloc_list(cls, al, ALLOC_LIST_HEAD, allocated);
-  /*@ alloc_list_update_unrelevant(update(ALLOC_LIST_HEAD, n_al_head,
+    if (al == nil) {
+      forall_update(cls, (dbounded)(size+INDEX_SHIFT), allocated, nalloc);
+      forall_update(update(allocated, nalloc, cls),
+                    (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD, n_fl_head);
+      forall_update(ncls, (dbounded)(size+INDEX_SHIFT),
+                    ALLOC_LIST_HEAD, dcell(allocated, allocated));
+      update_update(cls, FREE_LIST_HEAD, n_fl_head, allocated, nalloc);
+      alloc_list_update_unrelevant(cls, al, ALLOC_LIST_HEAD,
+                                   FREE_LIST_HEAD, n_fl_head,
+                                   ALLOC_LIST_HEAD);
+      insert_to_empty_alloc_list(update(FREE_LIST_HEAD, n_fl_head, cls),
+                                 ALLOC_LIST_HEAD, allocated);
+
+      remove_first_free_cell(cls, fl, FREE_LIST_HEAD);
+      free_list_update_unrelevant(update(FREE_LIST_HEAD, n_fl_head, cls),
+                                  tail(fl), FREE_LIST_HEAD, FREE_LIST_HEAD,
+                                  allocated, nalloc);
+      free_list_update_unrelevant(update(allocated, nalloc,
+                                   update(FREE_LIST_HEAD, n_fl_head, cls)),
+                                  tail(fl), FREE_LIST_HEAD, FREE_LIST_HEAD,
+                                  ALLOC_LIST_HEAD, dcell(allocated, allocated));
+    } else {
+      dcell n_last_alloc = dcell(dchain_cell_get_prev(nth(last_alloc, cls)),allocated);
+      dcell n_al_head = dcell(allocated, dchain_cell_get_next(nth(ALLOC_LIST_HEAD,cls)));
+      forall_update(cls, (dbounded)(size+INDEX_SHIFT), allocated, nalloc);
+      forall_update(update(allocated, nalloc, cls),
+                    (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD, n_fl_head);
+      forall_update(ncls, (dbounded)(size+INDEX_SHIFT),
+                    last_alloc, n_last_alloc);
+      forall_update(update(last_alloc, n_last_alloc, ncls),
+                    (dbounded)(size+INDEX_SHIFT), ALLOC_LIST_HEAD, n_al_head);
+      update_update(update(allocated, nalloc, cls), 1, n_fl_head, last_alloc, n_last_alloc);
+      update_update(update(last_alloc, n_last_alloc,
+                     update(allocated, nalloc, cls)), 0, n_al_head, 1, n_fl_head);
+      update_update(cls, allocated, nalloc, last_alloc, n_last_alloc);
+      insert_alloc_list(cls, al, ALLOC_LIST_HEAD, allocated);
+      alloc_list_update_unrelevant(update(ALLOC_LIST_HEAD, n_al_head,
                                     update(allocated, nalloc,
                                      update(last_alloc, n_last_alloc, cls))),
                                    append(al, cons(allocated, nil)),
                                    ALLOC_LIST_HEAD,
                                    FREE_LIST_HEAD, n_fl_head,
                                    ALLOC_LIST_HEAD);
-    @*/
-  /*@ {
       update_update(update(last_alloc, n_last_alloc, cls),
                     allocated, nalloc, ALLOC_LIST_HEAD, n_al_head);
       update_update(update(0, n_al_head,
                      update(last_alloc, n_last_alloc, cls)),
                     allocated, nalloc, FREE_LIST_HEAD, n_fl_head);
-    } @*/
-  /*
-    update(allocated, nalloc,
-     update(1, n_fl_head,
-      update(0, n_al_head,
-       update(last_alloc, n_last_alloc, cls))));
-  */
-  /*@
-    {
-      assert true == mem(last_alloc, al);
-      free_alloc_disjoint(al, fl, last_alloc, nat_of_int(size));
-      assert(head(fl) == allocated);
-      free_list_no_dups_head(cls, fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
-      assert false == mem(allocated, tail(fl));
-      free_list_update_unrelevant(cls, fl, FREE_LIST_HEAD,
-                                  FREE_LIST_HEAD,
-                                  last_alloc, n_last_alloc);
-      free_list_update_unrelevant(update(last_alloc, n_last_alloc, cls),
-                                  fl, FREE_LIST_HEAD,
-                                  FREE_LIST_HEAD,
-                                  ALLOC_LIST_HEAD, n_al_head);
-      remove_first_free_cell(update(ALLOC_LIST_HEAD, n_al_head,
-                              update(last_alloc, n_last_alloc, cls)),
-                             fl, FREE_LIST_HEAD);
-      free_list_update_unrelevant(update(FREE_LIST_HEAD, n_fl_head,
-                                   update(ALLOC_LIST_HEAD, n_al_head,
-                                    update(last_alloc, n_last_alloc, cls))),
-                                  tail(fl), FREE_LIST_HEAD,
-                                  FREE_LIST_HEAD,
-                                  allocated, nalloc);
+      {
+        assert true == mem(last_alloc, al);
+        free_alloc_disjoint(al, fl, last_alloc, nat_of_int(size));
+        assert(head(fl) == allocated);
+        free_list_update_unrelevant(cls, fl, FREE_LIST_HEAD,
+                                    FREE_LIST_HEAD,
+                                    last_alloc, n_last_alloc);
+        free_list_update_unrelevant(update(last_alloc, n_last_alloc, cls),
+                                    fl, FREE_LIST_HEAD,
+                                    FREE_LIST_HEAD,
+                                    ALLOC_LIST_HEAD, n_al_head);
+        remove_first_free_cell(update(ALLOC_LIST_HEAD, n_al_head,
+                                update(last_alloc, n_last_alloc, cls)),
+                              fl, FREE_LIST_HEAD);
+        free_list_update_unrelevant(update(FREE_LIST_HEAD, n_fl_head,
+                                     update(ALLOC_LIST_HEAD, n_al_head,
+                                      update(last_alloc, n_last_alloc, cls))),
+                                    tail(fl), FREE_LIST_HEAD,
+                                    FREE_LIST_HEAD,
+                                    allocated, nalloc);
+      }
     }
     @*/
-
   //@ move_cell_to_alloc_engaged(al, fl, nat_of_int(size));
   //@ assert true == forall(cons(allocated, nil), (lbounded)(INDEX_SHIFT));
   //@ forall_append(al, cons(allocated, nil), (lbounded)(INDEX_SHIFT));
