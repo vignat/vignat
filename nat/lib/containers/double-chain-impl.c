@@ -70,6 +70,7 @@ enum DCHAIN_ENUM {
     switch(ch) { case dchaini(allocd, size):
       return
         0 < size &*&
+        size + INDEX_SHIFT < INT_MAX &*&
         dcellsp(cells, size + INDEX_SHIFT, ?cls) &*&
         true == forall(cls, (dbounded)(size+INDEX_SHIFT)) &*&
         alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD) &*&
@@ -1311,7 +1312,6 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
   //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD);
   //@ assert 0 <= allocated &*& allocated < size + INDEX_SHIFT;
   //@ assert FREE_LIST_HEAD != allocated;
-  // @ free_list_above_alloc(cls, fl, 1);
   //@ dcells_limits(cells+INDEX_SHIFT);
   //@ extract_cell(cells, cls, allocated);
   struct dchain_cell* allocp = cells + allocated;
@@ -1487,6 +1487,50 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
   return 1;
 }
 
+/*@
+  lemma void simm_non_alloc_iter(list<dcell> cls, list<int> al,
+                                 int start, int x, int i)
+  requires alloc_listp(cls, al, start, i) &*&
+           nth(x, cls) == dcell(?p,?n) &*& p == n &*& p != start &*&
+           false == mem(i, al) &*& false == mem(start, al);
+  ensures alloc_listp(cls, al, start, i) &*&
+          false == mem(x, al);
+  {
+    switch(al) {
+      case nil: break;
+      case cons(h,t):
+        open alloc_listp(cls, al, start, i);
+        if (h == x) {
+          open alloc_listp(cls, t, start, h);
+          switch(t) {
+            case nil: break;
+            case cons(th,tt):
+              assert(th == i);
+              assert(true == mem(i, al));
+          }
+          close alloc_listp(cls, t, start, h);
+        }
+        else {
+          close alloc_listp(cls, al, start, i);
+          alloc_list_no_dups_head(cls, al, start, i);
+          open alloc_listp(cls, al, start, i);
+          simm_non_alloc_iter(cls, t, start, x, h);
+        }
+        close alloc_listp(cls, al, start, i);
+        break;
+    }
+  }
+
+  lemma void simm_non_alloc(list<dcell> cls, list<int> al, int start, int x)
+  requires alloc_listp(cls, al, start, start) &*&
+           nth(x, cls) == dcell(?p,?n) &*& p == n &*& p != start &*&
+           false == mem(start, al);
+  ensures alloc_listp(cls, al, start, start) &*& false == mem(x, al);
+  {
+    simm_non_alloc_iter(cls, al, start, x, start);
+  }
+  @*/
+
 int dchain_impl_free_index(struct dchain_cell *cells, int index)
 /*@ requires dchainip(?dc, cells) &*&
              0 <= index &*& index < dchaini_irange_fp(dc); @*/
@@ -1496,20 +1540,49 @@ int dchain_impl_free_index(struct dchain_cell *cells, int index)
              (dchainip(dc, cells) &*&
               result == 0)); @*/
 {
-    int freed = index + INDEX_SHIFT;
-    /* The index is already free. */
-    if (cells[freed].next == cells[freed].prev)
-        return 0;
-    /* Extract the link from the "alloc" chain. */
-    cells[cells[freed].prev].next = cells[freed].next;
-    cells[cells[freed].next].prev = cells[freed].prev;
+  //@ open dchainip(dc, cells);
+  //@ assert dcellsp(cells, ?clen, ?cls);
+  //@ assert free_listp(cls, ?fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+  //@ assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+  //@ dcellsp_length(cells);
+  //@ dcells_limits(cells);
+  //@ extract_heads(cells, cls);
+  int freed = index + INDEX_SHIFT;
+  //@ extract_cell(cells, cls, freed);
+  struct dchain_cell* freedp = cells + freed;
+  int freed_prev = freedp->prev;
+  int freed_next = freedp->next;
+  /* The index is already free. */
+  if (freedp->next == freedp->prev &&
+      freedp->next != ALLOC_LIST_HEAD) {
+    //@ lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
+    //@ simm_non_alloc(cls, al, ALLOC_LIST_HEAD, freed);
+    //@ assert false == mem(freed, al);
+    //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, freed);
+    //@ assert false == mem(index, dchaini_alist_fp(dc));
+    //@ glue_cells(cells, cls, freed);
+    //@ attach_heads(cells, cls);
+    //@ close dchainip(dc, cells);
+    return 0;
+  }
 
-    /* Add the link to the "free" chain. */
-    cells[freed].next = cells[FREE_LIST_HEAD].next;
-    cells[freed].prev = cells[freed].next;
-    cells[FREE_LIST_HEAD].next = freed;
-    cells[FREE_LIST_HEAD].prev = cells[FREE_LIST_HEAD].next;
-    return 1;
+  struct dchain_cell* fr_head = cells + FREE_LIST_HEAD;
+
+
+  /* Extract the link from the "alloc" chain. */
+  struct dchain_cell* freed_prevp = cells + freed_prev;
+  freed_prev.next = freed_next;
+
+  struct dchain_cell* freed_nextp = cells + freed_next;
+  freed_nextp->prev = freed_prev;
+
+  /* Add the link to the "free" chain. */
+  freedp->next = fr_head->next;
+  freedp->prev = freedp->next;
+
+  fr_head->next = freed;
+  fr_head->prev = fr_head->next;
+  return 1;
 }
 
 int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
