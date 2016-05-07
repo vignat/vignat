@@ -728,19 +728,6 @@ void dchain_impl_init(struct dchain_cell *cells, int size)
 
 
 /*@
-  lemma void nth_update_unrelevant<t>(int i, int j, t y, list<t> xs)
-  requires i != j;
-  ensures nth(i, update(j, y, xs)) == nth(i, xs);
-  {
-    switch(xs){
-      case nil: break;
-      case cons(h,t):
-        if (j == 0) break;
-        if (i == 0) break;
-        nth_update_unrelevant(i-1, j-1, y, t);
-    }
-  }
-
   lemma void free_list_update_unrelevant(list<dcell> cls, list<int> fl,
                                          int start, int i,
                                          int x, dcell val)
@@ -1488,7 +1475,7 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
 }
 
 /*@
-  lemma void simm_non_alloc_iter(list<dcell> cls, list<int> al,
+  lemma void symm_non_alloc_iter(list<dcell> cls, list<int> al,
                                  int start, int x, int i)
   requires alloc_listp(cls, al, start, i) &*&
            nth(x, cls) == dcell(?p,?n) &*& p == n &*& p != start &*&
@@ -1514,20 +1501,243 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
           close alloc_listp(cls, al, start, i);
           alloc_list_no_dups_head(cls, al, start, i);
           open alloc_listp(cls, al, start, i);
-          simm_non_alloc_iter(cls, t, start, x, h);
+          symm_non_alloc_iter(cls, t, start, x, h);
         }
         close alloc_listp(cls, al, start, i);
         break;
     }
   }
 
-  lemma void simm_non_alloc(list<dcell> cls, list<int> al, int start, int x)
+  lemma void symm_non_alloc(list<dcell> cls, list<int> al, int start, int x)
   requires alloc_listp(cls, al, start, start) &*&
            nth(x, cls) == dcell(?p,?n) &*& p == n &*& p != start &*&
            false == mem(start, al);
   ensures alloc_listp(cls, al, start, start) &*& false == mem(x, al);
   {
-    simm_non_alloc_iter(cls, al, start, x, start);
+    symm_non_alloc_iter(cls, al, start, x, start);
+  }
+  @*/
+
+/*@
+  lemma void asymm_non_in_free_list(list<dcell> cls, list<int> fl,
+                                    int start, int x, int i)
+  requires free_listp(cls, fl, start, i) &*&
+           nth(x, cls) == dcell(?p,?n) &*& p != n;
+  ensures free_listp(cls, fl, start, i) &*& false == mem(x, fl);
+  {
+    open free_listp(cls, fl, start, i);
+    switch(fl) {
+      case nil: break;
+      case cons(h,t):
+        asymm_non_in_free_list(cls, t, start, x, h);
+        if (h == x) {
+          open free_listp(cls, t, start, h);
+          assert p == n;
+          close free_listp(cls, t, start, h);
+        }
+    }
+    close free_listp(cls, fl, start, i);
+  }
+
+  lemma void next_fl_member(list<dcell> cls, list<int> fl,
+                            int start, int x, int i)
+  requires free_listp(cls, fl, start, i) &*&
+           nth(x, cls) == dcell(?p,?n) &*&
+           n != start &*&
+           true == mem(x, fl);
+  ensures free_listp(cls, fl, start, i) &*&
+          true == mem(n, fl) &*& p == n;
+  {
+    switch(fl) {
+      case nil:
+        return;
+      case cons(h,t):
+        open free_listp(cls, fl, start, i);
+        if (h == x) {
+          open free_listp(cls, t, start, h);
+          switch(t) {
+            case nil: break;
+            case cons(th,tt):
+              open free_listp(cls, tt, start, th);
+              close free_listp(cls, tt, start, th);
+          }
+          close free_listp(cls, t, start, h);
+        } else {
+          next_fl_member(cls, t, start, x, h);
+        }
+        close free_listp(cls, fl, start, i);
+    }
+  }
+
+  lemma void points_to_alloc_head_non_in_fl(list<dcell> cls, list<int> fl,
+                                            int start, int x, int ahead)
+  requires free_listp(cls, fl, start, start) &*&
+           false == mem(ahead, fl) &*& nth(x,cls) == dcell(?p,ahead) &*&
+           ahead != start;
+  ensures free_listp(cls, fl, start, start) &*&
+          false == mem(x, fl);
+  {
+    if (mem(x, fl)) {
+      next_fl_member(cls, fl, start, x, start);
+    }
+  }
+  @*/
+
+/*@
+  lemma void alloc_list_prev_next_mem(list<dcell> cls, list<int> al, int start,
+                                      int x, int i)
+  requires alloc_listp(cls, al, start, i) &*& true == mem(x, al) &*&
+           nth(x, cls) == dcell(?p,?n);
+  ensures alloc_listp(cls, al, start, i) &*&
+          (mem(p, al) ? true : i == p) &*&
+          (mem(n, al) ? true : n == start);
+  {
+    switch(al) {
+      case nil: break;
+      case cons(h,t):
+        open alloc_listp(cls, al, start, i);
+        if (h == x) {
+          assert p == i;
+          open alloc_listp(cls, t, start, h);
+          switch(t) {
+            case nil: break;
+            case cons(th,tt):
+          }
+          close alloc_listp(cls, t, start, h);
+        } else {
+          alloc_list_prev_next_mem(cls, t, start, x, h);
+          if (mem(p, t)) {
+          } else {
+          }
+        }
+        close alloc_listp(cls, al, start, i);
+        break;
+    }
+  }
+  @*/
+
+/*@
+lemma void add_to_free_list(list<dcell> cls, list<int> fl, int start, int x)
+requires free_listp(cls, fl, start, start) &*& x != start &*&
+         false == mem(x, fl) &*&
+         false == mem(start, fl) &*&
+         nth(start, cls) == dcell(_,?n) &*&
+         0 <= x &*& x < length(cls) &*&
+         0 <= start &*& start < length(cls);
+ensures free_listp(update(start, dcell(x,x), update(x, dcell(n,n), cls)),
+                   cons(x, fl), start, start);
+{
+  open free_listp(cls, fl, start, start);
+  switch(fl) {
+    case nil:
+    case cons(h,t):
+      free_list_update_unrelevant(cls, t, start, h, x, dcell(n,n));
+      free_list_update_unrelevant(update(x, dcell(n,n), cls), t, start, h,
+                                  start, dcell(x,x));
+  }
+  close free_listp(update(start, dcell(x,x), update(x, dcell(n,n), cls)),
+                   fl, start, x);
+  close free_listp(update(start, dcell(x,x), update(x, dcell(n,n), cls)),
+                   cons(x, fl), start, start);
+}
+@*/
+
+/*@
+lemma void move_cell_to_free_engaged(list<int> al, list<int> fl, nat size)
+requires true == all_engaged(al, fl, size) &*& al == cons(?ah,?at) &*&
+         false == mem(ah,at);
+ensures true == all_engaged(at, cons(ah,fl), size);
+{
+  switch(size) {
+    case zero: return;
+    case succ(n):
+      move_cell_to_free_engaged(al, fl, n);
+      if (int_of_nat(n) + INDEX_SHIFT == ah) {
+        assert true == mem(int_of_nat(n) + INDEX_SHIFT, cons(ah,fl));
+        assert false == mem(int_of_nat(n) + INDEX_SHIFT, at);
+      } else {
+      }
+  }
+}
+@*/
+
+/*@
+lemma void alloc_cell_points_back(list<dcell> cls, list<int> al,
+                                  int start, int i, int x)
+requires alloc_listp(cls, al, start, i) &*&
+         true == mem(x, al) &*&
+         nth(x, cls) == dcell(?p, ?n) &*&
+         nth(p, cls) == dcell(?pp, ?pn) &*&
+         nth(n, cls) == dcell(?np, ?nn);
+ensures alloc_listp(cls, al, start, i) &*&
+        pn == x &*& np == x;
+{
+  open alloc_listp(cls, al, start, i);
+  switch(al) {
+    case nil: break;
+    case cons(h,t):
+      if (h == x) {
+        assert i == p;
+        assert pn == x;
+        open alloc_listp(cls, t, start, h);
+        assert np == x;
+        close alloc_listp(cls, t, start, h);
+      } else {
+        alloc_cell_points_back(cls, t, start, h, x);
+      }
+  }
+  close alloc_listp(cls, al, start, i);
+}
+
+lemma void alloc_list_has_just_one_el(list<dcell> cls, list<int> al,
+                                      int start, int x)
+requires alloc_listp(cls, al, start, start) &*&
+         false == mem(start, al) &*&
+         true == mem(x, al) &*&
+         nth(x, cls) == dcell(start,start);
+ensures alloc_listp(cls, al, start, start) &*&
+        al == cons(x,nil) &*&
+        nth(start, cls) == dcell(x,x);
+{
+  alloc_cell_points_back(cls, al, start, start, x);
+  assert nth(start, cls) == dcell(x,x);
+  assert start != x;
+  open alloc_listp(cls, al, start, start);
+  switch(al) {
+    case nil: break;
+    case cons(h,t):
+      assert h == x;
+      open alloc_listp(cls, t, start, h);
+      switch(t) {
+        case nil: break;
+        case cons(th,tt):
+      }       
+      close alloc_listp(cls, t, start, h);
+  }
+  close alloc_listp(cls, al, start, start);
+}
+@*/
+
+/*@
+  lemma void shift_inds_remove(list<int> al, int i, list<int> allocd)
+  requires al == shift_inds_fp(allocd, INDEX_SHIFT);
+  ensures remove(i, al) ==
+          shift_inds_fp(remove(i-INDEX_SHIFT, allocd), INDEX_SHIFT);
+  {
+    switch(al){
+      case nil:
+        switch(allocd) {
+          case nil: return;
+          case cons(x,y):
+            return;
+        }
+      case cons(h,t):
+        switch(allocd) {
+          case nil: return;
+          case cons(all_h, all_t):
+            shift_inds_remove(t, i, all_t);
+        }
+    }
   }
   @*/
 
@@ -1541,6 +1751,7 @@ int dchain_impl_free_index(struct dchain_cell *cells, int index)
               result == 0)); @*/
 {
   //@ open dchainip(dc, cells);
+  //@ int size = dchaini_irange_fp(dc);
   //@ assert dcellsp(cells, ?clen, ?cls);
   //@ assert free_listp(cls, ?fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
   //@ assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
@@ -1552,36 +1763,141 @@ int dchain_impl_free_index(struct dchain_cell *cells, int index)
   struct dchain_cell* freedp = cells + freed;
   int freed_prev = freedp->prev;
   int freed_next = freedp->next;
+  //@ glue_cells(cells, cls, freed);
   /* The index is already free. */
-  if (freedp->next == freedp->prev &&
-      freedp->next != ALLOC_LIST_HEAD) {
-    //@ lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
-    //@ simm_non_alloc(cls, al, ALLOC_LIST_HEAD, freed);
-    //@ assert false == mem(freed, al);
-    //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, freed);
-    //@ assert false == mem(index, dchaini_alist_fp(dc));
-    //@ glue_cells(cells, cls, freed);
-    //@ attach_heads(cells, cls);
-    //@ close dchainip(dc, cells);
-    return 0;
+  if (freed_next == freed_prev) {
+    if (freed_prev != ALLOC_LIST_HEAD) {
+      //@ lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
+      //@ symm_non_alloc(cls, al, ALLOC_LIST_HEAD, freed);
+      //@ assert false == mem(freed, al);
+      //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, freed);
+      //@ assert false == mem(index, dchaini_alist_fp(dc));
+      //@ attach_heads(cells, cls);
+      //@ close dchainip(dc, cells);
+      return 0;
+    } else {
+      //@ lbounded_then_start_nonmem(fl, ALLOC_LIST_HEAD);
+      /*@ points_to_alloc_head_non_in_fl(cls, fl, FREE_LIST_HEAD,
+                                         freed, ALLOC_LIST_HEAD); @*/
+    }
+  } else {
+    /*@ asymm_non_in_free_list(cls, fl, FREE_LIST_HEAD, freed,
+                               FREE_LIST_HEAD); @*/
   }
 
+  //@ mul_nonnegative(size, sizeof(struct dchain_cell));
   struct dchain_cell* fr_head = cells + FREE_LIST_HEAD;
 
+  //@ assert false == mem(freed, fl);
+  //@ free_alloc_disjoint(al, fl, freed, nat_of_int(size));
+  //@ assert true == mem(freed, al);
+  //@ alloc_list_prev_next_mem(cls, al, ALLOC_LIST_HEAD, freed, ALLOC_LIST_HEAD);
+  /*@
+    if (freed_prev == freed_next) {
+      assert freed_prev == ALLOC_LIST_HEAD;
+      assert freed_next == ALLOC_LIST_HEAD;
+      lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
+      alloc_list_has_just_one_el(cls, al, ALLOC_LIST_HEAD, freed);
+      assert nth(0,cls) == dcell(freed, freed);
+      assert al == cons(freed, nil);
+    } else {
+      assert true == mem(freed_prev, al);
+      assert true == mem(freed_next, al);
+      extract_cell(cells, cls, freed_prev);
+    }
+    @*/
 
   /* Extract the link from the "alloc" chain. */
   struct dchain_cell* freed_prevp = cells + freed_prev;
-  freed_prev.next = freed_next;
+  freed_prevp->next = freed_next;
+
+  //@ list<dcell> ncls1;
+
+  /*@
+    if (freed_prev != freed_next) {
+      dcell nfpr = dcell(dchain_cell_get_prev(nth(freed_prev, cls),freed_next));
+      ncls1 = update(freed_prev, nfpr, cls);
+      glue_cells(cells, ncls1, freed_prev);
+      extract_cells(cells, ncls1, freed_next);
+    } else {
+      ncls1 = cls;
+    }
+    @*/
 
   struct dchain_cell* freed_nextp = cells + freed_next;
   freed_nextp->prev = freed_prev;
 
+  //@ list<dcell> ncls2;
+
+  /*@
+    if (freed_prev != freed_next) {
+      dcell nfne = dcell(freed_prev,dchain_cell_get_prev(nth(freed_next, cls)));
+      ncls2 = update(freed_prev, nfne, ncls1);
+      glue_cells(cells, cls, freed_next);
+    } else {
+      dcell nalh = dcell(ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+      ncls2 = update(ALLOC_LIST_HEAD, nalh, ncls1);
+      drop_update_unrelevant(INDEX_SHIFT, ALLOC_LIST_HEAD, nalh, ncls1);
+    }
+    @*/
+  //@ extract_cell(cells, ncls2, freed);
+
   /* Add the link to the "free" chain. */
   freedp->next = fr_head->next;
   freedp->prev = freedp->next;
+  //@ int fr_fst = dchain_cell_get_next(nth(FREE_LIST_HEAD, cls));
+  //@ dcell nfreed = dcell(fr_fst, fr_fst);
+  //@ list<dcell> ncls3 = update(freed, nfreed, ncls2);
+  //@ drop_update_relevant(INDEX_SHIFT, freed, nfreed, ncls2);
+  /*@ take_update_unrelevant(freed-INDEX_SHIFT, freed-INDEX_SHIFT,
+                             nfreed, drop(INDEX_SHIFT, ncls2)); @*/
+  //@ drop_update_unrelevant(freed+1, freed, nfreed, ncls2);
+
+  //@ glue_cells(cells, ncls3, freed);
 
   fr_head->next = freed;
   fr_head->prev = fr_head->next;
+  //@ list<dcell> ncls4 = update(FREE_LIST_HEAD, dcell(freed, freed), ncls3);
+  //@ drop_update_unrelevant(INDEX_SHIFT, FREE_LIST_HEAD, dcell(freed, freed), ncls3);
+  //@ attach_heads(cells, ncls4);
+  /*@
+    if (freed_prev == freed_next) {
+    // update(1, dcell(freed,freed), update(freed, nfreed, update(0, nalh, cls)));
+
+      close alloc_listp(ncls2, nil, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+      alloc_list_update_unrelevant(ncls2, nil, ALLOC_LIST_HEAD,
+                                   freed, nfreed,
+                                   ALLOC_LIST_HEAD);
+      alloc_list_update_unrelevant(ncls3, nil, ALLOC_LIST_HEAD,
+                                   FREE_LIST_HEAD, dcell(freed, freed),
+                                   ALLOC_LIST_HEAD);
+
+      free_list_update_unrelevant(cls, fl, FREE_LIST_HEAD, FREE_LIST_HEAD,
+                                  ALLOC_LIST_HEAD,
+                                  dcell(ALLOC_LIST_HEAD, ALLOC_LIST_HEAD));
+      lbounded_then_start_nonmem(fl, FREE_LIST_HEAD);
+      add_to_free_list(ncls2, fl, FREE_LIST_HEAD, freed);
+
+      dcell nalh = dcell(ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+      forall_nth(cls, (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD);
+      forall_update(cls, (dbounded)(size+INDEX_SHIFT), ALLOC_LIST_HEAD, nalh);
+      forall_update(update(ALLOC_LIST_HEAD, nalh, cls),
+                    (dbounded)(size+INDEX_SHIFT), freed, nfreed);
+      forall_update(update(freed, nfreed,
+                     update(ALLOC_LIST_HEAD, nalh, cls)),
+                    (dbounded)(size+INDEX_SHIFT), FREE_LIST_HEAD,
+                    dcell(freed,freed));
+      assert nil == remove(freed, al);
+      open alloc_listp(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+      open alloc_listp(cls, nil, ALLOC_LIST_HEAD, freed);
+    } else {
+    
+    }
+    @*/
+  //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, freed);
+  //@ move_cell_to_free_engaged(al, fl, nat_of_int(size));
+  //@ shift_inds_remove(al, freed, dchaini_alist_fp(dc));
+  //@ close dchainip(dchaini_remove_fp(dc, index), cells);
   return 1;
 }
 

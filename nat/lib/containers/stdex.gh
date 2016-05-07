@@ -282,6 +282,20 @@ ensures update(i, vi, update(j, vj, lst)) == update(j, vj, update(i, vi, lst));
   }
 }
 
+  lemma void nth_update_unrelevant<t>(int i, int j, t y, list<t> xs)
+  requires i != j;
+  ensures nth(i, update(j, y, xs)) == nth(i, xs);
+  {
+    switch(xs){
+      case nil: break;
+      case cons(h,t):
+        if (j == 0) break;
+        if (i == 0) break;
+        nth_update_unrelevant(i-1, j-1, y, t);
+    }
+  }
+
+
 fixpoint t get_some<t>(option<t> x) {
   switch(x) {
     case none: return default_value<t>();
