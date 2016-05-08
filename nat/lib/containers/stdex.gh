@@ -295,7 +295,6 @@ ensures update(i, vi, update(j, vj, lst)) == update(j, vj, update(i, vi, lst));
     }
   }
 
-
 fixpoint t get_some<t>(option<t> x) {
   switch(x) {
     case none: return default_value<t>();
@@ -380,6 +379,20 @@ ensures drop(n+1, lst) == tail(drop(n, lst));
         }
     }
   }
+
+lemma void forall_remove<t>(list<t> lst, t x, fixpoint(t, bool) p)
+requires true == forall(lst, p);
+ensures true == forall(remove(x, lst), p);
+{
+  switch(lst) {
+    case nil: return;
+    case cons(h,t):
+      if (h == x) {
+      } else {
+        forall_remove(t, x, p);
+      }
+  }
+}
 
   lemma void drop_drop<t>(int n, int m, list<t> l)
   requires 0 <= n &*& 0 <= m &*& n + m <= length(l);
