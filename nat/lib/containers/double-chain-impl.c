@@ -2195,7 +2195,12 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
       return 0;
     }
   }
+  //@ open alloc_listp(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+  //@ assert al == cons(?oldest, _);
+  //@ assert oldest == al_head->next;
+  //@ close alloc_listp(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
   *index = al_head->next - INDEX_SHIFT;
+  //@ assert dchaini_alist_fp(dc) == cons(oldest - INDEX_SHIFT, _);
   //@ attach_heads(cells, cls);
   //@ close dchainip(dc, cells);
   return 1;

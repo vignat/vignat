@@ -95,7 +95,7 @@ struct dchain_cell {
 
   fixpoint dchaini dchaini_rejuvenate_fp(dchaini ch, int index) {
     switch(ch) { case dchaini(alist, size):
-      return dchaini(cons(index, remove(index, alist)), size);
+      return dchaini(append(remove(index, alist), cons(index, nil)), size);
     }
   }
 
@@ -105,7 +105,7 @@ struct dchain_cell {
 
   fixpoint int dchaini_get_oldest_index_fp(dchaini ch) {
     switch(ch) { case dchaini(alist, size):
-      return nth(length(alist) - 1, alist);
+      return head(alist);
     }
   }
 
