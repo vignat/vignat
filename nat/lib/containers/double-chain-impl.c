@@ -2178,7 +2178,6 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
   //@ open dchainip(dc, cells);
   //@ int size = dchaini_irange_fp(dc);
   //@ assert dcellsp(cells, ?clen, ?cls);
-  //@ assert free_listp(cls, ?fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
   //@ assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
   //@ dcellsp_length(cells);
   //@ dcells_limits(cells);
@@ -2215,20 +2214,53 @@ int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
              (dchainip(dc, cells) &*&
               result == 0)); @*/
 {
-    int lifted = index + INDEX_SHIFT;
-    /* The index is not allocated. */
-    if (cells[lifted].next == cells[lifted].prev)
-        return 0;
-    
-    /* Unlink it from the middle of the "alloc" chain. */
-    cells[cells[lifted].prev].next = cells[lifted].next;
-    cells[cells[lifted].next].prev = cells[lifted].prev;
+  //@ open dchainip(dc, cells);
+  //@ int size = dchaini_irange_fp(dc);
+  //@ assert dcellsp(cells, ?clen, ?cls);
+  //@ assert free_listp(cls, ?fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+  //@ assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+  //@ dcellsp_length(cells);
+  //@ dcells_limits(cells);
+  //@ extract_heads(cells, cls);
+  int lifted = index + INDEX_SHIFT;
+  //@ extract_cell(cells, cls, lifted);
+  struct dchain_cell *liftedp = cells + lifted;
+  int lifted_next = liftedp->next;
+  int lifted_prev = liftedp->prev;
+  /* The index is not allocated. */
+  if (lifted_next == lifted_prev) {
+    if (lifted_next != ALLOC_LIST_HEAD) {
+      //@ lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
+      //@ symm_non_alloc(cls, al, ALLOC_LIST_HEAD, lifted);
+      //@ assert false == mem(lifted, al);
+      //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, lifted);
+      //@ assert false == mem(index, dchaini_alist_fp(dc));
+      //@ glue_cells(cells, cls, lifted);
+      //@ attach_heads(cells, cls);
+      //@ close dchainip(dc, cells);
+      return 0;
+    }
+  }
 
-    /* Link it at the very end - right before the special link. */
-    cells[lifted].next = ALLOC_LIST_HEAD;
-    cells[lifted].prev = cells[ALLOC_LIST_HEAD].prev;
-    cells[cells[ALLOC_LIST_HEAD].prev].next = lifted;
-    cells[ALLOC_LIST_HEAD].prev = lifted;
-    return 1;
+  struct dchain_cell *al_head = cells + ALLOC_LIST_HEAD;
+  int al_head_prev = al_head->prev;
+
+  /* Unlink it from the middle of the "alloc" chain. */
+  struct dchain_cell *lifted_prevp = cells + lifted_prev;
+  lifted_prevp->next = lifted_next;
+
+  struct dchain_cell *lifted_nextp = cells + lifted_next;
+  lifted_nextp->prev = lifted_prev;
+
+  /* Link it at the very end - right before the special link. */
+  liftedp->next = ALLOC_LIST_HEAD;
+  liftedp->prev = al_head_prev;
+
+  struct dchain_cell *al_head_prevp = cells + al_head_prev;
+  al_head_prevp->next = lifted;
+  al_head->prev = lifted;
+  //@ attach_heads(cells, cls);
+  //@ close dchainip(dc, cells);
+  return 1;
 }
 
