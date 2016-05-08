@@ -2137,6 +2137,35 @@ int dchain_impl_free_index(struct dchain_cell *cells, int index)
   return 1;
 }
 
+/*@
+  lemma void alloc_list_empty(list<dcell> cls, list<int> al, int start)
+  requires alloc_listp(cls, al, start, start) &*&
+           nth(start, cls) == dcell(start, start);
+  ensures alloc_listp(cls, al, start, start) &*&
+          al == nil;
+  {
+    switch(al) {
+      case nil: return;
+      case cons(h,t):
+        open alloc_listp(cls, al, start, start);
+        close alloc_listp(cls, al, start, start);
+    }
+  }
+
+  lemma void shift_inds_empty(list<int> x, int shift)
+  requires nil == shift_inds_fp(x, shift);
+  ensures x == nil;
+  {
+    switch(x) {
+      case nil: return;
+      case cons(h,t):
+        assert shift_inds_fp(x, shift) ==
+               cons(h - shift, shift_inds_fp(t, shift));
+        return;
+    }
+  }
+  @*/
+
 int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
 /*@ requires dchainip(?dc, cells) &*& *index |-> ?i; @*/
 /*@ ensures dchainip(dc, cells) &*&
@@ -2146,11 +2175,30 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
              (*index |-> dchaini_get_oldest_index_fp(dc) &*&
               result == 1)); @*/
 {
-    /* No allocated indexes. */
-    if (cells[ALLOC_LIST_HEAD].next == cells[ALLOC_LIST_HEAD].prev)
-        return 0;
-    *index = cells[ALLOC_LIST_HEAD].next - INDEX_SHIFT;
-    return 1;
+  //@ open dchainip(dc, cells);
+  //@ int size = dchaini_irange_fp(dc);
+  //@ assert dcellsp(cells, ?clen, ?cls);
+  //@ assert free_listp(cls, ?fl, FREE_LIST_HEAD, FREE_LIST_HEAD);
+  //@ assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+  //@ dcellsp_length(cells);
+  //@ dcells_limits(cells);
+  //@ extract_heads(cells, cls);
+  struct dchain_cell * al_head = cells + ALLOC_LIST_HEAD;
+  /* No allocated indexes. */
+  if (al_head->next == al_head->prev) {
+    if (al_head->next == ALLOC_LIST_HEAD) {
+      //@ alloc_list_empty(cls, al, ALLOC_LIST_HEAD);
+      //@ assert al == nil;
+      //@ shift_inds_empty(dchaini_alist_fp(dc), INDEX_SHIFT);
+      //@ attach_heads(cells, cls);
+      //@ close dchainip(dc, cells);
+      return 0;
+    }
+  }
+  *index = al_head->next - INDEX_SHIFT;
+  //@ attach_heads(cells, cls);
+  //@ close dchainip(dc, cells);
+  return 1;
 }
 
 int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
