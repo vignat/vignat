@@ -2205,6 +2205,20 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
   return 1;
 }
 
+/*@
+  lemma void shift_inds_single_element(list<int> lst, int shift)
+  requires shift_inds_fp(lst, shift) == cons(?x, nil);
+  ensures lst == cons(x - shift, nil);
+  {
+    switch(lst) {
+      case nil:
+        return;
+      case cons(h,t):
+        shift_inds_empty(t, shift);
+    }
+  }
+  @*/
+
 int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
 /*@ requires dchainip(?dc, cells) &*&
              0 <= index &*& index < dchaini_irange_fp(dc); @*/
@@ -2227,6 +2241,8 @@ int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
   struct dchain_cell *liftedp = cells + lifted;
   int lifted_next = liftedp->next;
   int lifted_prev = liftedp->prev;
+  //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), lifted);
+  //@ glue_cells(cells, cls, lifted);
   /* The index is not allocated. */
   if (lifted_next == lifted_prev) {
     if (lifted_next != ALLOC_LIST_HEAD) {
@@ -2235,10 +2251,48 @@ int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
       //@ assert false == mem(lifted, al);
       //@ shift_inds_mem(dchaini_alist_fp(dc), INDEX_SHIFT, lifted);
       //@ assert false == mem(index, dchaini_alist_fp(dc));
-      //@ glue_cells(cells, cls, lifted);
       //@ attach_heads(cells, cls);
       //@ close dchainip(dc, cells);
       return 0;
+    } else {
+      /* There is only one element allocated - no point in changing anything */
+      //@ assert lifted_prev == ALLOC_LIST_HEAD;
+      //@ assert lifted_next == ALLOC_LIST_HEAD;
+      //@ lbounded_then_start_nonmem(fl, ALLOC_LIST_HEAD);
+      /*@ points_to_alloc_head_non_in_fl(cls, fl, FREE_LIST_HEAD,
+                                         lifted, ALLOC_LIST_HEAD); @*/
+      //@ free_alloc_disjoint(al, fl, lifted, nat_of_int(size));
+      //@ assert true == mem(lifted, al);
+      //@ lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
+      //@ alloc_list_has_just_one_el(cls, al, ALLOC_LIST_HEAD, lifted);
+      //@ assert nth(0,cls) == dcell(lifted, lifted);
+      //@ assert al == cons(lifted, nil);
+      //@ shift_inds_single_element(dchaini_alist_fp(dc), INDEX_SHIFT);
+      //@ assert dchaini_alist_fp(dc) == cons(index, nil);
+
+      //@ attach_heads(cells, cls);
+      //@ close dchainip(dc, cells);
+      return 1;
+    }
+  } else {
+    /*@ asymm_non_in_free_list(cls, fl, FREE_LIST_HEAD, lifted,
+                               FREE_LIST_HEAD); @*/
+    //@ free_alloc_disjoint(al, fl, lifted, nat_of_int(size));
+    //@ assert true == mem(lifted, al);
+    //@ alloc_list_prev_next_mem(cls, al, ALLOC_LIST_HEAD, lifted, ALLOC_LIST_HEAD);
+    if (lifted_next == ALLOC_LIST_HEAD) {
+      //@ assert lifted_prev != ALLOC_LIST_HEAD;
+      //@ assert true == mem(lifted_prev, al);
+      //@ forall_mem(lifted_prev, al, (lbounded)(INDEX_SHIFT));
+    } else {
+      //@ assert lifted_next != ALLOC_LIST_HEAD;
+      //@ assert true == mem(lifted_next, al);
+      //@ forall_mem(lifted_next, al, (lbounded)(INDEX_SHIFT));
+      if (lifted_prev == ALLOC_LIST_HEAD) {
+      } else {
+        //@ assert true == mem(lifted_prev, al);
+        //@ forall_mem(lifted_prev, al, (lbounded)(INDEX_SHIFT));
+      }
     }
   }
 
@@ -2246,20 +2300,59 @@ int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
   int al_head_prev = al_head->prev;
 
   /* Unlink it from the middle of the "alloc" chain. */
+  /*@
+    if (lifted_prev != ALLOC_LIST_HEAD) {
+      extract_cell(cells, cls, lifted_prev);
+    }
+    @*/
   struct dchain_cell *lifted_prevp = cells + lifted_prev;
   lifted_prevp->next = lifted_next;
 
+  //@ dcell nlifted_prev = dcell(dchain_cell_get_prev(nth(lifted_prev, cls)), lifted_next);
+  //@ list<dcell> ncls1 = update(lifted_prev, nlifted_prev, cls);
+  /*@
+    if (lifted_prev != ALLOC_LIST_HEAD) {
+      glue_cells(cells, ncls1, lifted_prev);
+    }
+    @*/
+  /*@
+    if (lifted_next != ALLOC_LIST_HEAD) {
+      extract_cell(cells, ncls1, lifted_next);
+    }
+    @*/
+
   struct dchain_cell *lifted_nextp = cells + lifted_next;
   lifted_nextp->prev = lifted_prev;
+
+  //@ dcell nlifted_next = dcell(lifted_prev, dchain_cell_get_next(nth(lifted_next, cls)));
+  //@ list<dcell> ncls2 = update(lifted_next, nlifted_next, ncls1);
+  /*@
+    if (lifted_next != ALLOC_LIST_HEAD) {
+      glue_cells(cells, ncls2, lifted_next);
+    }
+    @*/
+  //@ extract_cell(cells, ncls2, lifted);
 
   /* Link it at the very end - right before the special link. */
   liftedp->next = ALLOC_LIST_HEAD;
   liftedp->prev = al_head_prev;
 
+  //@ dcell nlifted = dcell(al_head_prev, ALLOC_LIST_HEAD);
+  //@ list<dcell> ncls3 = update(lifted, nlifted, ncls2);
+  //@ glue_cells(cells, ncls3, lifted);
+  //@ extract_cell(cells, ncls3, al_head_prev);
+
+  //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), ALLOC_LIST_HEAD);
+  //@ mul_nonnegative(al_head_prev, sizeof(struct dchain_cell));
   struct dchain_cell *al_head_prevp = cells + al_head_prev;
   al_head_prevp->next = lifted;
+  //@ dcell nal_head_prev = dcell(dchain_cell_get_prev(nth(al_head_prev, cls)), lifted);
+  //@ list<dcell> ncls4 = update(al_head_prev, nal_head_prev, ncls3);
+  //@ glue_cells(cells, ncls4, al_head_prev);
   al_head->prev = lifted;
-  //@ attach_heads(cells, cls);
+  //@ dcell nal_head = dcell(lifted, dchain_cell_get_next(nth(ALLOC_LIST_HEAD, cls)));
+  //@ list<dcell> ncls5 = update(ALLOC_LIST_HEAD, nal_head, ncls4);
+  //@ attach_heads(cells, ncls5);
   //@ close dchainip(dc, cells);
   return 1;
 }
