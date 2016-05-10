@@ -4,6 +4,10 @@
 #include <stdint.h>
 
 struct DoubleChain;
+/* Makes sure the allocator structur fits into memory, and particularly into
+   32 bit address space. @*/
+#define IRANG_LIMIT (1048576)
+
 /*@
   inductive dchain = dchain(list<pair<int, uint32_t> >, int);
 
@@ -144,7 +148,8 @@ struct DoubleChain;
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
-/*@ requires *chain_out |-> ?old_val; @*/
+/*@ requires *chain_out |-> ?old_val &*&
+             0 < index_range &*& index_range <= IRANG_LIMIT; @*/
 /*@ ensures result == 0 ?
              *chain_out |-> old_val :
              (result == 1 &*& *chain_out |-> ?chp &*&

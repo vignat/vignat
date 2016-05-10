@@ -4,6 +4,8 @@
 #include "double-chain.h"
 #include "double-chain-impl.h"
 
+//@ #include "arith.gh"
+
 struct DoubleChain {
   struct dchain_cell* cells;
   uint32_t *timestamps;
@@ -17,7 +19,8 @@ struct DoubleChain {
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out)
-  /*@ requires *chain_out |-> ?old_val; @*/
+  /*@ requires *chain_out |-> ?old_val &*&
+               0 < index_range &*& index_range <= IRANG_LIMIT; @*/
   /*@ ensures result == 0 ?
    *chain_out |-> old_val :
    (result == 1 &*& *chain_out |-> ?chp &*&
@@ -30,13 +33,30 @@ int dchain_allocate(int index_range, struct DoubleChain** chain_out)
   if (chain_alloc == NULL) return 0;
   *chain_out = (struct DoubleChain*) chain_alloc;
 
-  if (NULL == ((**chain_out).cells = malloc(sizeof(struct dchain_cell)*
-                                             (index_range + DCHAIN_RESERVED))))
+  //@ dcell_layout_assumptions((*chain_out)->cells);
+
+  /*@
+    mul_bounds(sizeof (struct dchain_cell), 1024,
+               (index_range + DCHAIN_RESERVED), IRANG_LIMIT + DCHAIN_RESERVED);
+    @*/
+  struct dchain_cell* cells_alloc =
+    malloc(sizeof (struct dchain_cell)*(index_range + DCHAIN_RESERVED));
+  if (cells_alloc == NULL) {
+    free(chain_alloc);
+    *chain_out = old_chain_out;
     return 0;
-  if (NULL == ((**chain_out).timestamps =
-               malloc(sizeof(uint32_t)*index_range)))
+  }
+  (*chain_out)->cells = cells_alloc;
+
+  uint32_t* timestamps_alloc = malloc(sizeof(uint32_t)*(index_range));
+  if (timestamps_alloc == NULL) {
+    free((void*)cells_alloc);
+    free(chain_alloc);
+    *chain_out = old_chain_out;
     return 0;
-  dchain_impl_init((**chain_out).cells, index_range);
+  }
+
+  dchain_impl_init((*chain_out)->cells, index_range);
   return 1;
 }
 

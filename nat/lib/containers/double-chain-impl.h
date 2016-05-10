@@ -120,6 +120,13 @@ struct dchain_cell {
   }
   @*/
 
+/*@
+  lemma void dcell_layout_assumptions(struct dchain_cell* p);
+  requires true;
+  ensures sizeof(struct dchain_cell) == sizeof(int) + sizeof(int) &*&
+          true == ((void*)&p->prev + sizeof(int) == (void*)&p->next);
+  @*/
+
 void dchain_impl_init(struct dchain_cell *cells, int index_range);
 /*@ requires 0 < index_range &*&
              index_range < INT_MAX - 2 &*&

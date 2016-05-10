@@ -89,8 +89,7 @@ enum DCHAIN_ENUM {
   ensures [f]dcellp(p, v) &*& p > (struct dchain_cell *)0 &*&
                               p + 1 <= (struct dchain_cell *)UINTPTR_MAX;
   {
-    assume(sizeof(struct dchain_cell) == sizeof(int) + sizeof(int));
-    assume((void*)&p->prev + sizeof(int) <= (void*)&p->next);
+    dcell_layout_assumptions(p);
     open [f]dcellp(p,v);
     open [f]dchain_cell_prev(p,?prev);
     open [f]dchain_cell_next(p,?next);
