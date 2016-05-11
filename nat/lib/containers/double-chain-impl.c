@@ -430,10 +430,6 @@ void dchain_impl_init(struct dchain_cell *cells, int size)
     }
   }
 
-  fixpoint list<int> dchaini_alist_fp(dchaini dc) {
-    switch(dc) { case dchaini(alist, size): return alist; }
-  }
-
   lemma void shift_inds_len(list<int> l, int shift)
   requires true;
   ensures length(shift_inds_fp(l, shift)) == length(l);

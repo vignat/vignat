@@ -118,6 +118,11 @@ struct dchain_cell {
   fixpoint int dchaini_irange_fp(dchaini ch) {
     switch(ch) { case dchaini(alist, size): return size; }
   }
+
+  fixpoint list<int> dchaini_alist_fp(dchaini dc) {
+    switch(dc) { case dchaini(alist, size): return alist; }
+  }
+
   @*/
 
 /*@
