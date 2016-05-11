@@ -162,10 +162,10 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
 /*@ ensures dchain_out_of_space_fp(ch) ?
             (result == 0 &*& *index_out |-> i &*&
              double_chainp(ch, chain)) :
-            (result == 1 &*& *index_out |-> ?in &*&
-             false == dchain_allocated_fp(ch, in) &*&
-             0 <= in &*& in < dchain_index_range_fp(ch) &*&
-             double_chainp(dchain_allocate_fp(ch, in, time), chain)); @*/
+            (result == 1 &*& *index_out |-> ?ni &*&
+             false == dchain_allocated_fp(ch, ni) &*&
+             0 <= ni &*& ni < dchain_index_range_fp(ch) &*&
+             double_chainp(dchain_allocate_fp(ch, ni, time), chain)); @*/
 
 int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time);

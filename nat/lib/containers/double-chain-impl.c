@@ -1259,6 +1259,7 @@ int dchain_impl_allocate_new_index(struct dchain_cell *cells, int *index)
               *index |-> i) :
              (result == 1 &*&
               *index |-> ?ni &*&
+              0 <= ni &*& ni < dchaini_irange_fp(dc) &*&
               false == dchaini_allocated_fp(dc, ni) &*&
               dchainip(dchaini_allocate_fp(dc, ni), cells))); @*/
 {

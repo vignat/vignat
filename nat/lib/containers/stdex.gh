@@ -407,6 +407,17 @@ ensures true == forall(remove(x, lst), p);
     }
   }
 
+lemma void append_nonnil_l<t>(list<t> a, list<t> b)
+requires a != nil;
+ensures append(a, b) != nil;
+{
+  switch(a) {
+    case nil: return;
+    case cons(h,t):
+      return;
+  }
+}
+
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
