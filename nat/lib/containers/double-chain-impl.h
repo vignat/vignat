@@ -132,6 +132,14 @@ struct dchain_cell {
           true == ((void*)&p->prev + sizeof(int) == (void*)&p->next);
   @*/
 
+/*@
+  lemma void dchaini_no_dups(struct dchain_cell *cells, dchaini dc, int index);
+  requires dchainip(dc, cells);
+  ensures dchainip(dc, cells) &*&
+          false == dchaini_allocated_fp(dchaini_remove_fp(dc, index), index);
+  @*/
+
+
 void dchain_impl_init(struct dchain_cell *cells, int index_range);
 /*@ requires 0 < index_range &*&
              index_range < INT_MAX - 2 &*&

@@ -248,7 +248,7 @@ int dchain_allocate(int index_range, struct DoubleChain** chain_out)
   @*/
 
 /*@
-  lemma void dchaini_non_alloc_non_mem(dchaini dci, int i)
+  lemma void dchaini_allocated_def(dchaini dci, int i)
   requires true;
   ensures dchaini_allocated_fp(dci, i) == mem(i, dchaini_alist_fp(dci));
   {
@@ -323,7 +323,7 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
     //@ glue_timestamp(timestamps, update(ni, time, tstmps), ni);
     //@ dchaini_allocate_keep_irange(chi, ni);
     //@ dchain_allocate_keep_irange(ch, ni, time);
-    //@ dchaini_non_alloc_non_mem(chi, ni);
+    //@ dchaini_allocated_def(chi, ni);
     //@ insync_append(dchaini_alist_fp(chi), dchain_alist_fp(ch), tstmps, ni, time);
     //@ dchaini_allocate_def(chi, ni);
     //@ insync_mem_exists_same_index(dchaini_alist_fp(chi), dchain_alist_fp(ch), tstmps, ni);
@@ -335,45 +335,218 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
   return ret;
 }
 
+/*@
+  lemma void dchaini_rejuvenate_keep_irange(dchaini chi, int idx)
+  requires true;
+  ensures dchaini_irange_fp(chi) ==
+          dchaini_irange_fp(dchaini_rejuvenate_fp(chi, idx));
+  {
+    switch(chi) { case dchaini(alist, size):
+    }
+  }
+
+  lemma void dchain_rejuvenate_keep_irange(dchain ch, int idx, uint32_t time)
+  requires true;
+  ensures dchain_index_range_fp(ch) ==
+          dchain_index_range_fp(dchain_rejuvenate_fp(ch, idx, time));
+  {
+    switch(ch) { case dchain(alist, size):
+    }
+  }
+  @*/
+
+/*@
+  lemma void dc_alist_no_dups(dchaini chi, int index)
+  requires dchainip(chi, ?cells);
+  ensures dchainip(chi, cells) &*&
+          false == mem(index, remove(index, dchaini_alist_fp(chi)));
+  {
+    dchaini_no_dups(cells, chi, index);
+    switch(chi) { case dchaini(alist, size):
+    }
+  }
+  @*/
+
+/*@
+  lemma void insync_remove(list<int> bare_alist,
+                           list<pair<int, uint32_t> > alist,
+                           list<uint32_t> tstmps,
+                           int i)
+  requires true == insync_fp(bare_alist, tstmps, alist) &*&
+           0 <= i &*& i < length(tstmps);
+  ensures true == insync_fp(remove(i, bare_alist),
+                            tstmps,
+                            remove_by_index_fp(i, alist));
+  {
+    switch(bare_alist) {
+      case nil: return;
+      case cons(h,t):
+        cons_head_tail(alist);
+        insync_remove(t, tail(alist), tstmps, i);
+    }
+  }
+
+  lemma void insync_rejuvenate(list<int> bare_alist,
+                               list<pair<int, uint32_t> > alist,
+                               list<uint32_t> tstmps,
+                               int i, uint32_t t)
+  requires true == insync_fp(bare_alist, tstmps, alist) &*&
+           0 <= i &*& i < length(tstmps) &*&
+           false == mem(i, remove(i, bare_alist));
+  ensures true == insync_fp(append(remove(i, bare_alist), cons(i, nil)),
+                            update(i, t, tstmps),
+                            append(remove_by_index_fp(i, alist),
+                                   cons(pair(i, t), nil)));
+  {
+    insync_remove(bare_alist, alist, tstmps, i);
+    insync_append(remove(i, bare_alist),
+                  remove_by_index_fp(i, alist), tstmps, i, t);
+  }
+  @*/
+
+/*@
+  lemma void rejuvenate_def(dchain dc, dchaini dci, int i, uint32_t t)
+  requires true;
+  ensures dchain_alist_fp(dchain_rejuvenate_fp(dc, i, t)) ==
+          append(remove_by_index_fp(i, dchain_alist_fp(dc)),
+                 cons(pair(i,t), nil)) &*&
+          dchaini_alist_fp(dchaini_rejuvenate_fp(dci, i)) ==
+          append(remove(i, dchaini_alist_fp(dci)), cons(i, nil));
+  {
+    switch(dc) { case dchain(alist, size):
+    }
+    switch (dci) { case dchaini(alist, size):
+    }
+  }
+  @*/
+
+/*@
+  lemma void get_time_int(list<int> bare_alist,
+                          list<uint32_t> times,
+                          list<pair<int, uint32_t> > alist,
+                          int index)
+  requires true == insync_fp(bare_alist, times, alist) &*&
+           true == mem(index, bare_alist);
+  ensures alist_get_fp(alist, index) == nth(index, times);
+  {
+    switch(bare_alist) {
+      case nil: return;
+      case cons(h,t):
+        cons_head_tail(alist);
+        if (h != index) get_time_int(t, times, tail(alist), index);
+    }
+  }
+  @*/
+
+/*@
+  lemma void insync_update_unrelevant(list<int> bare_alist,
+                                      list<uint32_t> times,
+                                      list<pair<int, uint32_t> > alist,
+                                      int i, uint32_t time)
+  requires true == insync_fp(bare_alist, times, alist) &*&
+           false == mem(i, bare_alist);
+  ensures true == insync_fp(bare_alist, update(i, time, times), alist);
+  {
+    switch(bare_alist) {
+      case nil: return;
+      case cons(h,t):
+        cons_head_tail(alist);
+        insync_update_unrelevant(t, times, tail(alist), i, time);
+        nth_update_unrelevant(h, i, time, times);
+    }
+  }
+  @*/
+
 int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time)
 /*@ requires double_chainp(?ch, chain) &*&
-  0 <= index &*& index < dchain_index_range_fp(ch); @*/
+             0 <= index &*& index < dchain_index_range_fp(ch); @*/
 /*@ ensures dchain_allocated_fp(ch, index) ?
-  (result == 1 &*&
-  double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
-  (result == 0 &*&
-  double_chainp(ch, chain)); @*/
+             (dchain_get_time_fp(ch, index) < time ?
+              (result == 1 &*&
+               double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
+              (result == 0 &*&
+               double_chainp(ch, chain))) :
+             (result == 0 &*&
+              double_chainp(ch, chain)); @*/
 {
-  int ret = dchain_impl_rejuvenate_index(chain->cells, index);
-  if (ret) {
-    if (chain->timestamps[index] > time) return 0;
+  //@ open double_chainp(ch, chain);
+  //@ assert chain->cells |-> ?cells;
+  //@ assert chain->timestamps |-> ?timestamps;
+  //@ assert dchainip(?chi, cells);
+  //@ int size = dchain_index_range_fp(ch);
+  //@ assert uints(timestamps, size, ?tmstmps);
+  //@ extract_timestamp(timestamps, tmstmps, index);
+
+  /* Checking the timestamp is safe,
+     even if the index is not really allocated */
+  if (chain->timestamps[index] < time) {
+    //@ assert nth(index, tmstmps) < time;
     chain->timestamps[index] = time;
+    //@ take_update_unrelevant(index, index, time, tmstmps);
+    //@ drop_update_unrelevant(index+1, index, time, tmstmps);
+    //@ glue_timestamp(timestamps, update(index, time, tmstmps), index);
+    //@ dc_alist_no_dups(chi, index);
+    int ret = dchain_impl_rejuvenate_index(chain->cells, index);
+    //@ dchaini_allocated_def(chi, index);
+    /*@ insync_mem_exists_same_index(dchaini_alist_fp(chi),
+                                     dchain_alist_fp(ch), tmstmps, index);
+                                     @*/
+    //@ dchain_allocated_def(ch, index);
+    /*@
+      if (ret) {
+        get_time_int(dchaini_alist_fp(chi),tmstmps, dchain_alist_fp(ch), index);
+        assert dchain_get_time_fp(ch, index) < time;
+        dchaini_rejuvenate_keep_irange(chi, index);
+        dchain_rejuvenate_keep_irange(ch, index, time);
+        insync_rejuvenate(dchaini_alist_fp(chi), dchain_alist_fp(ch),
+                          tmstmps, index, time);
+        rejuvenate_def(ch, chi, index, time);
+        close double_chainp(dchain_rejuvenate_fp(ch, index, time), chain);
+      } else {
+        insync_update_unrelevant(dchaini_alist_fp(chi), tmstmps,
+                                 dchain_alist_fp(ch), index, time);
+        close double_chainp(ch, chain);
+      }
+      @*/
+    return ret;
   }
-  return ret;
+  //@ glue_timestamp(timestamps, tmstmps, index);
+  /*@
+    if (dchain_allocated_fp(ch, index)) {
+      dchain_allocated_def(ch, index);
+      insync_mem_exists_same_index(dchaini_alist_fp(chi), dchain_alist_fp(ch),
+                                   tmstmps, index);
+      get_time_int(dchaini_alist_fp(chi), tmstmps, dchain_alist_fp(ch), index);
+      assert time <= dchain_get_time_fp(ch, index);
+    }
+    @*/
+  //@ close double_chainp(ch, chain);
+  return 0;
 }
 
 int dchain_expire_one_index(struct DoubleChain* chain,
                             int* index_out, uint32_t time)
 /*@ requires double_chainp(?ch, chain) &*&
- *index_out |-> ?io; @*/
+             *index_out |-> ?io; @*/
 /*@ ensures (dchain_is_empty_fp(ch) ?
-  (double_chainp(ch, chain) &*&
-  *index_out |-> io &*&
-  result == 0) :
-  (dchain_get_oldest_time_fp(ch) < time ?
-  (*index_out |-> ?oi &*&
-  dchain_get_oldest_index_fp(ch) == oi &*&
-  double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
-  result == 1) :
-  (double_chainp(ch, chain) &*&
-  *index_out |-> io &*&
-  result == 0))); @*/
+             (double_chainp(ch, chain) &*&
+              *index_out |-> io &*&
+              result == 0) :
+             (dchain_get_oldest_time_fp(ch) < time ?
+              (*index_out |-> ?oi &*&
+               dchain_get_oldest_index_fp(ch) == oi &*&
+               double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
+               result == 1) :
+              (double_chainp(ch, chain) &*&
+               *index_out |-> io &*&
+               result == 0))); @*/
 {
   int has_ind = dchain_impl_get_oldest_index(chain->cells, index_out);
   if (has_ind) {
     if (chain->timestamps[*index_out] < time) {
-      return dchain_impl_free_index(chain->cells, *index_out);
+      int rez = dchain_impl_free_index(chain->cells, *index_out);
+      return rez;
     }
   }
   return 0;

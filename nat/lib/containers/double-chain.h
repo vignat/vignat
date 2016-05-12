@@ -62,6 +62,20 @@ struct DoubleChain;
     }
   }
 
+  fixpoint uint32_t alist_get_fp(list<pair<int, uint32_t> > al, int i) {
+    switch(al) {
+      case nil: return default_value<uint32_t>();
+      case cons(h,t):
+        return (fst(h) == i) ? snd(h) : alist_get_fp(t, i);
+    }
+  }
+
+  fixpoint uint32_t dchain_get_time_fp(dchain ch, int index) {
+    switch(ch) { case dchain(alist, size):
+      return alist_get_fp(alist, index);
+    }
+  }
+
   fixpoint bool dchain_is_empty_fp(dchain ch) {
     switch(ch) { case dchain(alist, size):
       return alist == nil;
@@ -172,8 +186,11 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
 /*@ requires double_chainp(?ch, chain) &*&
              0 <= index &*& index < dchain_index_range_fp(ch); @*/
 /*@ ensures dchain_allocated_fp(ch, index) ?
-            (result == 1 &*&
-             double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
+            (dchain_get_time_fp(ch, index) < time ?
+             (result == 1 &*&
+              double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
+             (result == 0 &*&
+              double_chainp(ch, chain))) :
             (result == 0 &*&
              double_chainp(ch, chain)); @*/
 

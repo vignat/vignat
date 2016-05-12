@@ -2470,3 +2470,24 @@ int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index)
   return 1;
 }
 
+/*@
+lemma void dchaini_no_dups(struct dchain_cell *cells, dchaini dc, int index)
+requires dchainip(dc, cells);
+ensures dchainip(dc, cells) &*&
+        false == dchaini_allocated_fp(dchaini_remove_fp(dc, index), index);
+{
+  open dchainip(dc, cells);
+  assert dcellsp(cells, ?clen, ?cls);
+  assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+
+  switch(dc) { case dchaini(alist, size):
+    lbounded_then_start_nonmem(al, ALLOC_LIST_HEAD);
+    alloc_list_no_dups(cls, al, ALLOC_LIST_HEAD,
+                       ALLOC_LIST_HEAD, index+INDEX_SHIFT);
+    shift_inds_remove(al, index+INDEX_SHIFT, alist);
+    shift_inds_mem(remove(index, alist), INDEX_SHIFT, index+INDEX_SHIFT);
+  }
+
+  close dchainip(dc, cells);
+}
+@*/
