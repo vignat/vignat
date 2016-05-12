@@ -525,6 +525,33 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
   return 0;
 }
 
+/*@
+  lemma void get_oldest_index_def(dchain dc, dchaini dci)
+  requires true;
+  ensures dchain_get_oldest_index_fp(dc) == fst(head(dchain_alist_fp(dc))) &*&
+          dchaini_get_oldest_index_fp(dci) == head(dchaini_alist_fp(dci));
+  {
+    switch(dc) { case dchain(alist, size):
+    }
+    switch(dci) { case dchaini(alist, size):
+    }
+  }
+  @*/
+
+/*@
+  lemma void insync_head_matches(list<int> bare_alist,
+                                 list<uint32_t> times,
+                                 list<pair<int, uint32_t> > alist)
+  requires true == insync_fp(bare_alist, times, alist);
+  ensures fst(head(alist)) == head(bare_alist);
+  {
+    switch(bare_alist) {
+      case nil: return;
+      case cons(h,t): return;
+    }
+  }
+  @*/
+
 int dchain_expire_one_index(struct DoubleChain* chain,
                             int* index_out, uint32_t time)
 /*@ requires double_chainp(?ch, chain) &*&
@@ -533,7 +560,7 @@ int dchain_expire_one_index(struct DoubleChain* chain,
              (double_chainp(ch, chain) &*&
               *index_out |-> io &*&
               result == 0) :
-             (dchain_get_oldest_time_fp(ch) < time ?
+              (dchain_get_oldest_time_fp(ch) < time ?
               (*index_out |-> ?oi &*&
                dchain_get_oldest_index_fp(ch) == oi &*&
                double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
@@ -542,12 +569,30 @@ int dchain_expire_one_index(struct DoubleChain* chain,
                *index_out |-> io &*&
                result == 0))); @*/
 {
+  //@ open double_chainp(ch, chain);
+  //@ assert chain->cells |-> ?cells;
+  //@ assert chain->timestamps |-> ?timestamps;
+  //@ assert dchainip(?chi, cells);
+  //@ int size = dchain_index_range_fp(ch);
+  //@ assert uints(timestamps, size, ?tmstmps);
   int has_ind = dchain_impl_get_oldest_index(chain->cells, index_out);
+  //@ get_oldest_index_def(ch, chi);
+  //@ insync_head_matches(dchaini_alist_fp(chi), tmstmps, dchain_alist_fp(ch));
   if (has_ind) {
+    //@ assert *index_out |-> ?oi;
+    //@ extract_timestamp(timestamps, tmstmps, oi);
     if (chain->timestamps[*index_out] < time) {
       int rez = dchain_impl_free_index(chain->cells, *index_out);
+      /*@
+        if (rez) {
+          close double_chainp(dchain_remove_index_fp(ch, oi), chain);
+        } else {
+          close double_chainp(ch, chain);
+        }
+        @*/
       return rez;
     }
   }
+  //@ close double_chainp(ch, chain);
   return 0;
 }
