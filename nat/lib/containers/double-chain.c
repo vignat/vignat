@@ -527,7 +527,8 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
 
 /*@
   lemma void get_oldest_index_def(dchain dc, dchaini dci)
-  requires true;
+  requires false == dchain_is_empty_fp(dc) &*&
+           false == dchaini_is_empty_fp(dci);
   ensures dchain_get_oldest_index_fp(dc) == fst(head(dchain_alist_fp(dc))) &*&
           dchaini_get_oldest_index_fp(dci) == head(dchaini_alist_fp(dci));
   {
@@ -542,13 +543,71 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
   lemma void insync_head_matches(list<int> bare_alist,
                                  list<uint32_t> times,
                                  list<pair<int, uint32_t> > alist)
-  requires true == insync_fp(bare_alist, times, alist);
+  requires true == insync_fp(bare_alist, times, alist) &*&
+           bare_alist != nil;
   ensures fst(head(alist)) == head(bare_alist);
   {
     switch(bare_alist) {
-      case nil: return;
+      case nil:
+        assume(false);
+        return;
       case cons(h,t): return;
     }
+  }
+  @*/
+
+/*@
+  lemma void is_empty_def(dchain dc, dchaini dci)
+  requires true;
+  ensures dchain_is_empty_fp(dc) == (dchain_alist_fp(dc) == nil) &*&
+          dchaini_is_empty_fp(dci) == (dchaini_alist_fp(dci) == nil);
+  {
+    switch(dc) { case dchain(alist, size):
+    }
+    switch(dci) { case dchaini(alist, size):
+    }
+  }
+
+  lemma void insync_both_empty(list<int> bare_alist,
+                               list<uint32_t> times,
+                               list<pair<int, uint32_t> > alist)
+  requires true == insync_fp(bare_alist, times, alist);
+  ensures bare_alist == nil ? (alist == nil) : (alist != nil);
+  {
+    switch(bare_alist) {
+      case nil: return;
+      case cons(h,t):
+    }
+  }
+  @*/
+
+/*@
+  lemma void remove_def(dchain dc, dchaini dci, int index)
+  requires true;
+  ensures dchain_alist_fp(dchain_remove_index_fp(dc, index)) ==
+          remove_by_index_fp(index, dchain_alist_fp(dc)) &*&
+          dchaini_alist_fp(dchaini_remove_fp(dci, index)) ==
+          remove(index, dchaini_alist_fp(dci)) &*&
+          dchain_index_range_fp(dchain_remove_index_fp(dc, index)) ==
+          dchain_index_range_fp(dc) &*&
+          dchaini_irange_fp(dchaini_remove_fp(dci, index)) ==
+          dchaini_irange_fp(dci);
+  {
+    switch(dc) { case dchain(alist, size):
+    }
+    switch(dci) { case dchaini(alist, size):
+    }
+  }
+  @*/
+
+/*@
+  lemma void insync_get_oldest_time(dchain dc, dchaini dci,
+                                    list<uint32_t> times)
+  requires true == insync_fp(dchaini_alist_fp(dci), times, dchain_alist_fp(dc));
+  ensures nth(dchain_get_oldest_index_fp(dc), times) ==
+          dchain_get_oldest_time_fp(dc);
+  {
+    assume(false);
   }
   @*/
 
@@ -560,14 +619,14 @@ int dchain_expire_one_index(struct DoubleChain* chain,
              (double_chainp(ch, chain) &*&
               *index_out |-> io &*&
               result == 0) :
-              (dchain_get_oldest_time_fp(ch) < time ?
               (*index_out |-> ?oi &*&
                dchain_get_oldest_index_fp(ch) == oi &*&
-               double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
-               result == 1) :
-              (double_chainp(ch, chain) &*&
-               *index_out |-> io &*&
-               result == 0))); @*/
+               0 <= oi &*& oi < dchain_index_range_fp(ch) &*&
+               (dchain_get_oldest_time_fp(ch) < time ?
+                (double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
+                 result == 1) :
+                (double_chainp(ch, chain) &*&
+                 result == 0)))); @*/
 {
   //@ open double_chainp(ch, chain);
   //@ assert chain->cells |-> ?cells;
@@ -576,22 +635,31 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   //@ int size = dchain_index_range_fp(ch);
   //@ assert uints(timestamps, size, ?tmstmps);
   int has_ind = dchain_impl_get_oldest_index(chain->cells, index_out);
-  //@ get_oldest_index_def(ch, chi);
-  //@ insync_head_matches(dchaini_alist_fp(chi), tmstmps, dchain_alist_fp(ch));
+  //@ is_empty_def(ch, chi);
+  //@ insync_both_empty(dchaini_alist_fp(chi), tmstmps, dchain_alist_fp(ch));
+  //@ assert dchaini_is_empty_fp(chi) == dchain_is_empty_fp(ch);
   if (has_ind) {
+    //@ get_oldest_index_def(ch, chi);
+    //@ insync_head_matches(dchaini_alist_fp(chi), tmstmps, dchain_alist_fp(ch));
     //@ assert *index_out |-> ?oi;
+    //@ insync_get_oldest_time(ch, chi, tmstmps);
     //@ extract_timestamp(timestamps, tmstmps, oi);
     if (chain->timestamps[*index_out] < time) {
+      //@ glue_timestamp(timestamps, tmstmps, oi);
+      //@ assert nth(oi, tmstmps) == dchain_get_oldest_time_fp(ch);
       int rez = dchain_impl_free_index(chain->cells, *index_out);
       /*@
-        if (rez) {
+        {
+          assert rez == 1;
+          remove_def(ch, chi, oi);
+          insync_remove(dchaini_alist_fp(chi), dchain_alist_fp(ch),
+                        tmstmps, oi);
           close double_chainp(dchain_remove_index_fp(ch, oi), chain);
-        } else {
-          close double_chainp(ch, chain);
         }
         @*/
       return rez;
     }
+    //@ glue_timestamp(timestamps, tmstmps, oi);
   }
   //@ close double_chainp(ch, chain);
   return 0;

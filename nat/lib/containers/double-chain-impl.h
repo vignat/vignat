@@ -173,7 +173,10 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index);
             (dchaini_is_empty_fp(dc) ?
              (*index |-> i &*&
               result == 0) :
-             (*index |-> dchaini_get_oldest_index_fp(dc) &*&
+             (*index |-> ?oi &*&
+              oi == dchaini_get_oldest_index_fp(dc) &*&
+              0 <= oi &*& oi < dchaini_irange_fp(dc) &*&
+              true == dchaini_allocated_fp(dc, oi) &*&
               result == 1)); @*/
 
 int dchain_impl_rejuvenate_index(struct dchain_cell *cells, int index);

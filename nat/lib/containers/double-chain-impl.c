@@ -2169,7 +2169,10 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
             (dchaini_is_empty_fp(dc) ?
              (*index |-> i &*&
               result == 0) :
-             (*index |-> dchaini_get_oldest_index_fp(dc) &*&
+             (*index |-> ?oi &*&
+              oi == dchaini_get_oldest_index_fp(dc) &*&
+              0 <= oi &*& oi < dchaini_irange_fp(dc) &*&
+              true == dchaini_allocated_fp(dc, oi) &*&
               result == 1)); @*/
 {
   //@ open dchainip(dc, cells);
@@ -2196,6 +2199,10 @@ int dchain_impl_get_oldest_index(struct dchain_cell *cells, int *index)
   //@ assert oldest == al_head->next;
   //@ close alloc_listp(cls, al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
   *index = al_head->next - INDEX_SHIFT;
+  //@ forall_nth(cls, (dbounded)(size+INDEX_SHIFT), ALLOC_LIST_HEAD);
+  //@ forall_mem(oldest, al, (lbounded)(INDEX_SHIFT));
+  //@ assert *index |-> ?oi;
+  //@ assert oi < dchaini_irange_fp(dc);
   //@ assert dchaini_alist_fp(dc) == cons(oldest - INDEX_SHIFT, _);
   //@ attach_heads(cells, cls);
   //@ close dchainip(dc, cells);

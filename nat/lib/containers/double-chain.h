@@ -202,13 +202,13 @@ int dchain_expire_one_index(struct DoubleChain* chain,
              (double_chainp(ch, chain) &*&
               *index_out |-> io &*&
               result == 0) :
-             (dchain_get_oldest_time_fp(ch) < time ?
-              (*index_out |-> ?oi &*&
-               dchain_get_oldest_index_fp(ch) == oi &*&
-               double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
-               result == 1) :
-              (double_chainp(ch, chain) &*&
-               *index_out |-> io &*&
-               result == 0))); @*/
+             (*index_out |-> ?oi &*&
+              dchain_get_oldest_index_fp(ch) == oi &*&
+              0 <= oi &*& oi < dchain_index_range_fp(ch) &*&
+              (dchain_get_oldest_time_fp(ch) < time ?
+               (double_chainp(dchain_remove_index_fp(ch, oi), chain) &*&
+                result == 1) :
+               (double_chainp(ch, chain) &*&
+                result == 0)))); @*/
 
 #endif //_DOUBLE_CHAIN_H_INCLUDED_
