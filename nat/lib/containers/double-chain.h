@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+//@ #include <listex.gh>
+
 struct DoubleChain;
 /* Makes sure the allocator structur fits into memory, and particularly into
    32 bit address space. @*/
@@ -45,18 +47,18 @@ struct DoubleChain;
   }
 
   fixpoint list<pair<int, uint32_t> >
-    remove_by_index_fp(int i, list<pair<int, uint32_t> > lst) {
+    remove_by_index_fp(list<pair<int, uint32_t> > lst, int i) {
       switch(lst) {
         case nil: return nil;
         case cons(h,t):
           return fst(h) == i ? t :
-                               cons(h, remove_by_index_fp(i, t));
+                               cons(h, remove_by_index_fp(t, i));
       }
     }
 
   fixpoint dchain dchain_rejuvenate_fp(dchain ch, int index, uint32_t time) {
     switch(ch) { case dchain(alist, size):
-      return dchain(append(remove_by_index_fp(index, alist),
+      return dchain(append(remove_by_index_fp(alist, index),
                            cons(pair(index, time), nil)),
                     size);
     }
@@ -96,36 +98,17 @@ struct DoubleChain;
 
   fixpoint dchain dchain_remove_index_fp(dchain ch, int index) {
     switch(ch) { case dchain(alist, size):
-      return dchain(remove_by_index_fp(index, alist), size);
+      return dchain(remove_by_index_fp(alist, index), size);
     }
   }
 
-  fixpoint list<pair<int, uint32_t> >
-    expire_old_indexes_fp(uint32_t time, list<pair<int, uint32_t> > lst) {
-      switch(lst) {
-        case nil: return nil;
-        case cons(h,t):
-          return snd(h) < time ?
-                  expire_old_indexes_fp(time, t) :
-                  lst;
-      }
-    }
-
-  fixpoint dchain dchain_expire_old_indexes_fp(dchain ch, uint32_t time) {
-    switch(ch) { case dchain(alist, size):
-      return dchain(expire_old_indexes_fp(time, alist), size);
-    }
+  fixpoint bool is_cell_expired(uint32_t time, pair<int, uint32_t> cell) {
+    return snd(cell) < time;
   }
 
   fixpoint list<int>
   get_expired_indexes_fp(uint32_t time, list<pair<int, uint32_t> > lst) {
-    switch(lst) {
-      case nil: return nil;
-      case cons(h,t):
-        return snd(h) < time ?
-                 cons(fst(h), get_expired_indexes_fp(time, t)) :
-                 nil;
-    }
+    return map(fst, filter((is_cell_expired)(time), lst));
   }
 
   fixpoint list<int> dchain_get_expired_indexes_fp(dchain ch, uint32_t time) {
@@ -134,10 +117,22 @@ struct DoubleChain;
     }
   }
 
-  lemma void expire_old_dchain_nonfull(dchain ch, uint32_t time);
-  requires length(dchain_get_expired_indexes_fp(ch, time)) > 0;
-  ensures dchain_out_of_space_fp(dchain_expire_old_indexes_fp(ch, time))
-          == false;
+  fixpoint dchain dchain_expire_old_indexes_fp(dchain ch, uint32_t time) {
+    switch(ch) { case dchain(alist, size):
+      return dchain(fold_left(alist, remove_by_index_fp,
+                              get_expired_indexes_fp(time, alist)),
+                    size);
+    }
+  }
+
+
+  lemma void expire_old_dchain_nonfull(struct DoubleChain* chain, dchain ch,
+                                       uint32_t time);
+  requires double_chainp(ch, chain) &*&
+           length(dchain_get_expired_indexes_fp(ch, time)) > 0;
+  ensures double_chainp(ch, chain) &*&
+          dchain_out_of_space_fp(dchain_expire_old_indexes_fp(ch, time)) ==
+          false;
 
   lemma void index_range_of_empty(int ir);
   requires 0 < ir;
