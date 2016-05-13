@@ -7,8 +7,10 @@
 
 #ifdef KLEE_VERIFICATION
 #  define AND(x,y) ((x)&(y))
+#  define TO_INT(x) (x)
 #else //KLEE_VERIFICATION
 #  define AND(x,y) ((x)&&(y))
+#  define TO_INT(x) (x ? 1 : 0)
 #endif //KLEE_VERIFICATION
 
 int int_key_eq(void* a, void* b)
@@ -24,8 +26,7 @@ int int_key_eq(void* a, void* b)
     AND(k1->dst_ip        == k2->dst_ip,
     AND(k1->int_device_id == k2->int_device_id,
        (k1->protocol      == k2->protocol))))));
-  if (rez) return 1;
-  else return 0;
+  return TO_INT(rez);
 }
 
 int ext_key_eq(void* a, void* b)
@@ -41,8 +42,7 @@ int ext_key_eq(void* a, void* b)
     AND(k1->dst_ip        == k2->dst_ip,
     AND(k1->ext_device_id == k2->ext_device_id,
        (k1->protocol      == k2->protocol))))));
-  if (rez) return 1;
-  else return 0;
+  return TO_INT(rez);
 }
 
 static int ovf_cast(uint32_t x)

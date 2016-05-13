@@ -60,10 +60,11 @@ requires dmap_dchain_coherent(m, ch);
 ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
 
 lemma void coherent_put_allocated_preserves_coherent
-(dmap<int_k,ext_k,flw> m, dchain ch, int_k k1, ext_k k2, flw value, int ind);
+(dmap<int_k,ext_k,flw> m, dchain ch, int_k k1, ext_k k2,
+ flw value, int ind, uint32_t t);
 requires dmap_dchain_coherent(m, ch) &*& false == dchain_allocated_fp(ch, ind);
 ensures dmap_dchain_coherent(dmap_put_fp(m, k1, k2, ind, value),
-                             dchain_allocate_fp(ch, ind));
+                             dchain_allocate_fp(ch, ind, t));
 
 lemma void coherent_dchain_non_out_of_space_map_nonfull(dmap<int_k,ext_k,flw> m, dchain ch);
 requires dmappingp<int_k,ext_k,flw>(m, ?a, ?b, ?c, ?d, ?e, ?g, ?h, ?i, ?j, ?k, ?l, ?n, ?cap, ?f) &*&

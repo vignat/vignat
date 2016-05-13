@@ -452,7 +452,8 @@ let fun_types =
                            (List.nth_exn args 2) ^
                            ")) > 0 ) {\n\
                             expire_old_dchain_nonfull\
-                            (cur_chain, " ^ (List.nth_exn args 2) ^
+                            (" ^ (List.nth_exn args 0) ^ ", cur_chain, " ^
+                           (List.nth_exn args 2) ^
                            ");\n\
                             }} @*/");
                         ];
