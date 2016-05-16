@@ -32,6 +32,8 @@ let last_index_gotten = ref ""
 let last_index_key = ref Int
 let last_indexing_succ_ret_var = ref ""
 
+let last_time_for_index_alloc = ref ""
+
 let gen_get_fp map_name =
   match !last_index_key with
   | Int-> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
@@ -391,7 +393,7 @@ let fun_types =
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                        new_index_0);\
+                        new_index_0, " ^ !last_time_for_index_alloc ^ ");\
                         }@*/");
                   ]
                   ;
@@ -480,7 +482,11 @@ let fun_types =
                                           (tmp "chain_before_alloc") ^
                                           ", *" ^
                                           (List.nth_exn args 1) ^
-                                          ");\n}");
+                                          ", " ^ (List.nth_exn args 2) ^ ");\n}");
+                                     (fun _ args _ ->
+                                        last_time_for_index_alloc :=
+                                          (List.nth_exn args 2);
+                                        "")
                                    ];
                                    leaks = [];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
