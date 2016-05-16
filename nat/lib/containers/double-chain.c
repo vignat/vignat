@@ -678,6 +678,120 @@ int dchain_expire_one_index(struct DoubleChain* chain,
 }
 
 /*@
+  lemma void remove_by_index_decreases(list<pair<int, uint32_t> > alist,
+                                       int i)
+  requires true == exists(alist, (same_index)(i));
+  ensures length(remove_by_index_fp(alist, i)) < length(alist);
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != i) {
+          remove_by_index_decreases(t, i);
+        }
+    }
+  }
+
+  lemma void remove_by_index_monotone_len(list<pair<int, uint32_t> > alist,
+                                          int i)
+  requires true;
+  ensures length(remove_by_index_fp(alist, i)) <= length(alist);
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) == i) {
+        } else {
+          remove_by_index_monotone_len(t, i);
+        }
+    }
+  }
+
+  lemma void remove_some_monotone_len(list<pair<int, uint32_t> > alist,
+                                      list<int> idx)
+  requires true;
+  ensures length(fold_left(alist, remove_by_index_fp, idx)) <= length(alist);
+  {
+    switch(idx) {
+      case nil: return;
+      case cons(h,t):
+        remove_by_index_monotone_len(alist, h);
+        remove_some_monotone_len(remove_by_index_fp(alist, h), t);
+    }
+  }
+
+  lemma void remove_some_decreases_alist(list<pair<int, uint32_t> > alist,
+                                         list<int> idx)
+  requires idx == cons(?ih,_) &*& true == exists(alist, (same_index)(ih));
+  ensures length(fold_left(alist, remove_by_index_fp, idx)) < length(alist);
+  {
+    switch(idx) {
+      case nil: return;
+      case cons(h,t):
+        remove_by_index_decreases(alist, h);
+        remove_some_monotone_len(remove_by_index_fp(alist, h), t);
+    }
+  }
+  @*/
+
+/*@
+  lemma void mem_head_filter<t>(fixpoint (t,bool) pred, list<t> lst)
+  requires filter(pred, lst) != nil;
+  ensures true == mem(head(filter(pred, lst)), lst);
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (pred(h)) {
+        } else {
+          mem_head_filter(pred, t);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void head_map<t,u>(fixpoint (t,u) f, list<t> lst)
+  requires lst != nil;
+  ensures head(map(f, lst)) == f(head(lst));
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        return;
+    }
+  }
+  @*/
+
+/*@
+  lemma void mem_exists_same_index(list<pair<int, uint32_t> > alist,
+                                   pair<int, uint32_t> x)
+  requires true == mem(x, alist);
+  ensures true == exists(alist, (same_index)(fst(x)));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (h != x) mem_exists_same_index(t, x);
+    }
+  }
+  @*/
+
+/*@
+  lemma void head_expired_is_mem(list<pair<int, uint32_t> > alist, uint32_t time)
+  requires get_expired_indexes_fp(time, alist) == cons(?eh,_);
+  ensures true == exists(alist, (same_index)(eh));
+  {
+    list<pair<int, uint32_t> > exp = filter((is_cell_expired)(time), alist);
+    mem_head_filter((is_cell_expired)(time), alist);
+    assert(true == mem(head(exp), alist));
+    head_map(fst, exp);
+    assert(eh == fst(head(exp)));
+    mem_exists_same_index(alist, head(exp));
+  }
+  @*/
+
+/*@
   lemma void expire_old_dchain_nonfull(struct DoubleChain* chain, dchain ch,
                                        uint32_t time)
   requires double_chainp(ch, chain) &*&
@@ -693,7 +807,23 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     int size = dchain_index_range_fp(ch);
     assert uints(timestamps, size, ?tmstmps);
 
-    assume(false); //TODO
+    switch(ch) { case dchain(alist, sz):
+      list<int> exp_inds = dchain_get_expired_indexes_fp(ch, time);
+      assert exp_inds == get_expired_indexes_fp(time, alist);
+      assert exp_inds != nil;
+      switch(chi) { case dchaini(bare_alist, sz1):
+        assert sz1 == sz;
+        dchaini_alist_upperbound(cells, chi);
+        assert length(bare_alist) <= sz1;
+        insync_same_len(bare_alist, tmstmps, alist);
+      }
+      assert length(alist) <= size;
+      cons_head_tail(exp_inds);
+      head_expired_is_mem(alist, time);
+      remove_some_decreases_alist(alist, exp_inds);
+      assert length(fold_left(alist, remove_by_index_fp, exp_inds)) <
+             length(alist);
+    }
 
     close double_chainp(ch, chain);
   }

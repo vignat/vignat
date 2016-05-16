@@ -137,6 +137,11 @@ struct dchain_cell {
   requires dchainip(dc, cells);
   ensures dchainip(dc, cells) &*&
           false == dchaini_allocated_fp(dchaini_remove_fp(dc, index), index);
+
+  lemma void dchaini_alist_upperbound(struct dchain_cell *cells, dchaini dc);
+  requires dchainip(dc, cells);
+  ensures dchainip(dc, cells) &*&
+          length(dchaini_alist_fp(dc)) <= dchaini_irange_fp(dc);
   @*/
 
 

@@ -2498,3 +2498,22 @@ ensures dchainip(dc, cells) &*&
   close dchainip(dc, cells);
 }
 @*/
+
+/*@
+  lemma void dchaini_alist_upperbound(struct dchain_cell *cells, dchaini dc)
+  requires dchainip(dc, cells);
+  ensures dchainip(dc, cells) &*&
+          length(dchaini_alist_fp(dc)) <= dchaini_irange_fp(dc);
+  {
+    open dchainip(dc, cells);
+    assert dcellsp(cells, ?clen, ?cls);
+    assert alloc_listp(cls, ?al, ALLOC_LIST_HEAD, ALLOC_LIST_HEAD);
+
+    switch(dc) { case dchaini(alist, size):
+      assert length(al) <= size;
+      shift_inds_len(alist, INDEX_SHIFT);
+    }
+
+    close dchainip(dc, cells);
+  }
+  @*/
