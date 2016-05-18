@@ -34,6 +34,21 @@ struct DoubleMap {
 };
 
 /*@
+  predicate valsp<vt>(void* values, int val_size, predicate (void*,vt) vp,
+                      int length, list<option<vt> > vals) =
+     switch(vals) {
+       case nil: return length == 0;
+       case cons(h,t):
+         return switch(h) {
+           case none: return chars(values, val_size, _) &*&
+                             valsp(values + val_size,
+                                   val_size, vp, length-1, t);
+           case some(v): return vp(values, v) &*&
+                             valsp(values + val_size,
+                                   val_size, vp, length-1, t);
+         };
+     };
+
   predicate dmappingp<t1,t2,vt>(dmap<t1,t2,vt> m,
                                 predicate (void*;t1) keyp1,
                                 predicate (void*;t2) keyp2,
@@ -55,7 +70,7 @@ struct DoubleMap {
     mp->cpy |-> ?v_cpy &*&
     [_]is_uq_value_copy<vt>(v_cpy, full_vp, val_size) &*&
     mp->values |-> ?values &*&
-    values[0..(val_size*capacity)] |-> _ &*&
+    valsp(values, val_size, full_vp, capacity, ?val_arr) &*&
     malloc_block(values, val_size*capacity) &*&
     mp->bbs_a |-> ?bbs_a &*& malloc_block_ints(bbs_a, capacity) &*&
     mp->kps_a |-> ?kps_a &*& malloc_block_pointers(kps_a, capacity) &*&
@@ -85,9 +100,33 @@ struct DoubleMap {
                          right_offsets, vk1, vk2) &*&
     mp->capacity |-> capacity &*&
     mp->n_vals |-> dmap_size_fp(m) &*&
-    0 <= capacity &*& capacity < 4096;
+    0 <= capacity &*& capacity < 4096 &*&
+    m == dmap(ma, mb, val_arr);
   @*/
 
+/*@
+  lemma void empty_valsp<vt>(void* values, int val_size,
+                             predicate (void*,vt) vp, nat len)
+  requires chars(values, val_size*int_of_nat(len), _) &*&
+           0 <= val_size;
+  ensures valsp(values, val_size, vp, int_of_nat(len),
+                empty_vals_fp(len));
+  {
+    switch(len) {
+      case zero:
+        close valsp(values, val_size, vp, 0, nil);
+        return;
+      case succ(n):
+        assume(val_size < val_size*int_of_nat(len)); //TODO
+        assume(val_size*int_of_nat(len) - val_size == val_size*int_of_nat(n));
+        chars_split(values, val_size);
+        empty_valsp(values + val_size, val_size, vp, n);
+        close valsp(values, val_size, vp, int_of_nat(len),
+                    empty_vals_fp(len));
+        return;
+    }
+  }
+  @*/
 int dmap_allocate/*@ <K1,K2,V> @*/
                  (map_keys_equality* eq_a, map_key_hash* hsh_a,
                   map_keys_equality* eq_b, map_key_hash* hsh_b,
@@ -114,7 +153,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
             (*map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&
              result == 1 &*&
-             dmappingp<K1,K2,V>(empty_dmap_fp(), keyp1,
+             dmappingp<K1,K2,V>(empty_dmap_fp(capacity), keyp1,
                                 keyp2, hsh1, hsh2, fvp, bvp, rof, value_size,
                                 vk1, vk2, recp1, recp2,
                                 capacity, mapp)); @*/
@@ -252,13 +291,20 @@ int dmap_allocate/*@ <K1,K2,V> @*/
                  (*map_out)->capacity);
 
   (*map_out)->n_vals = 0;
-  /*@ close dmappingp<K1,K2,V>(empty_dmap_fp<K1,K2,V>(), keyp1, keyp2,
+  //@ empty_valsp(vals_alloc, value_size, fvp, nat_of_int(capacity));
+  /*@ close dmappingp<K1,K2,V>(empty_dmap_fp<K1,K2,V>(capacity), keyp1, keyp2,
                                hsh1, hsh2,
                                fvp, bvp, rof, value_size,
                                vk1, vk2, recp1, recp2, capacity, *map_out);
     @*/
   return 1;
 }
+
+/*@
+  predicate hide_map_key_hash<kt>(map_key_hash* hsh, predicate (void*;kt) keyp,
+                                  fixpoint (kt,int) hshfp) =
+    is_map_key_hash<kt>(hsh, keyp, hshfp);
+  @*/
 
 int dmap_get_a/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
@@ -279,9 +325,12 @@ int dmap_get_a/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
 {
   /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
-  //@ assume(false); // see verifast#23
   map_key_hash *hsh_a = map->hsh_a;
+  //@ map_key_hash *hsh_b = map->hsh_b;
+  //@ assert [?x]is_map_key_hash(hsh_b, kp2, hsh2);
+  //@ close [x]hide_map_key_hash(map->hsh_b, kp2, hsh2);
   int hash = hsh_a(key);
+  //@ open [x]hide_map_key_hash(map->hsh_b, kp2, hsh2);
   int rez = map_get(map->bbs_a, map->kps_a, map->khs_a, map->inds_a, key,
                     map->eq_a, hash, index,
                     map->capacity);
@@ -328,7 +377,7 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
              0 <= index &*& index < cap; @*/
 /*@ ensures (dmap_size_fp(m) < cap ?
              (result == 1 &*&
-              dmappingp<K1,K2,V>(dmap_put_fp(m, vk1(v), vk2(v), index, v),
+              dmappingp<K1,K2,V>(dmap_put_fp(m, index, v, vk1, vk2),
                                  kp1, kp2, hsh1, hsh2,
                                  fvp, bvp, rof, vsz,
                                  vk1, vk2, rp1, rp2, cap, map)) :
@@ -384,15 +433,15 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
              0 <= index &*& index < cap; @*/
 /*@ ensures (dmap_index_used_fp(m, index) ?
              (result == 1 &*&
-              dmappingp<K1,K2,V>(dmap_erase_fp(m, index),
+              dmappingp<K1,K2,V>(dmap_erase_fp(m, index, vk1, vk2),
                                  kp1, kp2, hsh1, hsh2,
                                  fvp, bvp, rof, vsz,
-                                 vk1, vk2, rp1, rp2, cap, map)) :
+                                 vk1, vk2, rp1, rp2, cap, map) &*&
+              fvp(_, dmap_get_val_fp(m, index))) :
              (result == 0 &*&
               dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
                                  fvp, bvp, rof, vsz,
-                                 vk1, vk2, rp1, rp2, cap, map))) &*&
-              fvp(_, dmap_get_val_fp(m, index)); @*/
+                                 vk1, vk2, rp1, rp2, cap, map))); @*/
 {
   void* key_a = 0;
   void* key_b = 0;
