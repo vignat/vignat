@@ -304,6 +304,17 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   predicate hide_map_key_hash<kt>(map_key_hash* hsh, predicate (void*;kt) keyp,
                                   fixpoint (kt,int) hshfp) =
     is_map_key_hash<kt>(hsh, keyp, hshfp);
+
+  predicate hide_mapping<kt>(list<pair<kt,int> > m,
+                             predicate (void*;kt) keyp,
+                             fixpoint (kt,int,bool) recp,
+                             fixpoint (kt,int) hash,
+                             int capacity,
+                             int* busybits,
+                             void** keyps,
+                             int* k_hashes,
+                             int* values) =
+    mapping<kt>(m, keyp, recp, hash, capacity, busybits, keyps, k_hashes, values);
   @*/
 
 int dmap_get_a/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
@@ -356,12 +367,26 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
               true == rp2(k2, ind)) :
              (result == 0 &*& *index |-> i)); @*/
 {
-  //@ assume(false); // see verifast#23
+  /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
+                     fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
   map_key_hash *hsh_b = map->hsh_b;
+  //@ map_key_hash *hsh_a = map->hsh_a;
+  //@ assert [?x]is_map_key_hash(hsh_a, kp1, hsh1);
+  //@ close [x]hide_map_key_hash(map->hsh_a, kp1, hsh1);
   int hash = hsh_b(key);
+  //@ open [x]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+  //@ int* bbs1 = map->bbs_a;
+  //@ void** kps1 = map->kps_a;
+  //@ int* khs1 = map->khs_a;
+  //@ int* vals1 = map->inds_a;
+  //@ assert mapping(?m1, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
+  //@ close hide_mapping(m1, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
   return map_get(map->bbs_b, map->kps_b, map->khs_b, map->inds_b, key,
                  map->eq_b, hash, index,
                  map->capacity);
+  //@ open hide_mapping(_, _, _, _, _, _, _, _, _);
+  /*@ close dmappingp(m, kp1, kp2, hsh1, hsh2,
+                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
 }
 
 int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
