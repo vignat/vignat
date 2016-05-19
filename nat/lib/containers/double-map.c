@@ -66,7 +66,7 @@ struct DoubleMap {
                                 struct DoubleMap* mp) =
     malloc_block_DoubleMap(mp) &*&
     mp->value_size |-> val_size &*&
-    0 <= val_size &*& val_size < capacity &*&
+    0 < val_size &*& val_size < 4096 &*&
     mp->cpy |-> ?v_cpy &*&
     [_]is_uq_value_copy<vt>(v_cpy, full_vp, val_size) &*&
     mp->values |-> ?values &*&
@@ -101,6 +101,7 @@ struct DoubleMap {
     mp->capacity |-> capacity &*&
     mp->n_vals |-> dmap_size_fp(m) &*&
     0 <= capacity &*& capacity < 4096 &*&
+    values + val_size*capacity <= (void*)UINTPTR_MAX &*&
     m == dmap(ma, mb, val_arr);
   @*/
 
@@ -108,7 +109,7 @@ struct DoubleMap {
   lemma void empty_valsp<vt>(void* values, int val_size,
                              predicate (void*,vt) vp, nat len)
   requires chars(values, val_size*int_of_nat(len), _) &*&
-           0 <= val_size;
+           0 < val_size;
   ensures valsp(values, val_size, vp, int_of_nat(len),
                 empty_vals_fp(len));
   {
@@ -147,8 +148,8 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              dmap_record_property1<K1>(?recp1) &*&
              dmap_record_property2<K2>(?recp2) &*&
              *map_out |-> ?old_map_out &*&
-             0 < value_size &*& value_size < capacity &*&
-             capacity < 4096; @*/
+             0 < value_size &*& value_size < 4096 &*&
+             0 < capacity &*& capacity < 4096; @*/
 /*@ ensures result == 0 ?
             (*map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&
@@ -291,6 +292,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
                  (*map_out)->capacity);
 
   (*map_out)->n_vals = 0;
+  //@ chars_limits((void*)vals_alloc);
   //@ empty_valsp(vals_alloc, value_size, fvp, nat_of_int(capacity));
   /*@ close dmappingp<K1,K2,V>(empty_dmap_fp<K1,K2,V>(capacity), keyp1, keyp2,
                                hsh1, hsh2,
@@ -389,6 +391,28 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
                       fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
 }
 
+/*@
+  lemma void extract_value<vt>(void* values, list<option<vt> > vals, int i)
+  requires valsp(values, ?vsz, ?vp, ?len, vals) &*&
+           0 <= i &*& i < len;
+  ensures valsp(values, vsz, vp, i, take(i, vals)) &*&
+          switch(nth(i, vals)) { case none : return chars(values+i*vsz, vsz, _);
+                                 case some(x): return vp(values+i*vsz, x); } &*&
+          valsp(values+(i+1)*vsz, vsz, vp, len-i-1, drop(i+1, vals));
+  {
+    open valsp(values, vsz, vp, len, vals);
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          extract_value(values + vsz, t, i-1);
+        }
+    }
+    close valsp(values, vsz, vp, i, take(i, vals));
+  }
+  @*/
+
 int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
@@ -414,24 +438,53 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
 {
   /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
+  //@ void* values = map->values;
+  //@ assert valsp(values, vsz, fvp, cap, ?vals);
   void* key_a = 0;
   void* key_b = 0;
-  //@ mul_bounds(index, 4096, vsz, 4096);
+  //@ mul_bounds(index, cap, vsz, 4096);
+  //@ mul_mono_strict(index, cap, vsz);
+  //@ extract_value(map->values, vals, index);
   void* my_value = map->values + index*map->value_size;
-  map->cpy(my_value, value);
-  map->exk(my_value, &key_a, &key_b);
-  int ret = map_put(map->bbs_a, map->kps_a, map->khs_a,
-                    map->inds_a, key_a,
-                    map->hsh_a(key_a),
-                    index, map->capacity) &&
-    map_put(map->bbs_b, map->kps_b, map->khs_b,
-            map->inds_b, key_b,
-            map->hsh_b(key_b),
-            index, map->capacity);
-  if (ret) ++map->n_vals;
+  uq_value_copy* cpy = map->cpy;
+  cpy(my_value, value);
+
+  dmap_extract_keys *exk = map->exk;
+  exk(my_value, &key_a, &key_b);
+
+  map_key_hash *hsh_a = map->hsh_a;
+  int hash1 = hsh_a(key_a);
+
+  int ret1 = map_put(map->bbs_a, map->kps_a, map->khs_a,
+                     map->inds_a, key_a,
+                     hash1,
+                     index, map->capacity);
+
+  if (ret1) {
+    //@ assert [?x]is_map_key_hash(hsh_a, kp1, hsh1);
+    //@ close [x]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+    map_key_hash *hsh_b = map->hsh_b;
+    int hash2 = hsh_b(key_b);
+    //@ open [x]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+    int ret2 = map_put(map->bbs_b, map->kps_b, map->khs_b,
+                       map->inds_b, key_b,
+                       hash2,
+                       index, map->capacity);
+    if (ret2) {
+      ++map->n_vals;
+      /*@ close dmappingp(dmap_put_fp(m, index, v, vk1, vk2),
+                          kp1, kp2, hsh1, hsh2,
+                          fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
+      return 1;
+    } else {
+      ret1 = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
+                       map->eq_a, hash1,
+                       map->capacity);
+    }
+  }
   /*@ close dmappingp(m, kp1, kp2, hsh1, hsh2,
                       fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
-  return ret;
+  return 0;
 }
 
 void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
