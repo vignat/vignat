@@ -14,12 +14,12 @@
 
 typedef int map_key_hash/*@ <K>(predicate (void*; K) keyp,
                                 fixpoint (K,int) hash) @*/(void* k1);
-//@ requires keyp(k1, ?kk1);
-//@ ensures keyp(k1, kk1) &*& result == hash(kk1);
+//@ requires [?fr]keyp(k1, ?kk1);
+//@ ensures [fr]keyp(k1, kk1) &*& result == hash(kk1);
 
 typedef void uq_value_copy/*@<K>(predicate (void*, K) vp, int size) @*/(char* dst, void* src);
-//@ requires vp(src, ?v) &*& dst[0..size] |-> _;
-//@ ensures vp(src, v) &*& vp(dst, v);
+//@ requires [?fr]vp(src, ?v) &*& dst[0..size] |-> _;
+//@ ensures [fr]vp(src, v) &*& vp(dst, v);
 
 typedef void dmap_extract_keys/*@ <K1,K2,V>
                                 (predicate (void*; K1) keyp1,
@@ -32,9 +32,9 @@ typedef void dmap_extract_keys/*@ <K1,K2,V>
                                  fixpoint (V,K2) vk2)
                               @*/
                               (void* vp, void** kpp1, void** kpp2);
-//@ requires full_valp(vp, ?v) &*& *kpp1 |-> _ &*& *kpp2 |-> _;
-/*@ ensures bare_valp(vp, v) &*& *kpp1 |-> ?kp1 &*& *kpp2 |-> ?kp2 &*&
-            keyp1(kp1, ?k1) &*& keyp2(kp2, ?k2) &*&
+//@ requires [?fr]full_valp(vp, ?v) &*& *kpp1 |-> _ &*& *kpp2 |-> _;
+/*@ ensures [fr]bare_valp(vp, v) &*& *kpp1 |-> ?kp1 &*& *kpp2 |-> ?kp2 &*&
+            [fr]keyp1(kp1, ?k1) &*& [fr]keyp2(kp2, ?k2) &*&
             true == right_offsets(vp, kp1, kp2) &*&
             k1 == vk1(v) &*&
             k2 == vk2(v); @*/
@@ -50,11 +50,11 @@ typedef void dmap_pack_keys/*@ <K1,K2,V>
                               fixpoint (V,K2) vk2)
                            @*/
                            (void* vp, void* kp1, void* kp2);
-/*@ requires bare_valp(vp, ?v) &*& keyp1(kp1, ?k1) &*& keyp2(kp2, ?k2) &*&
+/*@ requires [?fr]bare_valp(vp, ?v) &*& [fr]keyp1(kp1, ?k1) &*& [fr]keyp2(kp2, ?k2) &*&
              true == right_offsets(vp, kp1, kp2) &*&
              k1 == vk1(v) &*&
              k2 == vk2(v); @*/
-//@ ensures full_valp(vp, v);
+//@ ensures [fr]full_valp(vp, v);
 
 struct DoubleMap;
 /*@
@@ -359,16 +359,11 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index);
              false == dmap_has_k1_fp(m, vk1(v)) &*&
              false == dmap_has_k2_fp(m, vk2(v)) &*&
              0 <= index &*& index < cap; @*/
-/*@ ensures (dmap_size_fp(m) < cap ?
-             (result == 1 &*&
-              dmappingp<K1,K2,V>(dmap_put_fp(m, index, v, vk1, vk2),
-                                 kp1, kp2, hsh1, hsh2,
-                                 fvp, bvp, rof, vsz,
-                                 vk1, vk2, rp1, rp2, cap, map)) :
-             (result == 0 &*&
-              dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
-                                 fvp, bvp, rof, vsz,
-                                 vk1, vk2, rp1, rp2, cap, map))) &*&
+/*@ ensures result == 1 &*&
+            dmappingp<K1,K2,V>(dmap_put_fp(m, index, v, vk1, vk2),
+                               kp1, kp2, hsh1, hsh2,
+                               fvp, bvp, rof, vsz,
+                               vk1, vk2, rp1, rp2, cap, map) &*&
             fvp(value, v);@*/
 
 void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
