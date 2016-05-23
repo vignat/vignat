@@ -775,14 +775,28 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
                                 ?fvp, ?bvp, ?rof, ?vsz,
                                 ?vk1, ?vk2, ?rp1, ?rp2, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true &*&
-             fvp(value_out, _) &*&
+             chars(value_out, vsz, _) &*&
              0 <= index &*& index < cap; @*/
 /*@ ensures dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
                                fvp, bvp, rof, vsz,
                                vk1, vk2, rp1, rp2, cap, map) &*&
             fvp(value_out, dmap_get_val_fp(m, index)); @*/
 {
-  map->cpy(value_out, map->values + index*map->value_size);
+  /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
+                     fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
+  //@ void* values = map->values;
+  //@ assert valsp(values, vsz, fvp, bvp, cap, ?vals);
+  //@ vals_len_is_cap(vals, cap);
+  //@ mul_bounds(index, cap, vsz, 4096);
+  //@ mul_mono_strict(index, cap, vsz);
+  //@ extract_value(map->values, vals, index);
+  void* my_value = map->values + index*map->value_size;
+  uq_value_copy* cpy = map->cpy;
+  cpy(value_out, my_value);
+  //@ glue_values(map->values, vals, index);
+  /*@ close dmappingp(m,
+                      kp1, kp2, hsh1, hsh2,
+                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
 }
 
 int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
