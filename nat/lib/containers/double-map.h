@@ -56,6 +56,14 @@ typedef void dmap_pack_keys/*@ <K1,K2,V>
              k2 == vk2(v); @*/
 //@ ensures [fr]full_valp(vp, v);
 
+typedef void uq_value_destr/*@ <V>
+                             (predicate (void*; V) full_valp,
+                              int val_size)
+                             @*/
+                           (void* vp);
+/*@ requires full_valp(vp, _); @*/
+/*@ ensures chars(vp, val_size, _); @*/
+
 struct DoubleMap;
 /*@
   inductive dmap<t1,t2,vt> = dmap(list<pair<t1,int> >, list<pair<t2,int> >,
@@ -287,6 +295,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
                  (map_keys_equality* eq_a, map_key_hash* hsh_a,
                   map_keys_equality* eq_b, map_key_hash* hsh_b,
                   int value_size, uq_value_copy* v_cpy,
+                  uq_value_destr* v_destr,
                   dmap_extract_keys* dexk,
                   dmap_pack_keys* dpk,
                   int capacity,
@@ -297,6 +306,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              [_]is_map_keys_equality<K2>(eq_b, ?keyp2) &*&
              [_]is_map_key_hash<K2>(hsh_b, keyp2, ?hsh2) &*&
              [_]is_uq_value_copy<V>(v_cpy, ?fvp, value_size) &*&
+             [_]is_uq_value_destr<V>(v_destr, fvp, value_size) &*&
              [_]is_dmap_extract_keys(dexk, keyp1, keyp2, fvp,
                                      ?bvp, ?rof, ?vk1, ?vk2) &*&
              [_]is_dmap_pack_keys(dpk, keyp1, keyp2, fvp, bvp, rof, vk1, vk2) &*&
@@ -385,17 +395,11 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index);
                                 ?vk1, ?vk2, ?rp1, ?rp2, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true &*&
              0 <= index &*& index < cap; @*/
-/*@ ensures (dmap_index_used_fp(m, index) ?
-             (result == 1 &*&
-              dmappingp<K1,K2,V>(dmap_erase_fp(m, index, vk1, vk2),
-                                 kp1, kp2, hsh1, hsh2,
-                                 fvp, bvp, rof, vsz,
-                                 vk1, vk2, rp1, rp2, cap, map) &*&
-              fvp(_, dmap_get_val_fp(m, index))) :
-             (result == 0 &*&
-              dmappingp<K1,K2,V>(m, kp1, kp2, hsh1, hsh2,
-                                 fvp, bvp, rof, vsz,
-                                 vk1, vk2, rp1, rp2, cap, map))); @*/
+/*@ ensures (result == 1 &*&
+             dmappingp<K1,K2,V>(dmap_erase_fp(m, index, vk1, vk2),
+                                kp1, kp2, hsh1, hsh2,
+                                fvp, bvp, rof, vsz,
+                                vk1, vk2, rp1, rp2, cap, map); @*/
 
 int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
