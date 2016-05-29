@@ -57,7 +57,7 @@ typedef void dmap_pack_keys/*@ <K1,K2,V>
 //@ ensures [fr]full_valp(vp, v);
 
 typedef void uq_value_destr/*@ <V>
-                             (predicate (void*; V) full_valp,
+                             (predicate (void*, V) full_valp,
                               int val_size)
                              @*/
                            (void* vp);
@@ -395,11 +395,11 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index);
                                 ?vk1, ?vk2, ?rp1, ?rp2, ?cap, map) &*&
              dmap_index_used_fp(m, index) == true &*&
              0 <= index &*& index < cap; @*/
-/*@ ensures (result == 1 &*&
-             dmappingp<K1,K2,V>(dmap_erase_fp(m, index, vk1, vk2),
-                                kp1, kp2, hsh1, hsh2,
-                                fvp, bvp, rof, vsz,
-                                vk1, vk2, rp1, rp2, cap, map); @*/
+/*@ ensures result == 1 &*&
+            dmappingp<K1,K2,V>(dmap_erase_fp(m, index, vk1, vk2),
+                               kp1, kp2, hsh1, hsh2,
+                               fvp, bvp, rof, vsz,
+                               vk1, vk2, rp1, rp2, cap, map); @*/
 
 int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,

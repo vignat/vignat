@@ -35,21 +35,37 @@ struct DoubleMap {
 };
 
 /*@
-  predicate valsp<vt>(void* values, int val_size,
-                      predicate (void*,vt) fvp,
-                      predicate (void*,vt) bvp,
-                      int length, list<option<vt> > vals) =
+  predicate valsp<t1,t2,vt>(void* values, int val_size,
+                            predicate (void*,vt) fvp,
+                            predicate (void*,vt) bvp,
+                            list<pair<t1,void*> > addrs1,
+                            list<pair<t2,void*> > addrs2,
+                            fixpoint (vt,t1) vk1,
+                            fixpoint (vt,t2) vk2,
+                            fixpoint (void*,void*,void*,bool) rof,
+                            int length, list<option<vt> > vals) =
      switch(vals) {
        case nil: return length == 0;
        case cons(h,t):
          return switch(h) {
            case none: return chars(values, val_size, _) &*&
                              valsp(values + val_size,
-                                   val_size, fvp, bvp, length-1, t);
+                                   val_size, fvp, bvp,
+                                   addrs1, addrs2,
+                                   vk1, vk2, rof,
+                                   length-1, t);
            case some(v): return [0.5]fvp(values, v) &*&
                                 [0.5]bvp(values, v) &*&
-                             valsp(values + val_size,
-                                   val_size, fvp, bvp, length-1, t);
+                                true == map_has_fp(addrs1, vk1(v)) &*&
+                                true == map_has_fp(addrs2, vk2(v)) &*&
+                                true == rof(values,
+                                            map_get_fp(addrs1, vk1(v)),
+                                            map_get_fp(addrs2, vk2(v))) &*&
+                                valsp(values + val_size,
+                                      val_size, fvp, bvp,
+                                      addrs1, addrs2,
+                                      vk1, vk2, rof,
+                                      length-1, t);
          };
      };
 
@@ -77,6 +93,15 @@ struct DoubleMap {
     }
   }
 
+  fixpoint bool no_extra_ptrs<t>(list<pair<t,void*> > addrs,
+                                 list<pair<t,int> > m) {
+    switch(addrs) {
+      case nil: return true;
+      case cons(h,t):
+        return map_has_fp(m, fst(h)) && no_extra_ptrs(t, m);
+    }
+  }
+
   predicate dmappingp<t1,t2,vt>(dmap<t1,t2,vt> m,
                                 predicate (void*;t1) keyp1,
                                 predicate (void*;t2) keyp2,
@@ -100,13 +125,15 @@ struct DoubleMap {
     mp->dstr |-> ?v_destr &*&
     [_]is_uq_value_destr<vt>(v_destr, full_vp, val_size) &*&
     mp->values |-> ?values &*&
-    valsp(values, val_size, full_vp, bare_vp, capacity, ?val_arr) &*&
+    valsp(values, val_size, full_vp, bare_vp,
+          ?addrsa, ?addrsb, vk1, vk2, right_offsets,
+          capacity, ?val_arr) &*&
     malloc_block(values, val_size*capacity) &*&
     mp->bbs_a |-> ?bbs_a &*& malloc_block_ints(bbs_a, capacity) &*&
     mp->kps_a |-> ?kps_a &*& malloc_block_pointers(kps_a, capacity) &*&
     mp->khs_a |-> ?khs_a &*& malloc_block_ints(khs_a, capacity) &*&
     mp->inds_a |-> ?inds_a &*& malloc_block_ints(inds_a, capacity) &*&
-    mapping(?ma, ?addrsa, keyp1, recp1, hsh1, capacity,
+    mapping(?ma, addrsa, keyp1, recp1, hsh1, capacity,
             bbs_a, kps_a, khs_a, inds_a) &*&
     mp->eq_a |-> ?eq_a &*&
     [_]is_map_keys_equality<t1>(eq_a, keyp1) &*&
@@ -116,7 +143,7 @@ struct DoubleMap {
     mp->kps_b |-> ?kps_b &*& malloc_block_pointers(kps_b, capacity) &*&
     mp->khs_b |-> ?khs_b &*& malloc_block_ints(khs_b, capacity) &*&
     mp->inds_b |-> ?inds_b &*& malloc_block_ints(inds_b, capacity) &*&
-    mapping(?mb, ?addrsb, keyp2, recp2, hsh2, capacity,
+    mapping(?mb, addrsb, keyp2, recp2, hsh2, capacity,
             bbs_b, kps_b, khs_b, inds_b) &*&
     mp->eq_b |-> ?eq_b &*&
     [_]is_map_keys_equality<t2>(eq_b, keyp2) &*&
@@ -133,28 +160,46 @@ struct DoubleMap {
     0 <= capacity &*& capacity < 4096 &*&
     values + val_size*capacity <= (void*)UINTPTR_MAX &*&
     true == insync_fp(val_arr, ma, mb, vk1, vk2, 0) &*&
+    true == no_extra_ptrs(addrsa, ma) &*&
+    true == no_extra_ptrs(addrsb, mb) &*&
     m == dmap(ma, mb, val_arr);
   @*/
 
 /*@
-  lemma void empty_valsp<vt>(void* values, int val_size,
-                             predicate (void*,vt) fvp,
-                             predicate (void*,vt) bvp, nat len)
+  lemma void empty_valsp<t1,t2,vt>(void* values, int val_size,
+                                   predicate (void*,vt) fvp,
+                                   predicate (void*,vt) bvp,
+                                   fixpoint (vt,t1) vk1,
+                                   fixpoint (vt,t2) vk2,
+                                   fixpoint (void*,void*,void*,bool) rof,
+                                   nat len)
   requires chars(values, val_size*int_of_nat(len), _) &*&
            0 < val_size;
-  ensures valsp(values, val_size, fvp, bvp, int_of_nat(len),
+  ensures valsp(values, val_size, fvp, bvp,
+                empty_map_fp<t1,void*>(),
+                empty_map_fp<t2,void*>(),
+                vk1, vk2, rof,
+                int_of_nat(len),
                 empty_vals_fp(len));
   {
     switch(len) {
       case zero:
-        close valsp(values, val_size, fvp, bvp, 0, nil);
+        close valsp(values, val_size, fvp, bvp,
+                    empty_map_fp<t1,void*>(),
+                    empty_map_fp<t2,void*>(),
+                    vk1, vk2, rof, 0, nil);
         return;
       case succ(n):
         assume(val_size < val_size*int_of_nat(len)); //TODO
         assume(val_size*int_of_nat(len) - val_size == val_size*int_of_nat(n));
         chars_split(values, val_size);
-        empty_valsp(values + val_size, val_size, fvp, bvp, n);
-        close valsp(values, val_size, fvp, bvp, int_of_nat(len),
+        empty_valsp(values + val_size, val_size, fvp, bvp,
+                    vk1, vk2, rof, n);
+        close valsp(values, val_size, fvp, bvp,
+                    empty_map_fp<t1,void*>(),
+                    empty_map_fp<t2,void*>(),
+                    vk1, vk2, rof,
+                    int_of_nat(len),
                     empty_vals_fp(len));
         return;
     }
@@ -348,7 +393,10 @@ int dmap_allocate/*@ <K1,K2,V> @*/
 
   (*map_out)->n_vals = 0;
   //@ chars_limits((void*)vals_alloc);
-  //@ empty_valsp(vals_alloc, value_size, fvp, bvp, nat_of_int(capacity));
+  /*@ empty_valsp(vals_alloc, value_size, fvp, bvp,
+                  vk1, vk2, rof,
+                  nat_of_int(capacity));
+    @*/
   //@ empty_insync(nat_of_int(capacity), capacity, vk1, vk2);
   /*@ close dmappingp<K1,K2,V>(empty_dmap_fp<K1,K2,V>(capacity), keyp1, keyp2,
                                hsh1, hsh2,
@@ -450,16 +498,33 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
 }
 
 /*@
-  lemma void extract_value<vt>(void* values, list<option<vt> > vals, int i)
-  requires valsp(values, ?vsz, ?fvp, ?bvp, ?len, vals) &*&
+  lemma void extract_value<t1,t2,vt>(void* values, list<option<vt> > vals, int i)
+  requires valsp<t1,t2,vt>(values, ?vsz, ?fvp, ?bvp, ?addrs1, ?addrs2,
+                           ?vk1, ?vk2, ?rof, ?len, vals) &*&
            0 <= i &*& i < len;
-  ensures valsp(values, vsz, fvp, bvp, i, take(i, vals)) &*&
+  ensures valsp<t1,t2,vt>(values, vsz, fvp, bvp,
+                          addrs1, addrs2, vk1, vk2, rof,
+                          i, take(i, vals)) &*&
           switch(nth(i, vals)) { case none : return chars(values+i*vsz, vsz, _);
                                  case some(x): return [0.5]fvp(values+i*vsz, x) &*&
-                                                      [0.5]bvp(values+i*vsz, x); } &*&
-          valsp(values+(i+1)*vsz, vsz, fvp, bvp, len-i-1, drop(i+1, vals));
+                                                      [0.5]bvp(values+i*vsz, x) &*&
+                                                      true ==
+                                                      map_has_fp(addrs1, vk1(x)) &*&
+                                                      true ==
+                                                      map_has_fp(addrs2, vk2(x)) &*&
+                                                      true ==
+                                                      rof(values+i*vsz,
+                                                          map_get_fp(addrs1,
+                                                                     vk1(x)),
+                                                          map_get_fp(addrs2,
+                                                                     vk2(x))); } &*&
+          valsp<t1,t2,vt>(values+(i+1)*vsz, vsz, fvp, bvp,
+                          addrs1, addrs2, vk1, vk2, rof,
+                          len-i-1, drop(i+1, vals));
   {
-    open valsp(values, vsz, fvp, bvp, len, vals);
+    open valsp(values, vsz, fvp, bvp,
+               addrs1, addrs2, vk1, vk2,
+               rof, len, vals);
     switch(vals) {
       case nil: return;
       case cons(h,t):
@@ -468,49 +533,112 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
           extract_value(values + vsz, t, i-1);
         }
     }
-    close valsp(values, vsz, fvp, bvp, i, take(i, vals));
+    close valsp(values, vsz, fvp, bvp,
+                addrs1, addrs2, vk1, vk2, rof,
+                i, take(i, vals));
   }
   @*/
 
 /*@
-  lemma void glue_values<vt>(void* values, list<option<vt> > vals, int i)
-  requires valsp(values, ?vsz, ?fvp, ?bvp, i, take(i, vals)) &*&
+  //workaround for https://github.com/verifast/verifast/issues/37
+  predicate keep_rof(fixpoint (void*,void*,void*,bool) rof,
+                     void* v, void* k1, void* k2) =
+    true == rof(v, k1, k2);
+    @*/
+
+/*@
+  lemma void glue_values<t1,t2,vt>(void* values, list<option<vt> > vals, int i)
+  requires valsp<t1,t2,vt>(values, ?vsz, ?fvp, ?bvp,
+                           ?addrs1, ?addrs2, ?vk1, ?vk2, ?rof,
+                           i, take(i, vals)) &*&
            nth(i, vals) != none &*&
            [0.5]fvp(values+i*vsz, get_some(nth(i, vals))) &*&
            [0.5]bvp(values+i*vsz, get_some(nth(i, vals))) &*&
-           valsp(values+(i+1)*vsz, vsz, fvp, bvp,
-                 length(vals)-i-1, drop(i+1, vals)) &*&
+           true == map_has_fp(addrs1, vk1(get_some(nth(i, vals)))) &*&
+           true == map_has_fp(addrs2, vk2(get_some(nth(i, vals)))) &*&
+           true == rof(values+i*vsz,
+                       map_get_fp(addrs1, vk1(get_some(nth(i, vals)))),
+                       map_get_fp(addrs2, vk2(get_some(nth(i, vals))))) &*&
+           valsp<t1,t2,vt>(values+(i+1)*vsz, vsz, fvp, bvp,
+                           addrs1, addrs2, vk1, vk2, rof,
+                           length(vals)-i-1, drop(i+1, vals)) &*&
            0 <= i &*& i < length(vals);
-  ensures valsp(values, vsz, fvp, bvp, length(vals), vals);
+  ensures valsp<t1,t2,vt>(values, vsz, fvp, bvp,
+                          addrs1, addrs2, vk1, vk2, rof,
+                          length(vals), vals);
   {
+    assume (vals != nil);
+    void* xxx = values + i*vsz;
+    void* aaa = map_get_fp(addrs1, vk1(get_some(nth(i, vals))));
+    void* bbb = map_get_fp(addrs2, vk2(get_some(nth(i, vals))));
+  assert true == rof(xxx,
+                     aaa,
+                     bbb);
+    close keep_rof(rof, xxx, aaa, bbb);
     switch(vals) {
       case nil:
         return;
       case cons(h,t):
-        open valsp(values, vsz, fvp, bvp, i, take(i, vals));
+        open keep_rof(rof, xxx, aaa, bbb);
+        assert true == rof(xxx,
+                           aaa,
+                           bbb);
+        assert true == rof(values+i*vsz,
+                           map_get_fp(addrs1, vk1(get_some(nth(i, vals)))),
+                           map_get_fp(addrs2, vk2(get_some(nth(i, vals)))));
+        close keep_rof(rof, values+i*vsz,
+                       map_get_fp(addrs1, vk1(get_some(nth(i, vals)))),
+                       map_get_fp(addrs2, vk2(get_some(nth(i, vals)))));
+        open valsp(values, vsz, fvp, bvp,
+                   addrs1, addrs2, vk1, vk2, rof,
+                   i, take(i, vals));
+        open keep_rof(rof, values+i*vsz,
+                       map_get_fp(addrs1, vk1(get_some(nth(i, vals)))),
+                       map_get_fp(addrs2, vk2(get_some(nth(i, vals)))));
+        assert true == rof(values+i*vsz,
+                           map_get_fp(addrs1, vk1(get_some(nth(i, vals)))),
+                           map_get_fp(addrs2, vk2(get_some(nth(i, vals)))));
         if (i == 0) {
         } else {
+          assert(values + vsz + (i-1)*vsz == values + i*vsz);
+          assert(get_some(nth(i-1,t)) == get_some(nth(i,vals)));
+          assert true == rof(values+i*vsz,
+                             map_get_fp(addrs1, vk1(get_some(nth(i, vals)))),
+                             map_get_fp(addrs2, vk2(get_some(nth(i, vals)))));
+          assert true == rof(values + vsz + (i-1)*vsz,
+                             map_get_fp(addrs1, vk1(get_some(nth(i-1, t)))),
+                             map_get_fp(addrs2, vk2(get_some(nth(i-1, t)))));
           glue_values(values + vsz, t, i-1);
         }
-        close valsp(values, vsz, fvp, bvp, length(vals), vals);
+        close valsp(values, vsz, fvp, bvp,
+                    addrs1, addrs2, vk1, vk2, rof,
+                    length(vals), vals);
     }
   }
   @*/
 
 /*@
-  lemma void vals_len_is_cap<vt>(list<option<vt> > vals, int capacity)
-  requires valsp(?values, ?vsz, ?fvp, ?bvp, capacity, vals);
-  ensures valsp(values, vsz, fvp, bvp, capacity, vals) &*&
+  lemma void vals_len_is_cap<t1,t2,vt>(list<option<vt> > vals, int capacity)
+  requires valsp<t1,t2,vt>(?values, ?vsz, ?fvp, ?bvp,
+                           ?addrs1, ?addrs2, ?vk1, ?vk2, ?rof,
+                           capacity, vals);
+  ensures valsp<t1,t2,vt>(values, vsz, fvp, bvp,
+                          addrs1, addrs2, vk1, vk2, rof,
+                          capacity, vals) &*&
           length(vals) == capacity;
   {
-    open valsp(values, vsz, fvp, bvp, capacity, vals);
+    open valsp(values, vsz, fvp, bvp,
+               addrs1, addrs2, vk1, vk2, rof,
+               capacity, vals);
     switch(vals) {
       case nil:
         break;
       case cons(h,t):
         vals_len_is_cap(t, capacity-1);
     }
-    close valsp(values, vsz, fvp, bvp, capacity, vals);
+    close valsp(values, vsz, fvp, bvp,
+                addrs1, addrs2, vk1, vk2, rof,
+                capacity, vals);
   }
   @*/
 
@@ -686,6 +814,101 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   @*/
 
 /*@
+  lemma void map_get_put_unrelevant<kt,vt>(list<pair<kt,vt> > m, kt k1, kt k2, vt v)
+  requires k1 != k2;
+  ensures map_get_fp(map_put_fp(m, k2, v), k1) == map_get_fp(m, k1);
+  {
+  assume (false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void valsp_addrs_put<t1,t2,vt>(void* values, list<option<vt> > vals,
+                                       vt v,
+                                       list<pair<t1,void*> > addrs1,
+                                       list<pair<t2,void*> > addrs2,
+                                       fixpoint (vt,t1) vk1,
+                                       fixpoint (vt,t2) vk2,
+                                       void* key_a,
+                                       void* key_b)
+   requires valsp(values, ?vsz, ?fvp, ?bvp, addrs1, addrs2,
+                  vk1, vk2, ?rof, ?len, vals) &*&
+            false == map_has_fp(addrs1, vk1(v)) &*&
+            false == map_has_fp(addrs2, vk2(v));
+   ensures valsp(values, vsz, fvp, bvp,
+                 map_put_fp(addrs1, vk1(v), key_a),
+                 map_put_fp(addrs2, vk2(v), key_b),
+                 vk1, vk2, rof, len, vals);
+   {
+     open valsp(values, vsz, fvp, bvp, addrs1, addrs2, vk1, vk2, rof, len, vals);
+     switch(vals) {
+       case nil: break;
+       case cons(h,t):
+         assert h != some(v);
+         switch(h) {
+           case none: break;
+           case some(x):
+             assert x != v;
+             assert true == map_has_fp(addrs1, vk1(x));
+             assert false == map_has_fp(addrs1, vk1(v));
+             assert vk1(x) != vk1(v);
+             map_get_put_unrelevant(addrs1, vk1(x), vk1(v), key_a);
+             assert map_get_fp(addrs1, vk1(x)) ==
+                    map_get_fp(map_put_fp(addrs1, vk1(v), key_a), vk1(x));
+         }
+         valsp_addrs_put(values+vsz, t, v, addrs1, addrs2,
+                         vk1, vk2, key_a, key_b);
+     }
+     close valsp(values, vsz, fvp, bvp,
+                 map_put_fp(addrs1, vk1(v), key_a),
+                 map_put_fp(addrs2, vk2(v), key_b),
+                 vk1, vk2, rof, len, vals);
+   }
+   @*/
+
+/*@
+  lemma void no_extra_ptrs_has_not<t>(list<pair<t, int> > m,
+                                      list<pair<t, void*> > addrs,
+                                      t k)
+  requires true == no_extra_ptrs(addrs, m) &*&
+           false == map_has_fp(m, k);
+  ensures false == map_has_fp(addrs, k);
+  {
+    switch(addrs) {
+      case nil: return;
+      case cons(h,t):
+        no_extra_ptrs_has_not(m, t, k);
+    }
+  }
+  @*/
+
+/*@
+
+  lemma void map_put_preserves_no_extra_ptrs<t>(list<pair<t, int> > m,
+                                                list<pair<t, void*> > addrs,
+                                                t k, int v)
+  requires true == no_extra_ptrs(addrs, m);
+  ensures true == no_extra_ptrs(addrs, map_put_fp(m, k, v));
+  {
+    switch(addrs) {
+      case nil: return;
+      case cons(h,t):
+        map_put_preserves_no_extra_ptrs(m, t, k, v);
+    }
+  }
+
+  lemma void put_preserves_no_extra_ptrs<t>(list<pair<t, int> > m,
+                                            list<pair<t, void*> > addrs,
+                                            t k, int v, void* addr)
+  requires true == no_extra_ptrs(addrs, m);
+  ensures true == no_extra_ptrs(map_put_fp(addrs, k, addr), map_put_fp(m, k, v));
+  {
+    map_put_preserves_no_extra_ptrs(m, addrs, k, v);
+    assert true == no_extra_ptrs(addrs, map_put_fp(m, k, v));
+  }
+  @*/
+
+/*@
   predicate hide_half_bvp<vt>(predicate (void*,vt) bvp, void* addr, vt v) =
     [0.5]bvp(addr,v);
   @*/
@@ -711,13 +934,16 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
   /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
   //@ void* values = map->values;
-  //@ assert valsp(values, vsz, fvp, bvp, cap, ?vals);
-  //@ vals_len_is_cap(vals, cap);
+  /*@ assert valsp(values, vsz, fvp, bvp,
+                   ?addrs1, ?addrs2, vk1, vk2, rof,
+                   cap, ?vals);
+                   @*/
+  //@ vals_len_is_cap<K1,K2,V>(vals, cap);
   void* key_a = 0;
   void* key_b = 0;
   //@ mul_bounds(index, cap, vsz, 4096);
   //@ mul_mono_strict(index, cap, vsz);
-  //@ extract_value(map->values, vals, index);
+  //@ extract_value<K1,K2,V>(map->values, vals, index);
   void* my_value = map->values + index*map->value_size;
   uq_value_copy* cpy = map->cpy;
   cpy(my_value, value);
@@ -728,8 +954,8 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
   map_key_hash *hsh_a = map->hsh_a;
   int hash1 = hsh_a(key_a);
 
-  //@ assert mapping(?m1, ?addrs1, kp1, rp1, hsh1, cap, ?bbs1, ?kps1, ?khs1, ?vals1);
-  //@ assert mapping(?m2, ?addrs2, kp2, rp2, hsh2, cap, ?bbs2, ?kps2, ?khs2, ?vals2);
+  //@ assert mapping(?m1, addrs1, kp1, rp1, hsh1, cap, ?bbs1, ?kps1, ?khs1, ?vals1);
+  //@ assert mapping(?m2, addrs2, kp2, rp2, hsh2, cap, ?bbs2, ?kps2, ?khs2, ?vals2);
   //@ insync_has_not_nonfull(vals, m1, m2, vk1, vk2, cap, index);
   //@ assert map_size_fp(m1) < cap;
 
@@ -752,9 +978,9 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
                          kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
     @*/
   int ret2 = map_put(map->bbs_b, map->kps_b, map->khs_b,
-                      map->inds_b, key_b,
-                      hash2,
-                      index, map->capacity);
+                     map->inds_b, key_b,
+                     hash2,
+                     index, map->capacity);
   //@ open hide_mapping(_, _, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
   //@ assert ret2 == 1;
   ++map->n_vals;
@@ -765,9 +991,19 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
   //@ take_update_unrelevant(index, index, some(v), vals);
   //@ drop_update_unrelevant(index+1, index, some(v), vals);
   //@ nth_update(index, index, some(v), vals);
+  //@ assert true == rof(values + index*vsz, key_a, key_b);
+  //@ assert map_get_fp(map_put_fp(addrs1, (vk1(v)), key_a), vk1(v)) == key_a;
+  //@ assert map_get_fp(map_put_fp(addrs2, (vk2(v)), key_b), vk2(v)) == key_b;
+  //@ no_extra_ptrs_has_not(m1, addrs1, vk1(v));
+  //@ no_extra_ptrs_has_not(m2, addrs2, vk2(v));
+  //@ valsp_addrs_put(map->values, take(index, vals), v, addrs1, addrs2, vk1, vk2, key_a, key_b);
+  //@ valsp_addrs_put(map->values + (index+1)*vsz, drop(index+1, vals), v, addrs1, addrs2, vk1, vk2, key_a, key_b);
   //@ glue_values(map->values, update(index, some(v), vals), index);
 
   //@ update_insync(vals, m1, m2, index, v, vk1, vk2, cap);
+
+  //@ put_preserves_no_extra_ptrs(m1, addrs1, vk1(v), index, key_a);
+  //@ put_preserves_no_extra_ptrs(m2, addrs2, vk2(v), index, key_b);
 
   /*@ close dmappingp(dmap_put_fp(m, index, v, vk1, vk2),
                       kp1, kp2, hsh1, hsh2,
@@ -791,7 +1027,10 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
   /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
   //@ void* values = map->values;
-  //@ assert valsp(values, vsz, fvp, bvp, cap, ?vals);
+  /*@ assert valsp(values, vsz, fvp, bvp,
+                   ?addrs1, ?addrs2, vk1, vk2, rof,
+                   cap, ?vals);
+    @*/
   //@ vals_len_is_cap(vals, cap);
   //@ mul_bounds(index, cap, vsz, 4096);
   //@ mul_mono_strict(index, cap, vsz);
@@ -817,17 +1056,59 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
                                fvp, bvp, rof, vsz,
                                vk1, vk2, rp1, rp2, cap, map); @*/
 {
+  /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
+                     fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
+  //@ void* values = map->values;
+  /*@ assert valsp(values, vsz, fvp, bvp,
+                   ?addrs1, ?addrs2, vk1, vk2, rof,
+                   cap, ?vals);
+    @*/
+  //@ vals_len_is_cap(vals, cap);
   void* key_a = 0;
+  void* out_key_a = 0;
   void* key_b = 0;
-  map->exk(map->values + index*map->value_size, &key_a, &key_b);
-  int ret = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
-                      map->eq_a, map->hsh_a(key_a),
-                      map->capacity, 0) &&
-    map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
-              map->eq_b, map->hsh_b(key_b),
-              map->capacity, 0);
-  if (ret) --map->n_vals;
-  return ret;
+  void* out_key_b = 0;
+  //@ mul_bounds(index, cap, vsz, 4096);
+  //@ mul_mono_strict(index, cap, vsz);
+  //@ extract_value(map->values, vals, index);
+  void* my_value = map->values + index*map->value_size;
+  dmap_extract_keys *exk = map->exk;
+  exk(my_value, &key_a, &key_b);
+  //@ assert [0.5]bvp(my_value, ?v);
+
+
+  //@ assert mapping(?m1, addrs1, kp1, rp1, hsh1, cap, ?bbs1, ?kps1, ?khs1, ?vals1);
+  //@ assert mapping(?m2, addrs2, kp2, rp2, hsh2, cap, ?bbs2, ?kps2, ?khs2, ?vals2);
+  map_key_hash *hsh_a = map->hsh_a;
+  int hash1 = hsh_a(key_a);
+
+  int ret1 = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
+                       map->eq_a, hash1,
+                       map->capacity, &out_key_a);
+  //@ assert ret1 == 1;
+  //@ assert [?x1]is_map_key_hash(hsh_a, kp1, hsh1);
+  //@ close [x1]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+  //@ assert [?x2]is_map_key_hash(hsh_a, kp1, hsh1);
+  //@ close [x2]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+  map_key_hash *hsh_b = map->hsh_b;
+  int hash2 = hsh_b(key_b);
+  //@ open [x2]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+  //@ open [x1]hide_map_key_hash(map->hsh_a, kp1, hsh1);
+  /*@ close hide_mapping(map_erase_fp(m1, vk1(v)),
+                         map_erase_fp(addrs1, vk1(v)),
+                         kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
+    @*/
+  int ret2 = map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
+                       map->eq_b, hash2,
+                       map->capacity, &out_key_b);
+  //@ open hide_mapping(_, _, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
+  //@ assert ret2 == 1;
+  //@ assert true == rof(my_value, out_key_a, out_key_b);
+  --map->n_vals;
+  /*@ close dmappingp(dmap_erase_fp(m, index, vk1, vk2),
+                      kp1, kp2, hsh1, hsh2,
+                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
+  return 1;
 }
 
 int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
