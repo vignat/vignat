@@ -1,3 +1,13 @@
+/*
+  The assertion will fail during verification, while
+  it must not according to the contract.
+  this is due to overapproximation of the model in use.
+  it does not remember the latest 'pop' call, and permits
+  'full' to return true after it.
+  The user will see the false positive. Currently there is
+  not detection built in the framework for such cases, although,
+  it should be possible to automate.
+*/
 #include "net.h"
 #include "cell.h"
 #include "invariants.h"
@@ -16,6 +26,7 @@ int main() {
     if (full(cp)) {
       int sum = pop(cp) + *p;
       send(&sum);
+      assert(!full(cp));
     } else {
       push(cp, *p);
       //failure at this point will not be detected,
