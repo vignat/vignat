@@ -102,12 +102,38 @@ struct DoubleMap {
     }
   }
 
+  fixpoint bool no_such_keys<t1,t2,vt>(vt v, list<option<vt> > vals,
+                                       fixpoint (vt,t1) vk1,
+                                       fixpoint (vt,t2) vk2) {
+    switch(vals) {
+      case nil: return true;
+      case cons(h,t): return no_such_keys(v, t, vk1, vk2) &&
+        switch(h) {
+          case none: return true;
+          case some(x): return vk1(v) != vk1(x) && vk2(v) != vk2(x);
+      };
+    }
+  }
+
+  fixpoint bool all_keys_differ<t1,t2,vt>(list<option<vt> > vals,
+                                          fixpoint (vt,t1) vk1,
+                                          fixpoint (vt,t2) vk2) {
+    switch(vals) {
+      case nil: return true;
+      case cons(h,t): return all_keys_differ(t, vk1, vk2) &&
+        switch(h) {
+          case none: return true;
+          case some(v): return no_such_keys(v, t, vk1, vk2);
+      };
+    }
+  }
+
   predicate dmappingp<t1,t2,vt>(dmap<t1,t2,vt> m,
                                 predicate (void*;t1) keyp1,
                                 predicate (void*;t2) keyp2,
                                 fixpoint (t1,int) hsh1,
                                 fixpoint (t2,int) hsh2,
-                                predicate (void*,vt) full_vp,
+                                predicate (void*;vt) full_vp,
                                 predicate (void*,vt) bare_vp,
                                 fixpoint (void*,void*,void*,bool) right_offsets,
                                 int val_size,
@@ -156,12 +182,13 @@ struct DoubleMap {
     [_]is_dmap_pack_keys(pk, keyp1, keyp2, full_vp, bare_vp,
                          right_offsets, vk1, vk2) &*&
     mp->capacity |-> capacity &*&
-    mp->n_vals |-> dmap_size_fp(m) &*&
+    mp->n_vals |-> map_size_fp(ma) &*&
     0 <= capacity &*& capacity < 4096 &*&
     values + val_size*capacity <= (void*)UINTPTR_MAX &*&
     true == insync_fp(val_arr, ma, mb, vk1, vk2, 0) &*&
     true == no_extra_ptrs(addrsa, ma) &*&
     true == no_extra_ptrs(addrsb, mb) &*&
+    true == all_keys_differ(val_arr, vk1, vk2) &*&
     m == dmap(ma, mb, val_arr);
   @*/
 
@@ -220,6 +247,22 @@ struct DoubleMap {
         return;
       case succ(n):
         empty_insync(n, capacity, vk1, vk2);
+        return;
+    }
+  }
+  @*/
+
+/*@
+  lemma void empty_all_keys_differ<t1,t2,vt>(nat len,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2)
+  requires true;
+  ensures true == all_keys_differ(empty_vals_fp(len), vk1, vk2);
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n):
+        empty_all_keys_differ(n, vk1, vk2);
         return;
     }
   }
@@ -398,6 +441,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
                   nat_of_int(capacity));
     @*/
   //@ empty_insync(nat_of_int(capacity), capacity, vk1, vk2);
+  //@ empty_all_keys_differ(nat_of_int(capacity), vk1, vk2);
   /*@ close dmappingp<K1,K2,V>(empty_dmap_fp<K1,K2,V>(capacity), keyp1, keyp2,
                                hsh1, hsh2,
                                fvp, bvp, rof, value_size,
@@ -567,7 +611,7 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
                           addrs1, addrs2, vk1, vk2, rof,
                           length(vals), vals);
   {
-    assume (vals != nil);
+    assume (vals != nil); //WTF?? TODO
     void* xxx = values + i*vsz;
     void* aaa = map_get_fp(addrs1, vk1(get_some(nth(i, vals))));
     void* bbb = map_get_fp(addrs2, vk2(get_some(nth(i, vals))));
@@ -617,6 +661,39 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   }
   @*/
 
+/*@
+  lemma void update_values_hole<t1,t2,vt>(void* values, list<option<vt> > vals, int i)
+  requires valsp<t1,t2,vt>(values, ?vsz, ?fvp, ?bvp,
+                           ?addrs1, ?addrs2, ?vk1, ?vk2, ?rof,
+                           i, take(i, vals)) &*&
+           nth(i, vals) == none &*&
+           chars(values+i*vsz, vsz, _) &*&
+           valsp<t1,t2,vt>(values+(i+1)*vsz, vsz, fvp, bvp,
+                           addrs1, addrs2, vk1, vk2, rof,
+                           length(vals)-i-1, drop(i+1, vals)) &*&
+           0 <= i &*& i < length(vals);
+  ensures valsp<t1,t2,vt>(values, vsz, fvp, bvp,
+                          addrs1, addrs2, vk1, vk2, rof,
+                          length(vals), vals);
+  {
+    assume (vals != nil); //TODO
+    switch(vals) {
+      case nil:
+        return;
+      case cons(h,t):
+        open valsp(values, vsz, fvp, bvp,
+                   addrs1, addrs2, vk1, vk2, rof,
+                   i, take(i, vals));
+        if (i == 0) {
+        } else {
+          update_values_hole(values + vsz, t, i-1);
+        }
+        close valsp(values, vsz, fvp, bvp,
+                    addrs1, addrs2, vk1, vk2, rof,
+                    length(vals), vals);
+    }
+  }
+  @*/
 /*@
   lemma void vals_len_is_cap<t1,t2,vt>(list<option<vt> > vals, int capacity)
   requires valsp<t1,t2,vt>(?values, ?vsz, ?fvp, ?bvp,
@@ -814,13 +891,74 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   @*/
 
 /*@
+  lemma void put_unrelevant_preserves_no_such_keys<t1,t2,vt>
+             (vt v, int i, vt x,
+              list<option<vt> > vals,
+              fixpoint (vt,t1) vk1,
+              fixpoint (vt,t2) vk2)
+  requires true == no_such_keys(x, vals, vk1, vk2) &*&
+           0 <= i &*& i < length(vals) &*&
+           vk1(v) != vk1(x) &*& vk2(v) != vk2(x);
+  ensures true == no_such_keys(x, update(i, some(v), vals), vk1, vk2);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          put_unrelevant_preserves_no_such_keys(v, i-1, x, t, vk1, vk2);
+          update_tail_tail_update(h, t, i, some(v));
+          switch(h) {
+            case none: break;
+            case some(hv): break;
+          }
+        }
+    }
+  }
+
+  lemma void put_preserves_all_keys_differ<t1,t2,vt>(vt v, int i,
+                                                     list<option<vt> > vals,
+                                                     fixpoint (vt,t1) vk1,
+                                                     fixpoint (vt,t2) vk2)
+  requires true == all_keys_differ(vals, vk1, vk2) &*&
+           0 <= i &*& i < length(vals) &*&
+           true == no_such_keys(v, vals, vk1, vk2);
+  ensures true == all_keys_differ(update(i, some(v), vals), vk1, vk2);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (i == 0) {
+          switch(h) {
+            case none: break;
+            case some(x): break;
+          }
+          assert true == all_keys_differ(t, vk1, vk2);
+          assert true == no_such_keys(v, t, vk1, vk2);
+        } else {
+          switch(h) {
+            case none: break;
+            case some(x):
+              assert vk1(v) != vk1(x);
+              assert vk2(v) != vk2(x);
+              put_unrelevant_preserves_no_such_keys(v, i-1, x, t, vk1, vk2);
+              break;
+          }
+          put_preserves_all_keys_differ(v, i-1, t, vk1, vk2);
+        }
+    }
+  }
+  @*/
+
+/*@
   lemma void map_get_put_unrelevant<kt,vt>(list<pair<kt,vt> > m, kt k1, kt k2, vt v)
   requires k1 != k2;
   ensures map_get_fp(map_put_fp(m, k2, v), k1) == map_get_fp(m, k1);
   {
-  assume (false);//TODO
+    assume (false);//TODO
   }
   @*/
+
 
 /*@
   lemma void valsp_addrs_put<t1,t2,vt>(void* values, list<option<vt> > vals,
@@ -905,6 +1043,38 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   {
     map_put_preserves_no_extra_ptrs(m, addrs, k, v);
     assert true == no_extra_ptrs(addrs, map_put_fp(m, k, v));
+  }
+  @*/
+
+/*@
+  lemma void insync_no_keys<t1,t2,vt>(list<option<vt> > vals,
+                                      vt v,
+                                      list<pair<t1, int> > m1,
+                                      list<pair<t2, int> > m2,
+                                      fixpoint (vt,t1) vk1,
+                                      fixpoint (vt,t2) vk2,
+                                      int capacity)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2,
+                             capacity - length(vals)) &*&
+           false == map_has_fp(m1, vk1(v)) &*&
+           false == map_has_fp(m2, vk2(v));
+  ensures true == no_such_keys(v, vals, vk1, vk2);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            insync_no_keys(t, v, m1, m2, vk1, vk2, capacity);
+            break;
+          case some(x):
+            map_erase_preserves_not_has(m1, vk1(x), vk1(v));
+            map_erase_preserves_not_has(m2, vk2(x), vk2(v));
+            insync_no_keys(t, v, map_erase_fp(m1, vk1(x)),
+                           map_erase_fp(m2, vk2(x)),
+                           vk1, vk2, capacity);
+        }
+    }
   }
   @*/
 
@@ -1001,6 +1171,8 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
   //@ glue_values(map->values, update(index, some(v), vals), index);
 
   //@ update_insync(vals, m1, m2, index, v, vk1, vk2, cap);
+  //@ insync_no_keys(vals, v, m1, m2, vk1, vk2, cap);
+  //@ put_preserves_all_keys_differ(v, index, vals, vk1, vk2);
 
   //@ put_preserves_no_extra_ptrs(m1, addrs1, vk1(v), index, key_a);
   //@ put_preserves_no_extra_ptrs(m2, addrs2, vk2(v), index, key_b);
@@ -1044,6 +1216,210 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
                       fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
 }
 
+/*@
+  lemma void map_erase_has_unrelevant<kt,vt>(list<pair<kt,vt> > m,
+                                             kt k1, kt k2)
+  requires k1 != k2;
+  ensures map_has_fp(m, k2) == map_has_fp(map_erase_fp(m, k1), k2);
+  {
+    switch(m) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != k1) map_erase_has_unrelevant(t, k1, k2);
+    }
+  }
+
+  lemma void map_erase_get_unrelevant<kt,vt>(list<pair<kt,vt> > m,
+                                             kt k1, kt k2)
+  requires k1 != k2;
+  ensures map_get_fp(m, k2) == map_get_fp(map_erase_fp(m, k1), k2);
+  {
+    switch(m) {
+      case nil: return;
+      case cons(h,t):
+      if (fst(h) != k1) map_erase_get_unrelevant(t, k1, k2);
+    }
+  }
+
+  lemma void erase_addrs<t1,t2,vt>(void* values, list<option<vt> > vals,
+                                   vt v,
+                                   fixpoint (vt,t1) vk1,
+                                   fixpoint (vt,t2) vk2)
+  requires valsp<t1,t2,vt>(values, ?vsz, ?fvp, ?bvp,
+                           ?addrs1, ?addrs2, vk1, vk2, ?rof,
+                           length(vals), vals) &*&
+           true == no_such_keys(v, vals, vk1, vk2);
+  ensures valsp<t1,t2,vt>(values, vsz, fvp, bvp,
+                          map_erase_fp(addrs1, vk1(v)),
+                          map_erase_fp(addrs2, vk2(v)),
+                          vk1, vk2, rof,
+                          length(vals), vals);
+  {
+    open valsp(values, vsz, fvp, bvp, addrs1, addrs2, vk1, vk2, rof,
+               length(vals), vals);
+    switch(vals) {
+      case nil:
+        break;
+      case cons(h,t):
+        erase_addrs(values + vsz, t, v, vk1, vk2);
+        switch(h) {
+          case none: break;
+          case some(x):
+            map_erase_has_unrelevant(addrs1, vk1(v), vk1(x));
+            map_erase_has_unrelevant(addrs2, vk2(v), vk2(x));
+            map_erase_get_unrelevant(addrs1, vk1(v), vk1(x));
+            map_erase_get_unrelevant(addrs2, vk2(v), vk2(x));
+        }
+    }
+    close valsp(values, vsz, fvp, bvp,
+                map_erase_fp(addrs1, vk1(v)),
+                map_erase_fp(addrs2, vk2(v)),
+                vk1, vk2, rof,
+                length(vals), vals);
+  }
+  @*/
+
+/*@
+  lemma void no_such_keys_back<t1,t2,vt>(list<option<vt> > vals,
+                                         vt v1, vt v2,
+                                         fixpoint (vt,t1) vk1,
+                                         fixpoint (vt,t2) vk2)
+  requires true == no_such_keys(v1, vals, vk1, vk2) &*&
+           true == mem(some(v2), vals);
+  ensures vk1(v1) != vk1(v2) &*& vk2(v1) != vk2(v2);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none: no_such_keys_back(t, v1, v2, vk1, vk2);
+          case some(x):
+            if (x == v2) return;
+            else no_such_keys_back(t, v1, v2, vk1, vk2);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void all_keys_differ_no_such_keys<t1,t2,vt>(list<option<vt> > vals,
+                                                    int index,
+                                                    fixpoint (vt,t1) vk1,
+                                                    fixpoint (vt,t2) vk2)
+  requires true == all_keys_differ(vals, vk1, vk2) &*&
+           0 <= index &*& index < length(vals) &*&
+           nth(index, vals) == some(?v);
+  ensures true == no_such_keys(v, update(index, none, vals), vk1, vk2);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none: all_keys_differ_no_such_keys(t, index-1, vk1, vk2);
+          case some(x):
+            if (index == 0) {
+            } else {
+              all_keys_differ_no_such_keys(t, index-1, vk1, vk2);
+              update_tail_tail_update(h, t, index, none);
+              assert true == mem(some(v), t);
+              no_such_keys_back(t, x, v, vk1, vk2);
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_has_erase_size_dec<kt,vt>(list<pair<kt,vt> > m,
+                                            kt k)
+  requires true == map_has_fp(m, k);
+  ensures map_size_fp(m) == map_size_fp(map_erase_fp(m, k)) + 1;
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+
+  lemma void erase_one_insync<t1,t2,vt>(list<option<vt> > vals,
+                                        list<pair<t1,int> > m1,
+                                        list<pair<t2,int> > m2,
+                                        int index,
+                                        vt v,
+                                        fixpoint (vt,t1) vk1,
+                                        fixpoint (vt,t2) vk2,
+                                        int capacity)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2,
+                             capacity - length(vals)) &*&
+           0 <= index &*& index < length(vals) &*&
+           nth(index, vals) == some(v);
+  ensures true == insync_fp(update(index, none, vals),
+                            map_erase_fp(m1, vk1(v)),
+                            map_erase_fp(m2, vk2(v)),
+                            vk1, vk2, capacity - length(vals));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void erase_one_no_extra_ptrs<t>(list<pair<t, void*> > addrs,
+                                        list<pair<t, int> > m,
+                                        t k)
+  requires true == no_extra_ptrs(addrs, m);
+  ensures true == no_extra_ptrs(map_erase_fp(addrs, k), map_erase_fp(m, k));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void erase_one_all_keys_differ<t1,t2,vt>(list<option<vt> > vals,
+                                                 int index,
+                                                 fixpoint (vt,t1) vk1,
+                                                 fixpoint (vt,t2) vk2)
+  requires true == all_keys_differ(vals, vk1, vk2);
+  ensures true == all_keys_differ(update(index, none, vals), vk1, vk2);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void insync_has<t1,t2,vt>(list<option<vt> > vals,
+                                  list<pair<t1, int> > m1,
+                                  list<pair<t2, int> > m2,
+                                  fixpoint (vt,t1) vk1,
+                                  fixpoint (vt,t2) vk2,
+                                  int index,
+                                  int capacity)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2,
+                             capacity - length(vals)) &*&
+           0 <= index &*& index < length(vals) &*&
+           nth(index, vals) == some(?v);
+  ensures true == map_has_fp(m1, vk1(v)) &*&
+          true == map_has_fp(m2, vk2(v));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none: insync_has(t, m1, m2, vk1, vk2, index-1, capacity);
+          case some(x):
+            if (index == 0) {
+            } else {
+              insync_has(t, map_erase_fp(m1, vk1(x)),
+                         map_erase_fp(m2, vk2(x)), vk1, vk2, index-1, capacity);
+              if (!map_has_fp(m1, vk1(v)))
+                map_erase_has_unrelevant(m1, vk1(x), vk1(v));
+              if (!map_has_fp(m2, vk2(v)))
+                map_erase_has_unrelevant(m2, vk2(x), vk2(v));
+            }
+        }
+    }
+  }
+  @*/
+
 int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
@@ -1082,6 +1458,7 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
   map_key_hash *hsh_a = map->hsh_a;
   int hash1 = hsh_a(key_a);
 
+  //@ insync_has(vals, m1, m2, vk1, vk2, index, cap);
   int ret1 = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
                        map->eq_a, hash1,
                        map->capacity, &out_key_a);
@@ -1104,7 +1481,23 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
   //@ open hide_mapping(_, _, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
   //@ assert ret2 == 1;
   //@ assert true == rof(my_value, out_key_a, out_key_b);
+  dmap_pack_keys *pk = map->pk;
+  pk(my_value, key_a, key_b);
+  pk(my_value, out_key_a, out_key_b);
+  uq_value_destr* dstr = map->dstr;
+  dstr(my_value);
   --map->n_vals;
+  //@ take_update_unrelevant(index, index, none, vals);
+  //@ drop_update_unrelevant(index+1, index, none, vals);
+  //@ nth_update(index, index, none, vals);
+  //@ update_values_hole(map->values, update(index, none, vals), index);
+  //@ all_keys_differ_no_such_keys(vals, index, vk1, vk2);
+  //@ erase_addrs(map->values, update(index, none, vals), v, vk1, vk2);
+  //@ map_has_erase_size_dec(m1, vk1(v));
+  //@ erase_one_insync(vals, m1, m2, index, v, vk1, vk2, cap);
+  //@ erase_one_no_extra_ptrs(addrs1, m1, vk1(v));
+  //@ erase_one_no_extra_ptrs(addrs2, m2, vk2(v));
+  //@ erase_one_all_keys_differ(vals, index, vk1, vk2);
   /*@ close dmappingp(dmap_erase_fp(m, index, vk1, vk2),
                       kp1, kp2, hsh1, hsh2,
                       fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/

@@ -17,14 +17,14 @@ typedef int map_key_hash/*@ <K>(predicate (void*; K) keyp,
 //@ requires [?fr]keyp(k1, ?kk1);
 //@ ensures [fr]keyp(k1, kk1) &*& result == hash(kk1);
 
-typedef void uq_value_copy/*@<K>(predicate (void*, K) vp, int size) @*/(char* dst, void* src);
+typedef void uq_value_copy/*@<K>(predicate (void*; K) vp, int size) @*/(char* dst, void* src);
 //@ requires [?fr]vp(src, ?v) &*& dst[0..size] |-> _;
 //@ ensures [fr]vp(src, v) &*& vp(dst, v);
 
 typedef void dmap_extract_keys/*@ <K1,K2,V>
                                 (predicate (void*; K1) keyp1,
                                  predicate (void*; K2) keyp2,
-                                 predicate (void*, V) full_valp,
+                                 predicate (void*; V) full_valp,
                                  predicate (void*, V) bare_valp,
                                  fixpoint (void*, void*, void*, bool)
                                    right_offsets,
@@ -39,10 +39,12 @@ typedef void dmap_extract_keys/*@ <K1,K2,V>
             k1 == vk1(v) &*&
             k2 == vk2(v); @*/
 
+//TODO: replace with pack key halves first and second,
+// because it is called two times
 typedef void dmap_pack_keys/*@ <K1,K2,V>
                              (predicate (void*; K1) keyp1,
                               predicate (void*; K2) keyp2,
-                              predicate (void*, V) full_valp,
+                              predicate (void*; V) full_valp,
                               predicate (void*, V) bare_valp,
                               fixpoint (void*, void*, void*, bool)
                                 right_offsets,
@@ -57,7 +59,7 @@ typedef void dmap_pack_keys/*@ <K1,K2,V>
 //@ ensures [fr]full_valp(vp, v);
 
 typedef void uq_value_destr/*@ <V>
-                             (predicate (void*, V) full_valp,
+                             (predicate (void*; V) full_valp,
                               int val_size)
                              @*/
                            (void* vp);
@@ -74,7 +76,7 @@ struct DoubleMap;
                                 predicate (void*;t2) keyp2,
                                 fixpoint (t1,int) hsh1,
                                 fixpoint (t2,int) hsh2,
-                                predicate (void*,vt) full_vp,
+                                predicate (void*;vt) full_vp,
                                 predicate (void*,vt) bare_vp,
                                 fixpoint (void*,void*,void*,bool) right_offsets,
                                 int val_size,
@@ -171,6 +173,7 @@ struct DoubleMap;
       return nth(index, val_arr) != none;
     }
   }
+
 
   lemma void dmap_get_k1_limits<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k1);
   requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
