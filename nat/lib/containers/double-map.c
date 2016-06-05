@@ -218,8 +218,12 @@ struct DoubleMap {
                     vk1, vk2, rof, 0, nil);
         return;
       case succ(n):
-        assume(val_size < val_size*int_of_nat(len)); //TODO
-        assume(val_size*int_of_nat(len) - val_size == val_size*int_of_nat(n));
+        assert 1 <= int_of_nat(len);
+        assert val_size <= val_size*1;
+        mul_mono(1, int_of_nat(len), val_size);
+        mul_mono(int_of_nat(len) - 1, int_of_nat(n), val_size);
+        mul_mono(int_of_nat(n), int_of_nat(len) - 1, val_size);
+        assert val_size*(int_of_nat(len) - 1) == val_size*(int_of_nat(n));
         chars_split(values, val_size);
         empty_valsp(values + val_size, val_size, fvp, bvp,
                     vk1, vk2, rof, n);
@@ -612,7 +616,6 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
                           addrs1, addrs2, vk1, vk2, rof,
                           length(vals), vals);
   {
-    assume (vals != nil); //WTF?? TODO
     void* xxx = values + i*vsz;
     void* aaa = map_get_fp(addrs1, vk1(get_some(nth(i, vals))));
     void* bbb = map_get_fp(addrs2, vk2(get_some(nth(i, vals))));
@@ -677,7 +680,6 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
                           addrs1, addrs2, vk1, vk2, rof,
                           length(vals), vals);
   {
-    assume (vals != nil); //TODO
     switch(vals) {
       case nil:
         return;
@@ -952,16 +954,6 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   @*/
 
 /*@
-  lemma void map_get_put_unrelevant<kt,vt>(list<pair<kt,vt> > m, kt k1, kt k2, vt v)
-  requires k1 != k2;
-  ensures map_get_fp(map_put_fp(m, k2, v), k1) == map_get_fp(m, k1);
-  {
-    assume (false);//TODO
-  }
-  @*/
-
-
-/*@
   lemma void valsp_addrs_put<t1,t2,vt>(void* values, list<option<vt> > vals,
                                        vt v,
                                        list<pair<t1,void*> > addrs1,
@@ -991,7 +983,6 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
              assert true == map_has_fp(addrs1, vk1(x));
              assert false == map_has_fp(addrs1, vk1(v));
              assert vk1(x) != vk1(v);
-             map_get_put_unrelevant(addrs1, vk1(x), vk1(v), key_a);
              assert map_get_fp(addrs1, vk1(x)) ==
                     map_get_fp(map_put_fp(addrs1, vk1(v), key_a), vk1(x));
          }
