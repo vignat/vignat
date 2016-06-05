@@ -1678,6 +1678,11 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
                                vk1, vk2, rp1, rp2, cap, map) &*&
             result == dmap_size_fp(m); @*/
 {
+  /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
+                     fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
   return map->n_vals;
+  /*@ close dmappingp(m,
+                      kp1, kp2, hsh1, hsh2,
+                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, cap, map); @*/
 }
 
