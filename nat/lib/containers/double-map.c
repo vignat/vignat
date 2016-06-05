@@ -98,7 +98,8 @@ struct DoubleMap {
     switch(addrs) {
       case nil: return true;
       case cons(h,t):
-        return map_has_fp(m, fst(h)) && no_extra_ptrs(t, m);
+        return !map_has_fp(t, fst(h)) &&
+               map_has_fp(m, fst(h)) && no_extra_ptrs(t, m);
     }
   }
 
@@ -1038,11 +1039,11 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   lemma void put_preserves_no_extra_ptrs<t>(list<pair<t, int> > m,
                                             list<pair<t, void*> > addrs,
                                             t k, int v, void* addr)
-  requires true == no_extra_ptrs(addrs, m);
+  requires true == no_extra_ptrs(addrs, m) &*&
+           false == map_has_fp(addrs, k);
   ensures true == no_extra_ptrs(map_put_fp(addrs, k, addr), map_put_fp(m, k, v));
   {
     map_put_preserves_no_extra_ptrs(m, addrs, k, v);
-    assert true == no_extra_ptrs(addrs, map_put_fp(m, k, v));
   }
   @*/
 
@@ -1330,12 +1331,84 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
   @*/
 
 /*@
+  lemma void no_such_keys_these_differ<t1,t2,vt>(list<option<vt> > vals,
+                                                 int index,
+                                                 vt v,
+                                                 fixpoint (vt,t1) vk1,
+                                                 fixpoint (vt,t2) vk2)
+  requires true == no_such_keys(v, vals, vk1, vk2) &*&
+           0 <= index &*& index < length(vals) &*&
+           nth(index, vals) == some(?x);
+  ensures vk1(v) != vk1(x) &*& vk2(v) != vk2(x);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none: no_such_keys_these_differ(t, index-1, v, vk1, vk2);
+          case some(a):
+            if (index != 0) no_such_keys_these_differ(t, index-1, v, vk1, vk2);
+        }
+    }
+  }
+
+  lemma void all_keys_differ_these_differ<t1,t2,vt>(list<option<vt> > vals,
+                                                    int i, int j,
+                                                    fixpoint (vt,t1) vk1,
+                                                    fixpoint (vt,t2) vk2)
+  requires true == all_keys_differ(vals, vk1, vk2) &*&
+           0 <= i &*& i < j &*& j < length(vals) &*&
+           nth(i, vals) == some(?a) &*&
+           nth(j, vals) == some(?b);
+  ensures vk1(a) != vk1(b) &*& vk2(a) != vk2(b);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            all_keys_differ_these_differ(t, i-1, j-1, vk1, vk2);
+            break;
+          case some(v):
+            if (i == 0) {
+              assert v == a;
+              no_such_keys_these_differ(t, j-1, v, vk1, vk2);
+            } else {
+              all_keys_differ_these_differ(t, i-1, j-1, vk1, vk2);
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
   lemma void map_has_erase_size_dec<kt,vt>(list<pair<kt,vt> > m,
                                             kt k)
   requires true == map_has_fp(m, k);
   ensures map_size_fp(m) == map_size_fp(map_erase_fp(m, k)) + 1;
   {
-    assume(false);//TODO
+    switch(m) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != k)
+          map_has_erase_size_dec(t, k);
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_erase_erase_swap<kt,vt>(list<pair<kt,vt> > m, kt k1, kt k2)
+  requires true;
+  ensures map_erase_fp(map_erase_fp(m, k1), k2) ==
+          map_erase_fp(map_erase_fp(m, k2), k1);
+  {
+    switch(m) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != k2) {
+          map_erase_erase_swap(t, k1, k2);
+        }
+    }
   }
   @*/
 
@@ -1352,13 +1425,58 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
   requires true == insync_fp(vals, m1, m2, vk1, vk2,
                              capacity - length(vals)) &*&
            0 <= index &*& index < length(vals) &*&
-           nth(index, vals) == some(v);
+           nth(index, vals) == some(v) &*&
+           true == all_keys_differ(vals, vk1, vk2);
   ensures true == insync_fp(update(index, none, vals),
                             map_erase_fp(m1, vk1(v)),
                             map_erase_fp(m2, vk2(v)),
                             vk1, vk2, capacity - length(vals));
   {
-    assume(false);//TODO
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            assert index != 0;
+            erase_one_insync(t, m1, m2, index-1, v, vk1, vk2, capacity);
+            break;
+          case some(x):
+            if (index == 0) {
+              assert x == v;
+            } else {
+              erase_one_insync(t, map_erase_fp(m1, vk1(x)),
+                               map_erase_fp(m2, vk2(x)),
+                               index-1, v,
+                               vk1, vk2, capacity);
+              map_erase_erase_swap(m1, vk1(x), vk1(v));
+              map_erase_erase_swap(m2, vk2(x), vk2(v));
+              update_tail_tail_update(h, t, index, none);
+              all_keys_differ_these_differ(vals, 0, index, vk1, vk2);
+              map_erase_has_unrelevant(m1, vk1(v), vk1(x));
+              map_erase_has_unrelevant(m2, vk2(v), vk2(x));
+              map_erase_get_unrelevant(m1, vk1(v), vk1(x));
+              map_erase_get_unrelevant(m2, vk2(v), vk2(x));
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void erase_unrelevant_no_extra_ptrs<t>(list<pair<t, void*> > addrs,
+                                               list<pair<t, int> > m,
+                                               t k)
+  requires true == no_extra_ptrs(addrs, m) &*&
+           false == map_has_fp(addrs, k);
+  ensures true == no_extra_ptrs(addrs, map_erase_fp(m, k));
+  {
+    switch(addrs) {
+      case nil: return;
+      case cons(h,t):
+        assert fst(h) != k;
+        erase_unrelevant_no_extra_ptrs(t, m, k);
+        map_erase_has_unrelevant(m, k, fst(h));
+    }
   }
   @*/
 
@@ -1369,19 +1487,66 @@ void dmap_get_value/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index,
   requires true == no_extra_ptrs(addrs, m);
   ensures true == no_extra_ptrs(map_erase_fp(addrs, k), map_erase_fp(m, k));
   {
-    assume(false);//TODO
+    switch(addrs) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) == k) {
+          erase_unrelevant_no_extra_ptrs(t, m, k);
+        } else {
+          erase_one_no_extra_ptrs(t, m, k);
+          map_erase_has_unrelevant(m, k, fst(h));
+          map_erase_has_unrelevant(t, k, fst(h));
+        }
+    }
   }
   @*/
 
 /*@
+  lemma void erase_one_no_such_keys<t1,t2,vt>(list<option<vt> > vals,
+                                              vt v,
+                                              int index,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2)
+  requires true == no_such_keys(v, vals, vk1, vk2) &*&
+           0 <= index &*& index < length(vals);
+  ensures true == no_such_keys(v, update(index, none, vals), vk1, vk2);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (index != 0) {
+          erase_one_no_such_keys(t, v, index-1, vk1, vk2);
+          update_tail_tail_update(h, t, index, none);
+          switch(h) {
+            case none: break;
+            case some(x): break;
+          }
+        }
+    }
+  }
+
   lemma void erase_one_all_keys_differ<t1,t2,vt>(list<option<vt> > vals,
                                                  int index,
                                                  fixpoint (vt,t1) vk1,
                                                  fixpoint (vt,t2) vk2)
-  requires true == all_keys_differ(vals, vk1, vk2);
+  requires true == all_keys_differ(vals, vk1, vk2) &*&
+           0 <= index &*& index < length(vals);
   ensures true == all_keys_differ(update(index, none, vals), vk1, vk2);
   {
-    assume(false);//TODO
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (index == 0) {
+        } else {
+          erase_one_all_keys_differ(t, index-1, vk1, vk2);
+          update_tail_tail_update(h, t, index, none);
+          switch(h) {
+            case none: break;
+            case some(v):
+              erase_one_no_such_keys(t, v, index-1, vk1, vk2);
+          };
+        }
+    }
   }
   @*/
 
