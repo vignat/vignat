@@ -42,7 +42,7 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
 
 lemma void empty_dmap_dchain_coherent(int len);
 requires true;
-ensures dmap_dchain_coherent(empty_dmap_fp(), empty_dchain_fp(len));
+ensures dmap_dchain_coherent(empty_dmap_fp(len), empty_dchain_fp(len));
 
 lemma void coherent_dmap_used_dchain_allocated(dmap<int_k,ext_k,flw> m, dchain ch, int idx);
 requires dmap_dchain_coherent(m, ch) &*& dmap_index_used_fp(m, idx) == true;
@@ -51,7 +51,8 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 lemma void expire_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch, uint32_t time);
 requires dmap_dchain_coherent(m, ch);
-ensures dmap_dchain_coherent(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time)),
+ensures dmap_dchain_coherent(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time),
+                                               flw_get_ik, flw_get_ek),
                              dchain_expire_old_indexes_fp(ch, time));
 
 lemma void rejuvenate_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch,
@@ -63,7 +64,7 @@ lemma void coherent_put_allocated_preserves_coherent
 (dmap<int_k,ext_k,flw> m, dchain ch, int_k k1, ext_k k2,
  flw value, int ind, uint32_t t);
 requires dmap_dchain_coherent(m, ch) &*& false == dchain_allocated_fp(ch, ind);
-ensures dmap_dchain_coherent(dmap_put_fp(m, k1, k2, ind, value),
+ensures dmap_dchain_coherent(dmap_put_fp(m, ind, value, flw_get_ik, flw_get_ek),
                              dchain_allocate_fp(ch, ind, t));
 
 lemma void coherent_dchain_non_out_of_space_map_nonfull(dmap<int_k,ext_k,flw> m, dchain ch);

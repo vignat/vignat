@@ -77,6 +77,7 @@ int dmap_allocate(map_keys_equality eq_a,
                   map_key_hash hsh_b,
                   int value_size,
                   uq_value_copy v_cpy,
+                  uq_value_destr v_destr,
                   dmap_extract_keys dexk,
                   dmap_pack_keys dpk,
                   int capacity,
@@ -88,6 +89,7 @@ int dmap_allocate(map_keys_equality eq_a,
   klee_trace_param_fptr(hsh_b, "hsh_b");
   klee_trace_param_i32(value_size, "value_size");
   klee_trace_param_fptr(v_cpy, "v_cpy");
+  klee_trace_param_fptr(v_destr, "v_destr");
   klee_trace_param_fptr(dexk, "dexk");
   klee_trace_param_fptr(dpk, "dpk");
   klee_trace_param_i32(capacity, "capacity");

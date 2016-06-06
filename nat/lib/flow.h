@@ -211,6 +211,10 @@ int ext_key_hash(void* ek);
 //@ requires ext_k_p(ek, ?k);
 //@ ensures ext_k_p(ek, k) &*& result == ext_hash(k);
 
+void flow_destroy(void* flwp);
+//@ requires flw_p(flwp, ?flw);
+//@ ensures chars(flwp, sizeof(struct flow), _);
+
 void flow_extract_keys(void* flwp, void** ikpp, void** ekpp);
 //@ requires flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
 /*@ ensures flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&

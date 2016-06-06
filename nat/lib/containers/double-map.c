@@ -1121,12 +1121,11 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
   //@ insync_has_not_nonfull(vals, m1, m2, vk1, vk2, cap, index);
   //@ assert map_size_fp(m1) < cap;
 
-  int ret1 = map_put(map->bbs_a, map->kps_a, map->khs_a,
-                     map->inds_a, key_a,
-                     hash1,
-                     index, map->capacity);
+  map_put(map->bbs_a, map->kps_a, map->khs_a,
+          map->inds_a, key_a,
+          hash1,
+          index, map->capacity);
 
-  //@ assert ret1 == 1;
   //@ assert [?x1]is_map_key_hash(hsh_a, kp1, hsh1);
   //@ close [x1]hide_map_key_hash(map->hsh_a, kp1, hsh1);
   //@ assert [?x2]is_map_key_hash(hsh_a, kp1, hsh1);
@@ -1139,12 +1138,11 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
                          map_put_fp(addrs1, vk1(v), key_a),
                          kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
     @*/
-  int ret2 = map_put(map->bbs_b, map->kps_b, map->khs_b,
-                     map->inds_b, key_b,
-                     hash2,
-                     index, map->capacity);
+  map_put(map->bbs_b, map->kps_b, map->khs_b,
+          map->inds_b, key_b,
+          hash2,
+          index, map->capacity);
   //@ open hide_mapping(_, _, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
-  //@ assert ret2 == 1;
   ++map->n_vals;
   dmap_pack_keys *pk = map->pk;
   //@ close hide_half_bvp(bvp, my_value, v);
@@ -1615,10 +1613,9 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
   int hash1 = hsh_a(key_a);
 
   //@ insync_has(vals, m1, m2, vk1, vk2, index, cap);
-  int ret1 = map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
-                       map->eq_a, hash1,
-                       map->capacity, &out_key_a);
-  //@ assert ret1 == 1;
+  map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
+            map->eq_a, hash1,
+            map->capacity, &out_key_a);
   //@ assert [?x1]is_map_key_hash(hsh_a, kp1, hsh1);
   //@ close [x1]hide_map_key_hash(map->hsh_a, kp1, hsh1);
   //@ assert [?x2]is_map_key_hash(hsh_a, kp1, hsh1);
@@ -1631,11 +1628,10 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
                          map_erase_fp(addrs1, vk1(v)),
                          kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
     @*/
-  int ret2 = map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
-                       map->eq_b, hash2,
-                       map->capacity, &out_key_b);
+  map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
+            map->eq_b, hash2,
+            map->capacity, &out_key_b);
   //@ open hide_mapping(_, _, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
-  //@ assert ret2 == 1;
   //@ assert true == rof(my_value, out_key_a, out_key_b);
   dmap_pack_keys *pk = map->pk;
   pk(my_value, key_a, key_b);

@@ -12,7 +12,8 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                 ?vk1, ?vk2, ?rp1, ?rp2, ?cap, map) &*&
              double_chainp(?ch, chain); @*/
 /*@ ensures dmappingp<K1,K2,V>(dmap_erase_all_fp
-                               (m, dchain_get_expired_indexes_fp(ch, time)),
+                               (m, dchain_get_expired_indexes_fp(ch, time),
+                                vk1, vk2),
                                kp1, kp2, hsh1, hsh2, fvp, bvp, rof, vsz,
                                vk1, vk2, rp1, rp2, cap, map) &*&
             double_chainp(dchain_expire_old_indexes_fp(ch, time), chain) &*&

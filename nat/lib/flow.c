@@ -279,3 +279,11 @@ void flow_cpy(char* dst, void* src)
   destination->ext_device_id = source->ext_device_id;
   destination->protocol = source->protocol;
 }
+
+void flow_destroy(void* flwp)
+//@ requires flw_p(flwp, ?flw);
+//@ ensures chars(flwp, sizeof(struct flow));
+{
+  IGNORE(flwp);
+  //do nothing
+}

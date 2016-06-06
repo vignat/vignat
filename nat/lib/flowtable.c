@@ -150,6 +150,7 @@ int allocate_flowtables(uint8_t nb_ports) {
     return dmap_allocate(int_key_eq, int_key_hash,
                          ext_key_eq, ext_key_hash,
                          sizeof(struct flow), flow_cpy,
+                         flow_destroy,
                          flow_extract_keys,
                          flow_pack_keys,
                          MAX_FLOWS,
