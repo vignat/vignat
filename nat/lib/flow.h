@@ -197,6 +197,12 @@ void log_flow(const struct flow *f);
   }
   @*/
 
+/*@
+  lemma void flow_to_chars(struct flow* p);
+  requires flw_p(p, _);
+  ensures chars((void*)p, sizeof(struct flow), _);
+  @*/
+
 int int_key_eq(void* a, void* b);
 //@ requires [?f1]int_k_p(a, ?ak) &*& [?f2]int_k_p(b, ?bk);
 //@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));

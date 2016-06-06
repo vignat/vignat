@@ -358,7 +358,8 @@ let fun_types =
                      }@*/");
                     (fun args _ ->
                        "//@assert dmappingp<int_k,ext_k,flw>(?map_before_put,\
-                        _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 0) ^ ");\n");
+                        _,_,_,_,_,_,_,_,?vk1_before_put,?vk2_before_put,_,_,_," ^
+                       (List.nth_exn args 0) ^ ");\n");
                     tx_bl "{\n\
                            assert dmap_dchain_coherent(map_before_put, ?ch);\n\
                            coherent_dchain_non_out_of_space_map_nonfull\
@@ -378,11 +379,7 @@ let fun_types =
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n\
-                        ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                        user_buf0_30, cmplx1, user_buf0_23),\n\
-                        ekc(tmp1, user_buf0_36, 184789184,\
-                        user_buf0_30, 1, user_buf0_23),\n\
-                        new_index_0);\n\
+                        new_index_0, vk1_before_put, vk2_before_put);\n\
                         }@*/"
                     );
                     (fun ret_var _ _ ->
@@ -408,7 +405,10 @@ let fun_types =
                   leaks = [];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
-                        lemmas_before = [];
+                        lemmas_before = [
+                          (fun args _ ->
+                             "//@ flow_to_chars(" ^
+                             (List.nth_exn args 2) ^ ");")];
                         lemmas_after = [
                           (fun _ args _ ->
                              "/*@{ " ^
@@ -441,12 +441,12 @@ let fun_types =
                            else
                            "/*@ {\n" ^
                            "assert dmappingp<int_k,ext_k,flw>(?cur_map,\
-                            _,_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args 1) ^ ");\n" ^
+                            _,_,_,_,_,_,_,_,?vk1,?vk2,_,_,_," ^ (List.nth_exn args 1) ^ ");\n" ^
                            "assert dmap_dchain_coherent(cur_map, ?cur_chain);\n\
                             dmap_erase_all_has_trans(cur_map, ikc(user_buf0_34,\
                             user_buf0_36, user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
                             dchain_get_expired_indexes_fp(cur_chain, " ^ (List.nth_exn args 2) ^
-                           "));\n\
+                           "), vk1, vk2);\n\
                             }@*/");
                         (fun args _ ->
                            "/*@ {\n\

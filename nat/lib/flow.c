@@ -287,3 +287,12 @@ void flow_destroy(void* flwp)
   IGNORE(flwp);
   //do nothing
 }
+
+/*@
+  lemma void flow_to_chars(struct flow* p)
+  requires flw_p(p, _);
+  ensures chars((void*)p, sizeof(struct flow), _);
+  {
+  //TODO
+  }
+  @*/
