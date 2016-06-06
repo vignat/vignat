@@ -86,6 +86,7 @@ let fun_types =
                          [Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
                           Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
                           Sint32; Ptr (Ctm "uq_value_copy");
+                          Ptr (Ctm "uq_value_destr");
                           Ptr (Ctm "dmap_extract_keys"); Ptr (Ctm "dmap_pack_keys");
                           Sint32;
                           Ptr (Ptr dmap_struct)];
@@ -129,6 +130,13 @@ let fun_types =
                                  flow_keys_offsets_fp,\
                                  flw_get_ik,\
                                  flw_get_ek)(a, b, c)\
+                                {\
+                                call();\
+                                }";
+                         tx_bl "produce_function_pointer_chunk \
+                                uq_value_destr<flw>\
+                                (flow_destroy)\
+                                (flw_p, sizeof(struct flow))(a)\
                                 {\
                                 call();\
                                 }";

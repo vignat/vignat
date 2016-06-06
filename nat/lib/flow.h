@@ -198,38 +198,39 @@ void log_flow(const struct flow *f);
   @*/
 
 int int_key_eq(void* a, void* b);
-//@ requires int_k_p(a, ?ak) &*& int_k_p(b, ?bk);
-//@ ensures int_k_p(a, ak) &*& int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+//@ requires [?f1]int_k_p(a, ?ak) &*& [?f2]int_k_p(b, ?bk);
+//@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
 int ext_key_eq(void* a, void* b);
-//@ requires ext_k_p(a, ?ak) &*& ext_k_p(b, ?bk);
-//@ ensures ext_k_p(a, ak) &*& ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+//@ requires [?f1]ext_k_p(a, ?ak) &*& [?f2]ext_k_p(b, ?bk);
+//@ ensures [f1]ext_k_p(a, ak) &*& [f2]ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
 
 int int_key_hash(void* ik);
-//@ requires int_k_p(ik, ?k);
-//@ ensures int_k_p(ik, k) &*& result == int_hash(k);
+//@ requires [?f]int_k_p(ik, ?k);
+//@ ensures [f]int_k_p(ik, k) &*& result == int_hash(k);
 int ext_key_hash(void* ek);
-//@ requires ext_k_p(ek, ?k);
-//@ ensures ext_k_p(ek, k) &*& result == ext_hash(k);
+//@ requires [?f]ext_k_p(ek, ?k);
+//@ ensures [f]ext_k_p(ek, k) &*& result == ext_hash(k);
 
 void flow_destroy(void* flwp);
 //@ requires flw_p(flwp, ?flw);
 //@ ensures chars(flwp, sizeof(struct flow), _);
 
 void flow_extract_keys(void* flwp, void** ikpp, void** ekpp);
-//@ requires flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
-/*@ ensures flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&
-            int_k_p(ikp, ?ik) &*& ext_k_p(ekp, ?ek) &*&
+//@ requires [?f]flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
+/*@ ensures [f]flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&
+            [f]int_k_p(ikp, ?ik) &*& [f]ext_k_p(ekp, ?ek) &*&
             true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
             ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
 
 void flow_pack_keys(void* flwp, void* ikp, void* ekp);
-/*@ requires flow_p(flwp, ?flw) &*& int_k_p(ikp, ?ik) &*& ext_k_p(ekp, ?ek) &*&
+/*@ requires [?f]flow_p(flwp, ?flw) &*&
+             [f]int_k_p(ikp, ?ik) &*& [f]ext_k_p(ekp, ?ek) &*&
              true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
              ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
-//@ ensures flw_p(flwp, flw);
+//@ ensures [f]flw_p(flwp, flw);
 
 void flow_cpy(char* dst, void* src);
-//@ requires flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
-//@ ensures flw_p(src, f) &*& flw_p((void*)dst, f);
+//@ requires [?fr]flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
+//@ ensures [fr]flw_p(src, f) &*& flw_p((void*)dst, f);
 
 #endif //_FLOW_H_INCLUDED_
