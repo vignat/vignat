@@ -11,11 +11,6 @@
 #define RTE_NUM_DEVICES 2
 
 /*@
-
-predicate dmap_dchain_coherent(dmap<int_k,ext_k,flw> m, dchain ch);
-
-fixpoint int dochain_index_range(dchain ch);
-
 fixpoint bool nat_int_fp(int_k ik, int index) {
     return 0 <= int_k_get_idid(ik) &&
            int_k_get_idid(ik) < RTE_NUM_DEVICES;
