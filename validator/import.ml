@@ -3,8 +3,6 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
-module Fs = Function_spec
-
 let preamble = In_channel.read_all "preamble.tmpl"
 
 let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
@@ -89,14 +87,10 @@ let expand_shorted_sexp sexp =
   assert(map_non_expandable defs defs);
   (fst (expand_exp (remove_defs sexp) defs))
 
-let get_fun_arg_type fun_name arg_num =
-  match String.Map.find Fs.fun_types fun_name with
-  | Some spec -> List.nth_exn spec.arg_types arg_num
-  | None -> failwith ("unknown function " ^ fun_name)
+let get_fun_arg_type ftype_of fun_name arg_num =
+  List.nth_exn (ftype_of fun_name).arg_types arg_num
 
-let get_fun_ret_type fun_name = match String.Map.find Fs.fun_types fun_name with
-  | Some spec -> spec.ret_type
-  | None -> failwith ("unknown function " ^ fun_name)
+let get_fun_ret_type ftype_of fun_name = (ftype_of fun_name).ret_type
 
 let to_symbol str =
   let no_spaces = String.substr_replace_all str ~pattern:" " ~with_:"_" in
@@ -105,7 +99,7 @@ let to_symbol str =
 
 let get_var_name_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.Atom pos; Sexp.Atom name]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.Atom pos; Sexp.Atom name]
     when ( String.equal rd "ReadLSB" ||
            String.equal rd "Read") -> Some (to_symbol name ^ "_" ^
                                             pos(* FIXME: '^ w' - this reveals a bug where
@@ -273,10 +267,10 @@ let is_bool_fun fname =
 let rec is_bool_expr exp =
   match exp with
   | Sexp.List [Sexp.Atom f; _; _] when is_bool_fun f -> true
-  | Sexp.List [Sexp.Atom a; w; lhs; rhs] when String.equal a "And" ->
+  | Sexp.List [Sexp.Atom a; _; lhs; rhs] when String.equal a "And" ->
     (*FIXME: and here, but really that is a bool expression, I know it*)
     (is_bool_expr lhs) || (is_bool_expr rhs)
-  | Sexp.List [Sexp.Atom ext; w; e] when String.equal ext "ZExt" ->
+  | Sexp.List [Sexp.Atom ext; _; e] when String.equal ext "ZExt" ->
     is_bool_expr e
   | _ -> false
 
@@ -297,12 +291,12 @@ let rec get_sexp_value exp t =
         else {v=Id v; t}
       | _ -> {v=Id v;t}
     end
-  | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
+  | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
     (*FIXME: make sure the typetransformation works.*)
     (*FIXME: pass a right type to get_sexp_value and llocate_tmp here*)
     {v=Cast (t, allocate_tmp (get_sexp_value src Sint32));t}
-  | Sexp.List [Sexp.Atom f; Sexp.Atom w; lhs; rhs]
+  | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
     when (String.equal f "Add") ->
     begin (* Prefer a variable in the left position
              due to the weird VeriFast type inference rules.*)
@@ -368,7 +362,7 @@ let rec get_struct_val_value valu t =
     end
   | _ -> get_sexp_value valu.full t
 
-let get_vars tpref arg_name_gen =
+let get_vars ftype_of tpref arg_name_gen =
   let get_vars known_vars call =
     let alloc_local_arg addr value =
       match String.Map.find !allocated_args addr with
@@ -383,7 +377,7 @@ let get_vars tpref arg_name_gen =
     in
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
-            let arg_type = get_fun_arg_type call.fun_name i in
+            let arg_type = get_fun_arg_type ftype_of call.fun_name i in
             match arg.pointee with
             | Some ptee ->
               begin
@@ -415,7 +409,7 @@ let get_vars tpref arg_name_gen =
     in
     let ret_vars = match call.ret with
       | Some ret -> get_vars_from_struct_val
-                      ret.value (get_fun_ret_type call.fun_name) arg_vars
+                      ret.value (get_fun_ret_type ftype_of call.fun_name) arg_vars
       (*TODO: get also ret.pointee vars.*)
       | None -> arg_vars in
     let add_vars_from_ctxt vars ctxt =
@@ -433,15 +427,13 @@ let get_vars tpref arg_name_gen =
                     ~f:get_vars) in
   tip_vars
 
-let compose_fcall_preamble call args tmp_gen =
-  match String.Map.find Fs.fun_types call.fun_name with
-  | Some t -> (List.map t.lemmas_before ~f:(fun l -> l args tmp_gen))
-  | None -> failwith ("function not found " ^ call.fun_name)
+let compose_fcall_preamble ftype_of call args tmp_gen =
+  (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
 
-let extract_fun_args call =
+let extract_fun_args ftype_of call =
   List.mapi call.args
     ~f:(fun i arg ->
-        let a_type = get_fun_arg_type call.fun_name i in
+        let a_type = get_fun_arg_type ftype_of call.fun_name i in
         ( if arg.is_ptr then
             match arg.pointee with
             | Some ptee ->
@@ -466,14 +458,13 @@ let extract_fun_args call =
           else
             get_struct_val_value arg.value a_type))
 
-let compose_post_lemmas call ret_name args tmp_gen =
+let compose_post_lemmas ftype_of call ret_name args tmp_gen =
   let ret_name = match ret_name with
     | Some ret_name -> ret_name
     | None -> ""
   in
-  match String.Map.find Fs.fun_types call.fun_name with
-  | Some t -> List.map t.lemmas_after ~f:(fun l -> l ret_name args tmp_gen)
-  | None -> failwith ("unknown function " ^ call.fun_name)
+  List.map (ftype_of call.fun_name).lemmas_after
+    ~f:(fun l -> l ret_name args tmp_gen)
 
 let compose_args_post_conditions call =
   List.filter_map call.args ~f:(fun arg ->
@@ -500,56 +491,56 @@ let extract_tip_ret_post_conditions call =
   List.map call.ret_context ~f:(fun sttmt ->
       get_sexp_value sttmt Boolean)
 
-let get_ret_val call =
+let get_ret_val ftype_of call =
   match call.ret with
   | Some ret ->
-    let t = get_fun_ret_type call.fun_name in
+    let t = get_fun_ret_type ftype_of call.fun_name in
     get_struct_val_value ret.value t
   | None -> {v=Undef;t=Unknown}
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
 
-let extract_common_call_context call ret_name args unique_postfix =
+let extract_common_call_context ftype_of call ret_name args unique_postfix =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
-  let ret_type = get_fun_ret_type call.fun_name in
+  let ret_type = get_fun_ret_type ftype_of call.fun_name in
   let arg_names = List.map args ~f:render_tterm in
-  let pre_lemmas = compose_fcall_preamble call arg_names tmp_gen in
+  let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
   let application = Apply (call.fun_name,args) in
-  let post_lemmas = compose_post_lemmas call ret_name arg_names tmp_gen in
+  let post_lemmas = compose_post_lemmas ftype_of call ret_name arg_names tmp_gen in
   {pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
-let extract_hist_call_context call rname_gen index =
-  let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
+let extract_hist_call_context ftype_of call rname_gen index =
+  let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
     else Some rname_gen#generate in
-  let args = extract_fun_args call in
+  let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
-  {context=extract_common_call_context call ret_name args
+  {context=extract_common_call_context ftype_of call ret_name args
        (string_of_int index);
-   result={args_post_conditions;ret_val=get_ret_val call;
+   result={args_post_conditions;ret_val=get_ret_val ftype_of call;
            post_statements=[]}}
 
-let tip_calls_context calls rname_gen =
+let tip_calls_context ftype_of calls rname_gen =
   let call = List.hd_exn calls in
-  let ret_name = if is_void (get_fun_ret_type call.fun_name) then None
+  let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
     else Some rname_gen#generate in
-  let args = extract_fun_args call in
-  let context = extract_common_call_context call ret_name args "tip" in
+  let args = extract_fun_args ftype_of call in
+  let context = extract_common_call_context ftype_of call ret_name args "tip" in
   let results = List.map calls ~f:(fun call ->
       let args_post_conditions = compose_args_post_conditions call in
       {args_post_conditions;
-       ret_val=get_ret_val call;
+       ret_val=get_ret_val ftype_of call;
        post_statements=(extract_tip_ret_post_conditions call);})
   in
   {context;results}
 
-let extract_calls_info tpref =
+let extract_calls_info ftype_of tpref =
   let rez_gen = name_gen "rez" in
   let hist_funs =
     (List.mapi tpref.history ~f:(fun ind call ->
-         extract_hist_call_context call rez_gen ind))
+         extract_hist_call_context ftype_of call rez_gen ind))
   in
-  let tip_calls = tip_calls_context tpref.tip_calls rez_gen in
+  let tip_calls = tip_calls_context ftype_of tpref.tip_calls rez_gen in
   hist_funs, tip_calls
 
 let collect_context pref =
@@ -563,13 +554,13 @@ let collect_context pref =
    | hd :: _ -> (collect_ctxt_list hd.call_context)
    | [] -> failwith "Must have at least one tip call.")
 
-let extract_leaks ccontexts =
+let extract_leaks ftype_of ccontexts =
   let leak_map =
     List.fold ccontexts ~init:String.Map.empty ~f:(fun acc {ret_name;application;_} ->
         match application with
         | Apply (fname,args) ->
           let args = List.map args ~f:render_tterm in
-          let spec = String.Map.find_exn Fs.fun_types fname in
+          let spec = (ftype_of fname) in
           let ret_name = match ret_name with Some name -> name | None -> "" in
           List.fold spec.leaks ~init:acc ~f:(fun acc l ->
               l ret_name args acc)
@@ -587,7 +578,12 @@ let rec get_relevant_segment pref =
        tip_calls = pref.tip_calls;}
   | None -> pref
 
-let build_ir fin =
+let build_ir fun_types fin =
+  let ftype_of fun_name =
+    match String.Map.find fun_types fun_name with
+    | Some spec -> spec
+    | None -> failwith ("unknown function " ^ fun_name)
+  in
   let pref = get_relevant_segment
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
   let preamble = preamble ^
@@ -595,9 +591,9 @@ let build_ir fin =
                   /*@ requires true; @*/ \
                   /*@ ensures true; @*/\n{\n" in
   let export_point = "export_point" in
-  let free_vars = (get_vars pref (name_gen "arg")) in
-  let (hist_calls,tip_call) = extract_calls_info pref in
-  let leaks = extract_leaks
+  let free_vars = (get_vars ftype_of pref (name_gen "arg")) in
+  let (hist_calls,tip_call) = extract_calls_info ftype_of pref in
+  let leaks = extract_leaks ftype_of
       ((List.map hist_calls ~f:(fun hc -> hc.context))@[tip_call.context]) in
   let cmplxs = !allocated_complex_vals in
   let tmps = !allocated_tmp_vals in

@@ -8,7 +8,7 @@ let validate_prefix fin fout intermediate_pref verifast_bin =
   let verify_out_fname = intermediate_pref ^ ".verify.stdout" in
   let ir_fname = intermediate_pref ^ ".ir" in
   let intermediate_fout = intermediate_pref ^ ".tmp.c" in
-  let ir = Import.build_ir fin in
+  let ir = Import.build_ir Function_spec.fun_types fin in
   Out_channel.write_all ir_fname ~data:(Sexp.to_string (sexp_of_ir ir));
   Render.render_ir ir intermediate_fout;
   match Verifier.verify_file verifast_bin intermediate_fout verify_out_fname with
