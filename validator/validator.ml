@@ -21,7 +21,9 @@ let validate_prefix fin fout intermediate_pref verifast_bin =
           verifast_bin intermediate_fout ir.export_point
           assumptions_fname lino_fname export_out_fname
       in
-      let ir = Analysis.induce_symbolic_assignments ir vf_assumptions in
+      let ir = Analysis.induce_symbolic_assignments
+          Function_spec.fixpoints ir vf_assumptions
+      in
       Render.render_ir ir fout;
       match Verifier.verify_file verifast_bin fout verify_out_fname with
       | Verifier.Valid -> printf "\\/alid.\n"

@@ -11,7 +11,7 @@ let log str =
 
 let start_log () =
   if no_log then ()
-  else Out_channel.with_file "analysis.log" ~f:(fun f -> ())
+  else Out_channel.with_file "analysis.log" ~f:(fun _ -> ())
 
 let lprintf fmt = ksprintf log fmt
 
@@ -25,9 +25,9 @@ let canonicalize_in_place statements =
       {v=Not rhs;t}
     | {v=Bop (Eq,lhs,{v=Bool false;_});t} ->
       {v=Not lhs;t}
-    | {v=Bop (Eq,{v=Bool true;_},rhs);t} ->
+    | {v=Bop (Eq,{v=Bool true;_},rhs);t=_} ->
       canonicalize1 rhs
-    | {v=Bop (Eq,lhs,{v=Bool true;_});t} ->
+    | {v=Bop (Eq,lhs,{v=Bool true;_});t=_} ->
       canonicalize1 lhs
     | {v=Bop (Ge,lhs,rhs);t} -> {v=Bop(Le,rhs,lhs);t}
     | {v=Bop (Gt,lhs,rhs);t} -> {v=Bop(Lt,rhs,lhs);t}
@@ -56,12 +56,13 @@ let rec expand_struct_eq sttmt : tterm list =
 let expand_struct_eqs sttmts =
   List.join (List.map sttmts ~f:expand_struct_eq)
 
-let expand_fixpoints_in_tterm tterm =
-  let rec impl tterm =
+let expand_fixpoints_in_tterm
+    (fixpoints : Ir.tterm Core.Std.String.Map.t) tterm =
+  let impl tterm =
     match tterm with
     | Apply (fname,args) ->
       begin
-        match String.Map.find Function_spec.fixpoints fname with
+        match String.Map.find fixpoints fname with
         | Some body ->
           Some (List.foldi args ~init:body
                   ~f:(fun i acc arg ->
@@ -82,13 +83,13 @@ let remove_double_negation sttmt =
 let remove_trues sttmts =
   List.filter sttmts ~f:(function {v=Bool true;t=_} -> false | _ -> true)
 
-let expand_fixpoints sttmts =
-  List.map sttmts ~f:expand_fixpoints_in_tterm
+let expand_fixpoints fixpoints sttmts =
+  List.map sttmts ~f:(expand_fixpoints_in_tterm fixpoints)
 
 let reduce_struct_idxes sttmt =
   sttmt |> call_recursively_on_tterm (function
       | Str_idx ({v=Struct(_,fields);t=_}, field) ->
-        Some (List.find_exn fields ~f:(fun {name;value} ->
+        Some (List.find_exn fields ~f:(fun {name;value=_} ->
           name = field)).value.v
       | _ -> None
     )
@@ -96,11 +97,11 @@ let reduce_struct_idxes sttmt =
 (* Transform statement list to a canonical form,
    breaking down conjunctions, inlining function definitions,
    and breaking structures into separate fields. *)
-let canonicalize sttmts =
+let canonicalize fixpoints sttmts =
   sttmts |>
   remove_trues |>
   canonicalize_in_place |>
-  expand_fixpoints |> (*May introduce conjunctions and negations.*)
+  expand_fixpoints fixpoints |> (*May introduce conjunctions and negations.*)
   List.map ~f:remove_double_negation |>
   expand_conjunctions |>
   expand_struct_eqs |>
@@ -161,16 +162,16 @@ let reduce_by_equalities vars sttmts =
   |> fst
   |> remove_trivial_eqs
 
-let simplify vars sttmts =
+let simplify fixpoints vars sttmts =
   lprintf "\n\nover vars: \n";
   lprint_list (List.map vars ~f:render_term);
-  let one = canonicalize sttmts in
+  let one = canonicalize fixpoints sttmts in
   lprintf "\ncanonicalized: \n";
   lprint_list (List.map one ~f:render_tterm);
   let two = reduce_by_equalities vars one in
   lprintf "\nreduced:\n";
   lprint_list (List.map two ~f:render_tterm);
-  let three = canonicalize two in
+  let three = canonicalize fixpoints two in
   lprintf "\ncanonicalized2: \n";
   lprint_list (List.map three ~f:render_tterm);
   let four = reduce_by_equalities vars three in
@@ -335,12 +336,12 @@ let guess_assignments assumptions assertions vars =
       | Some assignment -> [assignment]
       | None -> []))
 
-let is_assignment_justified var value executions =
+let is_assignment_justified fixpoints var value executions =
   lprintf "justifying assignment %s = %s\n" var (render_term value);
   let valid = List.for_all executions ~f:(fun assumptions ->
-      let orig_assumptions = assumptions |> simplify [Id var; value] in
+      let orig_assumptions = assumptions |> simplify fixpoints [Id var; value] in
       let rel_assumptions = take_relevant orig_assumptions [var] |> fst |>
-                            simplify [Id var]
+                            simplify fixpoints [Id var]
       in
       let mod_assumptions =
         replace_term_in_tterms (Id var) value orig_assumptions in
@@ -356,7 +357,7 @@ let is_assignment_justified var value executions =
   lprintf "%s\n" (if valid then "justified" else "unjustified");
   valid
 
-let induce_symbolic_assignments ir executions =
+let induce_symbolic_assignments fixpoints ir executions =
   start_log ();
   let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
   lprintf "free vars: \n";
@@ -365,7 +366,7 @@ let induce_symbolic_assignments ir executions =
       (prepare_assertions result
          ir.tip_call.context.ret_name
          ir.tip_call.context.ret_type) |>
-      canonicalize)
+      canonicalize fixpoints)
   in
   let assignments = List.fold assertion_lists ~init:[]
       ~f:(fun assignments assertions ->
@@ -378,7 +379,7 @@ let induce_symbolic_assignments ir executions =
                        (String.Set.of_list (List.map assignments ~f:fst)))
                 in
                 let var_ids = List.map vars ~f:(fun name -> Id name) in
-                let assumptions = assumptions |> simplify var_ids
+                let assumptions = assumptions |> simplify fixpoints var_ids
                 in
                 lprintf "\nassuming assignments:\n";
                 lprint_list (List.map assignments
@@ -392,6 +393,6 @@ let induce_symbolic_assignments ir executions =
   in
   lprintf "\n\n JUSTIFYING \n\n";
   let justified_assignments = List.filter assignments ~f:(fun (var,value) ->
-      is_assignment_justified var value executions)
+      is_assignment_justified fixpoints var value executions)
   in
   apply_assignments justified_assignments ir;
