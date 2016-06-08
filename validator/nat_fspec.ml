@@ -548,3 +548,14 @@ let fixpoints =
     "flw_get_ik", {v=Str_idx({v=Id "Arg0";t=Unknown},"ik");t=Unknown};
     "flw_get_ek", {v=Str_idx({v=Id "Arg0";t=Unknown},"ek");t=Unknown};
   ]
+
+module Iface : Fspec_api.Spec =
+struct
+  let fun_types = fun_types
+  let fixpoints = fixpoints
+end
+
+(* Register the module *)
+let () =
+  Fspec_api.spec := Some (module Iface) ;
+

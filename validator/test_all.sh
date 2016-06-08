@@ -57,9 +57,9 @@ validate_file() {
     VALID_RESULT="${UNIQUE_PREFIX}.validator_result"
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
     cp $FNAME $UNIQUE_PREFIX.src
-    CMD1="./validator.byte $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST"
+    CMD1="./validator.byte nat_fspec.cmo $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST"
     CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
-    echo "corebuild -use-menhir validator.byte && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
+    echo "make all && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
     $CMD1 > $VALID_RESULT && $CMD2 > $VERIF_RESULT
     analyze_result $VERIF_RESULT $FNAME
     show_result $FNAME $(cat $VALID_RESULT)
@@ -72,7 +72,7 @@ fi
 command -v $VERIFAST >/dev/null 2>&1 ||
     { echo >&2 "I require custom VeriFast in the PATH.  Aborting."; exit 1; }
 
-corebuild -use-menhir validator.byte
+make all
 mkdir -p $WORK_DIR
 rm -f $REPORT_FNAME
 

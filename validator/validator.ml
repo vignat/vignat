@@ -35,6 +35,19 @@ let validate_prefix fin fout intermediate_pref verifast_bin =
       | Verifier.Invalid cause -> printf "Failed: %s\n" cause
     end
 
+let load_plug fname =
+  let fname = Dynlink.adapt_filename fname in
+  match Sys.file_exists fname with
+  | `No | `Unknown -> failwith ("Plugin file " ^ fname ^ " does not exist")
+  | `Yes -> begin
+      try Dynlink.loadfile fname
+      with
+      | (Dynlink.Error err) as e ->
+        print_endline ("ERROR loading plugin: " ^ (Dynlink.error_message err) );
+        raise e
+      | _ -> failwith "Unknow error while loading plugin"
+    end
+
 let () =
-  Fspec_api.spec := Some (module Function_spec) ;
-  validate_prefix Sys.argv.(1) Sys.argv.(2) Sys.argv.(3) Sys.argv.(4)
+  load_plug Sys.argv.(1);
+  validate_prefix Sys.argv.(2) Sys.argv.(3) Sys.argv.(4) Sys.argv.(5)
