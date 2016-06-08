@@ -1,6 +1,7 @@
 open Core.Std
 open Trace_prefix
 open Ir
+open Fspec_api
 
 module Fs = Function_spec
 
@@ -90,11 +91,11 @@ let expand_shorted_sexp sexp =
 
 let get_fun_arg_type fun_name arg_num =
   match String.Map.find Fs.fun_types fun_name with
-  | Some spec -> List.nth_exn spec.Fs.arg_types arg_num
+  | Some spec -> List.nth_exn spec.arg_types arg_num
   | None -> failwith ("unknown function " ^ fun_name)
 
 let get_fun_ret_type fun_name = match String.Map.find Fs.fun_types fun_name with
-  | Some spec -> spec.Fs.ret_type
+  | Some spec -> spec.ret_type
   | None -> failwith ("unknown function " ^ fun_name)
 
 let to_symbol str =
@@ -434,7 +435,7 @@ let get_vars tpref arg_name_gen =
 
 let compose_fcall_preamble call args tmp_gen =
   match String.Map.find Fs.fun_types call.fun_name with
-  | Some t -> (List.map t.Fs.lemmas_before ~f:(fun l -> l args tmp_gen))
+  | Some t -> (List.map t.lemmas_before ~f:(fun l -> l args tmp_gen))
   | None -> failwith ("function not found " ^ call.fun_name)
 
 let extract_fun_args call =
@@ -471,7 +472,7 @@ let compose_post_lemmas call ret_name args tmp_gen =
     | None -> ""
   in
   match String.Map.find Fs.fun_types call.fun_name with
-  | Some t -> List.map t.Fs.lemmas_after ~f:(fun l -> l ret_name args tmp_gen)
+  | Some t -> List.map t.lemmas_after ~f:(fun l -> l ret_name args tmp_gen)
   | None -> failwith ("unknown function " ^ call.fun_name)
 
 let compose_args_post_conditions call =
@@ -570,7 +571,7 @@ let extract_leaks ccontexts =
           let args = List.map args ~f:render_tterm in
           let spec = String.Map.find_exn Fs.fun_types fname in
           let ret_name = match ret_name with Some name -> name | None -> "" in
-          List.fold spec.Fs.leaks ~init:acc ~f:(fun acc l ->
+          List.fold spec.leaks ~init:acc ~f:(fun acc l ->
               l ret_name args acc)
         | _ -> failwith "call context application must be Apply")
   in

@@ -1,30 +1,6 @@
+
 open Core.Std
-open Ir
-
-type lemma = (string -> string list -> (string -> string) -> string)
-type blemma = (string list -> (string -> string) -> string)
-type leak_updater = (string -> string list ->
-                     string String.Map.t -> string String.Map.t)
-
-let tx_l str = (fun _ _ _ -> "/*@ " ^ str ^ " @*/" )
-let tx_bl str = (fun _ _ -> "/*@ " ^ str ^ " @*/" )
-
-
-let leak str ?(id=str) = (fun _ _ leaks ->
-    String.Map.add leaks ~key:id ~data:("/*@ leak " ^ str ^ ";@*/"))
-
-let on_rez_nz_leak str ?(id=str) = (fun rez_var _ leaks ->
-    String.Map.add leaks ~key:id ~data:("/*@ if(" ^ rez_var ^
-                                        "!=0) leak " ^ str ^ ";@*/"))
-
-let remove_leak id = (fun _ _ leaks ->
-    String.Map.remove leaks id)
-
-let on_rez_nonzero str = (fun rez_var _ _ ->
-    "/*@ if(" ^ rez_var ^ "!=0) " ^ str ^ "@*/")
-
-let on_rez_nz f = (fun rez_var args tmp_gen ->
-    "/*@ if(" ^ rez_var ^ "!=0) " ^ (f args tmp_gen) ^ " @*/")
+open Fspec_api
 
 type map_key = Int | Ext
 
@@ -39,35 +15,31 @@ let gen_get_fp map_name =
   | Int-> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
   | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
-type fun_spec = {ret_type: ttype; arg_types: ttype list;
-                 lemmas_before: blemma list; lemmas_after: lemma list;
-                 leaks: leak_updater list;}
-
-let dmap_struct = Str ( "DoubleMap", [] )
-let dchain_struct = Str ( "DoubleChain", [] )
-let ext_key_struct = Str ( "ext_key", ["ext_src_port", Uint16;
-                                       "dst_port", Uint16;
-                                       "ext_src_ip", Uint32;
-                                       "dst_ip", Uint32;
-                                       "ext_device_id", Uint8;
-                                       "protocol", Uint8;] )
-let int_key_struct = Str ( "int_key", ["int_src_port", Uint16;
-                                       "dst_port", Uint16;
-                                       "int_src_ip", Uint32;
-                                       "dst_ip", Uint32;
-                                       "int_device_id", Uint8;
-                                       "protocol", Uint8;] )
-let flw_struct = Str ("flow", ["ik", int_key_struct;
-                               "ek", ext_key_struct;
-                               "int_src_port", Uint16;
-                               "ext_src_port", Uint16;
-                               "dst_port", Uint16;
-                               "int_src_ip", Uint32;
-                               "ext_src_ip", Uint32;
-                               "dst_ip", Uint32;
-                               "int_device_id", Uint8;
-                               "ext_device_id", Uint8;
-                               "protocol", Uint8;])
+let dmap_struct = Ir.Str ( "DoubleMap", [] )
+let dchain_struct = Ir.Str ( "DoubleChain", [] )
+let ext_key_struct = Ir.Str ( "ext_key", ["ext_src_port", Uint16;
+                                          "dst_port", Uint16;
+                                          "ext_src_ip", Uint32;
+                                          "dst_ip", Uint32;
+                                          "ext_device_id", Uint8;
+                                          "protocol", Uint8;] )
+let int_key_struct = Ir.Str ( "int_key", ["int_src_port", Uint16;
+                                          "dst_port", Uint16;
+                                          "int_src_ip", Uint32;
+                                          "dst_ip", Uint32;
+                                          "int_device_id", Uint8;
+                                          "protocol", Uint8;] )
+let flw_struct = Ir.Str ("flow", ["ik", int_key_struct;
+                                  "ek", ext_key_struct;
+                                  "int_src_port", Uint16;
+                                  "ext_src_port", Uint16;
+                                  "dst_port", Uint16;
+                                  "int_src_ip", Uint32;
+                                  "ext_src_ip", Uint32;
+                                  "dst_ip", Uint32;
+                                  "int_device_id", Uint8;
+                                  "ext_device_id", Uint8;
+                                  "protocol", Uint8;])
 
 let fun_types =
   String.Map.of_alist_exn
@@ -160,7 +132,7 @@ let fun_types =
                        lemmas_after = [];
                        leaks = [
                          on_rez_nz_leak "dmappingp<int_k, ext_k, flw>\
-                                         (_,_,_,_,_,_,_,_,_,_,_,_,_,_,_)"
+                                         (_,_,_,_,_,_,_,_,_,_,_,_,_,_)"
                            ~id:"dmappingp";];};
      "dmap_set_entry_condition", {ret_type = Void;
                                   arg_types = [Ptr (Ctm "entry_condition")];
@@ -179,7 +151,10 @@ let fun_types =
                                              Ptr (Ptr dchain_struct);
                                              Uint32];
                                 lemmas_before = [
-                                  tx_bl "empty_dmap_dchain_coherent(1024);";
+                                  tx_bl "empty_dmap_dchain_coherent\
+                                         <int_k,ext_k,flw>(1024);";
+                                  tx_bl "empty_dmap_cap\
+                                         <int_k,ext_k,flw>(1024);";
                                   tx_bl "index_range_of_empty(1024);";
                                   (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
@@ -515,10 +490,10 @@ let fun_types =
 
 let fixpoints =
   String.Map.of_alist_exn [
-    "nat_int_fp", {v=Bop(And,
-                         {v=Bop(Le,{v=Int 0;t=Sint32},{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown});t=Unknown},
-                         {v=Bop(Lt,{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown},
-                                {v=Int 2;t=Sint32});t=Unknown});t=Boolean};
+    "nat_int_fp", {Ir.v=Bop(And,
+                            {v=Bop(Le,{v=Int 0;t=Sint32},{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown});t=Unknown},
+                            {v=Bop(Lt,{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown},
+                                   {v=Int 2;t=Sint32});t=Unknown});t=Boolean};
     "nat_ext_fp", {v=Bop(And,
                          {v=Bop(And,
                                 {v=Bop(Le,
