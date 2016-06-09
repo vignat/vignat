@@ -57,7 +57,7 @@ validate_file() {
     VALID_RESULT="${UNIQUE_PREFIX}.validator_result"
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
     cp $FNAME $UNIQUE_PREFIX.src
-    CMD1="./validator.byte nat_fspec.cmo $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST"
+    CMD1="./validator.byte nat_fspec.cmo $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST ../nat"
     CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
     echo "make all && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
     $CMD1 > $VALID_RESULT && $CMD2 > $VERIF_RESULT

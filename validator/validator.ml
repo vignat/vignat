@@ -1,7 +1,7 @@
 open Core.Std
 open Ir
 
-let validate_prefix fin fout intermediate_pref verifast_bin =
+let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
   let spec_mod =  match !Fspec_api.spec with
     | Some m -> m
     | None -> failwith "Failed: could not find function spec dynamic module"
@@ -16,7 +16,9 @@ let validate_prefix fin fout intermediate_pref verifast_bin =
   let ir = Import.build_ir Spec.fun_types fin in
   Out_channel.write_all ir_fname ~data:(Sexp.to_string (sexp_of_ir ir));
   Render.render_ir ir intermediate_fout;
-  match Verifier.verify_file verifast_bin intermediate_fout verify_out_fname with
+  match Verifier.verify_file
+          verifast_bin intermediate_fout verify_out_fname proj_root
+  with
   | Verifier.Valid ->
     ignore (Sys.command ("cp " ^ intermediate_fout ^ " " ^ fout));
     printf "Valid.\n"
@@ -25,12 +27,15 @@ let validate_prefix fin fout intermediate_pref verifast_bin =
       let vf_assumptions = Verifier.export_assumptions
           verifast_bin intermediate_fout ir.export_point
           assumptions_fname lino_fname export_out_fname
+          proj_root
       in
       let ir = Analysis.induce_symbolic_assignments
           Spec.fixpoints ir vf_assumptions
       in
       Render.render_ir ir fout;
-      match Verifier.verify_file verifast_bin fout verify_out_fname with
+      match Verifier.verify_file
+              verifast_bin fout verify_out_fname proj_root
+      with
       | Verifier.Valid -> printf "\\/alid.\n"
       | Verifier.Invalid cause -> printf "Failed: %s\n" cause
     end
@@ -50,4 +55,4 @@ let load_plug fname =
 
 let () =
   load_plug Sys.argv.(1);
-  validate_prefix Sys.argv.(2) Sys.argv.(3) Sys.argv.(4) Sys.argv.(5)
+  validate_prefix Sys.argv.(2) Sys.argv.(3) Sys.argv.(4) Sys.argv.(5) Sys.argv.(6)
