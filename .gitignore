@@ -3,6 +3,8 @@
 ~*
 *~
 *.aux
+*.cmo
+*.byte
 #*
 *#
 .#*
@@ -22,3 +24,5 @@ bench/perfplot.png
 nat/build
 TAGS
 .vagrant
+validator/_build
+nat/klee-*

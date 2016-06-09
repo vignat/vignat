@@ -551,6 +551,7 @@ let fixpoints =
 
 module Iface : Fspec_api.Spec =
 struct
+  let preamble = In_channel.read_all "preamble.tmpl"
   let fun_types = fun_types
   let fixpoints = fixpoints
 end

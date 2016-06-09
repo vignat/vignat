@@ -3,8 +3,6 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
-let preamble = In_channel.read_all "preamble.tmpl"
-
 let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 
 let infer_signed_type w =
@@ -578,7 +576,7 @@ let rec get_relevant_segment pref =
        tip_calls = pref.tip_calls;}
   | None -> pref
 
-let build_ir fun_types fin =
+let build_ir fun_types fin preamble =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
     | Some spec -> spec
