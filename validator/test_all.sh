@@ -22,6 +22,9 @@ analyze_result() {
             if grep -q "No matching heap chunks" $RESULT; then
                 echo $FNAME nochunks fail >> $REPORT_FNAME
             fi
+            if grep -q "No matching pointsto chunk" $RESULT; then
+                echo $FNAME nochunks fail >> $REPORT_FNAME
+            fi
             if grep -q "Function leaks heap chunks" $RESULT; then
                 echo $FNAME leak fail >> $REPORT_FNAME
             fi

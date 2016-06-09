@@ -35,6 +35,7 @@ sig
   val preamble  : string
   val fun_types : fun_spec Core.Std.String.Map.t
   val fixpoints : Ir.tterm Core.Std.String.Map.t
+  val boundary_fun : string
 end
 
 let spec = ref None

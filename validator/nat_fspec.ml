@@ -554,6 +554,7 @@ struct
   let preamble = In_channel.read_all "preamble.tmpl"
   let fun_types = fun_types
   let fixpoints = fixpoints
+  let boundary_fun = "loop_invariant_consume"
 end
 
 (* Register the module *)

@@ -566,24 +566,27 @@ let extract_leaks ftype_of ccontexts =
   in
   String.Map.data leak_map
 
-let rec get_relevant_segment pref =
+let rec get_relevant_segment pref boundary_fun =
   match List.findi pref.history ~f:(fun _ call ->
-      String.equal call.fun_name "loop_invariant_consume") with
+      String.equal call.fun_name boundary_fun) with
   | Some (pos,_) ->
     let tail_len = (List.length pref.history) - pos - 1 in
     get_relevant_segment
       {history = List.sub pref.history ~pos:(pos + 1) ~len:tail_len;
        tip_calls = pref.tip_calls;}
+      boundary_fun
   | None -> pref
 
-let build_ir fun_types fin preamble =
+let build_ir fun_types fin preamble boundary_fun =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
     | Some spec -> spec
     | None -> failwith ("unknown function " ^ fun_name)
   in
   let pref = get_relevant_segment
-      (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin)) in
+      (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin))
+      boundary_fun
+  in
   let preamble = preamble ^
                  "void to_verify()\
                   /*@ requires true; @*/ \
