@@ -51,7 +51,8 @@ struct DoubleChain {
           dchainip(?dci, cells) &*&
           dchaini_irange_fp(dci) == index_range &*&
           true == insync_fp(dchaini_alist_fp(dci), tstamps, alist) &*&
-          true == bnd_sorted_fp(map(snd, alist), low, high);
+          true == bnd_sorted_fp(map(snd, alist), low, high) &*&
+          low <= high;
       };
 
   fixpoint list<pair<int, uint32_t> > dchain_alist_fp(dchain ch) {
@@ -318,12 +319,17 @@ int dchain_allocate(int index_range, struct DoubleChain** chain_out)
                                        uint32_t time,
                                        uint32_t high)
   requires true == bnd_sorted_fp(map(snd, alist), low, high) &*&
-           high <= time;
+           high <= time &*&
+           low <= high;
   ensures true == bnd_sorted_fp(map(snd, append(alist,
                                                 cons(pair(index, time), nil))),
                                 low, time);
   {
-    assume(false);//TODO
+    switch(alist){
+      case nil:
+      case cons(h, t):
+        allocate_keeps_bnd_sorted(t, index, snd(h), time, high);
+    }
   }
   @*/
 
@@ -494,6 +500,20 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
   @*/
 
 /*@
+  lemma void widen_bnd_sorted(list<uint32_t> times,
+                              uint32_t l, uint32_t L,
+                              uint32_t h, uint32_t H)
+  requires true == bnd_sorted_fp(times, L, h) &*&
+           l <= L &*& h <= H;
+  ensures true == bnd_sorted_fp(times, l, H);
+  {
+    switch(times) {
+      case nil: return;
+      case cons(hd, tl):
+        widen_bnd_sorted(tl, hd, hd, h, H);
+    }
+  }
+
   lemma void remove_index_keeps_bnd_sorted(list<pair<int, uint32_t> > alist,
                                            int index,
                                            uint32_t low,
@@ -502,7 +522,14 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
   ensures true == bnd_sorted_fp(map(snd, remove_by_index_fp(alist, index)),
                                 low, high);
   {
-  assume(false);//TODO
+    switch(alist) {
+      case nil: return;
+      case cons(h, t):
+        if (fst(h) == index) {
+          widen_bnd_sorted(map(snd, t), low, snd(h), high, high);
+        } else
+          remove_index_keeps_bnd_sorted(t, index, snd(h), high);
+    }
   }
   @*/
 
@@ -513,7 +540,8 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
                                          uint32_t time,
                                          uint32_t high)
   requires true == bnd_sorted_fp(map(snd, alist), low, high) &*&
-           high <= time;
+           high <= time &*&
+           low <= high;
   ensures true == bnd_sorted_fp(map(snd, append(remove_by_index_fp(alist, index),
                                                 cons(pair(index, time), nil))),
                                 low, time);
