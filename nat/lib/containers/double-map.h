@@ -292,6 +292,23 @@ struct DoubleMap;
           vk2(dmap_get_val_fp(m, dmap_get_k2_fp(m, k))) == k &*&
           true == recp1(vk1(dmap_get_val_fp(m, dmap_get_k2_fp(m, k))), dmap_get_k2_fp(m,k)) &*&
           true == recp2(k, dmap_get_k2_fp(m,k));
+
+  lemma void dmap_erase_erase_swap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                             int i1, int i2,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2);
+  requires true;
+  ensures dmap_erase_fp(dmap_erase_fp(m, i1, vk1, vk2), i2, vk1, vk2) ==
+          dmap_erase_fp(dmap_erase_fp(m, i2, vk1, vk2), i1, vk1, vk2);
+
+  lemma void dmap_erase_another_one<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                              list<int> idxs,
+                                              int idx,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2);
+  requires true;
+  ensures dmap_erase_fp(dmap_erase_all_fp(m, idxs, vk1, vk2), idx, vk1, vk2) ==
+          dmap_erase_all_fp(m, append(idxs, cons(idx, nil)), vk1, vk2);
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

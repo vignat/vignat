@@ -1672,3 +1672,47 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
                       fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, map); @*/
 }
 
+/*@
+  lemma void dmap_erase_erase_swap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                             int i1, int i2,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_erase_fp(dmap_erase_fp(m, i1, vk1, vk2), i2, vk1, vk2) ==
+          dmap_erase_fp(dmap_erase_fp(m, i2, vk1, vk2), i1, vk1, vk2);
+  {
+    switch(m) { case dmap(ma, mb, val_arr):
+      if (i1 == i2) {
+        return;
+      } else {
+        map_erase_erase_swap(ma, vk1(get_some(nth(i1, val_arr))),
+                                 vk1(get_some(nth(i2, val_arr))));
+        map_erase_erase_swap(mb, vk2(get_some(nth(i1, val_arr))),
+                                 vk2(get_some(nth(i2, val_arr))));
+        nth_update_unrelevant(i1, i2, none, val_arr);
+        nth_update_unrelevant(i2, i1, none, val_arr);
+        update_update(val_arr, i1, none, i2, none);
+      }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_another_one<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                              list<int> idxs,
+                                              int idx,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_erase_fp(dmap_erase_all_fp(m, idxs, vk1, vk2), idx, vk1, vk2) ==
+          dmap_erase_all_fp(m, append(idxs, cons(idx, nil)), vk1, vk2);
+  {
+    switch(idxs) {
+      case nil: return;
+      case cons(h,t):
+        dmap_erase_another_one(m, t, idx, vk1, vk2);
+        dmap_erase_erase_swap(dmap_erase_all_fp(m, t, vk1, vk2),
+                              idx, h, vk1, vk2);
+    }
+  }
+  @*/

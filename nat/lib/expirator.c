@@ -21,20 +21,6 @@
   @*/
 
 /*@
-  lemma void dmap_erase_another_one<t1,t2,vt>(dmap<t1,t2,vt> m,
-                                              list<int> idxs,
-                                              int idx,
-                                              fixpoint (vt,t1) vk1,
-                                              fixpoint (vt,t2) vk2)
-  requires true;
-  ensures dmap_erase_fp(dmap_erase_all_fp(m, idxs, vk1, vk2), idx, vk1, vk2) ==
-          dmap_erase_all_fp(m, append(idxs, cons(idx, nil)), vk1, vk2);
-  {
-    assume(false);//TODO
-  }
-  @*/
-
-/*@
   lemma void coherent_expire_one<t1,t2,vt>(dmap<t1,t2,vt> m,
                                            dchain ch,
                                            int idx,
