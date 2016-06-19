@@ -55,6 +55,12 @@ struct DoubleChain {
           low <= high;
       };
 
+  predicate dchain_is_sortedp(dchain ch) =
+   switch(ch) { case dchain(alist, index_range, low, high):
+      return true == bnd_sorted_fp(map(snd, alist), low, high);
+   };
+
+
   fixpoint list<pair<int, uint32_t> > dchain_alist_fp(dchain ch) {
     switch(ch) { case dchain(alist, size, l, h): return alist; }
   }
@@ -943,5 +949,120 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   {
     switch(ch) { case dchain(alist, size, l, h):
     }
+  }
+  @*/
+
+/*@
+  lemma void expire_indexes_tail(pair<int, uint32_t> ah,
+                                 list<pair<int, uint32_t> > at,
+                                 uint32_t time, int n)
+  requires snd(ah) < time &*& 0 <= n;
+  ensures fold_left(cons(ah,at), remove_by_index_fp,
+                    take(n+1, get_expired_indexes_fp(time, cons(ah,at)))) ==
+          fold_left(at, remove_by_index_fp,
+                    take(n, get_expired_indexes_fp(time, at)));
+  {
+    switch(at) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n)
+          if (snd(h) < time)
+            expire_indexes_tail(h, t, time, n-1);
+    }
+  }
+  @*/
+
+/*@
+  lemma void all_new_no_expired_indexes(list<pair<int, uint32_t> > al,
+                                        uint32_t time,
+                                        uint32_t low, uint32_t high)
+  requires true == bnd_sorted_fp(map(snd, al), low, high) &*&
+           time <= low;
+  ensures get_expired_indexes_fp(time, al) == nil;
+  {
+    switch(al) {
+      case nil: return;
+      case cons(h,t):
+        all_new_no_expired_indexes(t, time, snd(h), high);
+    }
+  }
+  @*/
+
+/*@
+  lemma void expire_n_plus_one_impl(list<pair<int, uint32_t> > al,
+                                    uint32_t time, int n,
+                                    uint32_t low, uint32_t high)
+  requires fold_left(al, remove_by_index_fp,
+                     take(n, get_expired_indexes_fp(time, al))) ==
+           cons(?ah,?at) &*&
+           snd(ah) < time &*&
+           0 <= n &*&
+           true == bnd_sorted_fp(map(snd, al), low, high);
+  ensures fold_left(al, remove_by_index_fp,
+                    take(n+1, get_expired_indexes_fp(time, al))) ==
+          remove_by_index_fp(cons(ah, at), fst(ah)) &*&
+          take(n+1, get_expired_indexes_fp(time, al)) ==
+          append(take(n, get_expired_indexes_fp(time, al)),
+                 cons(fst(ah), nil));
+  {
+    switch(al) {
+      case nil:
+        return;
+      case cons(h,t):
+        if (n != 0) {
+          if (snd(h) < time) {
+            expire_indexes_tail(h, t, time, n-1);
+            assert fold_left(t, remove_by_index_fp,
+                            take(n-1, get_expired_indexes_fp(time, t))) ==
+                  cons(ah,at);
+            expire_n_plus_one_impl(t, time, n-1, snd(h), high);
+            expire_indexes_tail(h, t, time, n);
+          } else {
+            all_new_no_expired_indexes(al, time, snd(h), high);
+          }
+        }
+    }
+  }
+  @*/
+/*@
+  lemma void double_chainp_to_sorted(dchain ch)
+  requires double_chainp(ch, ?cp);
+  ensures double_chainp(ch, cp) &*& dchain_is_sortedp(ch);
+  {
+    open double_chainp(ch, cp);
+    close dchain_is_sortedp(ch);
+    close double_chainp(ch, cp);
+  }
+
+  lemma void destroy_dchain_is_sortedp(dchain ch)
+  requires dchain_is_sortedp(ch);
+  ensures true;
+  {
+    open dchain_is_sortedp(ch);
+  }
+  @*/
+
+/*@
+  lemma void expire_n_plus_one(dchain ch, uint32_t time, int n)
+  requires false == dchain_is_empty_fp(expire_n_indexes(ch, time, n)) &*&
+           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, n)) <
+           time &*&
+           0 <= n &*&
+           dchain_is_sortedp(ch);
+  ensures dchain_remove_index_fp(expire_n_indexes(ch, time, n),
+                                 dchain_get_oldest_index_fp
+                                  (expire_n_indexes(ch, time, n))) ==
+          expire_n_indexes(ch, time, n+1) &*&
+          append(take(n, dchain_get_expired_indexes_fp(ch, time)),
+                 cons(dchain_get_oldest_index_fp(expire_n_indexes(ch, time, n)),
+                      nil)) ==
+          take(n+1, dchain_get_expired_indexes_fp(ch, time)) &*&
+          dchain_is_sortedp(ch);
+  {
+    open dchain_is_sortedp(ch);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      expire_n_plus_one_impl(alist, time, n, lo, hi);
+    }
+    close dchain_is_sortedp(ch);
   }
   @*/

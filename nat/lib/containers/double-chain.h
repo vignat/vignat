@@ -17,6 +17,8 @@ struct DoubleChain;
   predicate double_chainp(dchain ch,
                           struct DoubleChain* cp);
 
+  predicate dchain_is_sortedp(dchain ch);
+
   fixpoint dchain empty_dchain_fp(int index_range, uint32_t low) {
     return dchain(nil, index_range, low, low);
   }
@@ -133,6 +135,14 @@ struct DoubleChain;
     }
   }
 
+  fixpoint dchain expire_n_indexes(dchain ch, uint32_t time, int n) {
+    switch(ch) { case dchain(alist, size, l, h):
+      return dchain(fold_left(alist, remove_by_index_fp,
+                              take(n, get_expired_indexes_fp(time, alist))),
+                    size,
+                    l, h);
+    }
+  }
 
   lemma void expire_old_dchain_nonfull(struct DoubleChain* chain, dchain ch,
                                        uint32_t time);
@@ -162,6 +172,29 @@ struct DoubleChain;
   ensures dchain_index_range_fp(dchain_allocate_fp(ch, index, t)) ==
           dchain_index_range_fp(ch);
 
+  lemma void double_chainp_to_sorted(dchain ch);
+  requires double_chainp(ch, ?cp);
+  ensures double_chainp(ch, cp) &*& dchain_is_sortedp(ch);
+
+  lemma void destroy_dchain_is_sortedp(dchain ch);
+  requires dchain_is_sortedp(ch);
+  ensures true;
+
+  lemma void expire_n_plus_one(dchain ch, uint32_t time, int n);
+  requires false == dchain_is_empty_fp(expire_n_indexes(ch, time, n)) &*&
+           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, n)) <
+           time &*&
+           0 <= n &*&
+           dchain_is_sortedp(ch);
+  ensures dchain_remove_index_fp(expire_n_indexes(ch, time, n),
+                                 dchain_get_oldest_index_fp
+                                   (expire_n_indexes(ch, time, n))) ==
+          expire_n_indexes(ch, time, n+1) &*&
+          append(take(n, dchain_get_expired_indexes_fp(ch, time)),
+                 cons(dchain_get_oldest_index_fp(expire_n_indexes(ch, time, n)),
+                      nil)) ==
+          take(n+1, dchain_get_expired_indexes_fp(ch, time)) &*&
+          dchain_is_sortedp(ch);
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
