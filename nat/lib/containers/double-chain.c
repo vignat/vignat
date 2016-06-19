@@ -1066,3 +1066,24 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     close dchain_is_sortedp(ch);
   }
   @*/
+
+/*@
+  lemma void dchain_expired_indexes_limited(dchain ch, uint32_t time)
+  requires double_chainp(ch, ?cp);
+  ensures double_chainp(ch, cp) &*&
+          length(dchain_get_expired_indexes_fp(ch, time)) <=
+          dchain_index_range_fp(ch);
+  {
+    open double_chainp(ch, cp);
+    assert dchainip(?dci, ?cells);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      dchaini_alist_upperbound(cp->cells, dci);
+      assert uints(?timestamps, ir, ?tstmps);
+      insync_same_len(dchaini_alist_fp(dci), tstmps, alist);
+      assert length(alist) <= ir;
+      filter_no_increase_len((is_cell_expired)(time), alist);
+      map_preserves_length(fst, filter((is_cell_expired)(time), alist));
+    }
+    close double_chainp(ch, cp);
+  }
+  @*/

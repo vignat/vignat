@@ -1,6 +1,8 @@
 #ifndef STDEX_H
 #define STDEX_H
 
+#include <listex.gh>
+
 lemma void length_0_nil<T>(list<T> lst)
 requires length(lst) == 0;
 ensures lst == nil;
@@ -418,6 +420,27 @@ ensures append(a, b) != nil;
   }
 }
 
+  lemma void filter_no_increase_len<t>(fixpoint (t, bool) f, list<t> xs)
+  requires true;
+  ensures length(filter(f, xs)) <= length(xs);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        filter_no_increase_len(f, t);
+    }
+  }
+
+  lemma void map_preserves_length<a,b>(fixpoint (a,b) f, list<a> xs)
+  requires true;
+  ensures length(map(f, xs)) == length(xs);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        map_preserves_length(f, t);
+    }
+  }
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
