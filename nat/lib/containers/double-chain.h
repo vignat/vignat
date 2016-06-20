@@ -195,12 +195,16 @@ struct DoubleChain;
                       nil)) ==
           take(n+1, dchain_get_expired_indexes_fp(ch, time)) &*&
           dchain_is_sortedp(ch);
-  
+
   lemma void dchain_expired_indexes_limited(dchain ch, uint32_t time);
   requires double_chainp(ch, ?cp);
   ensures double_chainp(ch, cp) &*&
           length(dchain_get_expired_indexes_fp(ch, time)) <=
           dchain_index_range_fp(ch);
+
+  lemma void dchain_oldest_allocated(dchain ch);
+  requires false == dchain_is_empty_fp(ch);
+  ensures true == dchain_allocated_fp(ch, dchain_get_oldest_index_fp(ch));
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);

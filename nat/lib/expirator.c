@@ -36,17 +36,6 @@
   @*/
 
 /*@
-  lemma void dchain_oldest_allocated(dchain ch)
-  requires false == dchain_is_empty_fp(ch);
-  ensures true == dchain_allocated_fp(ch, dchain_get_oldest_index_fp(ch));
-  {
-    switch(ch) { case dchain(alist, ir, lo, hi):
-      assume(false);//TODO
-    }
-  }
-  @*/
-
-/*@
   lemma void expire_0_indexes(dchain ch, uint32_t time)
   requires true;
   ensures ch == expire_n_indexes(ch, time, 0);

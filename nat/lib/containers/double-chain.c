@@ -1087,3 +1087,22 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     close double_chainp(ch, cp);
   }
   @*/
+
+/*@
+  lemma void alist_fst_exists(list<pair<int, uint32_t> > alist)
+  requires alist == cons(?ah,?at);
+  ensures true == exists(alist, (same_index)(fst(ah)));
+  {
+  }
+  @*/
+
+/*@
+  lemma void dchain_oldest_allocated(dchain ch)
+  requires false == dchain_is_empty_fp(ch);
+  ensures true == dchain_allocated_fp(ch, dchain_get_oldest_index_fp(ch));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      alist_fst_exists(alist);
+    }
+  }
+  @*/
