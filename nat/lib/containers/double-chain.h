@@ -205,6 +205,14 @@ struct DoubleChain;
   lemma void dchain_oldest_allocated(dchain ch);
   requires false == dchain_is_empty_fp(ch);
   ensures true == dchain_allocated_fp(ch, dchain_get_oldest_index_fp(ch));
+
+  lemma void expired_all(dchain ch, uint32_t time, int count);
+  requires true == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
+           0 <= count &*&
+           count <= length(dchain_get_expired_indexes_fp(ch, time));
+  ensures count == length(dchain_get_expired_indexes_fp(ch, time)) &*&
+          dchain_expire_old_indexes_fp(ch, time) ==
+          expire_n_indexes(ch, time, count);
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);

@@ -47,17 +47,6 @@
   @*/
 
 /*@
-  lemma void expired_all(dchain ch, uint32_t time, int count)
-  requires true == dchain_is_empty_fp(expire_n_indexes(ch, time, count));
-  ensures count == length(dchain_get_expired_indexes_fp(ch, time)) &*&
-          dchain_expire_old_indexes_fp(ch, time) ==
-          expire_n_indexes(ch, time, count);
-  {
-    assume(false);//TODO
-  }
-  @*/
-
-/*@
   lemma void no_more_expired(dchain ch, uint32_t time, int count)
   requires time <=
            dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count));

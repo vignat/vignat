@@ -1106,3 +1106,117 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     }
   }
   @*/
+
+/*@
+  lemma void remove_by_index_len_monotonic(list<pair<int, uint32_t> > alist,
+                                           int index)
+  requires true;
+  ensures length(remove_by_index_fp(alist, index)) <= length(alist) &*&
+          length(alist) <= length(remove_by_index_fp(alist, index)) + 1;
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != index) remove_by_index_len_monotonic(t, index);
+    }
+  }
+  @*/
+
+/*@
+  lemma void remove_all_idxes_eq_len(list<pair<int, uint32_t> > alist,
+                                     list<int> lst)
+  requires fold_left(alist, remove_by_index_fp, lst) == nil;
+  ensures length(alist) <= length(lst);
+  {
+    switch(lst) {
+      case nil: return ;
+      case cons(h,t):
+        remove_all_idxes_eq_len(remove_by_index_fp(alist, h), t);
+        remove_by_index_len_monotonic(alist, h);
+    }
+  }
+  @*/
+
+/*@
+  lemma void length_take_filter_same_filter_holey
+              (list<pair<int, uint32_t> > alist,
+               uint32_t time,
+               int count)
+  requires length(alist) <=
+           length(take(count, map(fst, filter((is_cell_expired)(time),
+                                              alist)))) &*&
+           0 <= count;
+  ensures length(alist) <= count &*& filter((is_cell_expired)(time),
+                                            alist) == alist;
+  {
+    filter_effect_on_len(alist, (is_cell_expired)(time));
+    map_effect_on_len(filter((is_cell_expired)(time), alist), fst);
+    take_effect_on_len(map(fst, filter((is_cell_expired)(time), alist)),
+                       count);
+  }
+  @*/
+
+/*@
+  lemma void all_cells_expired(list<pair<int, uint32_t> > alist,
+                               uint32_t time, int count)
+  requires fold_left(alist, remove_by_index_fp,
+                     take(count, map(fst, filter((is_cell_expired)(time),
+                                                 alist)))) ==
+           nil &*&
+           0 <= count;
+  ensures filter((is_cell_expired)(time), alist) == alist &*&
+          length(alist) <= count;
+  {
+    remove_all_idxes_eq_len(alist,
+                            take(count, map(fst, filter((is_cell_expired)(time),
+                                                        alist))));
+    length_take_filter_same_filter_holey(alist, time, count);
+  }
+  @*/
+
+/*@
+  lemma void expired_indexes_limited2(list<pair<int, uint32_t> > alist,
+                                      uint32_t time)
+  requires true;
+  ensures length(get_expired_indexes_fp(time, alist)) <= length(alist);
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        expired_indexes_limited2(t, time);
+    }
+  }
+  @*/
+
+/*@
+  lemma void expired_all_impl(list<pair<int, uint32_t> > alist,
+                              uint32_t time, int count)
+  requires fold_left(alist, remove_by_index_fp,
+                     take(count, map(fst, filter((is_cell_expired)(time),
+                                                 alist)))) ==
+           nil &*&
+           0 <= count &*&
+           count <= length(get_expired_indexes_fp(time, alist));
+  ensures count == length(get_expired_indexes_fp(time, alist)) &*&
+          get_expired_indexes_fp(time, alist) ==
+          take(count, get_expired_indexes_fp(time, alist));
+  {
+     all_cells_expired(alist, time, count);
+     expired_indexes_limited2(alist, time);
+  }
+  @*/
+
+/*@
+  lemma void expired_all(dchain ch, uint32_t time, int count)
+  requires true == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
+           0 <= count &*&
+           count <= length(dchain_get_expired_indexes_fp(ch, time));
+  ensures count == length(dchain_get_expired_indexes_fp(ch, time)) &*&
+          dchain_expire_old_indexes_fp(ch, time) ==
+          expire_n_indexes(ch, time, count);
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      expired_all_impl(alist, time, count);
+    }
+  }
+  @*/

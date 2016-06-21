@@ -441,6 +441,43 @@ ensures append(a, b) != nil;
         map_preserves_length(f, t);
     }
   }
+  
+  lemma void take_effect_on_len<t>(list<t> l, int n)
+  requires 0 <= n;
+  ensures (n <= length(l) ?
+            (length(take(n, l)) == n) :
+            (length(take(n, l)) == length(l)));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (n != 0) take_effect_on_len(t, n-1);
+    }
+  }
+
+  lemma void map_effect_on_len<a,b>(list<a> l, fixpoint (a,b) f)
+  requires true;
+  ensures length(l) == length(map(f, l));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        map_effect_on_len(t, f);
+    }
+  }
+
+  lemma void filter_effect_on_len<t>(list<t> l, fixpoint (t,bool) f)
+  requires true;
+  ensures (length(filter(f, l)) == length(l) ?
+            (filter(f, l) == l) :
+            (length(filter(f, l)) < length(l)));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        filter_effect_on_len(t, f);
+    }
+  }
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
