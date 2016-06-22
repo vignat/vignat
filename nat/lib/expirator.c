@@ -47,18 +47,6 @@
   @*/
 
 /*@
-  lemma void no_more_expired(dchain ch, uint32_t time, int count)
-  requires time <=
-           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count));
-  ensures count == length(dchain_get_expired_indexes_fp(ch, time)) &*&
-          dchain_expire_old_indexes_fp(ch, time) ==
-          expire_n_indexes(ch, time, count);
-  {
-    assume(false);//TODO
-  }
-  @*/
-
-/*@
   lemma void coherent_old_index_used<t1,t2,vt>(dmap<t1,t2,vt> m, dchain ch)
   requires dmap_dchain_coherent(m, ch) &*&
            false == dchain_is_empty_fp(ch);
@@ -87,6 +75,16 @@
   {
     switch(m) { case dmap(ks1, ks2, idxs):
     }
+  }
+  @*/
+
+/*@
+  lemma void dchain_still_more_to_expire(dchain ch, uint32_t time, int count)
+  requires false == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
+           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count)) < time;
+  ensures count < length(dchain_get_expired_indexes_fp(ch, time));
+  {
+    assume(false);//TODO
   }
   @*/
 
@@ -145,6 +143,7 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
     //@ coherent_same_cap(cur_m, cur_ch);
     dmap_erase(map, index);
     //@ expire_n_plus_one(ch, time, count);
+    //@ dchain_still_more_to_expire(ch, time, count);
     ++count;
     /*@ dmap_erase_another_one(m, take(count-1, dchain_get_expired_indexes_fp(ch, time)),
                                dchain_get_oldest_index_fp(cur_ch),
@@ -152,7 +151,6 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                @*/
     //@ dchain_oldest_allocated(cur_ch);
     //@ coherent_expire_one(cur_m, cur_ch, dchain_get_oldest_index_fp(cur_ch), vk1, vk2);
-    //@ assume(count <= length(dchain_get_expired_indexes_fp(ch, time)));//TODO
   }
   /*@ if(dchain_is_empty_fp(expire_n_indexes(ch, time, count))) {
       expired_all(ch, time, count);

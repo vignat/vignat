@@ -479,6 +479,40 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void car_drop_is_nth<t>(int n, list<t> lst)
+  requires 0 <= n &*& n < length(lst) &*& drop(n, lst) == cons(?head,_);
+  ensures nth(n, lst) == head;
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n) car_drop_is_nth(n-1, t);
+    }
+  }
+
+  lemma void take_take<t>(int n, int m, list<t> lst)
+  requires 0 <= n &*& n <= m;
+  ensures take(n, take(m, lst)) == take(n, lst);
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n) take_take(n-1, m-1, t);
+    }
+  }
+
+  lemma void take_map<a,b>(int n, fixpoint (a,b) f, list<a> lst)
+  requires 0 <= n &*& n < length(lst);
+  ensures take(n, map(f, lst)) == map(f, take(n, lst));
+  {
+    switch(lst) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n) take_map(n-1, f, t);
+    }
+  }
+
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

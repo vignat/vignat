@@ -1220,3 +1220,113 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     }
   }
   @*/
+
+/*@
+  lemma void sorted_expired_idxes_is_the_first_part
+           (list<pair<int, uint32_t> > alist, uint32_t time,
+            uint32_t low, uint32_t high)
+  requires true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures get_expired_indexes_fp(time, alist) ==
+          map(fst, take(length(get_expired_indexes_fp(time, alist)), alist));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (snd(h) < time) {
+          sorted_expired_idxes_is_the_first_part(t, time, snd(h), high);
+          cons_take_take_cons(h, t, length(get_expired_indexes_fp(time, alist))-1);
+        } else {
+          assert true == bnd_sorted_fp(map(snd, alist), snd(h), high);
+          all_new_no_expired_indexes(alist, time, snd(h), high);
+        }
+    }
+  }
+
+  lemma void remove_first_indexes(list<pair<int, uint32_t> > alist, int n)
+  requires 0 <= n;
+  ensures fold_left(alist, remove_by_index_fp,
+                    map(fst, take(n, alist))) == drop(n, alist);
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n) {
+          remove_first_indexes(t, n-1);
+        }
+    }
+  }
+
+  @*/
+
+/*@
+  lemma void expired_indexes_exhausted(list<pair<int, uint32_t> > alist,
+                                       uint32_t time, int n,
+                                       uint32_t low, uint32_t high)
+  requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
+           true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures snd(nth(n, alist)) < time;
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n) {
+          expired_indexes_exhausted(t, time, n-1, snd(h), high);
+        } else {
+          if (time <= snd(h)) {
+            all_new_no_expired_indexes(alist, time, snd(h), high);
+            assert length(get_expired_indexes_fp(time, alist)) == 0;
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void no_more_expired_impl(list<pair<int, uint32_t> > alist,
+                                  uint32_t time, int count,
+                                  uint32_t low, uint32_t high)
+  requires fold_left(alist, remove_by_index_fp,
+                     take(count, get_expired_indexes_fp(time, alist))) ==
+           cons(?ah,?at) &*&
+           time <= snd(ah) &*&
+           true == bnd_sorted_fp(map(snd, alist), low, high) &*&
+           0 <= count;
+  ensures length(get_expired_indexes_fp(time, alist)) <= count;
+  {
+    sorted_expired_idxes_is_the_first_part(alist, time, low, high);
+    remove_first_indexes(alist, length(get_expired_indexes_fp(time, alist)));
+    if (count < length(get_expired_indexes_fp(time, alist))) {
+      take_effect_on_len(alist, length(get_expired_indexes_fp(time, alist)));
+      expired_indexes_limited2(alist, time);
+      take_map(count, fst,
+               take(length(get_expired_indexes_fp(time, alist)), alist));
+      take_take(count, length(get_expired_indexes_fp(time, alist)), alist);
+      remove_first_indexes(alist, count);
+      assert cons(ah,at) == drop(count, alist);
+      car_drop_is_nth(count, alist);
+      assert ah == nth(count, alist);
+      expired_indexes_exhausted(alist, time, count, low, high);
+    }
+  }
+  @*/
+
+/*@
+  lemma void no_more_expired(dchain ch, uint32_t time, int count)
+  requires false == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
+           time <=
+           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count)) &*&
+           0 <= count &*&
+           count <= length(dchain_get_expired_indexes_fp(ch, time)) &*&
+           dchain_is_sortedp(ch);
+  ensures count == length(dchain_get_expired_indexes_fp(ch, time)) &*&
+          dchain_expire_old_indexes_fp(ch, time) ==
+          expire_n_indexes(ch, time, count) &*&
+          dchain_is_sortedp(ch);
+  {
+    open dchain_is_sortedp(ch);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      no_more_expired_impl(alist, time, count, lo, hi);
+    }
+    close dchain_is_sortedp(ch);
+  }
+  @*/
