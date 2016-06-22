@@ -78,16 +78,6 @@
   }
   @*/
 
-/*@
-  lemma void dchain_still_more_to_expire(dchain ch, uint32_t time, int count)
-  requires false == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
-           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count)) < time;
-  ensures count < length(dchain_get_expired_indexes_fp(ch, time));
-  {
-    assume(false);//TODO
-  }
-  @*/
-
 int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                  struct DoubleMap* map,
                                  uint32_t time)

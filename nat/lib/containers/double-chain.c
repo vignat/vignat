@@ -1259,9 +1259,9 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   @*/
 
 /*@
-  lemma void expired_indexes_exhausted(list<pair<int, uint32_t> > alist,
-                                       uint32_t time, int n,
-                                       uint32_t low, uint32_t high)
+  lemma void expired_indexes_are_old(list<pair<int, uint32_t> > alist,
+                                     uint32_t time, int n,
+                                     uint32_t low, uint32_t high)
   requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
            true == bnd_sorted_fp(map(snd, alist), low, high);
   ensures snd(nth(n, alist)) < time;
@@ -1270,7 +1270,7 @@ int dchain_expire_one_index(struct DoubleChain* chain,
       case nil: return;
       case cons(h,t):
         if (0 < n) {
-          expired_indexes_exhausted(t, time, n-1, snd(h), high);
+          expired_indexes_are_old(t, time, n-1, snd(h), high);
         } else {
           if (time <= snd(h)) {
             all_new_no_expired_indexes(alist, time, snd(h), high);
@@ -1305,7 +1305,7 @@ int dchain_expire_one_index(struct DoubleChain* chain,
       assert cons(ah,at) == drop(count, alist);
       car_drop_is_nth(count, alist);
       assert ah == nth(count, alist);
-      expired_indexes_exhausted(alist, time, count, low, high);
+      expired_indexes_are_old(alist, time, count, low, high);
     }
   }
   @*/
@@ -1326,6 +1326,76 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     open dchain_is_sortedp(ch);
     switch(ch) { case dchain(alist, ir, lo, hi):
       no_more_expired_impl(alist, time, count, lo, hi);
+    }
+    close dchain_is_sortedp(ch);
+  }
+  @*/
+
+/*@
+  lemma void expired_indexes_exhausted(list<pair<int, uint32_t> > alist,
+                                       uint32_t time,
+                                       uint32_t low, uint32_t high)
+  requires true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures length(get_expired_indexes_fp(time, alist)) == length(alist) ?
+            true :
+            time <= snd(nth(length(get_expired_indexes_fp(time, alist)), alist));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (time <= snd(h)) {
+          all_new_no_expired_indexes(alist, time, snd(h), high);
+          assert length(get_expired_indexes_fp(time, alist)) == 0;
+        } else {
+          expired_indexes_exhausted(t, time, snd(h), high);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_still_more_to_expire_impl(list<pair<int, uint32_t> > alist,
+                                              uint32_t time, int count,
+                                              uint32_t low, uint32_t high)
+  requires fold_left(alist, remove_by_index_fp,
+                     take(count, get_expired_indexes_fp(time, alist))) ==
+           cons(?ah,?at) &*&
+           snd(ah) < time &*&
+           true == bnd_sorted_fp(map(snd, alist), low, high) &*&
+           0 <= count;
+  ensures count < length(get_expired_indexes_fp(time, alist));
+  {
+    list<int> expind = get_expired_indexes_fp(time, alist);
+    take_effect_on_len(get_expired_indexes_fp(time, alist), count);
+    if (length(expind) <= count) {
+      expired_indexes_exhausted(alist, time, low, high);
+      sorted_expired_idxes_is_the_first_part(alist, time, low, high);
+      remove_first_indexes(alist, length(expind));
+      take_take(length(expind), count, expind);
+      if (length(expind) == length(alist)) {
+      } else {
+        expired_indexes_limited2(alist, time);
+        car_drop_is_nth(length(expind), alist);
+
+        assert time <= snd(ah);
+      }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_still_more_to_expire(dchain ch, uint32_t time, int count)
+  requires false == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
+           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count)) <
+           time &*&
+           dchain_is_sortedp(ch) &*&
+           0 <= count;
+  ensures count < length(dchain_get_expired_indexes_fp(ch, time)) &*&
+          dchain_is_sortedp(ch);
+  {
+    open dchain_is_sortedp(ch);
+    switch(ch) { case dchain(alist, ri, lo, hi):
+      dchain_still_more_to_expire_impl(alist, time, count, lo, hi);
     }
     close dchain_is_sortedp(ch);
   }
