@@ -14,8 +14,8 @@
 #endif //KLEE_VERIFICATION
 
 int int_key_eq(void* a, void* b)
-//@ requires int_k_p(a, ?ak) &*& int_k_p(b, ?bk);
-//@ ensures int_k_p(a, ak) &*& int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+//@ requires [?f1]int_k_p(a, ?ak) &*& [?f2]int_k_p(b, ?bk);
+//@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
 {
   struct int_key* k1 = a;
   struct int_key* k2 = b;
@@ -30,8 +30,8 @@ int int_key_eq(void* a, void* b)
 }
 
 int ext_key_eq(void* a, void* b)
-//@ requires ext_k_p(a, ?ak) &*& ext_k_p(b, ?bk);
-//@ ensures ext_k_p(a, ak) &*& ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+//@ requires [?f1]ext_k_p(a, ?ak) &*& [?f2]ext_k_p(b, ?bk);
+//@ ensures [f1]ext_k_p(a, ak) &*& [f2]ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
 {
   struct ext_key* k1 = a;
   struct ext_key* k2 = b;
@@ -61,8 +61,8 @@ static int ovf_cast(uint32_t x)
 }
 
 int int_key_hash(void* key)
-//@ requires int_k_p(key, ?k);
-//@ ensures int_k_p(key, k) &*& result == int_hash(k);
+//@ requires [?f]int_k_p(key, ?k);
+//@ ensures [f]int_k_p(key, k) &*& result == int_hash(k);
 {
   struct int_key* ik = key;
   uint32_t int_src_port = ik->int_src_port;
@@ -72,8 +72,8 @@ int int_key_hash(void* key)
 }
 
 int ext_key_hash(void* key)
-//@ requires ext_k_p(key, ?k);
-//@ ensures ext_k_p(key, k) &*& result == ext_hash(k);
+//@ requires [?f]ext_k_p(key, ?k);
+//@ ensures [f]ext_k_p(key, k) &*& result == ext_hash(k);
 {
   struct ext_key* ek = key;
   uint32_t ext_src_port = ek->ext_src_port;
@@ -95,24 +95,25 @@ int ext_key_hash(void* key)
 @*/
 
 void flow_extract_keys(void* flwp, void** ikpp, void** ekpp)
-//@ requires flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
-/*@ ensures flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&
-            int_k_p(ikp, ?ik) &*& ext_k_p(ekp, ?ek) &*&
+//@ requires [?f]flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
+/*@ ensures [f]flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&
+            [f]int_k_p(ikp, ?ik) &*& [f]ext_k_p(ekp, ?ek) &*&
             true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
             ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
 {
-  //@ open flw_p(flwp, flw);
+  //@ open [f]flw_p(flwp, flw);
   struct flow* fp = flwp;
   *ikpp = &fp->ik;
   *ekpp = &fp->ek;
-  //@ close flow_p(flwp, flw);
+  //@ close [f]flow_p(flwp, flw);
 }
 
 void flow_pack_keys(void* flwp, void* ikp, void* ekp)
-/*@ requires flow_p(flwp, ?flw) &*& int_k_p(ikp, ?ik) &*& ext_k_p(ekp, ?ek) &*&
+/*@ requires [?f]flow_p(flwp, ?flw) &*&
+             [f]int_k_p(ikp, ?ik) &*& [f]ext_k_p(ekp, ?ek) &*&
              true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
              ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
-//@ ensures flw_p(flwp, flw);
+//@ ensures [f]flw_p(flwp, flw);
 {
   IGNORE(flwp);
   IGNORE(ikp);
@@ -219,6 +220,12 @@ void flow_pack_keys(void* flwp, void* ikp, void* ekp)
     assume(false);
   }
 
+  predicate u_short(uint16_t *p; uint16_t v);
+
+  lemma_auto void chars_to_u_short(void *p);
+  requires [?f]chars(p, sizeof(uint16_t), ?cs);
+  ensures [f]u_short(p, _);
+
   lemma void bytes_to_int_key(struct int_key* ik)
   requires chars((void*)ik, sizeof(struct int_key), ?chs);
   ensures int_k_p(ik, _);
@@ -226,7 +233,9 @@ void flow_pack_keys(void* flwp, void* ikp, void* ekp)
     assume(sizeof(struct int_key) == sizeof(uint16_t) + sizeof(uint16_t) +
            sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(uint8_t));
     chars_split((void*)ik, sizeof(uint16_t));
-    close int_key_int_src_port(ik, _);
+    chars_to_u_short((void*)&ik->int_src_port);
+
+    //close int_key_int_src_port(ik, _);
   }
 
   lemma void bytes_to_ext_key(void* ek);
@@ -235,24 +244,24 @@ void flow_pack_keys(void* flwp, void* ikp, void* ekp)
 
   lemma void bytes_to_flow(struct flow* f);
   requires chars((void*)f, sizeof(struct flow), ?chs);
-  ensures 
-  int_k_p(&f->ik, ?ik) &*&
-  ext_k_p(&f->ek, ?ek) &*&
-  f->int_src_port |-> ?isp &*&
-  f->ext_src_port |-> ?esp &*&
-  f->dst_port |-> ?dp &*&
-  f->int_src_ip |-> ?isip &*&
-  f->ext_src_ip |-> ?esip &*&
-  f->dst_ip |-> ?dip &*&
-  f->int_device_id |-> ?idid &*&
-  f->ext_device_id |-> ?edid &*&
-  f->protocol |-> ?prtc;
+  ensures
+    int_k_p(&f->ik, ?ik) &*&
+    ext_k_p(&f->ek, ?ek) &*&
+    f->int_src_port |-> ?isp &*&
+    f->ext_src_port |-> ?esp &*&
+    f->dst_port |-> ?dp &*&
+    f->int_src_ip |-> ?isip &*&
+    f->ext_src_ip |-> ?esip &*&
+    f->dst_ip |-> ?dip &*&
+    f->int_device_id |-> ?idid &*&
+    f->ext_device_id |-> ?edid &*&
+    f->protocol |-> ?prtc;
 
   @*/
 
 void flow_cpy(char* dst, void* src)
-//@ requires flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
-//@ ensures flw_p(src, f) &*& flw_p((void*)dst, f);
+//@ requires [?fr]flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
+//@ ensures [fr]flw_p(src, f) &*& flw_p((void*)dst, f);
 {
   struct flow* source = src;
   struct flow* destination = (void*)dst;
@@ -282,7 +291,7 @@ void flow_cpy(char* dst, void* src)
 
 void flow_destroy(void* flwp)
 //@ requires flw_p(flwp, ?flw);
-//@ ensures chars(flwp, sizeof(struct flow));
+//@ ensures chars(flwp, sizeof(struct flow), _);
 {
   IGNORE(flwp);
   //do nothing
