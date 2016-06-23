@@ -336,6 +336,11 @@ struct DoubleMap;
            false == mem(idx, remove(idx, ids));
   ensures true == forall(remove(idx, ids),
                          (dmap_index_used_fp)(dmap_erase_fp(m, idx, vk1, vk2)));
+
+  lemma void empty_dmap_cap<t1,t2,vt>(int len);
+  requires 0 < len;
+  ensures dmap_cap_fp(empty_dmap_fp<t1,t2,vt>(len)) == len;
+
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

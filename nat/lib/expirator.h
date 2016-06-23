@@ -3,8 +3,7 @@
 
 #include "containers/double-chain.h"
 #include "containers/double-map.h"
-
-//@ predicate dmap_dchain_coherent<t1,t2,vt>(dmap<t1,t2,vt> m, dchain ch);
+#include "coherence.h"
 
 int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                  struct DoubleMap* map,

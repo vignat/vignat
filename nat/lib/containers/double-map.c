@@ -1770,3 +1770,24 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
     }
   }
   @*/
+
+/*@
+  lemma void empty_vals_len<vt>(nat len)
+  requires true;
+  ensures length(empty_vals_fp<vt>(len)) == int_of_nat(len);
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n): empty_vals_len(n);
+    }
+  }
+  @*/
+
+/*@
+  lemma void empty_dmap_cap<t1,t2,vt>(int len)
+  requires 0 < len;
+  ensures dmap_cap_fp(empty_dmap_fp<t1,t2,vt>(len)) == len;
+  {
+    empty_vals_len(nat_of_int(len));
+  }
+  @*/

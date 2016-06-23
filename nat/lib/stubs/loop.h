@@ -7,8 +7,7 @@
 
 //@ #include "lib/predicates.gh"
 
-//TODO: included only for the dmap_dchain_coherent predicate. it should go into a separate file.
-#include "lib/expirator.h"
+#include "lib/coherence.h"
 
 //TODO: coerce this with the definition in rte_stubs.h
 #define RTE_NUM_DEVICES 2
@@ -37,45 +36,6 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
           last_time(time) &*&
           dmap_cap_fp(m) == MAX_FLOWS;
 
-lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len);
-requires true;
-ensures dmap_dchain_coherent<t1,t2,vt>
-         (empty_dmap_fp<t1,t2,vt>(len), empty_dchain_fp(len));
-
-lemma void empty_dmap_cap<t1,t2,vt>(int len);
-requires 0 < len;
-ensures dmap_cap_fp(empty_dmap_fp<t1,t2,vt>(len)) == len;
-
-lemma void coherent_dmap_used_dchain_allocated(dmap<int_k,ext_k,flw> m, dchain ch, int idx);
-requires dmap_dchain_coherent(m, ch) &*& dmap_index_used_fp(m, idx) == true;
-ensures dmap_dchain_coherent(m, ch) &*&
-        dchain_allocated_fp(ch, idx) == true;
-
-lemma void expire_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch, uint32_t time);
-requires dmap_dchain_coherent(m, ch);
-ensures dmap_dchain_coherent(dmap_erase_all_fp(m, dchain_get_expired_indexes_fp(ch, time),
-                                               flw_get_ik, flw_get_ek),
-                             dchain_expire_old_indexes_fp(ch, time));
-
-lemma void rejuvenate_preserves_coherent(dmap<int_k,ext_k,flw> m, dchain ch,
-                                         int index, uint32_t time);
-requires dmap_dchain_coherent(m, ch);
-ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
-
-lemma void coherent_put_allocated_preserves_coherent
-(dmap<int_k,ext_k,flw> m, dchain ch, int_k k1, ext_k k2,
- flw value, int ind, uint32_t t);
-requires dmap_dchain_coherent(m, ch) &*& false == dchain_allocated_fp(ch, ind);
-ensures dmap_dchain_coherent(dmap_put_fp(m, ind, value, flw_get_ik, flw_get_ek),
-                             dchain_allocate_fp(ch, ind, t));
-
-lemma void coherent_dchain_non_out_of_space_map_nonfull(dmap<int_k,ext_k,flw> m, dchain ch);
-requires dmappingp<int_k,ext_k,flw>(m, ?a, ?b, ?c, ?d, ?e, ?g, ?h, ?i, ?j, ?k, ?l, ?n, ?f) &*&
-         dmap_dchain_coherent(m, ch) &*&
-         dchain_out_of_space_fp(ch) == false;
-ensures dmappingp<int_k,ext_k,flw>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
-        dmap_dchain_coherent(m, ch) &*&
-        dmap_size_fp(m) < dmap_cap_fp(m);
 @*/
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
