@@ -179,6 +179,31 @@ struct DoubleMap;
     }
   }
 
+  fixpoint list<int> nonempty_indexes_fp<vt>(list<option<vt> > lst, int start) {
+    switch(lst) {
+      case nil: return nil;
+      case cons(h,t):
+        return switch(h) {
+          case none: return nonempty_indexes_fp(t, start+1);
+          case some(x): return cons(start, nonempty_indexes_fp(t, start+1));
+        };
+    }
+  }
+
+  fixpoint list<int> dmap_indexes_used_fp<t1,t2,vt>(dmap<t1,t2,vt> m) {
+    switch(m) { case dmap(ma, mb, val_arr):
+      return nonempty_indexes_fp(val_arr, 0);
+    }
+  }
+
+  lemma void dmap_indexes_contain_index_used<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                       int idx);
+  requires 0 <= idx &*& idx < dmap_cap_fp(m);
+  ensures mem(idx, dmap_indexes_used_fp(m)) == dmap_index_used_fp(m, idx);
+
+  lemma void dmap_indexes_used_distinct<t1,t2,vt>(dmap<t1,t2,vt> m);
+  requires true;
+  ensures true == distinct(dmap_indexes_used_fp(m));
 
   lemma void dmap_get_k1_limits<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k1);
   requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
@@ -337,10 +362,21 @@ struct DoubleMap;
   ensures true == forall(remove(idx, ids),
                          (dmap_index_used_fp)(dmap_erase_fp(m, idx, vk1, vk2)));
 
+  lemma void dmap_erase_removes_index<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                int idx,
+                                                fixpoint (vt,t1) vk1,
+                                                fixpoint (vt,t2) vk2);
+  requires 0 <= idx;
+  ensures dmap_indexes_used_fp(dmap_erase_fp(m, idx, vk1, vk2)) ==
+          remove(idx, dmap_indexes_used_fp(m));
+
   lemma void empty_dmap_cap<t1,t2,vt>(int len);
-  requires 0 < len;
+  requires 0 <= len;
   ensures dmap_cap_fp(empty_dmap_fp<t1,t2,vt>(len)) == len;
 
+  lemma void dmap_empty_no_indexes_used<t1,t2,vt>(int len);
+  requires 0 <= len;
+  ensures dmap_indexes_used_fp(empty_dmap_fp<t1,t2,vt>(len)) == nil;
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

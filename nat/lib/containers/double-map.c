@@ -1785,9 +1785,175 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
 
 /*@
   lemma void empty_dmap_cap<t1,t2,vt>(int len)
-  requires 0 < len;
+  requires 0 <= len;
   ensures dmap_cap_fp(empty_dmap_fp<t1,t2,vt>(len)) == len;
   {
     empty_vals_len(nat_of_int(len));
+  }
+  @*/
+
+/*@
+  lemma void dmap_empty_no_indexes_used_impl<vt>(nat len, int start)
+  requires true;
+  ensures nonempty_indexes_fp(empty_vals_fp(len), start) == nil;
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n):
+        dmap_empty_no_indexes_used_impl(n, start+1);
+    }
+  }
+
+  lemma void dmap_empty_no_indexes_used<t1,t2,vt>(int len)
+  requires 0 <= len;
+  ensures dmap_indexes_used_fp(empty_dmap_fp<t1,t2,vt>(len)) == nil;
+  {
+    dmap_empty_no_indexes_used_impl(nat_of_int(len), 0);
+  }
+  @*/
+
+/*@
+  lemma void dmap_indexes_used_above_start<vt>(list<option<vt> > vals,
+                                               int x, int start)
+  requires x < start;
+  ensures false == mem(x, nonempty_indexes_fp(vals, start));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        dmap_indexes_used_above_start(t, x, start+1);
+        switch(h) {
+          case none: break;
+          case some(y): break;
+        }
+    }
+  }
+
+  @*/
+
+/*@
+  lemma void nonmem_remove<t>(t x, list<t> l)
+  requires false == mem(x, l);
+  ensures l == remove(x, l);
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        nonmem_remove(x, t);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_removes_index_impl<vt>(list<option<vt> > vals,
+                                               int idx, int start)
+  requires start <= idx;
+  ensures nonempty_indexes_fp(update(idx-start, none, vals), start) ==
+          remove(idx, nonempty_indexes_fp(vals, start));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            if (start == idx) {
+              dmap_indexes_used_above_start(t, idx, start+1);
+              nonmem_remove(idx, nonempty_indexes_fp(vals, start));
+            } else {
+              dmap_erase_removes_index_impl(t, idx, start+1);
+            }
+            break;
+          case some(x):
+            if (start != idx) {
+              dmap_erase_removes_index_impl(t, idx, start+1);
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_removes_index<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                int idx,
+                                                fixpoint (vt,t1) vk1,
+                                                fixpoint (vt,t2) vk2)
+  requires 0 <= idx;
+  ensures dmap_indexes_used_fp(dmap_erase_fp(m, idx, vk1, vk2)) ==
+          remove(idx, dmap_indexes_used_fp(m));
+  {
+    switch(m) { case dmap(ma, mb, vals):
+      dmap_erase_removes_index_impl(vals, idx, 0);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_indexes_used_distinct_impl<vt>(list<option<vt> > vals,
+                                                 int start)
+  requires true;
+  ensures true == distinct(nonempty_indexes_fp(vals, start));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        dmap_indexes_used_distinct_impl(t, start+1);
+        dmap_indexes_used_above_start(t, start, start+1);
+        assert true == distinct(nonempty_indexes_fp(t, start+1));
+        switch(h) {
+          case none: break;
+          case some(x): break;
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_indexes_used_distinct<t1,t2,vt>(dmap<t1,t2,vt> m)
+  requires true;
+  ensures true == distinct(dmap_indexes_used_fp(m));
+  {
+    switch(m) { case dmap(ma, mb, vals):
+      dmap_indexes_used_distinct_impl(vals, 0);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_indexes_contain_index_used_impl<vt>(list<option<vt> > vals,
+                                                      int idx, int start)
+  requires 0 <= start &*& start <= idx &*& idx-start < length(vals);
+  ensures mem(idx, nonempty_indexes_fp(vals, start)) ==
+          (nth(idx-start, vals) != none);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (start == idx) {
+          switch(h) {
+            case none:
+              dmap_indexes_used_above_start(t, start, start+1);
+              break;
+            case some(x): break;
+          }
+        } else {
+          dmap_indexes_contain_index_used_impl(t, idx, start+1);
+          switch(h) {
+            case none: break;
+            case some(x): break;
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_indexes_contain_index_used<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                       int idx)
+  requires 0 <= idx &*& idx < dmap_cap_fp(m);
+  ensures mem(idx, dmap_indexes_used_fp(m)) == dmap_index_used_fp(m, idx);
+  {
+    switch(m) { case dmap(ma, mb, vals):
+      dmap_indexes_contain_index_used_impl(vals, idx, 0);
+    }
   }
   @*/

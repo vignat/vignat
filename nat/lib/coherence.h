@@ -10,7 +10,7 @@
 
 /*@
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len);
-requires true;
+requires 0 <= len;
 ensures dmap_dchain_coherent<t1,t2,vt>
          (empty_dmap_fp<t1,t2,vt>(len), empty_dchain_fp(len, 0));
 

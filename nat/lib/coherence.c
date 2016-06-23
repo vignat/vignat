@@ -3,17 +3,21 @@
 /*@
   predicate dmap_dchain_coherent<t1,t2,vt>(dmap<t1,t2,vt> m, dchain ch) =
     dchain_index_range_fp(ch) == dmap_cap_fp(m) &*&
-    true == forall(dchain_indexes_fp(ch), (dmap_index_used_fp)(m));
+    true == subset(dchain_indexes_fp(ch), dmap_indexes_used_fp(m)) &*&
+    true == subset(dmap_indexes_used_fp(m), dchain_indexes_fp(ch));
   @*/
 
 /*@
 
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len)
-requires true;
+requires 0 <= len;
 ensures dmap_dchain_coherent<t1,t2,vt>
          (empty_dmap_fp<t1,t2,vt>(len), empty_dchain_fp(len, 0));
 {
-  assume(false);//TODO
+  empty_dmap_cap<t1,t2,vt>(len);
+  dmap_empty_no_indexes_used<t1,t2,vt>(len);
+  close dmap_dchain_coherent(empty_dmap_fp<t1,t2,vt>(len),
+                             empty_dchain_fp(len, 0));
 }
 
 lemma void coherent_dmap_used_dchain_allocated<t1,t2,vt>
@@ -73,6 +77,41 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
 @*/
 
 /*@
+  lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys);
+  ensures true == subset(remove(el, xs), ys);
+  {
+    assume(false);//TODO
+  }
+
+  lemma void remove_subset<t>(list<t> xs, t el, list<t> ys)
+  requires true == subset(xs, ys) &*&
+           false == mem(el, xs);
+  ensures true == subset(xs, remove(el, ys));
+  {
+    assume(false);//TODO
+  }
+
+  lemma void remove_both_subset<t>(t el, list<t> xs, list<t> ys)
+  requires true == subset(xs, ys) &*&
+           false == mem(el, remove(el, xs));
+  ensures true == subset(remove(el, xs), remove(el, ys));
+  {
+    subset_remove(xs, ys, el);
+    remove_subset(remove(el, xs), el, ys);
+  }
+  @*/
+
+/*@
+  lemma void dchain_allocated_in_range(dchain ch, int idx)
+  requires true == dchain_allocated_fp(ch, idx);
+  ensures 0 <= idx &*& idx < dchain_index_range_fp(ch);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
   lemma void coherent_expire_one<t1,t2,vt>(dmap<t1,t2,vt> m,
                                            dchain ch,
                                            int idx,
@@ -94,8 +133,16 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     dchain_remove_idx_from_indexes(ch, idx);
     assert dchain_indexes_fp(nch) ==
            remove(idx, dchain_indexes_fp(ch));
+    dchain_allocated_in_range(ch, idx);
+    dmap_erase_removes_index(m, idx, vk1, vk2);
+    assert dmap_indexes_used_fp(nm) ==
+           remove(idx, dmap_indexes_used_fp(m));
+
     dchain_nodups_unique_idx(ch, idx);
-    dmap_erase_keeps_rest(m, idx, dchain_indexes_fp(ch), vk1, vk2);
+    dmap_indexes_used_distinct(m);
+    distinct_mem_remove(idx, dmap_indexes_used_fp(m));
+    remove_both_subset(idx, dchain_indexes_fp(ch), dmap_indexes_used_fp(m));
+    remove_both_subset(idx, dmap_indexes_used_fp(m), dchain_indexes_fp(ch));
 
     dchain_remove_keeps_nodups(ch, idx);
 
@@ -113,8 +160,10 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     dchain_oldest_allocated(ch);
     open dmap_dchain_coherent(m, ch);
     dchain_indexes_contain_index(ch, dchain_get_oldest_index_fp(ch));
-    forall_mem(dchain_get_oldest_index_fp(ch), dchain_indexes_fp(ch),
-               (dmap_index_used_fp)(m));
+    mem_subset(dchain_get_oldest_index_fp(ch), dchain_indexes_fp(ch),
+               dmap_indexes_used_fp(m));
+    dchain_allocated_in_range(ch, dchain_get_oldest_index_fp(ch));
+    dmap_indexes_contain_index_used(m, dchain_get_oldest_index_fp(ch));
     close dmap_dchain_coherent(m, ch);
   }
   @*/
