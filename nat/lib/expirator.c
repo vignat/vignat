@@ -10,17 +10,6 @@
   @*/
 
 /*@
-  lemma void dchain_remove_keeps_ir(dchain ch, int idx)
-  requires true;
-  ensures dchain_index_range_fp(ch) ==
-          dchain_index_range_fp(dchain_remove_index_fp(ch, idx));
-  {
-    switch(ch) { case dchain(alist, ir, lo, hi):
-    }
-  }
-  @*/
-
-/*@
   lemma void dmap_erase_keeps_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
                                             int idx,
                                             fixpoint (vt,t1) vk1,
@@ -34,13 +23,16 @@
   @*/
 
 /*@
-  lemma void dchain_remove_idx_from_indexes(dchain ch, int idx)
-  requires true;
-  ensures dchain_indexes_fp(dchain_remove_index_fp(ch, idx)) ==
-          remove(idx, dchain_indexes_fp(ch));
+  lemma void dmap_erase_other_keeps_used<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                   int idx1, int idx2,
+                                                   fixpoint (vt,t1) vk1,
+                                                   fixpoint (vt,t2) vk2)
+  requires idx1 != idx2;
+  ensures dmap_index_used_fp(dmap_erase_fp(m, idx1, vk1, vk2), idx2) ==
+          dmap_index_used_fp(m, idx2);
   {
-    switch(ch) { case dchain(alist, ir, lo, hi):
-      assume(false);//TODO
+    switch(m) { case dmap(m1,m2,vals):
+      nth_update_unrelevant(idx2, idx1, none, vals);
     }
   }
   @*/
@@ -59,18 +51,15 @@
     switch(ids){
       case nil: return;
       case cons(h,t):
-        assume(false);//TODO
+        if (h != idx) {
+          dmap_erase_keeps_rest(m, idx, t, vk1, vk2);
+          dmap_erase_other_keeps_used(m, idx, h, vk1, vk2);
+        } else {
+          if (mem(idx, remove(idx, t))) mem_remove_mem(idx, idx, t);
+          dmap_erase_keeps_rest(m, idx, t, vk1, vk2);
+          remove_nonmem(idx, t);
+        }
     }
-  }
-  @*/
-
-/*@
-  lemma void dchain_nodups_unique_idx(dchain ch, int idx)
-  requires dchain_nodups(ch);
-  ensures false == mem(idx, remove(idx, dchain_indexes_fp(ch))) &*&
-          dchain_nodups(ch);
-  {
-    assume(false);//TODO
   }
   @*/
 
@@ -81,15 +70,6 @@
                                                fixpoint (vt,t2) vk2)
   requires dmap_nodups(m, vk1, vk2);
   ensures dmap_nodups(dmap_erase_fp(m, idx, vk1, vk2), vk1, vk2);
-  {
-    assume(false);//TODO
-  }
-  @*/
-
-/*@
-  lemma void dchain_remove_keeps_nodups(dchain ch, int idx)
-  requires dchain_nodups(ch);
-  ensures dchain_nodups(dchain_remove_index_fp(ch, idx));
   {
     assume(false);//TODO
   }
@@ -152,22 +132,6 @@
     assume(false);//TODO
   }
 
-  lemma void destroy_dchain_nodups(dchain ch)
-  requires dchain_nodups(ch);
-  ensures true;
-  {
-    assume(false);//TODO
-  }
-  @*/
-
-/*@
-  lemma void double_chain_nodups(dchain ch)
-  requires double_chainp(ch, ?chain);
-  ensures double_chainp(ch, chain) &*&
-          dchain_nodups(ch);
-  {
-    assume(false);//TODO
-  }
   @*/
 
 /*@

@@ -246,6 +246,36 @@ struct DoubleChain;
   ensures true == mem(idx, dchain_indexes_fp(ch));
   @*/
 
+/*@
+  lemma void dchain_remove_keeps_ir(dchain ch, int idx);
+  requires true;
+  ensures dchain_index_range_fp(ch) ==
+          dchain_index_range_fp(dchain_remove_index_fp(ch, idx));
+
+  lemma void dchain_remove_idx_from_indexes(dchain ch, int idx);
+  requires true;
+  ensures dchain_indexes_fp(dchain_remove_index_fp(ch, idx)) ==
+          remove(idx, dchain_indexes_fp(ch));
+
+  lemma void dchain_nodups_unique_idx(dchain ch, int idx);
+  requires dchain_nodups(ch);
+  ensures false == mem(idx, remove(idx, dchain_indexes_fp(ch))) &*&
+          dchain_nodups(ch);
+
+  lemma void dchain_remove_keeps_nodups(dchain ch, int idx);
+  requires dchain_nodups(ch);
+  ensures dchain_nodups(dchain_remove_index_fp(ch, idx));
+
+  lemma void destroy_dchain_nodups(dchain ch);
+  requires dchain_nodups(ch);
+  ensures true;
+
+  lemma void double_chain_nodups(dchain ch);
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_nodups(ch);
+  @*/
+
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
 /*@ requires *chain_out |-> ?old_val &*&
              0 < index_range &*& index_range <= IRANG_LIMIT; @*/

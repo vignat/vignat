@@ -56,9 +56,12 @@ struct DoubleChain {
       };
 
   predicate dchain_is_sortedp(dchain ch) =
-   switch(ch) { case dchain(alist, index_range, low, high):
+    switch(ch) { case dchain(alist, index_range, low, high):
       return true == bnd_sorted_fp(map(snd, alist), low, high);
-   };
+    };
+
+  predicate dchain_nodups(dchain ch) =
+      true == distinct(dchain_indexes_fp(ch));
 
 
   fixpoint list<pair<int, uint32_t> > dchain_alist_fp(dchain ch) {
@@ -1423,5 +1426,171 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     switch(ch) { case dchain(alist, ir, lo, hi):
       dchain_indexes_contain_idx_impl(alist, idx);
     }
+  }
+  @*/
+
+/*@
+  lemma void dchain_remove_keeps_ir(dchain ch, int idx)
+  requires true;
+  ensures dchain_index_range_fp(ch) ==
+          dchain_index_range_fp(dchain_remove_index_fp(ch, idx));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_remove_idx_from_indexes_impl
+              (list<pair<int, uint32_t> > alist, int idx)
+  requires true;
+  ensures map(fst, remove_by_index_fp(alist, idx)) ==
+          remove(idx, map(fst, alist));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != idx) dchain_remove_idx_from_indexes_impl(t, idx);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_remove_idx_from_indexes(dchain ch, int idx)
+  requires true;
+  ensures dchain_indexes_fp(dchain_remove_index_fp(ch, idx)) ==
+          remove(idx, dchain_indexes_fp(ch));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      dchain_remove_idx_from_indexes_impl(alist, idx);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_nodups_unique_idx(dchain ch, int idx)
+  requires dchain_nodups(ch);
+  ensures false == mem(idx, remove(idx, dchain_indexes_fp(ch))) &*&
+          dchain_nodups(ch);
+  {
+    open dchain_nodups(ch);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      distinct_unique(map(fst, alist), idx);
+    }
+    close dchain_nodups(ch);
+  }
+  @*/
+
+/*@
+  lemma void dchain_remove_keeps_nodups(dchain ch, int idx)
+  requires dchain_nodups(ch);
+  ensures dchain_nodups(dchain_remove_index_fp(ch, idx));
+  {
+    open dchain_nodups(ch);
+    dchain_remove_idx_from_indexes(ch, idx);
+    distinct_remove(idx, dchain_indexes_fp(ch));
+    close dchain_nodups(dchain_remove_index_fp(ch, idx));
+  }
+  @*/
+
+/*@
+  lemma void indexes_is_dci_alist(list<pair<int, uint32_t> > alist,
+                                  list<uint32_t> tstamps,
+                                  list<int> bare_alist)
+  requires true == insync_fp(bare_alist, tstamps, alist);
+  ensures map(fst, alist) == bare_alist;
+  {
+    switch(bare_alist) {
+      case nil: return;
+      case cons(h,t):
+        indexes_is_dci_alist(tail(alist), tstamps, t);
+        cons_head_tail(alist);
+    }
+  }
+  @*/
+
+/*@
+  lemma void drop_cons<t>(list<t> l, int n)
+  requires 0 <= n &*& n < length(l);
+  ensures drop(n, l) == cons(nth(n, l), drop(n+1, l));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < n) drop_cons(t, n-1);
+    }
+  }
+  @*/
+
+/*@
+  lemma void mem_remove_drop<t>(list<t> l, int i, t x, t y)
+  requires false == mem(y, remove(x, l)) &*& 0 <= i;
+  ensures false == mem(y, remove(x, drop(i, l)));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (0 < i) {
+          if (mem(y, remove(x, t))) {
+            mem_remove_mem(y, x, t);
+          }
+          mem_remove_drop(t, i-1, x, y);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchaini_alist_distinct(dchaini chi)
+  requires dchainip(chi, ?cells);
+  ensures dchainip(chi, cells) &*&
+          true == distinct(dchaini_alist_fp(chi));
+  {
+    list<int> alist = dchaini_alist_fp(chi);
+    int i = length(alist);
+    while (0 < i)
+      invariant dchainip(chi, cells) &*& 0 <= i &*& i <= length(alist) &*&
+                true == distinct(drop(i, alist));
+      decreases i;
+    {
+      int cur = nth(i-1, alist);
+      dc_alist_no_dups(chi, cur);
+      list<int> next = drop(i-1, alist);
+      drop_cons(alist, i-1);
+      assert next == cons(cur, drop(i, alist));
+      assert false == mem(cur, remove(cur, alist));
+      mem_remove_drop(alist, i-1, cur, cur);
+      assert false == mem(cur, remove(cur, drop(i-1, alist)));
+      assert remove(cur, drop(i-1, alist)) == drop(i, alist);
+      --i;
+    }
+    assert true == distinct(alist);
+  }
+  @*/
+
+/*@
+  lemma void double_chain_nodups(dchain ch)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_nodups(ch);
+  {
+    open double_chainp(ch, chain);
+    assert dchainip(?chi, ?cells);
+    assert uints(_, _, ?tstamps);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      indexes_is_dci_alist(alist, tstamps, dchaini_alist_fp(chi));
+    }
+    dchaini_alist_distinct(chi);
+    close double_chainp(ch, chain);
+    close dchain_nodups(ch);
+  }
+  @*/
+
+/*@
+  lemma void destroy_dchain_nodups(dchain ch)
+  requires dchain_nodups(ch);
+  ensures true;
+  {
+    open dchain_nodups(ch);
   }
   @*/

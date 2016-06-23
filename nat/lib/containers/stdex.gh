@@ -512,6 +512,27 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void remove_nonmem<t>(t el, list<t> l)
+  requires false == mem(el, l);
+  ensures remove(el, l) == l;
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (h != el) remove_nonmem(el, t);
+    }
+  }
+
+  lemma void distinct_unique<t>(list<t> lst, t x)
+  requires true == distinct(lst);
+  ensures false == mem(x, remove(x, lst));
+  {
+    switch(lst) {
+      case nil: return ;
+      case cons(h,t):
+        if (h != x) distinct_unique(t, x);
+    }
+  }
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
