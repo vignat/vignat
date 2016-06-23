@@ -86,6 +86,10 @@ struct DoubleMap;
                                 fixpoint (t2,int,bool) recp2,
                                 struct DoubleMap* mp);
 
+  predicate dmap_nodups<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                  fixpoint (vt,t1) vk1,
+                                  fixpoint (vt,t2) vk2);
+
   fixpoint list<option<vt> > empty_vals_fp<vt>(nat len) {
     switch(len) {
       case zero: return nil;

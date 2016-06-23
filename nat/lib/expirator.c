@@ -4,20 +4,9 @@
 #include "expirator.h"
 
 /*@
-  predicate dmap_alist_coherent<t1,t2,vt>(dmap<t1,t2,vt> m,
-                                          list<pair<int, uint32_t> > alist) =
-    switch(alist) {
-      case nil: return true;
-      case cons(h,t):
-        return true == dmap_index_used_fp(m, fst(h)) &*&
-               dmap_alist_coherent(m, t);
-    };
-
   predicate dmap_dchain_coherent<t1,t2,vt>(dmap<t1,t2,vt> m, dchain ch) =
-    switch(ch) { case dchain(alist, size, l, h):
-      return size == dmap_cap_fp(m) &*&
-      dmap_alist_coherent(m, alist);
-    };
+    dchain_index_range_fp(ch) == dmap_cap_fp(m) &*&
+    true == forall(dchain_indexes_fp(ch), (dmap_index_used_fp)(m));
   @*/
 
 /*@
@@ -27,9 +16,53 @@
                                            fixpoint (vt,t1) vk1,
                                            fixpoint (vt,t2) vk2)
   requires dmap_dchain_coherent(m, ch) &*&
+           dmap_nodups(m, vk1, vk2) &*&
+           dchain_nodups(ch) &*&
            true == dchain_allocated_fp(ch, idx);
   ensures dmap_dchain_coherent(dmap_erase_fp(m, idx, vk1, vk2),
-                               dchain_remove_index_fp(ch, idx));
+                               dchain_remove_index_fp(ch, idx)) &*&
+          dmap_nodups(dmap_erase_fp(m, idx, vk1, vk2), vk1, vk2) &*&
+          dchain_nodups(dchain_remove_index_fp(ch, idx));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void dmapping_nodups<t1,t2,vt>(dmap<t1,t2,vt> m)
+  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                               ?fvp, ?bvp, ?rof, ?vsz,
+                               ?vk1, ?vk2, ?rp1, ?rp2, ?map);
+  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
+                              fvp, bvp, rof, vsz,
+                              vk1, vk2, rp1, rp2, map) &*&
+          dmap_nodups(m, vk1, vk2);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void destroy_dmap_nodups<t1,t2,vt>(dmap<t1,t2,vt> m)
+  requires dmap_nodups(m, ?vk1, ?vk2);
+  ensures true;
+  {
+    assume(false);//TODO
+  }
+
+  lemma void destroy_dchain_nodups(dchain ch)
+  requires dchain_nodups(ch);
+  ensures true;
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void double_chain_nodups(dchain ch)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_nodups(ch);
   {
     assume(false);//TODO
   }
@@ -92,7 +125,7 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                vk1, vk2, rp1, rp2, map) &*&
             nm == dmap_erase_all_fp
                                (m, dchain_get_expired_indexes_fp(ch, time),
-                               vk1, vk2) &*&
+                                vk1, vk2) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
             dmap_dchain_coherent<K1,K2,V>(nm, nch) &*&
@@ -104,6 +137,8 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
   //@ assert take(count, dchain_get_expired_indexes_fp(ch, time)) == nil;
   //@ double_chainp_to_sorted(ch);
   //@ dchain_expired_indexes_limited(ch, time);
+  //@ double_chain_nodups(ch);
+  //@ dmapping_nodups(m);
   while (dchain_expire_one_index(chain, &index, time))
     /*@ invariant double_chainp(expire_n_indexes(ch, time, count), chain) &*&
                   dchain_is_sortedp(ch) &*&
@@ -120,6 +155,12 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                          vk1, vk2),
                                         expire_n_indexes(ch, time, count)) &*&
                   integer(&index, _) &*&
+                  dchain_nodups(expire_n_indexes(ch, time, count)) &*&
+                  dmap_nodups(dmap_erase_all_fp
+                                (m, take(count, dchain_get_expired_indexes_fp
+                                                 (ch, time)),
+                                 vk1, vk2),
+                              vk1, vk2) &*&
                   0 <= count &*&
                   count <= length(dchain_get_expired_indexes_fp(ch, time)); @*/
   {
@@ -152,5 +193,9 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
   //@ assert take(count, dchain_get_expired_indexes_fp(ch, time)) == dchain_get_expired_indexes_fp(ch, time);
   return count;
   //@ destroy_dchain_is_sortedp(ch);
+  //@ destroy_dchain_nodups(expire_n_indexes(ch, time, count));
+  /*@ destroy_dmap_nodups(dmap_erase_all_fp
+          (m, dchain_get_expired_indexes_fp(ch, time), vk1, vk2));
+          @*/
 }
 

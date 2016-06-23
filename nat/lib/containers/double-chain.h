@@ -18,6 +18,7 @@ struct DoubleChain;
                           struct DoubleChain* cp);
 
   predicate dchain_is_sortedp(dchain ch);
+  predicate dchain_nodups(dchain ch);
 
   fixpoint dchain empty_dchain_fp(int index_range, uint32_t low) {
     return dchain(nil, index_range, low, low);
@@ -31,6 +32,10 @@ struct DoubleChain;
 
   fixpoint int dchain_index_range_fp(dchain ch) {
     switch(ch) { case dchain(alist, size, l, h): return size; }
+  }
+
+  fixpoint list<int> dchain_indexes_fp(dchain ch) {
+    switch(ch) { case dchain(alist, size, l, h): return map(fst, alist); }
   }
 
   fixpoint uint32_t dchain_high_fp(dchain ch) {
