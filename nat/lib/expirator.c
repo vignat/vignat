@@ -10,6 +10,92 @@
   @*/
 
 /*@
+  lemma void dchain_remove_keeps_ir(dchain ch, int idx)
+  requires true;
+  ensures dchain_index_range_fp(ch) ==
+          dchain_index_range_fp(dchain_remove_index_fp(ch, idx));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_keeps_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                            int idx,
+                                            fixpoint (vt,t1) vk1,
+                                            fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_cap_fp(m) == dmap_cap_fp(dmap_erase_fp(m, idx, vk1, vk2));
+  {
+    switch(m) { case dmap(m1, m2, vals):
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_remove_idx_from_indexes(dchain ch, int idx)
+  requires true;
+  ensures dchain_indexes_fp(dchain_remove_index_fp(ch, idx)) ==
+          remove(idx, dchain_indexes_fp(ch));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      assume(false);//TODO
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_keeps_rest<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                             int idx,
+                                             list<int> ids,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2)
+  requires true == forall(ids, (dmap_index_used_fp)(m)) &*&
+           false == mem(idx, remove(idx, ids));
+  ensures true == forall(remove(idx, ids),
+                         (dmap_index_used_fp)(dmap_erase_fp(m, idx, vk1, vk2)));
+  {
+    switch(ids){
+      case nil: return;
+      case cons(h,t):
+        assume(false);//TODO
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_nodups_unique_idx(dchain ch, int idx)
+  requires dchain_nodups(ch);
+  ensures false == mem(idx, remove(idx, dchain_indexes_fp(ch))) &*&
+          dchain_nodups(ch);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_keeps_nodups<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                               int idx,
+                                               fixpoint (vt,t1) vk1,
+                                               fixpoint (vt,t2) vk2)
+  requires dmap_nodups(m, vk1, vk2);
+  ensures dmap_nodups(dmap_erase_fp(m, idx, vk1, vk2), vk1, vk2);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void dchain_remove_keeps_nodups(dchain ch, int idx)
+  requires dchain_nodups(ch);
+  ensures dchain_nodups(dchain_remove_index_fp(ch, idx));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
   lemma void coherent_expire_one<t1,t2,vt>(dmap<t1,t2,vt> m,
                                            dchain ch,
                                            int idx,
@@ -24,9 +110,25 @@
           dmap_nodups(dmap_erase_fp(m, idx, vk1, vk2), vk1, vk2) &*&
           dchain_nodups(dchain_remove_index_fp(ch, idx));
   {
-    assume(false);//TODO
+    open dmap_dchain_coherent(m, ch);
+    dmap<t1,t2,vt> nm = dmap_erase_fp(m, idx, vk1, vk2);
+    dchain nch = dchain_remove_index_fp(ch, idx);
+    dchain_remove_keeps_ir(ch, idx);
+    dmap_erase_keeps_cap(m, idx, vk1, vk2);
+    assert dchain_index_range_fp(nch) == dmap_cap_fp(nm);
+    dchain_remove_idx_from_indexes(ch, idx);
+    assert dchain_indexes_fp(nch) ==
+           remove(idx, dchain_indexes_fp(ch));
+    dchain_nodups_unique_idx(ch, idx);
+    dmap_erase_keeps_rest(m, idx, dchain_indexes_fp(ch), vk1, vk2);
+
+    dmap_erase_keeps_nodups(m, idx, vk1, vk2);
+    dchain_remove_keeps_nodups(ch, idx);
+
+    close dmap_dchain_coherent(nm, nch);
   }
   @*/
+
 
 /*@
   lemma void dmapping_nodups<t1,t2,vt>(dmap<t1,t2,vt> m)
