@@ -77,32 +77,6 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
 @*/
 
 /*@
-  lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys);
-  ensures true == subset(remove(el, xs), ys);
-  {
-    assume(false);//TODO
-  }
-
-  lemma void remove_subset<t>(list<t> xs, t el, list<t> ys)
-  requires true == subset(xs, ys) &*&
-           false == mem(el, xs);
-  ensures true == subset(xs, remove(el, ys));
-  {
-    assume(false);//TODO
-  }
-
-  lemma void remove_both_subset<t>(t el, list<t> xs, list<t> ys)
-  requires true == subset(xs, ys) &*&
-           false == mem(el, remove(el, xs));
-  ensures true == subset(remove(el, xs), remove(el, ys));
-  {
-    subset_remove(xs, ys, el);
-    remove_subset(remove(el, xs), el, ys);
-  }
-  @*/
-
-/*@
   lemma void dchain_allocated_in_range(dchain ch, int idx)
   requires true == dchain_allocated_fp(ch, idx);
   ensures 0 <= idx &*& idx < dchain_index_range_fp(ch);

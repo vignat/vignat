@@ -534,6 +534,39 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys);
+  ensures true == subset(remove(el, xs), ys);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        if (h != el) subset_remove(t, ys, el);
+    }
+  }
+
+  lemma void remove_subset<t>(list<t> xs, t el, list<t> ys)
+  requires true == subset(xs, ys) &*&
+           false == mem(el, xs);
+  ensures true == subset(xs, remove(el, ys));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        neq_mem_remove(h, el, ys);
+        remove_subset(t, el, ys);
+    }
+  }
+
+  lemma void remove_both_subset<t>(t el, list<t> xs, list<t> ys)
+  requires true == subset(xs, ys) &*&
+           false == mem(el, remove(el, xs));
+  ensures true == subset(remove(el, xs), remove(el, ys));
+  {
+    subset_remove(xs, ys, el);
+    remove_subset(remove(el, xs), el, ys);
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)
