@@ -175,7 +175,8 @@ struct DoubleMap;
 
   fixpoint bool dmap_index_used_fp<t1,t2,vt>(dmap<t1,t2,vt> m, int index) {
     switch(m) { case dmap(ma, mb, val_arr):
-      return nth(index, val_arr) != none;
+      return 0 <= index && index < length(val_arr) &&
+             nth(index, val_arr) != none;
     }
   }
 
@@ -377,6 +378,10 @@ struct DoubleMap;
   lemma void dmap_empty_no_indexes_used<t1,t2,vt>(int len);
   requires 0 <= len;
   ensures dmap_indexes_used_fp(empty_dmap_fp<t1,t2,vt>(len)) == nil;
+
+  lemma void dmap_index_used_inbounds<t1,t2,vt>(dmap<t1,t2,vt> m, int idx);
+  requires true == dmap_index_used_fp(m, idx);
+  ensures 0 <= idx &*& idx < dmap_cap_fp(m);
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

@@ -63,7 +63,8 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
                                            fixpoint (vt,t2) vk2);
   requires dmap_dchain_coherent(m, ch) &*&
            dchain_nodups(ch) &*&
-           true == dchain_allocated_fp(ch, idx);
+           true == dchain_allocated_fp(ch, idx) &*&
+           0 <= idx;
   ensures dmap_dchain_coherent(dmap_erase_fp(m, idx, vk1, vk2),
                                dchain_remove_index_fp(ch, idx)) &*&
           dchain_nodups(dchain_remove_index_fp(ch, idx));
@@ -72,7 +73,9 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
 /*@
   lemma void coherent_old_index_used<t1,t2,vt>(dmap<t1,t2,vt> m, dchain ch);
   requires dmap_dchain_coherent(m, ch) &*&
-           false == dchain_is_empty_fp(ch);
+           false == dchain_is_empty_fp(ch) &*&
+           0 <= dchain_get_oldest_index_fp(ch) &*&
+           dchain_get_oldest_index_fp(ch) < dchain_index_range_fp(ch);
   ensures dmap_dchain_coherent(m, ch) &*&
           true == dmap_index_used_fp(m, dchain_get_oldest_index_fp(ch));
   @*/

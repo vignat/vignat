@@ -1957,3 +1957,13 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
     }
   }
   @*/
+
+/*@
+  lemma void dmap_index_used_inbounds<t1,t2,vt>(dmap<t1,t2,vt> m, int idx)
+  requires true == dmap_index_used_fp(m, idx);
+  ensures 0 <= idx &*& idx < dmap_cap_fp(m);
+  {
+    switch(m) { case dmap(ma, mb, vals) :
+    }
+  }
+  @*/

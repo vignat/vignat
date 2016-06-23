@@ -242,8 +242,8 @@ struct DoubleChain;
           dchain_is_sortedp(ch);
 
   lemma void dchain_indexes_contain_index(dchain ch, int idx);
-  requires true == dchain_allocated_fp(ch, idx);
-  ensures true == mem(idx, dchain_indexes_fp(ch));
+  requires true;
+  ensures dchain_allocated_fp(ch, idx) == mem(idx, dchain_indexes_fp(ch));
   @*/
 
 /*@
