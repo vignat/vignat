@@ -1400,3 +1400,28 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     close dchain_is_sortedp(ch);
   }
   @*/
+
+/*@
+  lemma void dchain_indexes_contain_idx_impl(list<pair<int, uint32_t> > alist,
+                                             int idx)
+  requires true;
+  ensures exists(alist, (same_index)(idx)) == mem(idx, map(fst, alist));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != idx) dchain_indexes_contain_idx_impl(t, idx);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dchain_indexes_contain_index(dchain ch, int idx)
+  requires true;
+  ensures dchain_allocated_fp(ch, idx) == mem(idx, dchain_indexes_fp(ch));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      dchain_indexes_contain_idx_impl(alist, idx);
+    }
+  }
+  @*/

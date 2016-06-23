@@ -86,7 +86,12 @@
   ensures dmap_dchain_coherent(m, ch) &*&
           true == dmap_index_used_fp(m, dchain_get_oldest_index_fp(ch));
   {
-    assume(false);//TODO
+    dchain_oldest_allocated(ch);
+    open dmap_dchain_coherent(m, ch);
+    dchain_indexes_contain_index(ch, dchain_get_oldest_index_fp(ch));
+    forall_mem(dchain_get_oldest_index_fp(ch), dchain_indexes_fp(ch),
+               (dmap_index_used_fp)(m));
+    close dmap_dchain_coherent(m, ch);
   }
   @*/
 
