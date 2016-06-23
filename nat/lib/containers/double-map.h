@@ -86,10 +86,6 @@ struct DoubleMap;
                                 fixpoint (t2,int,bool) recp2,
                                 struct DoubleMap* mp);
 
-  predicate dmap_nodups<t1,t2,vt>(dmap<t1,t2,vt> m,
-                                  fixpoint (vt,t1) vk1,
-                                  fixpoint (vt,t2) vk2);
-
   fixpoint list<option<vt> > empty_vals_fp<vt>(nat len) {
     switch(len) {
       case zero: return nil;
@@ -313,6 +309,33 @@ struct DoubleMap;
   requires true;
   ensures dmap_erase_fp(dmap_erase_all_fp(m, idxs, vk1, vk2), idx, vk1, vk2) ==
           dmap_erase_all_fp(m, append(idxs, cons(idx, nil)), vk1, vk2);
+  @*/
+
+/*@
+  lemma void dmap_erase_keeps_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                            int idx,
+                                            fixpoint (vt,t1) vk1,
+                                            fixpoint (vt,t2) vk2);
+  requires true;
+  ensures dmap_cap_fp(m) == dmap_cap_fp(dmap_erase_fp(m, idx, vk1, vk2));
+
+  lemma void dmap_erase_other_keeps_used<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                   int idx1, int idx2,
+                                                   fixpoint (vt,t1) vk1,
+                                                   fixpoint (vt,t2) vk2);
+  requires idx1 != idx2;
+  ensures dmap_index_used_fp(dmap_erase_fp(m, idx1, vk1, vk2), idx2) ==
+          dmap_index_used_fp(m, idx2);
+
+  lemma void dmap_erase_keeps_rest<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                             int idx,
+                                             list<int> ids,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2);
+  requires true == forall(ids, (dmap_index_used_fp)(m)) &*&
+           false == mem(idx, remove(idx, ids));
+  ensures true == forall(remove(idx, ids),
+                         (dmap_index_used_fp)(dmap_erase_fp(m, idx, vk1, vk2)));
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

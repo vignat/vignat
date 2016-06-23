@@ -1716,3 +1716,57 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
     }
   }
   @*/
+
+/*@
+  lemma void dmap_erase_keeps_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                            int idx,
+                                            fixpoint (vt,t1) vk1,
+                                            fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_cap_fp(m) == dmap_cap_fp(dmap_erase_fp(m, idx, vk1, vk2));
+  {
+    switch(m) { case dmap(m1, m2, vals):
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_other_keeps_used<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                   int idx1, int idx2,
+                                                   fixpoint (vt,t1) vk1,
+                                                   fixpoint (vt,t2) vk2)
+  requires idx1 != idx2;
+  ensures dmap_index_used_fp(dmap_erase_fp(m, idx1, vk1, vk2), idx2) ==
+          dmap_index_used_fp(m, idx2);
+  {
+    switch(m) { case dmap(m1,m2,vals):
+      nth_update_unrelevant(idx2, idx1, none, vals);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_erase_keeps_rest<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                             int idx,
+                                             list<int> ids,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2)
+  requires true == forall(ids, (dmap_index_used_fp)(m)) &*&
+           false == mem(idx, remove(idx, ids));
+  ensures true == forall(remove(idx, ids),
+                         (dmap_index_used_fp)(dmap_erase_fp(m, idx, vk1, vk2)));
+  {
+    switch(ids){
+      case nil: return;
+      case cons(h,t):
+        if (h != idx) {
+          dmap_erase_keeps_rest(m, idx, t, vk1, vk2);
+          dmap_erase_other_keeps_used(m, idx, h, vk1, vk2);
+        } else {
+          if (mem(idx, remove(idx, t))) mem_remove_mem(idx, idx, t);
+          dmap_erase_keeps_rest(m, idx, t, vk1, vk2);
+          remove_nonmem(idx, t);
+        }
+    }
+  }
+  @*/
