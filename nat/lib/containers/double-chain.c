@@ -1594,3 +1594,95 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     open dchain_nodups(ch);
   }
   @*/
+
+/*@
+  lemma void remove_by_index_to_remove(list<pair<int, uint32_t> > alist,
+                                       int index)
+  requires true;
+  ensures map(fst, remove_by_index_fp(alist, index)) ==
+          remove(index, map(fst, alist));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != index) remove_by_index_to_remove(t, index);
+    }
+  }
+  @*/
+
+/*@
+
+  lemma void dchain_rejuvenate_indexes_subset
+               (list<pair<int, uint32_t> > alist, int index, uint32_t time)
+  requires true;
+  ensures true == subset(map(fst, alist),
+                         map(fst, append(remove_by_index_fp(alist, index),
+                                         cons(pair(index, time), nil))));
+  {
+    remove_by_index_to_remove(alist, index);
+    map_append(fst, remove_by_index_fp(alist, index),
+               cons(pair(index, time), nil));
+    assert(map(fst, append(remove_by_index_fp(alist, index),
+                           cons(pair(index, time), nil))) ==
+           append(remove(index, map(fst, alist)), cons(index, nil)));
+    subset_push_to_the_end(map(fst, alist),
+                           map(fst, alist),
+                           index);
+  }
+
+  lemma void dchain_rejuvenate_indexes_superset
+               (list<pair<int, uint32_t> > alist, int index, uint32_t time)
+  requires true == mem(index, map(fst, alist));
+  ensures true == subset(map(fst, append(remove_by_index_fp(alist, index),
+                                         cons(pair(index, time), nil))),
+                         map(fst, alist));
+  {
+    remove_by_index_to_remove(alist, index);
+    map_append(fst, remove_by_index_fp(alist, index),
+               cons(pair(index, time), nil));
+    push_to_the_end_subset(map(fst, alist), map(fst, alist), index);
+  }
+
+lemma void dchain_rejuvenate_preserves_indexes_set(dchain ch, int index,
+                                                   uint32_t time)
+requires true == dchain_allocated_fp(ch, index);
+ensures true == subset(dchain_indexes_fp(ch),
+                       dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
+                                                              time))) &*&
+        true == subset(dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
+                                                              time)),
+                       dchain_indexes_fp(ch));
+{
+  dchain_indexes_contain_index(ch, index);
+  switch(ch) { case dchain(alist, ir, lo, hi):
+    dchain_rejuvenate_indexes_subset(alist, index, time);
+    dchain_rejuvenate_indexes_superset(alist, index, time);
+  }
+}
+
+@*/
+
+
+/*@
+  lemma void dchain_allocate_append_to_indexes_impl
+               (list<pair<int, uint32_t> > alist,
+                int ind, uint32_t time)
+  requires true;
+  ensures map(fst, append(alist, cons(pair(ind, time), nil))) ==
+          append(map(fst, alist), cons(ind, nil));
+  {
+    map_append(fst, alist, cons(pair(ind, time), nil));
+  }
+  @*/
+
+/*@
+  lemma void dchain_allocate_append_to_indexes(dchain ch, int ind, uint32_t time)
+  requires true;
+  ensures dchain_indexes_fp(dchain_allocate_fp(ch, ind, time)) ==
+          append(dchain_indexes_fp(ch), cons(ind, nil));
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      dchain_allocate_append_to_indexes_impl(alist, ind, time);
+    }
+  }
+  @*/

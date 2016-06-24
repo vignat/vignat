@@ -686,6 +686,29 @@ ensures append(a, b) != nil;
     distinct2_subset_sublen(xs, distinct_superset(xs, ys));
   }
 
+  lemma void subset_push_to_the_end<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys);
+  ensures true == subset(xs, append(remove(el, ys), cons(el, nil)));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        if (h == el) {
+        } else {
+          neq_mem_remove(h, el, ys);
+        }
+        subset_push_to_the_end(t, ys, el);
+    }
+  }
+
+  lemma void push_to_the_end_subset<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys) &*& true == mem(el, ys);
+  ensures true == subset(append(remove(el, xs), cons(el, nil)), ys);
+  {
+    subset_remove(xs, ys, el);
+    subset_append(remove(el, xs), cons(el, nil), ys);
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

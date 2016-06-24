@@ -50,97 +50,6 @@ ensures dmap_dchain_coherent(dmap_erase_all_fp
 @*/
 
 /*@
-  lemma void remove_by_index_to_remove(list<pair<int, uint32_t> > alist,
-                                       int index)
-  requires true;
-  ensures map(fst, remove_by_index_fp(alist, index)) ==
-          remove(index, map(fst, alist));
-  {
-    switch(alist) {
-      case nil: return;
-      case cons(h,t):
-        if (fst(h) != index) remove_by_index_to_remove(t, index);
-    }
-  }
-  @*/
-
-/*@
-  lemma void subset_push_to_the_end<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys);
-  ensures true == subset(xs, append(remove(el, ys), cons(el, nil)));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        if (h == el) {
-        } else {
-          neq_mem_remove(h, el, ys);
-        }
-        subset_push_to_the_end(t, ys, el);
-    }
-  }
-  @*/
-
-/*@
-  lemma void push_to_the_end_subset<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys) &*& true == mem(el, ys);
-  ensures true == subset(append(remove(el, xs), cons(el, nil)), ys);
-  {
-    subset_remove(xs, ys, el);
-    subset_append(remove(el, xs), cons(el, nil), ys);
-  }
-  @*/
-
-/*@
-
-  lemma void dchain_rejuvenate_indexes_subset
-               (list<pair<int, uint32_t> > alist, int index, uint32_t time)
-  requires true;
-  ensures true == subset(map(fst, alist),
-                         map(fst, append(remove_by_index_fp(alist, index),
-                                         cons(pair(index, time), nil))));
-  {
-    remove_by_index_to_remove(alist, index);
-    map_append(fst, remove_by_index_fp(alist, index),
-               cons(pair(index, time), nil));
-    assert(map(fst, append(remove_by_index_fp(alist, index),
-                           cons(pair(index, time), nil))) ==
-           append(remove(index, map(fst, alist)), cons(index, nil)));
-    subset_push_to_the_end(map(fst, alist),
-                           map(fst, alist),
-                           index);
-  }
-
-  lemma void dchain_rejuvenate_indexes_superset
-               (list<pair<int, uint32_t> > alist, int index, uint32_t time)
-  requires true == mem(index, map(fst, alist));
-  ensures true == subset(map(fst, append(remove_by_index_fp(alist, index),
-                                         cons(pair(index, time), nil))),
-                         map(fst, alist));
-  {
-    remove_by_index_to_remove(alist, index);
-    map_append(fst, remove_by_index_fp(alist, index),
-               cons(pair(index, time), nil));
-    push_to_the_end_subset(map(fst, alist), map(fst, alist), index);
-  }
-
-lemma void dchain_rejuvenate_preserves_indexes_set(dchain ch, int index,
-                                                   uint32_t time)
-requires true == dchain_allocated_fp(ch, index);
-ensures true == subset(dchain_indexes_fp(ch),
-                       dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
-                                                              time))) &*&
-        true == subset(dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
-                                                              time)),
-                       dchain_indexes_fp(ch));
-{
-  dchain_indexes_contain_index(ch, index);
-  switch(ch) { case dchain(alist, ir, lo, hi):
-    dchain_rejuvenate_indexes_subset(alist, index, time);
-    dchain_rejuvenate_indexes_superset(alist, index, time);
-  }
-}
-
 lemma void rejuvenate_preserves_coherent<t1,t2,vt>
              (dmap<t1,t2,vt> m, dchain ch,
               int index, uint32_t time)
@@ -158,17 +67,191 @@ ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
                dchain_indexes_fp(nch));
   close dmap_dchain_coherent(m, nch);
 }
+@*/
 
+/*@
+  lemma void dmap_put_equiv_indexes_sub<vt>(list<option<vt> > vals,
+                                            int ind, vt v, int start)
+  requires true;
+  ensures true == subset(nonempty_indexes_fp(update(ind-start, some(v), vals),
+                                             start),
+                         cons(ind, nonempty_indexes_fp(vals, start)));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (start == ind) {
+          switch(h) {
+            case none: break;
+            case some(lll):
+              add_extra_preserves_subset(nonempty_indexes_fp(t, start+1),
+                                         nonempty_indexes_fp(t, start+1), start);
+          }
+          add_extra_preserves_subset(nonempty_indexes_fp(t, start+1),
+                                     nonempty_indexes_fp(vals, start), ind);
+        } else {
+          dmap_put_equiv_indexes_sub(t, ind, v, start+1);
+          switch(h) {
+            case none: break;
+            case some(aaa):
+              list<int> prev_idxes = nonempty_indexes_fp(t, start+1);
+              add_extra_preserves_subset(prev_idxes, prev_idxes, start);
+              add_extra_preserves_subset(prev_idxes, cons(start, prev_idxes),
+                                         ind);
+
+              subset_trans(nonempty_indexes_fp(update(ind-start-1, some(v), t),
+                                               start+1),
+                           cons(ind, nonempty_indexes_fp(t, start+1)),
+                           cons(ind, nonempty_indexes_fp(vals, start)));
+              break;
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_put_equiv_indexes_sup<vt>(list<option<vt> > vals,
+                                            int ind, vt v, int start)
+  requires true;
+  ensures true == subset(nonempty_indexes_fp(vals, start),
+                         nonempty_indexes_fp(update(ind-start, some(v), vals),
+                                             start));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        dmap_put_equiv_indexes_sup(t, ind, v, start+1);
+        if (ind == start) {
+          add_extra_preserves_subset(nonempty_indexes_fp(t, start+1),
+                                     nonempty_indexes_fp(t, start+1),
+                                     start);
+        }
+        switch(h) {
+          case none:
+            return;
+          case some(ignore):
+            add_extra_preserves_subset(nonempty_indexes_fp(t, start+1),
+                                       nonempty_indexes_fp(update(ind-start-1,
+                                                                  some(v), t),
+                                                           start+1),
+                                       start);
+            break;
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_put_occupies<vt>(list<option<vt> > vals,
+                                   int ind, vt v, int start)
+  requires 0 <= start &*& start <= ind &*& ind - start < length(vals);
+  ensures true == mem(ind, nonempty_indexes_fp(update(ind-start, some(v), vals),
+                                               start));
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        if (start == ind) return;
+        dmap_put_occupies(t, ind, v, start+1);
+        switch(h) {
+          case none: break;
+          case some(ignore): break;
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_put_equiv_indexes<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                              int ind, vt value,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2)
+  requires 0 <= ind &*& ind < dmap_cap_fp(m);
+  ensures true == subset(dmap_indexes_used_fp
+                          (dmap_put_fp(m, ind, value, vk1, vk2)),
+                         cons(ind, dmap_indexes_used_fp(m))) &*&
+          true == subset(cons(ind, dmap_indexes_used_fp(m)),
+                         dmap_indexes_used_fp
+                          (dmap_put_fp(m, ind, value, vk1, vk2)));
+  {
+    switch(m) { case dmap(ma, mb, vals):
+      dmap_put_equiv_indexes_sub(vals, ind, value, 0);
+      dmap_put_equiv_indexes_sup(vals, ind, value, 0);
+      dmap_put_occupies(vals, ind, value, 0);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_put_preserves_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                              int ind, vt value,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_cap_fp(dmap_put_fp(m, ind, value, vk1, vk2)) ==
+          dmap_cap_fp(m);
+  {
+    switch(m) { case dmap(ma, mb, vals):
+    }
+  }
+  @*/
+
+/*@
+  lemma void subset_append2<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, ys);
+  ensures true == subset(xs, append(ys, zs));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        subset_append2(t, ys, zs);
+    }
+  }
+  @*/
+
+/*@
 lemma void coherent_put_allocated_preserves_coherent<t1,t2,vt>
 (dmap<t1,t2,vt> m, dchain ch, t1 k1, t2 k2,
  vt value, int ind, uint32_t t,
  fixpoint (vt,t1) vk1,
  fixpoint (vt,t2) vk2)
-requires dmap_dchain_coherent(m, ch) &*& false == dchain_allocated_fp(ch, ind);
+requires dmap_dchain_coherent(m, ch) &*&
+         0 <= ind &*& ind < dmap_cap_fp(m);
 ensures dmap_dchain_coherent(dmap_put_fp(m, ind, value, vk1, vk2),
                              dchain_allocate_fp(ch, ind, t));
 {
-  assume(false);//TODO
+  open dmap_dchain_coherent(m, ch);
+  dchain_allocate_append_to_indexes(ch, ind, t);
+  assert dchain_indexes_fp(dchain_allocate_fp(ch, ind, t)) ==
+         append(dchain_indexes_fp(ch), cons(ind, nil));
+  if (mem(ind, dmap_indexes_used_fp(m))) {
+    subset_mem_trans(dmap_indexes_used_fp(m), dchain_indexes_fp(ch), ind);
+  }
+  dmap_put_equiv_indexes(m, ind, value, vk1, vk2);
+  assert true == subset(dmap_indexes_used_fp(dmap_put_fp(m, ind, value,
+                                                         vk1, vk2)),
+                        cons(ind, dmap_indexes_used_fp(m)));
+  assert true == subset(dmap_indexes_used_fp(m),
+                        dmap_indexes_used_fp(dmap_put_fp(m, ind, value,
+                                                         vk1, vk2)));
+
+  dmap_put_preserves_cap(m, ind, value, vk1, vk2);
+  allocate_preserves_index_range(ch, ind, t);
+  subset_append2(dmap_indexes_used_fp(m), dchain_indexes_fp(ch),
+                 cons(ind, nil));
+  add_extra_preserves_subset(dchain_indexes_fp(ch),
+                             dmap_indexes_used_fp(m), ind);
+  subset_append(dchain_indexes_fp(ch), cons(ind, nil),
+                cons(ind, dmap_indexes_used_fp(m)));
+  subset_trans(dmap_indexes_used_fp(dmap_put_fp(m, ind, value, vk1, vk2)),
+               cons(ind, dmap_indexes_used_fp(m)),
+               dchain_indexes_fp(dchain_allocate_fp(ch, ind, t)));
+  subset_trans(dchain_indexes_fp(dchain_allocate_fp(ch, ind, t)),
+               cons(ind, dmap_indexes_used_fp(m)),
+               dmap_indexes_used_fp(dmap_put_fp(m, ind, value, vk1, vk2)));
+  close dmap_dchain_coherent(dmap_put_fp(m, ind, value, vk1, vk2),
+                             dchain_allocate_fp(ch, ind, t));
 }
 
 @*/

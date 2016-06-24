@@ -274,6 +274,20 @@ struct DoubleChain;
   requires double_chainp(ch, ?chain);
   ensures double_chainp(ch, chain) &*&
           dchain_nodups(ch);
+  lemma void dchain_rejuvenate_preserves_indexes_set(dchain ch, int index,
+                                                     uint32_t time);
+  requires true == dchain_allocated_fp(ch, index);
+  ensures true == subset(dchain_indexes_fp(ch),
+                        dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
+                                                                time))) &*&
+          true == subset(dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
+                                                                time)),
+                        dchain_indexes_fp(ch));
+  lemma void dchain_allocate_append_to_indexes(dchain ch, int ind,
+                                               uint32_t time);
+  requires true;
+  ensures dchain_indexes_fp(dchain_allocate_fp(ch, ind, time)) ==
+          append(dchain_indexes_fp(ch), cons(ind, nil));
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);

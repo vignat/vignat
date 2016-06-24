@@ -41,7 +41,8 @@ lemma void coherent_put_allocated_preserves_coherent<t1,t2,vt>
  vt value, int ind, uint32_t t,
  fixpoint (vt,t1) vk1,
  fixpoint (vt,t2) vk2);
-requires dmap_dchain_coherent(m, ch) &*& false == dchain_allocated_fp(ch, ind);
+requires dmap_dchain_coherent(m, ch) &*&
+         0 <= ind &*& ind < dmap_cap_fp(m);
 ensures dmap_dchain_coherent(dmap_put_fp(m, ind, value, vk1, vk2),
                              dchain_allocate_fp(ch, ind, t));
 
