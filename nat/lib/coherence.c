@@ -34,19 +34,6 @@ ensures dmap_dchain_coherent(m, ch) &*&
   close dmap_dchain_coherent(m, ch);
 }
 
-lemma void expire_preserves_coherent<t1,t2,vt>
-             (dmap<t1,t2,vt> m, dchain ch, uint32_t time,
-              fixpoint (vt,t1) vk1,
-              fixpoint (vt,t2) vk2)
-requires dmap_dchain_coherent(m, ch);
-ensures dmap_dchain_coherent(dmap_erase_all_fp
-                                (m, dchain_get_expired_indexes_fp(ch, time),
-                                vk1, vk2),
-                             dchain_expire_old_indexes_fp(ch, time));
-{
-  assume(false);//TODO
-}
-
 @*/
 
 /*@
