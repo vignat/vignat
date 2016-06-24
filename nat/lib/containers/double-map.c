@@ -1655,6 +1655,39 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
   return 1;
 }
 
+/*@
+  lemma void insync_map_size_val_size<t1,t2,vt>(list<option<vt> > vals,
+                                                list<pair<t1,int> > m1,
+                                                list<pair<t2,int> > m2,
+                                                fixpoint (vt,t1) vk1,
+                                                fixpoint (vt,t2) vk2,
+                                                int capacity)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2,
+                             capacity - length(vals));
+  ensures map_size_fp(m1) ==
+          length(nonempty_indexes_fp(vals, capacity - length(vals))) &*&
+          map_size_fp(m2) == map_size_fp(m1);
+  {
+    switch(vals) {
+      case nil:
+        return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            insync_map_size_val_size(t, m1, m2, vk1, vk2, capacity);
+            return;
+          case some(v):
+            insync_map_size_val_size(t, map_erase_fp(m1, vk1(v)),
+                                     map_erase_fp(m2, vk2(v)),
+                                     vk1, vk2, capacity);
+            map_has_erase_size_dec(m1, vk1(v));
+            map_has_erase_size_dec(m2, vk2(v));
+            return;
+        }
+    }
+  }
+  @*/
+
 int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
@@ -1666,6 +1699,9 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
 {
   /*@ open dmappingp(m, kp1, kp2, hsh1, hsh2,
                      fvp, bvp, rof, vsz, vk1, vk2, rp1, rp2, map); @*/
+  //@ assert m == dmap(?ma, ?mb, ?val_arr);
+  //@ insync_map_size_val_size(val_arr, ma, mb, vk1, vk2, length(val_arr));
+  //@ assert map_size_fp(ma) == dmap_size_fp(m);
   return map->n_vals;
   /*@ close dmappingp(m,
                       kp1, kp2, hsh1, hsh2,
@@ -1965,5 +2001,13 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
   {
     switch(m) { case dmap(ma, mb, vals) :
     }
+  }
+  @*/
+
+/*@
+  lemma void dmap_size_of_indexes_used<t1,t2,vt>(dmap<t1,t2,vt> m)
+  requires true;
+  ensures dmap_size_fp(m) == length(dmap_indexes_used_fp(m));
+  {
   }
   @*/

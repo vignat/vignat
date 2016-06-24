@@ -47,9 +47,86 @@ ensures dmap_dchain_coherent(dmap_erase_all_fp
   assume(false);//TODO
 }
 
+@*/
+
+/*@
+  lemma void remove_by_index_to_remove(list<pair<int, uint32_t> > alist,
+                                       int index)
+  requires true;
+  ensures map(fst, remove_by_index_fp(alist, index)) ==
+          remove(index, map(fst, alist));
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != index) remove_by_index_to_remove(t, index);
+    }
+  }
+  @*/
+
+/*@
+  lemma void subset_push_to_the_end<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys);
+  ensures true == subset(xs, append(remove(el, ys), cons(el, nil)));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        if (h == el) {
+        } else {
+          neq_mem_remove(h, el, ys);
+        }
+        subset_push_to_the_end(t, ys, el);
+    }
+  }
+  @*/
+
+/*@
+  lemma void push_to_the_end_subset<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys) &*& true == mem(el, ys);
+  ensures true == subset(append(remove(el, xs), cons(el, nil)), ys);
+  {
+    subset_remove(xs, ys, el);
+    subset_append(remove(el, xs), cons(el, nil), ys);
+  }
+  @*/
+
+/*@
+
+  lemma void dchain_rejuvenate_indexes_subset
+               (list<pair<int, uint32_t> > alist, int index, uint32_t time)
+  requires true;
+  ensures true == subset(map(fst, alist),
+                         map(fst, append(remove_by_index_fp(alist, index),
+                                         cons(pair(index, time), nil))));
+  {
+    remove_by_index_to_remove(alist, index);
+    map_append(fst, remove_by_index_fp(alist, index),
+               cons(pair(index, time), nil));
+    assert(map(fst, append(remove_by_index_fp(alist, index),
+                           cons(pair(index, time), nil))) ==
+           append(remove(index, map(fst, alist)), cons(index, nil)));
+    subset_push_to_the_end(map(fst, alist),
+                           map(fst, alist),
+                           index);
+  }
+
+  lemma void dchain_rejuvenate_indexes_superset
+               (list<pair<int, uint32_t> > alist, int index, uint32_t time)
+  requires true == mem(index, map(fst, alist));
+  ensures true == subset(map(fst, append(remove_by_index_fp(alist, index),
+                                         cons(pair(index, time), nil))),
+                         map(fst, alist));
+  {
+    remove_by_index_to_remove(alist, index);
+    map_append(fst, remove_by_index_fp(alist, index),
+               cons(pair(index, time), nil));
+    push_to_the_end_subset(map(fst, alist), map(fst, alist), index);
+  }
+
 lemma void dchain_rejuvenate_preserves_indexes_set(dchain ch, int index,
                                                    uint32_t time)
-requires true;
+requires true == dchain_allocated_fp(ch, index);
 ensures true == subset(dchain_indexes_fp(ch),
                        dchain_indexes_fp(dchain_rejuvenate_fp(ch, index,
                                                               time))) &*&
@@ -57,13 +134,18 @@ ensures true == subset(dchain_indexes_fp(ch),
                                                               time)),
                        dchain_indexes_fp(ch));
 {
-  assume(false);//TODO
+  dchain_indexes_contain_index(ch, index);
+  switch(ch) { case dchain(alist, ir, lo, hi):
+    dchain_rejuvenate_indexes_subset(alist, index, time);
+    dchain_rejuvenate_indexes_superset(alist, index, time);
+  }
 }
 
 lemma void rejuvenate_preserves_coherent<t1,t2,vt>
              (dmap<t1,t2,vt> m, dchain ch,
               int index, uint32_t time)
-requires dmap_dchain_coherent(m, ch);
+requires dmap_dchain_coherent(m, ch) &*&
+         true == dchain_allocated_fp(ch, index);
 ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
 {
   open dmap_dchain_coherent(m, ch);
@@ -91,15 +173,6 @@ ensures dmap_dchain_coherent(dmap_put_fp(m, ind, value, vk1, vk2),
 
 @*/
 
-/*@
-  lemma void distinct_subset_sublen<t>(list<t> xs, list<t> ys)
-  requires true == distinct(xs) &*&
-           true == subset(xs, ys);
-  ensures length(xs) <= length(ys);
-  {
-    assume(false);//TODO
-  }
-  @*/
 
 /*@
   lemma void dchain_out_of_space_to_indexes_size(dchain ch)
@@ -107,16 +180,9 @@ ensures dmap_dchain_coherent(dmap_put_fp(m, ind, value, vk1, vk2),
   ensures dchain_out_of_space_fp(ch) ==
           (dchain_index_range_fp(ch) <= length(dchain_indexes_fp(ch)));
   {
-    assume(false);//TODO
-  }
-  @*/
-
-/*@
-  lemma void dmap_size_of_indexes_used<t1,t2,vt>(dmap<t1,t2,vt> m)
-  requires true;
-  ensures dmap_size_fp(m) == length(dmap_indexes_used_fp(m));
-  {
-    assume(false);//TODO
+    switch(ch) { case dchain(alist, index_range, lo, hi):
+      map_effect_on_len(alist, fst);
+    }
   }
   @*/
 

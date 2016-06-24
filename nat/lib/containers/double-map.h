@@ -161,12 +161,6 @@ struct DoubleMap;
     }
   }
 
-  fixpoint int dmap_size_fp<t1,t2,vt>(dmap<t1,t2,vt> m) {
-    switch(m) { case dmap(m1, m2, vals):
-      return map_size_fp(m1);
-    }
-  }
-
   fixpoint int dmap_cap_fp<t1,t2,vt>(dmap<t1,t2,vt> m) {
     switch(m) { case dmap(m1, m2, vals):
       return length(vals);
@@ -196,6 +190,11 @@ struct DoubleMap;
       return nonempty_indexes_fp(val_arr, 0);
     }
   }
+
+  fixpoint int dmap_size_fp<t1,t2,vt>(dmap<t1,t2,vt> m) {
+    return length(dmap_indexes_used_fp(m));
+  }
+
 
   lemma void dmap_indexes_contain_index_used<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                        int idx);
@@ -382,6 +381,10 @@ struct DoubleMap;
   lemma void dmap_index_used_inbounds<t1,t2,vt>(dmap<t1,t2,vt> m, int idx);
   requires true == dmap_index_used_fp(m, idx);
   ensures 0 <= idx &*& idx < dmap_cap_fp(m);
+
+  lemma void dmap_size_of_indexes_used<t1,t2,vt>(dmap<t1,t2,vt> m);
+  requires true;
+  ensures dmap_size_fp(m) == length(dmap_indexes_used_fp(m));
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

@@ -567,6 +567,125 @@ ensures append(a, b) != nil;
     remove_subset(remove(el, xs), el, ys);
   }
 
+  lemma void subset_remove_unrelevant<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys) &*& false == mem(el, xs);
+  ensures true == subset(xs, remove(el, ys));
+  {
+    remove_nonmem(el, xs);
+    remove_both_subset(el, xs, ys);
+  }
+
+  lemma void subset_append<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, zs) &*& true == subset(ys, zs);
+  ensures true == subset(append(xs, ys), zs);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        subset_append(t, ys, zs);
+    }
+  }
+
+  lemma void remove_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys) &*& true == mem(el, remove(el, ys));
+  ensures true == subset(xs, remove(el, ys));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        if (h != el) neq_mem_remove(h, el, ys);
+        remove_extra_preserves_subset(t, ys, el);
+    }
+  }
+
+  lemma void add_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys);
+  ensures true == subset(xs, cons(el, ys));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        add_extra_preserves_subset(t, ys, el);
+    }
+  }
+
+  lemma void subset_unremove<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(remove(el, xs), ys);
+  ensures true == subset(xs, cons(el, ys));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        if (h != el) subset_unremove(t, ys, el);
+        else add_extra_preserves_subset(t, ys, el);
+    }
+  }
+
+  lemma void subset_mem_trans<t>(list<t> xs, list<t> ys, t el)
+  requires true == subset(xs, ys) &*& true == mem(el, xs);
+  ensures true == mem(el, ys);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        if (h != el) subset_mem_trans(t, ys, el);
+    }
+  }
+
+  lemma void distinct2_subset_sublen<t>(list<t> xs, list<t> ys)
+  requires true == distinct(xs) &*&
+           true == distinct(ys) &*&
+           true == subset(xs, ys);
+  ensures length(xs) <= length(ys);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        subset_remove_unrelevant(t, ys, h);
+        distinct_remove(h, ys);
+        distinct2_subset_sublen(t, remove(h, ys));
+    }
+  }
+
+  lemma list<t> distinct_superset<t>(list<t> xs, list<t> ys)
+  requires true == subset(xs, ys) &*&
+           true == distinct(xs);
+  ensures true == subset(xs, result) &*& true == subset(result, ys) &*&
+          true == distinct(result) &*& length(result) <= length(ys);
+  {
+    switch(ys) {
+      case nil: return nil;
+      case cons(h,t):
+        if (mem(h, t)) {
+          remove_extra_preserves_subset(xs, ys, h);
+          list<t> rez = distinct_superset(xs, t);
+          add_extra_preserves_subset(rez, t, h);
+          return rez;
+        }
+        else {
+          distinct_unique(xs, h);
+          remove_both_subset(h, xs, ys);
+          distinct_remove(h, xs);
+          list<t> t_rez = distinct_superset(remove(h, xs), t);
+          subset_unremove(xs, t_rez, h);
+          add_extra_preserves_subset(t_rez, t, h);
+          if (true == mem(h, t_rez)) {
+            subset_mem_trans(t_rez, t, h);
+          }
+          assert false == mem(h, t_rez);
+          return cons(h, t_rez);
+        }
+    }
+  }
+
+  lemma void distinct_subset_sublen<t>(list<t> xs, list<t> ys)
+  requires true == distinct(xs) &*&
+           true == subset(xs, ys);
+  ensures length(xs) <= length(ys);
+  {
+    distinct2_subset_sublen(xs, distinct_superset(xs, ys));
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)
