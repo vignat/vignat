@@ -318,11 +318,9 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
              0 <= index &*& index < dchain_index_range_fp(ch) &*&
              dchain_high_fp(ch) <= time; @*/
 /*@ ensures dchain_allocated_fp(ch, index) ?
-            (dchain_get_time_fp(ch, index) < time ?
-             (result == 1 &*&
-              double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
-             (result == 0 &*&
-              double_chainp(ch, chain))) :
+            (dchain_get_time_fp(ch, index) <= time &*&
+             result == 1 &*&
+             double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
             (result == 0 &*&
              double_chainp(ch, chain)); @*/
 

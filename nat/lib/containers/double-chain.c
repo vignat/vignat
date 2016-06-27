@@ -561,17 +561,32 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
   }
   @*/
 
+/*@
+  lemma void bnd_sorted_this_less_than_high(list<pair<int, uint32_t> > alist,
+                                            int index,
+                                            uint32_t low, uint32_t high)
+  requires true == bnd_sorted_fp(map(snd, alist), low, high) &*&
+           true == exists(alist, (same_index)(index));
+  ensures alist_get_fp(alist, index) <= high;
+  {
+    switch(alist) {
+      case nil: return;
+      case cons(h,t):
+      if (fst(h) != index)
+        bnd_sorted_this_less_than_high(t, index, snd(h), high);
+    }
+  }
+  @*/
+
 int dchain_rejuvenate_index(struct DoubleChain* chain,
                             int index, uint32_t time)
 /*@ requires double_chainp(?ch, chain) &*&
              0 <= index &*& index < dchain_index_range_fp(ch) &*&
              dchain_high_fp(ch) <= time; @*/
 /*@ ensures dchain_allocated_fp(ch, index) ?
-             (dchain_get_time_fp(ch, index) < time ?
-              (result == 1 &*&
-               double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
-              (result == 0 &*&
-               double_chainp(ch, chain))) :
+             (dchain_get_time_fp(ch, index) <= time &*&
+              result == 1 &*&
+              double_chainp(dchain_rejuvenate_fp(ch, index, time), chain)) :
              (result == 0 &*&
               double_chainp(ch, chain)); @*/
 {
@@ -581,56 +596,44 @@ int dchain_rejuvenate_index(struct DoubleChain* chain,
   //@ assert dchainip(?chi, cells);
   //@ int size = dchain_index_range_fp(ch);
   //@ assert uints(timestamps, size, ?tmstmps);
-  //@ extract_timestamp(timestamps, tmstmps, index);
 
-  /* Checking the timestamp is safe,
-     even if the index is not really allocated */
-  if (chain->timestamps[index] < time) {
-    //@ assert nth(index, tmstmps) < time;
+  //@ dc_alist_no_dups(chi, index);
+  int ret = dchain_impl_rejuvenate_index(chain->cells, index);
+  //@ dchaini_allocated_def(chi, index);
+  /*@ insync_mem_exists_same_index(dchaini_alist_fp(chi),
+                                   dchain_alist_fp(ch), tmstmps, index);
+                                   @*/
+  //@ dchain_allocated_def(ch, index);
+  if (ret) {
+    //@ extract_timestamp(timestamps, tmstmps, index);
     chain->timestamps[index] = time;
     //@ take_update_unrelevant(index, index, time, tmstmps);
     //@ drop_update_unrelevant(index+1, index, time, tmstmps);
     //@ glue_timestamp(timestamps, update(index, time, tmstmps), index);
-    //@ dc_alist_no_dups(chi, index);
-    int ret = dchain_impl_rejuvenate_index(chain->cells, index);
-    //@ dchaini_allocated_def(chi, index);
-    /*@ insync_mem_exists_same_index(dchaini_alist_fp(chi),
-                                     dchain_alist_fp(ch), tmstmps, index);
-                                     @*/
-    //@ dchain_allocated_def(ch, index);
-    /*@
-      if (ret) {
-        get_time_int(dchaini_alist_fp(chi),tmstmps, dchain_alist_fp(ch), index);
-        assert dchain_get_time_fp(ch, index) < time;
-        dchaini_rejuvenate_keep_irange(chi, index);
-        rejuvenate_preserves_index_range(ch, index, time);
-        insync_rejuvenate(dchaini_alist_fp(chi), dchain_alist_fp(ch),
-                          tmstmps, index, time);
-        rejuvenate_def(ch, chi, index, time);
-        rejuvenate_keeps_bnd_sorted(dchain_alist_fp(ch), index,
-                                     dchain_low_fp(ch), time,
-                                     dchain_high_fp(ch));
-        close double_chainp(dchain_rejuvenate_fp(ch, index, time), chain);
-      } else {
-        insync_update_unrelevant(dchaini_alist_fp(chi), tmstmps,
-                                 dchain_alist_fp(ch), index, time);
-        close double_chainp(ch, chain);
+    /*@ {
+      get_time_int(dchaini_alist_fp(chi),tmstmps, dchain_alist_fp(ch), index);
+      switch(ch) { case dchain(alist, ir, lo, hi):
+        bnd_sorted_this_less_than_high(alist, index, lo, hi);
       }
-      @*/
-    return ret;
+      assert dchain_get_time_fp(ch, index) <= time;
+      dchaini_rejuvenate_keep_irange(chi, index);
+      rejuvenate_preserves_index_range(ch, index, time);
+      insync_rejuvenate(dchaini_alist_fp(chi), dchain_alist_fp(ch),
+                        tmstmps, index, time);
+      rejuvenate_def(ch, chi, index, time);
+      rejuvenate_keeps_bnd_sorted(dchain_alist_fp(ch), index,
+                                  dchain_low_fp(ch), time,
+                                  dchain_high_fp(ch));
+      close double_chainp(dchain_rejuvenate_fp(ch, index, time), chain);
+      }@*/
+  } else {
+    /*@ {
+      insync_update_unrelevant(dchaini_alist_fp(chi), tmstmps,
+                               dchain_alist_fp(ch), index, time);
+      close double_chainp(ch, chain);
+      } @*/
   }
-  //@ glue_timestamp(timestamps, tmstmps, index);
-  /*@
-    if (dchain_allocated_fp(ch, index)) {
-      dchain_allocated_def(ch, index);
-      insync_mem_exists_same_index(dchaini_alist_fp(chi), dchain_alist_fp(ch),
-                                   tmstmps, index);
-      get_time_int(dchaini_alist_fp(chi), tmstmps, dchain_alist_fp(ch), index);
-      assert time <= dchain_get_time_fp(ch, index);
-    }
-    @*/
-  //@ close double_chainp(ch, chain);
-  return 0;
+  return ret;
 }
 
 /*@
