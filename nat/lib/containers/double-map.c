@@ -2247,6 +2247,103 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
   }
   @*/
 
+/*@
+  lemma void insync_get_above_start1<t1,t2,vt>(list<option<vt> > vals,
+                                               list<pair<t1,int> > m1,
+                                               list<pair<t2,int> > m2,
+                                               fixpoint (vt,t1) vk1,
+                                               fixpoint (vt,t2) vk2,
+                                               t1 k1,
+                                               int start_index)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2, start_index) &*&
+           true == map_has_fp(m1, k1);
+  ensures start_index <= map_get_fp(m1, k1);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            insync_get_above_start1(t, m1, m2, vk1, vk2, k1, start_index+1);
+          case some(v):
+            if (vk1(v) == k1) {
+              assert map_get_fp(m1, k1) == start_index;
+            } else {
+              map_erase_has_unrelevant(m1, vk1(v), k1);
+              insync_get_above_start1(t, map_erase_fp(m1, vk1(v)),
+                                      map_erase_fp(m2, vk2(v)),
+                                      vk1, vk2, k1, start_index+1);
+              map_erase_get_unrelevant(m1, vk1(v), k1);
+            }
+        }
+    }
+  }
+@*/
+
+/*@
+  lemma void insync_get_by_k1_invertible<t1,t2,vt>(list<option<vt> > vals,
+                                                   list<pair<t1,int> > m1,
+                                                   list<pair<t2,int> > m2,
+                                                   fixpoint (vt,t1) vk1,
+                                                   fixpoint (vt,t2) vk2,
+                                                   t1 k1,
+                                                   int start_index)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2, start_index) &*&
+           true == all_keys_differ(vals, vk1, vk2) &*&
+           true == map_has_fp(m1, k1);
+  ensures start_index <= map_get_fp(m1, k1) &*&
+          map_get_fp(m1, k1) - start_index < length(vals) &*&
+          nth(map_get_fp(m1, k1) - start_index, vals) == some(?x) &*&
+          k1 == vk1(x);
+  {
+    switch(vals) {
+      case nil: return;
+      case cons(h,t):
+        switch(h) {
+          case none:
+            insync_get_by_k1_invertible(t, m1, m2, vk1, vk2, k1,
+                                        start_index+1);
+            insync_get_above_start1(t, m1, m2, vk1, vk2, k1, start_index+1);
+            return;
+          case some(v):
+            if (vk1(v) == k1) {
+              assert map_get_fp(m1, k1) == start_index;
+            } else {
+              map_erase_has_unrelevant(m1, vk1(v), k1);
+              insync_get_by_k1_invertible(t, map_erase_fp(m1, vk1(v)),
+                                          map_erase_fp(m2, vk2(v)),
+                                          vk1, vk2, k1, start_index+1);
+              insync_get_above_start1(t, map_erase_fp(m1, vk1(v)),
+                                      map_erase_fp(m2, vk2(v)),
+                                      vk1, vk2, k1, start_index+1);
+              map_erase_get_unrelevant(m1, vk1(v), k1);
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_get_by_k1_invertible<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k1)
+  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                               ?fvp, ?bvp, ?rof, ?vsz,
+                               ?vk1, ?vk2, ?recp1, ?recp2, ?mp) &*&
+           dmap_has_k1_fp(m, k1) == true;
+  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
+                              fvp, bvp, rof, vsz,
+                              vk1, vk2, recp1, recp2, mp) &*&
+          true == dmap_index_used_fp(m, dmap_get_k1_fp(m, k1)) &*&
+          k1 == vk1(dmap_get_val_fp(m, dmap_get_k1_fp(m, k1)));
+  {
+    open dmappingp(m, kp1, kp2, hsh1, hsh2, fvp, bvp, rof,
+                   vsz, vk1, vk2, recp1, recp2, mp);
+    switch(m) { case dmap(ma, mb, vals):
+      insync_get_by_k1_invertible(vals, ma, mb, vk1, vk2, k1, 0);
+    }
+    close dmappingp(m, kp1, kp2, hsh1, hsh2, fvp, bvp, rof,
+                    vsz, vk1, vk2, recp1, recp2, mp);
+  }
+  @*/
 
 /*@
   lemma void insync_get_above_start2<t1,t2,vt>(list<option<vt> > vals,
@@ -2283,16 +2380,19 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
 
 /*@
   lemma void insync_get_by_k2_invertible<t1,t2,vt>(list<option<vt> > vals,
-                                                  list<pair<t1,int> > m1,
-                                                  list<pair<t2,int> > m2,
-                                                  fixpoint (vt,t1) vk1,
-                                                  fixpoint (vt,t2) vk2,
-                                                  t2 k2,
-                                                  int start_index)
+                                                    list<pair<t1,int> > m1,
+                                                    list<pair<t2,int> > m2,
+                                                    fixpoint (vt,t1) vk1,
+                                                    fixpoint (vt,t2) vk2,
+                                                    t2 k2,
+                                                    int start_index)
   requires true == insync_fp(vals, m1, m2, vk1, vk2, start_index) &*&
            true == all_keys_differ(vals, vk1, vk2) &*&
            true == map_has_fp(m2, k2);
-  ensures k2 == vk2(get_some(nth(map_get_fp(m2, k2) - start_index, vals)));
+  ensures start_index <= map_get_fp(m2, k2) &*&
+          map_get_fp(m2, k2) - start_index < length(vals) &*&
+          nth(map_get_fp(m2, k2) - start_index, vals) == some(?x) &*&
+          k2 == vk2(x);
   {
     switch(vals) {
       case nil: return;
@@ -2330,6 +2430,7 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
   ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
                               fvp, bvp, rof, vsz,
                               vk1, vk2, recp1, recp2, mp) &*&
+          true == dmap_index_used_fp(m, dmap_get_k2_fp(m, k2)) &*&
           k2 == vk2(dmap_get_val_fp(m, dmap_get_k2_fp(m, k2)));
   {
     open dmappingp(m, kp1, kp2, hsh1, hsh2, fvp, bvp, rof,
@@ -2340,22 +2441,19 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
     close dmappingp(m, kp1, kp2, hsh1, hsh2, fvp, bvp, rof,
                     vsz, vk1, vk2, recp1, recp2, mp);
   }
+  @*/
 
-  lemma void dmap_put_get<t1,t2,vt>(dmap<t1,t2,vt> m, vt v, int index,
+/*@
+
+  lemma void dmap_put_get<t1,t2,vt>(dmap<t1,t2,vt> m, int index, vt v,
                                     fixpoint (vt,t1) vk1,
                                     fixpoint (vt,t2) vk2)
-  requires dmappingp<t1,t2,vt>(dmap_put_fp(m, index, v, vk1, vk2),
-                               ?kp1, ?kp2, ?hsh1, ?hsh2,
-                               ?fvp, ?bvp, ?rof, ?vsz,
-                               vk1, vk2, ?recp1, ?recp2, ?mp);
-  ensures dmappingp<t1,t2,vt>(dmap_put_fp(m, index, v, vk1, vk2),
-                              kp1, kp2, hsh1, hsh2,
-                              fvp, bvp, rof, vsz,
-                              vk1, vk2, recp1, recp2, mp) &*&
-          dmap_index_used_fp(dmap_put_fp(m, index, v, vk1, vk2), index) == true &*&
+  requires 0 <= index &*& index < dmap_cap_fp(m);
+  ensures dmap_index_used_fp(dmap_put_fp(m, index, v, vk1, vk2), index) == true &*&
           v == dmap_get_val_fp(dmap_put_fp(m, index, v, vk1, vk2), index);
   {
-    assume(false);//TODO
+    switch(m) { case dmap(ma, mb, vals):
+    }
   }
 
   lemma void dmap_get_k1_get_val<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k)
@@ -2372,7 +2470,8 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
           true == recp2(vk2(dmap_get_val_fp(m, dmap_get_k1_fp(m, k))), dmap_get_k1_fp(m,k)) &*&
           true == recp1(k, dmap_get_k1_fp(m,k));
   {
-    assume(false);//TODO
+    dmap_get_by_k1_invertible(m, k);
+    dmap_get_by_index_rp(m, dmap_get_k1_fp(m, k));
   }
 
   lemma void dmap_get_k2_get_val<t1,t2,vt>(dmap<t1,t2,vt> m, t2 k)
@@ -2389,6 +2488,7 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
           true == recp1(vk1(dmap_get_val_fp(m, dmap_get_k2_fp(m, k))), dmap_get_k2_fp(m,k)) &*&
           true == recp2(k, dmap_get_k2_fp(m,k));
   {
-    assume(false);//TODO
+    dmap_get_by_k2_invertible(m, k);
+    dmap_get_by_index_rp(m, dmap_get_k2_fp(m, k));
   }
   @*/

@@ -353,13 +353,14 @@ let fun_types =
                        "!= 0) {\n\
                         dmap_put_get(" ^
                        (tmp "cur_map") ^
-                       ",flwc(ikc(user_buf0_34, user_buf0_36,\
+                       ",new_index_0,\
+                        flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n\
-                        new_index_0, vk1_before_put, vk2_before_put);\n\
+                        vk1_before_put, vk2_before_put);\n\
                         }@*/"
                     );
                     (fun ret_var _ tmp ->

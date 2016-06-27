@@ -256,20 +256,25 @@ struct DoubleMap;
   ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
                               fvp, bvp, rof, vsz,
                               vk1, vk2, recp1, recp2, mp) &*&
+          true == dmap_index_used_fp(m, dmap_get_k2_fp(m, k2)) &*&
           k2 == vk2(dmap_get_val_fp(m, dmap_get_k2_fp(m, k2)));
 
-  lemma void dmap_put_get<t1,t2,vt>(dmap<t1,t2,vt> m, vt v, int index,
-                                    fixpoint (vt,t1) vk1,
-                                    fixpoint (vt,t2) vk2);
-  requires dmappingp<t1,t2,vt>(dmap_put_fp(m, index, v, vk1, vk2),
-                               ?kp1, ?kp2, ?hsh1, ?hsh2,
+  lemma void dmap_get_by_k1_invertible<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k1);
+  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                ?fvp, ?bvp, ?rof, ?vsz,
-                               vk1, vk2, ?recp1, ?recp2, ?mp);
-  ensures dmappingp<t1,t2,vt>(dmap_put_fp(m, index, v, vk1, vk2),
-                              kp1, kp2, hsh1, hsh2,
+                               ?vk1, ?vk2, ?recp1, ?recp2, ?mp) &*&
+           dmap_has_k1_fp(m, k1) == true;
+  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
                               fvp, bvp, rof, vsz,
                               vk1, vk2, recp1, recp2, mp) &*&
-          dmap_index_used_fp(dmap_put_fp(m, index, v, vk1, vk2), index) == true &*&
+          true == dmap_index_used_fp(m, dmap_get_k1_fp(m, k1)) &*&
+          k1 == vk1(dmap_get_val_fp(m, dmap_get_k1_fp(m, k1)));
+
+  lemma void dmap_put_get<t1,t2,vt>(dmap<t1,t2,vt> m, int index, vt v,
+                                    fixpoint (vt,t1) vk1,
+                                    fixpoint (vt,t2) vk2);
+  requires 0 <= index &*& index < dmap_cap_fp(m);
+  ensures dmap_index_used_fp(dmap_put_fp(m, index, v, vk1, vk2), index) == true &*&
           v == dmap_get_val_fp(dmap_put_fp(m, index, v, vk1, vk2), index);
 
   lemma void dmap_get_k1_get_val<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k);
