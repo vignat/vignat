@@ -342,6 +342,16 @@ int dchain_allocate(int index_range, struct DoubleChain** chain_out)
   }
   @*/
 
+/*@
+  lemma void allocate_keeps_high_bounded(dchain ch, int index, uint32_t time)
+  requires dchain_high_fp(ch) <= time;
+  ensures dchain_high_fp(dchain_allocate_fp(ch, index, time)) <= time;
+  {
+    switch(ch) { case dchain(alist, ir, lo, hi):
+    }
+  }
+  @*/
+
 int dchain_allocate_new_index(struct DoubleChain* chain,
                               int *index_out, uint32_t time)
 /*@ requires double_chainp(?ch, chain) &*&
@@ -543,6 +553,21 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
   @*/
 
 /*@
+  lemma void remove_index_keeps_high_bounded(dchain ch, int index)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_high_fp(dchain_remove_index_fp(ch, index)) <=
+          dchain_high_fp(ch);
+  {
+    open double_chainp(ch, chain);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      remove_index_keeps_bnd_sorted(alist, index, lo, hi);
+    }
+    close double_chainp(ch, chain);
+  }
+  @*/
+
+/*@
   lemma void rejuvenate_keeps_bnd_sorted(list<pair<int, uint32_t> > alist,
                                          int index,
                                          uint32_t low,
@@ -558,6 +583,21 @@ int dchain_allocate_new_index(struct DoubleChain* chain,
     remove_index_keeps_bnd_sorted(alist, index, low, high);
     allocate_keeps_bnd_sorted(remove_by_index_fp(alist, index), index,
                               low, time, high);
+  }
+  @*/
+
+/*@
+  lemma void rejuvenate_keeps_high_bounded(dchain ch, int index, uint32_t time)
+  requires double_chainp(ch, ?chain) &*&
+           dchain_high_fp(ch) <= time;
+  ensures double_chainp(ch, chain) &*&
+          dchain_high_fp(dchain_rejuvenate_fp(ch, index, time)) <= time;
+  {
+    open double_chainp(ch, chain);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      rejuvenate_keeps_bnd_sorted(alist, index, lo, time, hi);
+    }
+    close double_chainp(ch, chain);
   }
   @*/
 
@@ -1687,5 +1727,17 @@ ensures true == subset(dchain_indexes_fp(ch),
     switch(ch) { case dchain(alist, ir, lo, hi):
       dchain_allocate_append_to_indexes_impl(alist, ind, time);
     }
+  }
+  @*/
+
+
+/*@
+  lemma void expire_olds_keeps_high_bounded(dchain ch, uint32_t time)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_high_fp(dchain_expire_old_indexes_fp(ch, time)) <=
+          dchain_high_fp(ch);
+  {
+    assert(false);//
   }
   @*/

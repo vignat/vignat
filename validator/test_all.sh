@@ -31,6 +31,9 @@ analyze_result() {
             if grep -q "Cannot prove" $RESULT; then
                 echo $FNAME unproven fail >> $REPORT_FNAME
             fi
+            if grep -q "Cannot read a ghost variable in a non-pure context" $RESULT; then
+                echo $FNAME syntax fail >> $REPORT_FNAME
+            fi
             if grep -q "No such variable, constructor, regular function," $RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
             fi

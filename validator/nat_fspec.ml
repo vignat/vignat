@@ -339,11 +339,11 @@ let fun_types =
                         }\n\
                         }@*/");
                     (fun args tmp ->
-                      "{\n\
+                      "/*@ {\n\
                        assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
                       ", ?ch);\n\
                        coherent_dchain_non_out_of_space_map_nonfull(" ^
-                      (tmp "cur_map") ^ ", ch);\n}");];
+                      (tmp "cur_map") ^ ", ch);\n} @*/");];
                   lemmas_after = [
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
@@ -359,10 +359,9 @@ let fun_types =
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n\
-                        vk1_before_put, vk2_before_put);\n\
-                        }@*/"
-                    );
+                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n" ^
+                       (tmp "vk1") ^ ", " ^
+                       (tmp "vk2") ^ ");\n}@*/");
                     (fun ret_var _ tmp ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
@@ -382,7 +381,8 @@ let fun_types =
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                        new_index_0, " ^ !last_time_for_index_alloc ^ ");\
+                        new_index_0, " ^ !last_time_for_index_alloc ^
+                       ", " ^ (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ ");\
                         }@*/");
                   ]
                   ;
@@ -459,9 +459,22 @@ let fun_types =
                            (List.nth_exn args 2) ^
                            ");\n\
                             }} @*/");
+                        (fun args tmp ->
+                           "/*@ dmap_erase_all_preserves_cap(" ^
+                           (tmp "cur_map") ^ ", " ^
+                           "dchain_get_expired_indexes_fp(" ^
+                           (tmp "cur_ch") ^
+                           ", " ^ (List.nth_exn args 2) ^
+                           "), " ^ (tmp "vk1") ^ ", " ^
+                           (tmp "vk2") ^ "); @*/");
                         (fun _ tmp ->
                            "/*@ coherent_same_cap(" ^
                            (tmp "cur_map") ^ ", " ^ (tmp "cur_ch") ^ ");@*/\n");
+                        (fun args tmp ->
+                           "//@ expire_olds_keeps_high_bounded(" ^
+                           (tmp "cur_ch") ^
+                           ", " ^ (List.nth_exn args 2) ^
+                           ");\n");
                         ];
                       lemmas_after = [
                       ];
@@ -479,10 +492,16 @@ let fun_types =
                                           ", *" ^
                                           (List.nth_exn args 1) ^
                                           ", " ^ (List.nth_exn args 2) ^ ");\n}");
+                                     (fun _ args tmp ->
+                                        "//@ allocate_keeps_high_bounded(" ^
+                                        (tmp "cur_ch") ^
+                                        ", *" ^ (List.nth_exn args 1) ^
+                                        ", " ^ (List.nth_exn args 2) ^
+                                        ");\n");
                                      (fun _ args _ ->
                                         last_time_for_index_alloc :=
                                           (List.nth_exn args 2);
-                                        "")
+                                        "");
                                    ];
                                    leaks = [];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
@@ -495,7 +514,13 @@ let fun_types =
                                       (tmp "cur_ch") ^
                                       ");\n coherent_same_cap(cur_map, " ^
                                       (tmp "cur_ch") ^
-                                      ");} @*/")];
+                                      ");} @*/");
+                                   (fun args tmp ->
+                                      "//@ rejuvenate_keeps_high_bounded(" ^
+                                      (tmp "cur_ch") ^
+                                      ", " ^ (List.nth_exn args 1) ^
+                                      ", " ^ (List.nth_exn args 2) ^
+                                      ");\n");];
                                  lemmas_after = [
                                    (fun ret_var args _ ->
                                       "/*@ if (" ^ ret_var ^ " != 0) { \n" ^

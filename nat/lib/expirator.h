@@ -24,6 +24,5 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
             dmap_dchain_coherent<K1,K2,V>(nm, nch) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
-//^^^ TODO: also ensures that all the items left are newer than "time";
 
 #endif //_EXPIRATOR_H_INCLUDED_

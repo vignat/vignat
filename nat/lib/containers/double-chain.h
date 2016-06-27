@@ -288,6 +288,29 @@ struct DoubleChain;
   requires true;
   ensures dchain_indexes_fp(dchain_allocate_fp(ch, ind, time)) ==
           append(dchain_indexes_fp(ch), cons(ind, nil));
+
+  lemma void allocate_keeps_high_bounded(dchain ch, int index, uint32_t time);
+  requires dchain_high_fp(ch) <= time;
+  ensures dchain_high_fp(dchain_allocate_fp(ch, index, time)) <= time;
+
+  lemma void rejuvenate_keeps_high_bounded(dchain ch, int index, uint32_t time);
+  requires double_chainp(ch, ?chain) &*&
+           dchain_high_fp(ch) <= time;
+  ensures double_chainp(ch, chain) &*&
+          dchain_high_fp(dchain_rejuvenate_fp(ch, index, time)) <= time;
+
+  lemma void remove_index_keeps_high_bounded(dchain ch, int index);
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_high_fp(dchain_remove_index_fp(ch, index)) <=
+          dchain_high_fp(ch);
+
+  lemma void expire_olds_keeps_high_bounded(dchain ch, uint32_t time);
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          dchain_high_fp(dchain_expire_old_indexes_fp(ch, time)) <=
+          dchain_high_fp(ch);
+
   @*/
 
 int dchain_allocate(int index_range, struct DoubleChain** chain_out);
