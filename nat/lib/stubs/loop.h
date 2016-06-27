@@ -34,6 +34,7 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
           double_chainp(?ch, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
           last_time(time) &*&
+          dchain_high_fp(ch) <= time &*&
           dmap_cap_fp(m) == MAX_FLOWS;
 
 @*/

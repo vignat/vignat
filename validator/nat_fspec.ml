@@ -16,17 +16,17 @@ let gen_get_fp map_name =
   | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
 let capture_map map_name ptr_num args tmp =
-  "//@assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
+  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
   ",_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args ptr_num) ^ ");\n"
 
 let capture_map_ex map_name vk1 vk2 ptr_num args tmp =
-  "//@assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
+  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
   ",_,_,_,_,_,_,_,_,?" ^ (tmp vk1) ^ ",?" ^ (tmp vk2) ^
   ",_,_," ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
 let capture_chain ch_name ptr_num args tmp =
-  "//@assert double_chainp(?" ^ (tmp ch_name) ^ ", " ^
+  "//@ assert double_chainp(?" ^ (tmp ch_name) ^ ", " ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
 let dmap_struct = Ir.Str ( "DoubleMap", [] )
@@ -487,10 +487,18 @@ let fun_types =
                                    leaks = [];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
                                  arg_types = [Ptr dchain_struct; Sint32; Uint32;];
-                                 lemmas_before = [];
+                                 lemmas_before = [
+                                   capture_chain "cur_ch" 0;
+                                   (fun args tmp ->
+                                      "/*@ {\n\
+                                       assert dmap_dchain_coherent(?cur_map, " ^
+                                      (tmp "cur_ch") ^
+                                      ");\n coherent_same_cap(cur_map, " ^
+                                      (tmp "cur_ch") ^
+                                      ");} @*/")];
                                  lemmas_after = [
-                                   (fun reg_var args _ ->
-                                      "/*@ if (" ^ reg_var ^ " != 0) {\n" ^
+                                   (fun ret_var args _ ->
+                                      "/*@ if (" ^ ret_var ^ " != 0) { \n" ^
                                       "assert dmap_dchain_coherent(?cur_map,?ch);\n" ^
                                       "rejuvenate_preserves_coherent(cur_map, ch, " ^
                                       (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
