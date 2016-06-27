@@ -61,6 +61,16 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
   @*/
 
 /*@
+  lemma void map_get_keeps_recp<kt>(list<pair<kt,int> > m, kt k);
+  requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
+                   ?cap, ?bbs, ?kps, ?khs, ?vals) &*&
+           true == map_has_fp(m, k);
+  ensures true == rp(k, map_get_fp(m, k)) &*&
+          mapping(m, addrs, kp, rp, hsh,
+                  cap, bbs, kps, khs, vals);
+  @*/
+
+/*@
   predicate map_key_type<kt>(kt k) = true;
   predicate map_key_hash<kt>(fixpoint (kt,int) hsh) = true;
   predicate map_record_property<kt>(fixpoint(kt,int,bool) prop) = true;

@@ -213,7 +213,8 @@ struct DoubleMap;
   ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2, fvp,
                               bvp, rof, vsz, vk1, vk2, recp1, recp2, mp) &*&
           0 <= dmap_get_k1_fp<t1,t2,vt>(m, k1) &*&
-          dmap_get_k1_fp<t1,t2,vt>(m, k1) < dmap_cap_fp(m);
+          dmap_get_k1_fp<t1,t2,vt>(m, k1) < dmap_cap_fp(m) &*&
+          true == dmap_index_used_fp(m, dmap_get_k1_fp(m, k1));
 
   lemma void dmap_get_k2_limits<t1,t2,vt>(dmap<t1,t2,vt> m, t2 k2);
   requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
@@ -224,27 +225,8 @@ struct DoubleMap;
                               fvp, bvp, rof, vsz,
                               vk1, vk2, recp1, recp2, mp) &*&
           0 <= dmap_get_k2_fp<t1,t2,vt>(m, k2) &*&
-          dmap_get_k2_fp<t1,t2,vt>(m, k2) < dmap_cap_fp(m);
-
-  lemma void dmap_get_k1_gives_used<t1,t2,vt>(dmap<t1,t2,vt> m, t1 k1);
-  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
-                               ?fvp, ?bvp, ?rof, ?vsz,
-                               ?vk1, ?vk2, ?recp1, ?recp2, ?mp) &*&
-           dmap_has_k1_fp<t1,t2,vt>(m, k1) == true;
-  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
-                              fvp, bvp, rof, vsz,
-                              vk1, vk2, recp1, recp2, mp) &*&
-          dmap_index_used_fp(m, dmap_get_k1_fp(m, k1)) == true;
-
-  lemma void dmap_get_k2_gives_used<t1,t2,vt>(dmap<t1,t2,vt> m, t2 k2);
-  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
-                               ?fvp, ?bvp, ?rof, ?vsz,
-                               ?vk1, ?vk2, ?recp1, ?recp2, ?mp) &*&
-          dmap_has_k2_fp<t1,t2,vt>(m, k2) == true;
-  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2,
-                              fvp, bvp, rof, vsz,
-                              vk1, vk2, recp1, recp2, mp) &*&
-          dmap_index_used_fp(m, dmap_get_k2_fp(m, k2)) == true;
+          dmap_get_k2_fp<t1,t2,vt>(m, k2) < dmap_cap_fp(m) &*&
+          true == dmap_index_used_fp(m, dmap_get_k2_fp(m, k2));
 
   lemma void dmap_erase_all_has_trans<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                 t1 k1, list<int> idx,

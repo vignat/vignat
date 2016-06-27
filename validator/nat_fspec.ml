@@ -216,12 +216,6 @@ let fun_types =
                       tx_l "open (ext_k_p(_,_));";
                       on_rez_nz
                         (fun args tmp ->
-                           "{\n dmap_get_k2_gives_used(" ^
-                           (tmp "cur_map") ^
-                           ", ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));\n}");
-                      on_rez_nz
-                        (fun args tmp ->
                            "{\n dmap_get_k2_limits(" ^
                            (tmp "cur_map") ^
                            ", ekc(user_buf0_36, user_buf0_34, \
@@ -258,12 +252,6 @@ let fun_types =
                              user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
                     lemmas_after = [
                       tx_l "open (int_k_p(_,_));";
-                      on_rez_nz
-                        (fun args tmp ->
-                           "{\n dmap_get_k1_gives_used(" ^
-                           (tmp "cur_map") ^
-                           ", ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));\n}");
                       on_rez_nz
                         (fun args tmp ->
                            "{\n dmap_get_k1_limits(" ^
@@ -321,7 +309,7 @@ let fun_types =
                        ", ek)) {\n\
                         int index = dmap_get_k2_fp(" ^ (tmp "cur_map") ^
                        ", ek);\n\
-                        dmap_get_k2_gives_used(" ^ (tmp "cur_map") ^
+                        dmap_get_k2_limits(" ^ (tmp "cur_map") ^
                        ", ek);\n\
                         flw value = dmap_get_val_fp(" ^ (tmp "cur_map") ^
                        ", index);\n\

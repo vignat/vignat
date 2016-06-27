@@ -1812,3 +1812,18 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
   //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
   return s;
 }
+
+/*@
+  lemma void map_get_keeps_recp<kt>(list<pair<kt,int> > m, kt k)
+  requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
+                   ?cap, ?bbs, ?kps, ?khs, ?vals) &*&
+           true == map_has_fp(m, k);
+  ensures true == rp(k, map_get_fp(m, k)) &*&
+          mapping(m, addrs, kp, rp, hsh,
+                  cap, bbs, kps, khs, vals);
+  {
+    open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    map_extract_recp(m, k, rp);
+    close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+  }
+  @*/
