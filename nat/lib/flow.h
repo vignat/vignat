@@ -65,6 +65,7 @@ void log_flow(const struct flow *f);
   }
 
   predicate int_k_p(struct int_key* kp; int_k k) =
+    struct_int_key_padding(kp) &*&
     kp->int_src_port |-> ?isp &*&
     kp->dst_port |-> ?dp &*&
     kp->int_src_ip |-> ?isip &*&
@@ -94,6 +95,7 @@ void log_flow(const struct flow *f);
   }
 
   predicate ext_k_p(struct ext_key* kp; ext_k k) =
+    struct_ext_key_padding(kp) &*&
     kp->ext_src_port |-> ?esp &*&
     kp->dst_port |-> ?dp &*&
     kp->ext_src_ip |-> ?esip &*&
@@ -149,6 +151,7 @@ void log_flow(const struct flow *f);
                        x6, x7, x8, x9, ret): return ret;}
   }
   predicate flow_p(struct flow* fp, flw f) =
+    struct_flow_padding(fp) &*&
     fp->int_src_port |-> ?isp &*&
     fp->ext_src_port |-> ?esp &*&
     fp->dst_port |-> ?dp &*&
@@ -163,6 +166,7 @@ void log_flow(const struct flow *f);
               isp, esp, dp, isip, esip, dip, idid, edid, prtc);
 
   predicate flw_p(struct flow* fp; flw f) =
+    struct_flow_padding(fp) &*&
     int_k_p(&fp->ik, ?ik) &*&
     ext_k_p(&fp->ek, ?ek) &*&
     fp->int_src_port |-> ?isp &*&
