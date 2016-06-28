@@ -1730,7 +1730,6 @@ ensures true == subset(dchain_indexes_fp(ch),
   }
   @*/
 
-
 /*@
   lemma void expire_olds_keeps_high_bounded(dchain ch, uint32_t time)
   requires double_chainp(ch, ?chain);
@@ -1738,6 +1737,7 @@ ensures true == subset(dchain_indexes_fp(ch),
           dchain_high_fp(dchain_expire_old_indexes_fp(ch, time)) <=
           dchain_high_fp(ch);
   {
-    assert(false);//TODO
+    switch(ch) { case dchain(alist, ir, lo, hi) :
+    }
   }
   @*/
