@@ -339,6 +339,15 @@ let fun_types =
                         }\n\
                         }@*/");
                     (fun args tmp ->
+                       "/*@ dmap_put_preserves_cap(" ^ (tmp "cur_map") ^
+                       ", new_index_0, flwc(ikc(user_buf0_34, user_buf0_36,\
+                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
+                        ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                        1, user_buf0_23),\n\
+                        user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
+                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23)," ^
+                       (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ "); @*/");
+                    (fun args tmp ->
                       "/*@ {\n\
                        assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
                       ", ?ch);\n\
@@ -391,6 +400,13 @@ let fun_types =
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         lemmas_before = [
                           capture_map "cur_map" 0;
+                          (fun args tmp ->
+                             "/*@ {\
+                              assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
+                             ", ?cur_ch);\n\
+                              coherent_same_cap(" ^ (tmp "cur_map") ^
+                             ", cur_ch);\n\
+                              }@*/");
                           (fun args _ ->
                              "//@ flow_to_chars(" ^
                              (List.nth_exn args 2) ^ ");")];

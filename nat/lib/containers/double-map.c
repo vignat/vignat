@@ -2499,9 +2499,27 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
                                                     fixpoint (vt,t1) vk1,
                                                     fixpoint (vt,t2) vk2)
   requires true;
-  ensures dmap_cap_fp(dap_erase_all_fp(m, idxs, vk1, vk2)) == dmap_cap_fp(m);
+  ensures dmap_cap_fp(dmap_erase_all_fp(m, idxs, vk1, vk2)) == dmap_cap_fp(m);
   {
-    switch(m) { case dmap(ma, mb, vals);
+    switch(idxs) {
+      case nil: return;
+      case cons(h,t):
+        dmap_erase_all_preserves_cap(m, t, vk1, vk2);
+        dmap_erase_keeps_cap(dmap_erase_all_fp(m, t, vk1, vk2), h, vk1, vk2);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_put_preserves_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                              int index,
+                                              vt v,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_cap_fp(dmap_put_fp(m, index, v, vk1, vk2)) == dmap_cap_fp(m);
+  {
+    switch(m) { case dmap(ma, mb, vals):
     }
   }
   @*/

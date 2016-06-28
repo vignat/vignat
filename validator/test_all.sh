@@ -37,6 +37,9 @@ analyze_result() {
             if grep -q "No such variable, constructor, regular function," $RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
             fi
+            if grep -q "Incorrect number of arguments" $RESULT; then
+                echo $FNAME syntax fail >> $REPORT_FNAME
+            fi
             if grep -q "Parse error." $RESULT; then
                 echo $FNAME parser fail >> $REPORT_FNAME
             fi

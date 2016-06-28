@@ -1738,6 +1738,6 @@ ensures true == subset(dchain_indexes_fp(ch),
           dchain_high_fp(dchain_expire_old_indexes_fp(ch, time)) <=
           dchain_high_fp(ch);
   {
-    assert(false);//
+    assert(false);//TODO
   }
   @*/

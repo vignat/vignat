@@ -333,6 +333,17 @@ struct DoubleMap;
   @*/
 
 /*@
+  lemma void dmap_put_preserves_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                              int index,
+                                              vt v,
+                                              fixpoint (vt,t1) vk1,
+                                              fixpoint (vt,t2) vk2);
+  requires true;
+  ensures dmap_cap_fp(dmap_put_fp(m, index, v, vk1, vk2)) == dmap_cap_fp(m);
+  @*/
+
+
+/*@
   lemma void dmap_erase_keeps_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
                                             int idx,
                                             fixpoint (vt,t1) vk1,
