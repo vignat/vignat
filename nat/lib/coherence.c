@@ -171,20 +171,6 @@ ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
   @*/
 
 /*@
-  lemma void dmap_put_preserves_cap<t1,t2,vt>(dmap<t1,t2,vt> m,
-                                              int ind, vt value,
-                                              fixpoint (vt,t1) vk1,
-                                              fixpoint (vt,t2) vk2)
-  requires true;
-  ensures dmap_cap_fp(dmap_put_fp(m, ind, value, vk1, vk2)) ==
-          dmap_cap_fp(m);
-  {
-    switch(m) { case dmap(ma, mb, vals):
-    }
-  }
-  @*/
-
-/*@
   lemma void subset_append2<t>(list<t> xs, list<t> ys, list<t> zs)
   requires true == subset(xs, ys);
   ensures true == subset(xs, append(ys, zs));
