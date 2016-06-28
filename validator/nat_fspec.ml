@@ -143,7 +143,9 @@ let fun_types =
                                            0,0,0,0,0,0,0,0,0));";
                          tx_bl "close dmap_record_property1(nat_int_fp);";
                          tx_bl "close dmap_record_property2(nat_ext_fp);"];
-                       lemmas_after = [];
+                       lemmas_after = [
+                         tx_l "empty_dmap_cap\
+                               <int_k,ext_k,flw>(1024);";];
                        leaks = [
                          on_rez_nz_leak "dmappingp<int_k, ext_k, flw>\
                                          (_,_,_,_,_,_,_,_,_,_,_,_,_,_)"
@@ -156,20 +158,22 @@ let fun_types =
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = [Sint32; Ptr (Ptr dchain_struct)];
                          lemmas_before = [];
-                         lemmas_after = [];
+                         lemmas_after = [
+                           on_rez_nz (fun _ _ ->
+                               "empty_dmap_dchain_coherent\
+                                <int_k,ext_k,flw>(1024);");
+                           tx_l "index_range_of_empty(1024, 0);";];
                          leaks = [
                            on_rez_nz_leak "double_chainp(_,_)"
-                             ~id:"double_chainp";];};
+                             ~id:"double_chainp";
+                           on_rez_nz_leak "dmap_dchain_coherent(_,_)"
+                             ~id:"dmap_dchain_coherent";
+                         ];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Uint32];
                                 lemmas_before = [
-                                  tx_bl "empty_dmap_dchain_coherent\
-                                         <int_k,ext_k,flw>(1024);";
-                                  tx_bl "empty_dmap_cap\
-                                         <int_k,ext_k,flw>(1024);";
-                                  tx_bl "index_range_of_empty(1024, 0);";
                                   (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
@@ -179,7 +183,8 @@ let fun_types =
                                 leaks = [
                                   remove_leak "dmappingp";
                                   remove_leak "double_chainp";
-                                  remove_leak "last_time";];};
+                                  remove_leak "last_time";
+                                  remove_leak "dmap_dchain_coherent"];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
@@ -187,7 +192,8 @@ let fun_types =
                                 lemmas_before = [];
                                 lemmas_after = [
                                   tx_l "open evproc_loop_invariant(?mp, ?chp, ?t);";
-                                  tx_l "assert dmap_dchain_coherent(?map,?chain);"];
+                                  tx_l "assert dmap_dchain_coherent(?map,?chain);";
+                                  tx_l "coherent_same_cap(map, chain);";];
                                 leaks = [
                                   leak "last_time(_)" ~id:"last_time";
                                   leak "dmappingp<int_k, ext_k, flw>\
@@ -195,7 +201,8 @@ let fun_types =
                                     ~id:"dmappingp";
                                   leak "double_chainp(_,_)"
                                     ~id:"double_chainp";
-                                  leak "dmap_dchain_coherent(_,_)"];};
+                                  leak "dmap_dchain_coherent(_,_)"
+                                    ~id:"dmap_dchain_coherent"];};
      "loop_enumeration_begin", {ret_type = Void;
                                 arg_types = [Sint32];
                                 lemmas_before = [];
