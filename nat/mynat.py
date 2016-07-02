@@ -82,9 +82,12 @@ def run():
     for h in net.hosts:
       if (h.name == 'nat1'):
         nat = h
+        # Allocate hugepages for the dkdp application
         nat.cmdPrint('mkdir -p /mnt/huge')
         nat.cmdPrint('mount -t hugetlbfs nodev /mnt/huge')
         nat.cmdPrint('sh -c \'echo 384 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages\'')
+        # Drop the fantom reset packets
+        nat.cmdPrint('iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP ')
       elif (h.name == 'h0'):
         srv = h
         srv.cmdPrint('service apache2 restart')
