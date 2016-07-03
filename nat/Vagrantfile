@@ -12,7 +12,7 @@ Vagrant.configure(2) do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = "ubuntu/trusty64"
+  config.vm.box = "bento/ubuntu-14.04"
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -26,15 +26,18 @@ Vagrant.configure(2) do |config|
 
   config.vm.define :server do |srv|
     srv.vm.hostname = "ext-serv"
-    srv.vm.network "private_network", ip: "192.168.33.10"
-    srv.vm.provision "shell", path: "server.sh"
+    srv.vm.network "private_network", ip: "192.168.33.10", :mac => "080027538b38"
+    srv.vm.provision "shell", path: "testbed/server.sh"
+    config.ssh.forward_x11 = true
   end
 
   config.vm.define :nat do |nat|
     nat.vm.hostname = "nat"
-    nat.vm.network "private_network", ip: "192.168.33.2"
-    nat.vm.network "private_network", ip: "192.168.40.2"
-    nat.vm.provision "shell", path: "nat.sh"
+    nat.vm.network "private_network", ip: "192.168.33.2", :mac => "080027004471"
+    nat.vm.network "private_network", ip: "192.168.40.2", :mac => "080027004472"
+    nat.vm.synced_folder ".", "/nat"
+    nat.vm.provision "shell", path: "testbed/nat.sh"
+    config.ssh.forward_x11 = true
     nat.vm.provider "virtualbox" do |v|
       v.memory = 2048
     end
@@ -42,8 +45,9 @@ Vagrant.configure(2) do |config|
 
   config.vm.define :client do |cl|
     cl.vm.hostname = "int-clnt"
-    cl.vm.network "private_network", ip: "192.168.40.5"
-    cl.vm.provision "shell", path: "client.sh"
+    cl.vm.network "private_network", ip: "192.168.40.5", :mac => "080027c11347"
+    cl.vm.provision "shell", path: "testbed/client.sh"
+    config.ssh.forward_x11 = true
   end
 
   # Create a private network, which allows host-only access to the machine
