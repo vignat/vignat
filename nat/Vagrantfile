@@ -27,7 +27,8 @@ Vagrant.configure(2) do |config|
   config.vm.define :server do |srv|
     srv.vm.hostname = "ext-serv"
     srv.vm.network "private_network", ip: "192.168.33.10", :mac => "080027538b38"
-    srv.vm.provision "shell", path: "testbed/server.sh"
+    provision_script = ENV["SRV_SETUP"] || "testbed/server.sh"
+    srv.vm.provision "shell", path: provision_script
     config.ssh.forward_x11 = true
   end
 
@@ -36,7 +37,8 @@ Vagrant.configure(2) do |config|
     nat.vm.network "private_network", ip: "192.168.33.2", :mac => "080027004471"
     nat.vm.network "private_network", ip: "192.168.40.2", :mac => "080027004472"
     nat.vm.synced_folder ".", "/nat"
-    nat.vm.provision "shell", path: "testbed/nat.sh"
+    provision_script = ENV["NAT_SETUP"] || "testbed/nat.sh"
+    nat.vm.provision "shell", path: provision_script
     config.ssh.forward_x11 = true
     nat.vm.provider "virtualbox" do |v|
       v.memory = 2048
