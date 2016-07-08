@@ -1,5 +1,5 @@
 sudo apt-get update
-sudo apt-get install -y tcpdump git wget build-essential libpcap-dev linux-headers-3.13.0-86 linux-headers-3.13.0-86-generic libglib2.0-dev
+sudo apt-get install -y tcpdump git wget build-essential libpcap-dev linux-headers-3.13.0-86 linux-headers-3.13.0-86-generic libglib2.0-dev daemon
 
 wget http://dpdk.org/browse/dpdk/snapshot/dpdk-2.2.0.tar.gz -O dpdk.tar.gz
 tar xf dpdk.tar.gz
@@ -138,4 +138,4 @@ sudo ifconfig eth2 down
 bind_nics_to_igb_uio '0000:00:08.0'
 bind_nics_to_igb_uio '0000:00:09.0'
 
-
+daemon -r /nat/testbed/run-nat.sh
