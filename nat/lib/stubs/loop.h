@@ -18,19 +18,19 @@ fixpoint bool nat_int_fp(int_k ik, int index) {
            int_k_get_idid(ik) < RTE_NUM_DEVICES;
 }
 
-fixpoint bool nat_ext_fp(ext_k ek, int index) {
-    return ext_k_get_esp(ek) == 2747 + index &&
+fixpoint bool nat_ext_fp(int start_port, ext_k ek, int index) {
+    return ext_k_get_esp(ek) == start_port + index &&
            0 <= ext_k_get_edid(ek) &&
            ext_k_get_edid(ek) < RTE_NUM_DEVICES;
 }
 
 
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
-                                uint32_t time, int max_flows) =
+                                uint32_t time, int max_flows, int start_port) =
           dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, int_hash, ext_hash,
                                      flw_p, flow_p, flow_keys_offsets_fp,
                                      sizeof(struct flow), flw_get_ik, flw_get_ek,
-                                     nat_int_fp, nat_ext_fp, mp) &*&
+                                     nat_int_fp, (nat_ext_fp)(start_port), mp) &*&
           double_chainp(?ch, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
           last_time(time) &*&
@@ -41,22 +41,22 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
 @*/
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
-                            uint32_t time, int max_flows);
+                            uint32_t time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
-             evproc_loop_invariant(mp, chp, time, max_flows); @*/
+             evproc_loop_invariant(mp, chp, time, max_flows, start_port); @*/
 //@ ensures *m |-> mp &*& *ch |-> chp;
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
-                            uint32_t *time, int max_flows);
+                            uint32_t *time, int max_flows, int start_port);
 //@ requires *m |-> ?mp &*& *ch |-> ?chp &*& *time |-> ?t;
 /*@ ensures *m |-> mp &*& *ch |-> chp &*& *time |-> t &*&
-            evproc_loop_invariant(mp, chp, t, max_flows); @*/
+            evproc_loop_invariant(mp, chp, t, max_flows, start_port); @*/
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
-                          uint32_t time, int max_flows);
+                          uint32_t time, int max_flows, int start_port);
 
 void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
-                        uint32_t time, int max_flows);
+                        uint32_t time, int max_flows, int start_port);
 
 void loop_enumeration_begin(int cnt);
 //@ requires true;

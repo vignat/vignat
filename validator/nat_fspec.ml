@@ -142,7 +142,9 @@ let fun_types =
                                            ekc(0,0,0,0,0,0),\
                                            0,0,0,0,0,0,0,0,0));";
                          tx_bl "close dmap_record_property1(nat_int_fp);";
-                         tx_bl "close dmap_record_property2(nat_ext_fp);"];
+                         (fun _ _ -> "int start_port;\n");
+                         tx_bl "close dmap_record_property2\
+                                ((nat_ext_fp)(start_port));"];
                        lemmas_after = [
                          tx_l "empty_dmap_cap\
                                <int_k,ext_k,flw>(1024);";];
@@ -173,14 +175,19 @@ let fun_types =
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Uint32;
+                                             Sint32;
                                              Sint32];
                                 lemmas_before = [
+                                  (fun args _ ->
+                                     "//@ assume(start_port == " ^
+                                     List.nth_exn args 4 ^");\n");
                                   (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
                                      List.nth_exn args 1 ^ ", " ^
                                      List.nth_exn args 2 ^ ", " ^
-                                     List.nth_exn args 3 ^ "); @*/")];
+                                     List.nth_exn args 3 ^ ", " ^
+                                     List.nth_exn args 4 ^ "); @*/")];
                                 lemmas_after = [];
                                 leaks = [
                                   remove_leak "dmappingp";
@@ -191,11 +198,21 @@ let fun_types =
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Ptr Uint32;
+                                             Sint32;
                                              Sint32];
-                                lemmas_before = [];
+                                lemmas_before = [
+                                  (fun _ _ ->
+                                     "int start_port;\n");];
                                 lemmas_after = [
-                                  tx_l "open evproc_loop_invariant(?mp, \
-                                        ?chp, _, ?t);";
+                                  (fun _ args _ ->
+                                     "/*@ open evproc_loop_invariant(?mp, \
+                                      ?chp, *" ^
+                                     List.nth_exn args 2 ^ ", " ^
+                                     List.nth_exn args 3 ^ ", " ^
+                                     List.nth_exn args 4 ^ ");@*/");
+                                  (fun _ args _ ->
+                                     "//@ assume(" ^
+                                     List.nth_exn args 4 ^ " == start_port);");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";];
                                 leaks = [
@@ -571,17 +588,17 @@ let fixpoints =
                          {v=Bop(And,
                                 {v=Bop(Le,
                                        {v=Int 0;t=Sint32},
-                                       {v=Str_idx({v=Id "Arg0";t=Unknown},"edid");t=Unknown});
+                                       {v=Str_idx({v=Id "Arg1";t=Unknown},"edid");t=Unknown});
                                  t=Unknown},
                                 {v=Bop(Lt,
-                                       {v=Str_idx({v=Id "Arg0";t=Unknown},"edid");t=Unknown},
+                                       {v=Str_idx({v=Id "Arg1";t=Unknown},"edid");t=Unknown},
                                        {v=Int 2;t=Sint32});t=Unknown});
                           t=Boolean},
                          {v=Bop(Eq,
-                                {v=Str_idx({v=Id "Arg0";t=Unknown},"edid");t=Unknown},
+                                {v=Str_idx({v=Id "Arg1";t=Unknown},"edid");t=Unknown},
                                 {v=Bop(Add,
-                                       {v=Int 2747;t=Sint32},
-                                       {v=Id "Arg1";t=Unknown});t=Unknown});
+                                       {v=Id "Arg0";t=Sint32},
+                                       {v=Id "Arg2";t=Sint32});t=Unknown});
                           t=Boolean});
                    t=Boolean};
     "ikc", {v=Struct ("int_k",

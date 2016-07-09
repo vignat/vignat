@@ -102,6 +102,11 @@ static uint32_t expiration_time = 10;//seconds
    will be discarded. */
 static int max_flows = 1024;
 
+/* The least port on the external device to be allocated for new flows.
+   The ports will be allocated within the range
+   [start_port, start_port+max_flows] */
+static int start_port = 1025;
+
 /* mask of enabled ports */
 static uint32_t enabled_port_mask = 0;
 
@@ -460,7 +465,7 @@ main_loop(__attribute__((unused)) void *dummy)
 
 #ifdef KLEE_VERIFICATION
     loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
-                         starting_time, max_flows);
+                         starting_time, max_flows, start_port);
 #else //KLEE_VERIFICATION
     while (1) 
 #endif //KLEE_VERIFICATION
@@ -535,7 +540,7 @@ main_loop(__attribute__((unused)) void *dummy)
     }
 #ifdef KLEE_VERIFICATION
     loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
-                       current_time(), max_flows);
+                       current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
     return 0;
 }
@@ -633,7 +638,11 @@ print_usage(const char *prgname)
             "flow will reside in the table, until it is vanished.\n"
             "  --max-flows <n>: the table capacity. if more than <n> flows\n"
             "arrive during the expiration time, the most recent ones are\n"
-            "discarded.\n",
+            "discarded.\n"
+            "  --starting-port <n>: the port where to start allocating ports\n"
+            "on the external interface for forwarded flows. Ports below <n>\n"
+            "will not be used, and NAT will occupy any port in the range:\n"
+            "[starting-port,max-flows].\n",
             prgname);
 }
 
@@ -695,6 +704,7 @@ parse_external_addr(const char *optarg)
 #define CMD_LINE_OPT_EXT_IP "extip"
 #define CMD_LINE_OPT_EXP_TIME "expire"
 #define CMD_LINE_OPT_MAX_FLOWS "max-flows"
+#define CMD_LINE_OPT_START_PORT "starting-port"
 
 /* Parse the argument given in the command line of the application */
 static int
@@ -711,6 +721,7 @@ parse_args(int argc, char **argv, unsigned nb_ports)
         {CMD_LINE_OPT_EXT_IP, 1, 0, 0},
         {CMD_LINE_OPT_EXP_TIME, 1, 0, 0},
         {CMD_LINE_OPT_MAX_FLOWS, 1, 0, 0},
+        {CMD_LINE_OPT_START_PORT, 1, 0, 0},
         {NULL, 0, 0, 0}
     };
 
@@ -764,6 +775,17 @@ parse_args(int argc, char **argv, unsigned nb_ports)
                                 sizeof (CMD_LINE_OPT_MAX_FLOWS))) {
           LOG("parsing number of flows bound: %s\n", optarg);
           max_flows = (int)strtol(optarg, &port_end, 10);
+          if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
+            return -1;
+          if (max_flows <= 0) {
+            printf("number of flows bound must be positive.");
+            return -1;
+          }
+        } else if (0 == strncmp(lgopts[option_index].name,
+                                CMD_LINE_OPT_START_PORT,
+                                sizeof (CMD_LINE_OPT_START_PORT))) {
+          LOG("parsing the lower bound for the ports allocation: %s\n", optarg);
+          start_port = (int)strtol(optarg, &port_end, 10);
           if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
             return -1;
           if (max_flows <= 0) {
@@ -824,7 +846,7 @@ init_mem(unsigned nb_mbuf, uint8_t nb_ports)
         }
     }
 
-    if (!allocate_flowmanager(nb_ports, 2747, external_ip,
+    if (!allocate_flowmanager(nb_ports, start_port, external_ip,
                               wan_port_id, expiration_time,
                               max_flows)) {
         LOG("Failed to allocate flow manager.\n");

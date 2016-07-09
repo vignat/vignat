@@ -4,35 +4,37 @@
 
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
-                            uint32_t time, int max_flows)
+                            uint32_t time, int max_flows, int start_port)
 {
   klee_trace_ret();
   klee_trace_param_ptr(m, sizeof(struct DoubleMap*), "m");
   klee_trace_param_ptr(ch, sizeof(struct DoubleChain*), "ch");
   klee_trace_param_i32(time, "time");
   klee_trace_param_i32(max_flows, "max_flows");
+  klee_trace_param_i32(start_port, "start_port");
 }
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
-                            uint32_t *time, int max_flows)
+                            uint32_t *time, int max_flows, int start_port)
 {
   klee_trace_ret();
   klee_trace_param_ptr(m, sizeof(struct DoubleMap*), "m");
   klee_trace_param_ptr(ch, sizeof(struct DoubleChain*), "ch");
   klee_trace_param_ptr(time, sizeof(uint32_t), "time");
   klee_trace_param_i32(max_flows, "max_flows");
+  klee_trace_param_i32(start_port, "start_port");
 }
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
-                          uint32_t time, int max_flows) {
-  loop_invariant_consume(m, ch, time, max_flows);
-  loop_invariant_produce(m, ch, &time, max_flows);
+                          uint32_t time, int max_flows, int start_port) {
+  loop_invariant_consume(m, ch, time, max_flows, start_port);
+  loop_invariant_produce(m, ch, &time, max_flows, start_port);
 }
 
 void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
-                        uint32_t time, int max_flows) {
-  loop_invariant_consume(m, ch, time, max_flows);
-  loop_invariant_produce(m, ch, &time, max_flows);
+                        uint32_t time, int max_flows, int start_port) {
+  loop_invariant_consume(m, ch, time, max_flows, start_port);
+  loop_invariant_produce(m, ch, &time, max_flows, start_port);
 }
 
 void loop_enumeration_begin(int cnt)
