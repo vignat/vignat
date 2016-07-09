@@ -638,7 +638,7 @@ print_usage(const char *prgname)
             "flow will reside in the table, until it is vanished.\n"
             "  --max-flows <n>: the table capacity. if more than <n> flows\n"
             "arrive during the expiration time, the most recent ones are\n"
-            "discarded.\n"
+            "discarded. \n"
             "  --starting-port <n>: the port where to start allocating ports\n"
             "on the external interface for forwarded flows. Ports below <n>\n"
             "will not be used, and NAT will occupy any port in the range:\n"
