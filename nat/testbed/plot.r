@@ -9,7 +9,9 @@ missrates_direct = read.table("direct.dat")
 missrates_direct["medium"] <- "direct"
 missrates_netfilter= read.table("netfilter.dat")
 missrates_netfilter["medium"] <- "netfilter"
-missrates <- rbind(missrates_nat, missrates_router, missrates_direct, missrates_netfilter)
+missrates_nolookup= read.table("no-lookup.dat")
+missrates_nolookup["medium"] <- "no lookup"
+missrates <- rbind(missrates_nat, missrates_router, missrates_direct, missrates_netfilter, missrates_nolookup)
 pd <- position_dodge(0.01)
 #summary_nat=ddply(missrates_nat, "V1", summarise, N=length(V2), mean=mean(V2), sd=sd(V2))
 #summary_router=ddply(missrates_router, "V1", summarise, N=length(V2), mean=mean(V2), sd=sd(V2))
