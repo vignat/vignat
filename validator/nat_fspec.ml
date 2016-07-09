@@ -172,13 +172,15 @@ let fun_types =
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
-                                             Uint32];
+                                             Uint32;
+                                             Sint32];
                                 lemmas_before = [
                                   (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
                                      List.nth_exn args 1 ^ ", " ^
-                                     List.nth_exn args 2 ^"); @*/")];
+                                     List.nth_exn args 2 ^ ", " ^
+                                     List.nth_exn args 3 ^ "); @*/")];
                                 lemmas_after = [];
                                 leaks = [
                                   remove_leak "dmappingp";
@@ -188,10 +190,12 @@ let fun_types =
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
-                                             Ptr Uint32];
+                                             Ptr Uint32;
+                                             Sint32];
                                 lemmas_before = [];
                                 lemmas_after = [
-                                  tx_l "open evproc_loop_invariant(?mp, ?chp, ?t);";
+                                  tx_l "open evproc_loop_invariant(?mp, \
+                                        ?chp, _, ?t);";
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";];
                                 leaks = [

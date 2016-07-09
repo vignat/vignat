@@ -74,17 +74,18 @@ struct DoubleChain** get_dchain_pp(void) {
 int allocate_flowmanager(uint8_t nb_ports,
                          uint16_t _starting_port, uint32_t _ext_src_ip,
                          uint8_t _ext_device_id,
-                         uint32_t _expiration_time) {
+                         uint32_t _expiration_time,
+                         int max_flows) {
 #ifdef KLEE_VERIFICATION
     dmap_set_entry_condition(flow_consistency);
 #endif//KLEE_VERIFICATION
-    if (0 == allocate_flowtables(nb_ports))
+    if (0 == allocate_flowtables(nb_ports, max_flows))
         return 0;
     starting_port = _starting_port;
     ext_src_ip = _ext_src_ip;
     ext_device_id = _ext_device_id;
     expiration_time = _expiration_time;
-    if (0 == dchain_allocate(MAX_FLOWS, &chain))
+    if (0 == dchain_allocate(max_flows, &chain))
         return 0;
     return 1;
 }

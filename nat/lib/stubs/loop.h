@@ -26,7 +26,7 @@ fixpoint bool nat_ext_fp(ext_k ek, int index) {
 
 
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
-                                uint32_t time) =
+                                uint32_t time, int max_flows) =
           dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, int_hash, ext_hash,
                                      flw_p, flow_p, flow_keys_offsets_fp,
                                      sizeof(struct flow), flw_get_ik, flw_get_ek,
@@ -35,26 +35,28 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
           dmap_dchain_coherent(m, ch) &*&
           last_time(time) &*&
           dchain_high_fp(ch) <= time &*&
-          dmap_cap_fp(m) == MAX_FLOWS;
+          dmap_cap_fp(m) == max_flows &*&
+          max_flows < INT_MAX;
 
 @*/
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
-                            uint32_t time);
-//@ requires *m |-> ?mp &*& *ch |-> ?chp &*& evproc_loop_invariant(mp, chp, time);
+                            uint32_t time, int max_flows);
+/*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
+             evproc_loop_invariant(mp, chp, time, max_flows); @*/
 //@ ensures *m |-> mp &*& *ch |-> chp;
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
-                            uint32_t *time);
+                            uint32_t *time, int max_flows);
 //@ requires *m |-> ?mp &*& *ch |-> ?chp &*& *time |-> ?t;
 /*@ ensures *m |-> mp &*& *ch |-> chp &*& *time |-> t &*&
-            evproc_loop_invariant(mp, chp, t); @*/
+            evproc_loop_invariant(mp, chp, t, max_flows); @*/
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
-                          uint32_t time);
+                          uint32_t time, int max_flows);
 
 void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
-                        uint32_t time);
+                        uint32_t time, int max_flows);
 
 void loop_enumeration_begin(int cnt);
 //@ requires true;

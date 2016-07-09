@@ -64,7 +64,6 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
 
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
 int add_flow(struct flow *f, int index) {
-    assert(0 <= index && index < MAX_FLOWS);
     LOG("add_flow (f = \n");
     log_flow(f);
     struct int_key* new_int_key = &f->ik;
@@ -139,7 +138,7 @@ struct DoubleMap **get_dmap_pp(void) {
 
 #endif //KLEE_VERIFICATION
 
-int allocate_flowtables(uint8_t nb_ports) {
+int allocate_flowtables(uint8_t nb_ports, int max_flows) {
     (void)nb_ports;
 #ifdef KLEE_VERIFICATION
     dmap_set_layout(int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),
@@ -153,7 +152,7 @@ int allocate_flowtables(uint8_t nb_ports) {
                          flow_destroy,
                          flow_extract_keys,
                          flow_pack_keys,
-                         MAX_FLOWS,
+                         max_flows,
                          &flow_map);
 }
 
