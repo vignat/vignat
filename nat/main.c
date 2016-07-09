@@ -623,9 +623,17 @@ static void
 print_usage(const char *prgname)
 {
     printf ("%s [EAL options] -- -wan port_id"
-            "  -wan port_id: set the port port_id to be the external one.\n"
+            "  --wan <port_id>: set the port port_id to be the external one.\n"
             "NAT does not change the source address of the packets, coming "
-            "from the external port",
+            "from the external port.\n"
+            "  --extip <ip>: set the external (global) IP address.\n"
+            "  --eth-dest <port_id>,<max>: set the router mac address for\n"
+            "the port <port_id>.\n"
+            "  --expire <time>: set the maximum time in seconds the inactive\n"
+            "flow will reside in the table, until it is vanished.\n"
+            "  --max-flows <n>: the table capacity. if more than <n> flows\n"
+            "arrive during the expiration time, the most recent ones are\n"
+            "discarded.\n",
             prgname);
 }
 
