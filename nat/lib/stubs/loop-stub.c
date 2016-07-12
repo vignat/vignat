@@ -1,6 +1,7 @@
 #include <klee/klee.h>
 #include "loop.h"
 #include "my-time-stub-control.h"
+#include "containers/double-chain-stub-control.h"
 
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
@@ -23,6 +24,7 @@ void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_param_ptr(time, sizeof(uint32_t), "time");
   klee_trace_param_i32(max_flows, "max_flows");
   klee_trace_param_i32(start_port, "start_port");
+  dchain_reset(*ch, max_flows);
 }
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
@@ -37,13 +39,21 @@ void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
   loop_invariant_produce(m, ch, &time, max_flows, start_port);
 }
 
-void loop_enumeration_begin(int cnt)
+void loop_enumeration_begin(struct DoubleMap** m, struct DoubleChain** ch,
+                            uint32_t time, int max_flows, int start_port,
+                            int cnt)
 {
-  klee_trace_ret();
-  klee_trace_param_i32(cnt, "cnt");
+  (void)cnt;
+  loop_invariant_consume(m, ch, time, max_flows, start_port);
+  loop_invariant_produce(m, ch, &time, max_flows, start_port);
+  //klee_trace_ret();
+  //klee_trace_param_i32(cnt, "cnt");
 }
 
-void loop_enumeration_end()
+void loop_enumeration_end(struct DoubleMap** m, struct DoubleChain** ch,
+                          uint32_t time, int max_flows, int start_port)
 {
-  klee_trace_ret();
+  loop_invariant_consume(m, ch, time, max_flows, start_port);
+  loop_invariant_produce(m, ch, &time, max_flows, start_port);
+  //klee_trace_ret();
 }

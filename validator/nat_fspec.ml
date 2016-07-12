@@ -224,16 +224,6 @@ let fun_types =
                                     ~id:"double_chainp";
                                   leak "dmap_dchain_coherent(_,_)"
                                     ~id:"dmap_dchain_coherent"];};
-     "loop_enumeration_begin", {ret_type = Void;
-                                arg_types = [Sint32];
-                                lemmas_before = [];
-                                lemmas_after = [];
-                                leaks = [];};
-     "loop_enumeration_end", {ret_type = Void;
-                              arg_types = [];
-                              lemmas_before = [];
-                              lemmas_after = [];
-                              leaks = [];};
      "dmap_get_b", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
                     lemmas_before = [
@@ -345,14 +335,14 @@ let fun_types =
                        ", index);\n\
                         dmap_get_by_k2_invertible(" ^ (tmp "cur_map") ^
                        ", ek);\n\
-                        assert(index == new_index_0);\n\
+                        assert(index == " ^ (List.nth_exn args 2) ^ ");\n\
                         assert(true == dmap_index_used_fp(" ^ (tmp "cur_map") ^
-                       ", new_index_0));\n\
+                       ", " ^ (List.nth_exn args 2) ^ "));\n\
                         coherent_dmap_used_dchain_allocated(" ^ (tmp "cur_map") ^
-                       ", cur_ch, new_index_0);\n\
+                       ", cur_ch, " ^ (List.nth_exn args 2) ^ ");\n\
                         assert(true == dchain_allocated_index_fp(" ^
                        (tmp "cur_map") ^
-                       ", new_index_0));\n\
+                       ", " ^ (List.nth_exn args 2) ^ "));\n\
                         assert(false);\n\
                         }\n\
                         }@*/");
@@ -361,14 +351,14 @@ let fun_types =
                         assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
                        ", ?cur_ch);\n\
                         if (dmap_index_used_fp(" ^ (tmp "cur_map") ^
-                       ", new_index_0)) {\n\
+                       ", " ^ (List.nth_exn args 2) ^ ")) {\n\
                         coherent_dmap_used_dchain_allocated(" ^ (tmp "cur_map") ^
-                       ", cur_ch, new_index_0);\n\
+                       ", cur_ch, " ^ (List.nth_exn args 2) ^ ");\n\
                         }\n\
                         }@*/");
                     (fun args tmp ->
                        "/*@ dmap_put_preserves_cap(" ^ (tmp "cur_map") ^
-                       ", new_index_0, flwc(ikc(user_buf0_34, user_buf0_36,\
+                       ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
@@ -385,12 +375,12 @@ let fun_types =
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
                     tx_l "open ext_k_p(_,_);";
-                    (fun ret_var _ tmp ->
+                    (fun ret_var args tmp ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
                         dmap_put_get(" ^
                        (tmp "cur_map") ^
-                       ",new_index_0,\
+                       "," ^ (List.nth_exn args 2) ^ ",\
                         flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
@@ -399,7 +389,7 @@ let fun_types =
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n" ^
                        (tmp "vk1") ^ ", " ^
                        (tmp "vk2") ^ ");\n}@*/");
-                    (fun ret_var _ tmp ->
+                    (fun ret_var args tmp ->
                        "/*@if (" ^ ret_var ^
                        "!= 0) {\n\
                         assert dmap_dchain_coherent(" ^
@@ -418,7 +408,8 @@ let fun_types =
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
                         184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
-                        new_index_0, " ^ !last_time_for_index_alloc ^
+                       " ^ (List.nth_exn args 2) ^ ", " ^
+                       !last_time_for_index_alloc ^
                        ", " ^ (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ ");\
                         }@*/");
                   ]
@@ -644,7 +635,7 @@ struct
   let preamble = In_channel.read_all "preamble.tmpl"
   let fun_types = fun_types
   let fixpoints = fixpoints
-  let boundary_fun = "loop_invariant_consume"
+  let boundary_fun = "loop_invariant_produce"
 end
 
 (* Register the module *)

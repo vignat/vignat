@@ -471,7 +471,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #endif //KLEE_VERIFICATION
     {
 
-        expire_flows(current_time());
+      expire_flows(current_time());
 
         cur_tsc = rte_rdtsc();
 
@@ -504,7 +504,9 @@ main_loop(__attribute__((unused)) void *dummy)
         klee_make_symbolic(&i, sizeof(int), "queue_num_i");
         klee_assume(i < qconf->n_rx_queue);
         klee_assume(0 <= i);
-        loop_enumeration_begin(i);
+        loop_enumeration_begin(get_dmap_pp(), get_dchain_pp(),
+                               current_time(), max_flows, start_port,
+                               i);
 #else //KLEE_VERIFICATION
         for (i = 0; i < qconf->n_rx_queue; ++i)
 #endif //KLEE_VERIFICATION
@@ -535,7 +537,8 @@ main_loop(__attribute__((unused)) void *dummy)
             }
         }
 #ifdef KLEE_VERIFICATION
-        loop_enumeration_end();
+        loop_enumeration_end(get_dmap_pp(), get_dchain_pp(),
+                             current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
     }
 #ifdef KLEE_VERIFICATION

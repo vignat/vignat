@@ -58,11 +58,14 @@ void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
 void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
                         uint32_t time, int max_flows, int start_port);
 
-void loop_enumeration_begin(int cnt);
+void loop_enumeration_begin(struct DoubleMap** m, struct DoubleChain** ch,
+                            uint32_t time, int max_flows, int start_port,
+                            int cnt);
 //@ requires true;
 //@ ensures true;
 
-void loop_enumeration_end();
+void loop_enumeration_end(struct DoubleMap** m, struct DoubleChain** ch,
+                          uint32_t time, int max_flows, int start_port);
 //@ requires true;
 //@ ensures true;
 

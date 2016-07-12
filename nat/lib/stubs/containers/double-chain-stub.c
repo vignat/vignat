@@ -89,3 +89,15 @@ void dchain_make_space(struct DoubleChain* chain) {
   //Do not trace internal stub control functions.
   out_of_space = 0;
 }
+
+void dchain_reset(struct DoubleChain* chain, int index_range) {
+  //Do not trace. This function is an internal knob of the model.
+  klee_assert(is_dchain_allocated);
+  klee_assert(chain == allocated_chain);
+
+  new_index = klee_int("new_index");
+  klee_assume(0 <= new_index);
+  klee_assume(new_index < index_range);
+  is_index_allocated = 0;
+  out_of_space = klee_int("out_of_space");
+}
