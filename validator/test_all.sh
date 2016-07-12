@@ -18,42 +18,34 @@ analyze_result() {
         else
             if grep -q "Assertion might not hold" $RESULT; then
                 echo $FNAME assertion fail >> $REPORT_FNAME
-            fi
-            if grep -q "No matching heap chunks" $RESULT; then
+            elif grep -q "No matching heap chunks" $RESULT; then
                 echo $FNAME nochunks fail >> $REPORT_FNAME
-            fi
-            if grep -q "No matching pointsto chunk" $RESULT; then
+            elif grep -q "No matching pointsto chunk" $RESULT; then
                 echo $FNAME nochunks fail >> $REPORT_FNAME
-            fi
-            if grep -q "Function leaks heap chunks" $RESULT; then
+            elif grep -q "Function leaks heap chunks" $RESULT; then
                 echo $FNAME leak fail >> $REPORT_FNAME
-            fi
-            if grep -q "Cannot prove" $RESULT; then
+            elif grep -q "Cannot prove" $RESULT; then
                 echo $FNAME unproven fail >> $REPORT_FNAME
-            fi
-            if grep -q "Cannot read a ghost variable in a non-pure context" $RESULT; then
+            elif grep -q "Cannot read a ghost variable in a non-pure context" $RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
-            fi
-            if grep -q "No such variable, constructor, regular function," $RESULT; then
+            elif grep -q "No such variable, constructor, regular function," $RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
-            fi
-            if grep -q "Incorrect number of arguments" $RESULT; then
+            elif grep -q "Incorrect number of arguments" $RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
-            fi
-            if grep -q "Parse error." $RESULT; then
+            elif grep -q "Parse error." $RESULT; then
                 echo $FNAME parser fail >> $REPORT_FNAME
-            fi
-            if grep -q "Type mismatch." $RESULT; then
+            elif grep -q "Type mismatch." $RESULT; then
                 echo $FNAME type fail >> $REPORT_FNAME
-            fi
-            if grep -q "Wrong number of arguments" $RESULT; then
+            elif grep -q "Wrong number of arguments" $RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
-            fi
-            if grep -q "No such function" $RESULT; then
+            elif grep -q "No such function" $RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
-            fi
-            if grep -q "Too many patterns" $RESULT; then
+            elif grep -q "Too many patterns" $RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
+            elif grep -1 "Potential arithmetic" $RESULT; then
+                echo $FNAME arith fail >> $REPORT_FNAME
+            else
+                echo $FNAME unknown fail >> $REPORT_FNAME
             fi
             cat $RESULT
         fi
@@ -145,6 +137,7 @@ SYNTAX=$(grep -c "syntax fail" $REPORT_FNAME)
 PARSER=$(grep -c "parser fail" $REPORT_FNAME)
 TYPE=$(grep -c "type fail" $REPORT_FNAME)
 SPEC=$(grep -c "spec fail" $REPORT_FNAME)
+ARITH=$(grep -c "arith fail" $REPORT_FNAME)
 UNKNOWN=$(grep -c "unknown fail" $REPORT_FNAME)
 
 echo "Test completed."
@@ -158,4 +151,5 @@ echo "syntax err: $SYNTAX"
 echo "type mismatch $TYPE"
 echo "parse errs: $PARSER"
 echo "spec errs: $SPEC"
+echo "arithmetic: $ARITH"
 echo "unknown fail: $UNKNOWN"
