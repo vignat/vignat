@@ -566,16 +566,30 @@ let extract_leaks ftype_of ccontexts =
   in
   String.Map.data leak_map
 
-let rec get_relevant_segment pref boundary_fun =
-  match List.findi pref.history ~f:(fun _ call ->
-      String.equal call.fun_name boundary_fun) with
-  | Some (pos,_) ->
-    let tail_len = (List.length pref.history) - pos - 1 in
-    get_relevant_segment
-      {history = List.sub pref.history ~pos:(pos + 1) ~len:tail_len;
-       tip_calls = pref.tip_calls;}
-      boundary_fun
-  | None -> pref
+let strip_context call =
+  {fun_name = call.fun_name; args = call.args;
+   ret = None; call_context = []; ret_context = []}
+
+let get_relevant_segment pref boundary_fun =
+  let rec last_relevant_seg hist candidat =
+    match hist with
+    | c :: rest ->
+      if (String.equal c.fun_name boundary_fun) then
+        last_relevant_seg rest hist
+      else
+        last_relevant_seg rest candidat
+    | [] -> candidat
+  in
+  match pref.tip_calls with
+  | [] -> failwith "must have at least one tip call."
+  | hd :: _ ->
+    if (String.equal hd.fun_name boundary_fun) then
+      {history=[]; tip_calls = List.map pref.tip_calls strip_context}
+    else
+      match last_relevant_seg pref.history [] with
+      | bnd :: rest ->
+        {history = strip_context bnd :: rest; tip_calls = pref.tip_calls}
+      | [] -> pref
 
 let build_ir fun_types fin preamble boundary_fun =
   let ftype_of fun_name =

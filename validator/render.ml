@@ -138,8 +138,8 @@ let render_tip_fun_call {context;results} export_point free_vars =
   (render_export_point export_point) ^
   (match results with
    | result :: [] ->
-     (render_post_sttmts ~is_assert:true result) ^ "\n" ^
-     (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val)
+     (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val) ^
+     "\n" ^ (render_post_sttmts ~is_assert:true result)
    | res1 :: res2 :: [] ->
      render_2tip_post_assertions res1 res2 context.ret_name
    | [] -> failwith "must be at least one tip call"
