@@ -12,6 +12,12 @@ uint32_t start_time(void) {
     return last_time;
 }
 
+uint32_t restart_time(void) {
+  starting_time = klee_int("restarting_time");
+  last_time = starting_time;
+  return last_time;
+}
+
 uint32_t current_time(void) {
     klee_trace_ret();
     uint32_t next_time = klee_int("next_time");

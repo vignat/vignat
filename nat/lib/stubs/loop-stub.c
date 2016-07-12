@@ -25,6 +25,7 @@ void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_param_i32(max_flows, "max_flows");
   klee_trace_param_i32(start_port, "start_port");
   dchain_reset(*ch, max_flows);
+  *time = restart_time();
 }
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
