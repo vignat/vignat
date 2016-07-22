@@ -4,8 +4,8 @@ library(ggplot2)
 load_missrates <- function(sources) {
   missrates <- data.frame(V1=integer(), V2=integer(), medium=character())
   for (s in sources) {
-    missrates_i <- read.table(paste(s, ".dat", sep=""))
-    missrates_i["medium"] <- s
+    missrates_i <- read.table(paste(s[1], ".dat", sep=""))
+    missrates_i["medium"] <- s[2]
     missrates <- rbind(missrates, missrates_i)
   }
   data.frame(rate=1e6/missrates$V1, loss=missrates$V2, medium=missrates$medium)
@@ -23,9 +23,9 @@ plot_missrates <- function(missrates, fname) {
       geom_line(position=pd) +
       geom_point(position=pd,size=3) +
       scale_x_continuous(trans='log10') +
-      labs(title="Comparative loss/rate dependencies") +
-      xlab("Rate, packets/second") +
-      ylab("Loss, %") +
+      labs(title="Comparative loss/rate dependencies for [tester]-[medium]-[reflector] scenarios") +
+      xlab("Source packet rate, packets/second, log scale") +
+      ylab("Packet loss (sent pkts - received pkts)/sent pkts, %") +
       geom_point(data=csummary,
                 aes(x=rate, y=loss, colour=medium,
                     group=medium, size=V1),
