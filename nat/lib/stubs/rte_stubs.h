@@ -672,9 +672,8 @@ struct rte_eth_conf {
     /* ... and many many many more, but unrelevant */
 };
 
-#define MAX_PKT_BURST 32
 //#define RTE_MAX_ETHPORTS 32
-//!!! this is wrong. made only for reducing the verification time.
+//!!!TODO this is wrong. made only for reducing the verification time.
 #define RTE_MAX_ETHPORTS 2
 
 #define ETHER_TYPE_IPv4 0x0800 /**< IPv4 Protocol. */
@@ -784,7 +783,11 @@ ether_format_addr(char *buf, uint16_t size,
 
 #define unlikely(x) (x)
 
-#define RTE_MAX_LCORE 128
+//#define RTE_MAX_LCORE 128
+//TODO: !!! change it back to 128 !
+// reduced to make symbolic execution feasible.
+// come back here when I add the batcher abstraction.
+#define RTE_MAX_LCORE 1
 
 int rte_lcore_is_enabled(unsigned lcore_id);
 unsigned rte_get_master_lcore();

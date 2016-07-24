@@ -73,7 +73,10 @@
 uint32_t starting_time;
 #endif
 
-#define MAX_PKT_BURST     32
+//#define MAX_PKT_BURST     32
+//TODO: this is wrong, get back 32 when I wrap the batcher into
+// a formally verified module.
+#define MAX_PKT_BURST     2
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 
 /*
@@ -466,10 +469,21 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
     loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
                          starting_time, max_flows, start_port);
+    while (klee_induce_invariants())
 #else //KLEE_VERIFICATION
     while (1) 
 #endif //KLEE_VERIFICATION
     {
+
+#ifdef KLEE_VERIFICATION
+      loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+                                 starting_time, max_flows, start_port);
+      //TODO: hide these into the batcher component.
+      klee_assume(0 <= lcore_conf->tx_mbufs[0].len);
+      klee_assume(0 <= lcore_conf->tx_mbufs[1].len);
+      klee_assume(lcore_conf->tx_mbufs[0].len < MAX_PKT_BURST);
+      klee_assume(lcore_conf->tx_mbufs[1].len < MAX_PKT_BURST);
+#endif//KLEE_VERIFICATION
 
       expire_flows(current_time());
 

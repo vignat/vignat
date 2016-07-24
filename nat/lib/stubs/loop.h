@@ -40,6 +40,12 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
 
 @*/
 
+void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
+                                uint32_t time, int max_flows, int start_port);
+
+void loop_iteration_assertions(struct DoubleMap** m, struct DoubleChain** ch,
+                               uint32_t time, int max_flows, int start_port);
+
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
                             uint32_t time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&

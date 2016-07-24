@@ -300,3 +300,10 @@ int dmap_size(struct DoubleMap* map) {
   klee_assert(0); //This model does not support size requests.
   return -1;
 }
+
+void dmap_reset(struct DoubleMap* map, int capacity) {
+  entry_claimed = 0;
+
+  klee_assume(0 <= allocated_index);
+  klee_assume(allocated_index < capacity);
+}

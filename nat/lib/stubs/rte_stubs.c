@@ -172,3 +172,8 @@ void rte_exit(int exit_code, const char *format, ...)
     printf("something went wrong(%s)?\n", format);
     exit(exit_code);
 }
+
+void rte_reset()
+{
+  incoming_package_allocated = 0;
+}

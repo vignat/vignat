@@ -2,7 +2,23 @@
 #include "loop.h"
 #include "my-time-stub-control.h"
 #include "containers/double-chain-stub-control.h"
+#include "containers/double-map-stub-control.h"
+#include "rte-stubs-control.h"
 
+
+void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
+                                uint32_t time, int max_flows, int start_port)
+{
+  rte_reset();
+  dchain_reset(*ch, max_flows);
+  dmap_reset(*m, max_flows);
+}
+
+void loop_iteration_assertions(struct DoubleMap** m, struct DoubleChain** ch,
+                               uint32_t time, int max_flows, int start_port)
+{
+  
+}
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
                             uint32_t time, int max_flows, int start_port)
