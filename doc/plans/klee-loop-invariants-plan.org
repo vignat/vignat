@@ -1,0 +1,183 @@
+* Introduce klee loop invariant support with auto-induction of the unmodified variables.
+The idea is to 
+1. note the loop header, remember all the variable values,
+2. symbolically execute the loop body, and 
+3. on every back edge note which variables were modified
+   (i.e. query (a != a') is satisfiable).
+4. then replace those variables with unconstrained symbols, and
+5. repeat from the step# 2 until all the affected variables are detected.
+
+To implement the idea:
+** DONE Build the loop tree: use existing LLVM algorithms
+CLOSED: [2016-07-18 Mon 19:23]
+:LOGBOOK:
+CLOCK: [2016-07-18 Mon 19:09]--[2016-07-18 Mon 19:23] =>  0:14
+CLOCK: [2016-07-18 Mon 16:04]--[2016-07-18 Mon 16:32] =>  0:28
+CLOCK: [2016-07-18 Mon 15:26]--[2016-07-18 Mon 15:50] =>  0:24
+CLOCK: [2016-07-18 Mon 14:22]--[2016-07-18 Mon 14:23] =>  0:01
+CLOCK: [2016-07-17 Son 13:41]--[2016-07-17 Son 14:06] =>  0:25
+:END:
+** DONE Study the loop representation
+CLOSED: [2016-07-18 Mon 10:15]
+:LOGBOOK:
+CLOCK: [2016-07-17 Son 12:58]--[2016-07-17 Son 13:15] =>  0:17
+:END:
+** DONE Study how LLVM LoopInfo pass works.
+CLOSED: [2016-07-18 Mon 19:26]
+:LOGBOOK:
+CLOCK: [2016-07-18 Mon 16:32]--[2016-07-18 Mon 17:45] =>  1:13
+:END:
+** DONE Introduce the marker.
+CLOSED: [2016-07-26 Die 14:57]
+:LOGBOOK:
+CLOCK: [2016-07-18 Mon 19:04]--[2016-07-18 Mon 19:09] =>  0:05
+CLOCK: [2016-07-17 Son 16:24]--[2016-07-17 Son 16:34] =>  0:10
+CLOCK: [2016-07-17 Son 13:15]--[2016-07-17 Son 13:38] =>  0:23
+:END:
+an intrinsic function that designates loops to process
+** DONE Add an attribute into execution state
+CLOSED: [2016-07-26 Die 14:58]
+:LOGBOOK:
+CLOCK: [2016-07-22 Fre 21:28]--[2016-07-22 Fre 21:35] =>  0:07
+CLOCK: [2016-07-22 Fre 20:10]--[2016-07-22 Fre 20:44] =>  0:34
+CLOCK: [2016-07-20 Mit 21:10]--[2016-07-20 Mit 21:57] =>  0:47
+CLOCK: [2016-07-20 Mit 12:24]--[2016-07-20 Mit 12:51] =>  0:27
+CLOCK: [2016-07-18 Mon 19:27]--[2016-07-18 Mon 19:52] =>  0:25
+CLOCK: [2016-07-18 Mon 13:48]--[2016-07-18 Mon 14:22] =>  0:34
+CLOCK: [2016-07-18 Mon 13:33]--[2016-07-18 Mon 13:38] =>  0:05
+CLOCK: [2016-07-18 Mon 10:16]--[2016-07-18 Mon 10:26] =>  0:10
+:END:
+for this special mode. The attribute should hold the current loop header
+** DONE Study how the execution state snapshots work
+CLOSED: [2016-07-26 Die 14:57]
+:LOGBOOK:
+CLOCK: [2016-07-16 Sam 14:55]--[2016-07-16 Sam 15:00] =>  0:05
+:END:
+** DONE Remember the full memory state on the loop entrance
+CLOSED: [2016-07-26 Die 14:57]
+*** TODO Get The state at the entrance of a loop containing the marker, not at the marker.
+:LOGBOOK:
+CLOCK: [2016-07-20 Mit 19:27]--[2016-07-20 Mit 19:52] =>  0:25
+:END:
+** DONE Study the branches handling in klee/llvm
+CLOSED: [2016-07-26 Die 14:57]
+:LOGBOOK:
+CLOCK: [2016-07-18 Mon 19:52]--[2016-07-18 Mon 19:58] =>  0:06
+:END:
+** DONE On each branch compare the memory state with the starting ones
+CLOSED: [2016-07-19 Die 16:10]
+:LOGBOOK:
+CLOCK: [2016-07-23 Sam 11:59]--[2016-07-23 Sam 12:59] =>  1:00
+CLOCK: [2016-07-22 Fre 20:44]--[2016-07-22 Fre 21:24] =>  0:40
+CLOCK: [2016-07-19 Die 15:25]--[2016-07-19 Die 16:10] =>  0:45
+CLOCK: [2016-07-19 Die 15:05]--[2016-07-19 Die 15:17] =>  0:12
+CLOCK: [2016-07-19 Die 15:01]--[2016-07-19 Die 15:02] =>  0:01
+CLOCK: [2016-07-19 Die 14:42]--[2016-07-19 Die 14:46] =>  0:04
+CLOCK: [2016-07-19 Die 14:15]--[2016-07-19 Die 14:39] =>  0:24
+CLOCK: [2016-07-19 Die 12:26]--[2016-07-19 Die 12:40] =>  0:14
+CLOCK: [2016-07-19 Die 12:11]--[2016-07-19 Die 12:21] =>  0:10
+CLOCK: [2016-07-18 Mon 19:58]--[2016-07-18 Mon 20:21] =>  0:23
+:END:
+** DONE Study how to schedule dependent executions.
+CLOSED: [2016-07-19 Die 16:10]
+
+- Note taken on [2016-07-15 Fre 15:26] \\
+  It turns out there is no support for inter-execution dependencies in Klee.
+:LOGBOOK:
+CLOCK: [2016-07-15 Fre 14:46]--[2016-07-15 Fre 15:26] =>  0:40
+:END:
+** TODO Report the altered values
+:LOGBOOK:
+CLOCK: [2016-07-19 Die 16:51]--[2016-07-19 Die 16:51] =>  0:00
+CLOCK: [2016-07-19 Die 16:33]--[2016-07-19 Die 16:34] =>  0:01
+:END:
+*** TODO Keep track of the addresses being affected by havoc
+:LOGBOOK:
+CLOCK: [2016-07-21 Don 16:15]--[2016-07-21 Don 16:36] => 0:21
+:END:
+** TODO Refactor
+:LOGBOOK:
+CLOCK: [2016-07-21 Don 13:59]--[2016-07-21 Don 14:03] =>  0:04
+CLOCK: [2016-07-21 Don 13:32]--[2016-07-21 Don 13:53] =>  0:21
+CLOCK: [2016-07-21 Don 13:00]--[2016-07-21 Don 13:12] =>  0:12
+CLOCK: [2016-07-21 Don 12:33]--[2016-07-21 Don 12:55] =>  0:22
+CLOCK: [2016-07-21 Don 12:03]--[2016-07-21 Don 12:26] =>  0:23
+CLOCK: [2016-07-21 Don 11:54]--[2016-07-21 Don 12:00] =>  0:06
+:END:
+** TODO Add support for logical expressions in the invariant.
+:LOGBOOK:
+CLOCK: [2016-07-21 Don 14:27]--[2016-07-21 Don 14:38] =>  0:11
+:END:
+*** TODO Support 'pure' functions in the expressions.
+** TODO [OPTIONAL] Resolve loop-analysis - model API tracing interference.
+** TODO Test
+:LOGBOOK:
+CLOCK: [2016-07-26 Die 13:52]--[2016-07-26 Die 14:55] =>  1:03
+CLOCK: [2016-07-26 Die 13:24]--[2016-07-26 Die 13:38] =>  0:14
+CLOCK: [2016-07-26 Die 12:35]--[2016-07-26 Die 13:01] =>  0:26
+CLOCK: [2016-07-21 Don 16:36]--[2016-07-21 Don 16:51] =>  0:15
+CLOCK: [2016-07-21 Don 15:38]--[2016-07-21 Don 16:09] =>  0:31
+CLOCK: [2016-07-21 Don 14:55]--[2016-07-21 Don 15:07] =>  0:12
+:END:
+** Proper implementation
+*** DONE Decide how to run one loop iteration after another
+CLOSED: [2016-07-26 Die 14:56]
+  :LOGBOOK:
+  CLOCK: [2016-07-15 Fre 15:26]--[2016-07-15 Fre 15:26] =>  0:00
+  :END:
+*** DONE When the loop body is fully explored, symbolize values
+CLOSED: [2016-07-26 Die 14:56]
+:LOGBOOK:
+CLOCK: [2016-07-20 Mit 12:22]--[2016-07-20 Mit 12:24] =>  0:02
+CLOCK: [2016-07-20 Mit 11:51]--[2016-07-20 Mit 12:11] =>  0:20
+CLOCK: [2016-07-19 Die 16:51]--[2016-07-19 Die 16:58] =>  0:07
+CLOCK: [2016-07-19 Die 16:30]--[2016-07-19 Die 16:33] =>  0:03
+:END:
+*** DONE If nothing new is symbolized, clear the attribute, rerun normally
+CLOSED: [2016-07-26 Die 14:56]
+:LOGBOOK:
+CLOCK: [2016-07-20 Mit 17:34]--[2016-07-20 Mit 18:16] =>  0:42
+CLOCK: [2016-07-20 Mit 16:13]--[2016-07-20 Mit 17:11] =>  0:58
+CLOCK: [2016-07-20 Mit 15:13]--[2016-07-20 Mit 16:08] =>  0:55
+CLOCK: [2016-07-20 Mit 12:51]--[2016-07-20 Mit 13:09] =>  0:18
+:END:
+*** DONE Rerun the loop iteration
+CLOSED: [2016-07-26 Die 14:56]
+:LOGBOOK:
+CLOCK: [2016-07-21 Don 16:09]--[2016-07-21 Don 16:15] =>  0:06
+:END:
+*** DONE Redo analysis on the second entry to the loop,
+CLOSED: [2016-07-26 Die 14:57]
+:LOGBOOK:
+CLOCK: [2016-07-25 Mon 15:03]--[2016-07-25 Mon 16:42] =>  1:39
+CLOCK: [2016-07-25 Mon 12:24]--[2016-07-25 Mon 12:41] =>  0:17
+CLOCK: [2016-07-25 Mon 11:22]--[2016-07-25 Mon 12:10] =>  0:48
+CLOCK: [2016-07-25 Mon 10:39]--[2016-07-25 Mon 11:11] =>  0:32
+:END:
+if it differs in the unmasked state.
+**** DONE Support loop reentry during the analysis.
+CLOSED: [2016-07-26 Die 00:09]
+:LOGBOOK:
+CLOCK: [2016-07-26 Die 00:03]--[2016-07-26 Die 00:09] =>  0:06
+CLOCK: [2016-07-25 Mon 22:31]--[2016-07-25 Mon 23:50] =>  1:19
+CLOCK: [2016-07-25 Mon 21:26]--[2016-07-25 Mon 22:26] =>  1:00
+CLOCK: [2016-07-25 Mon 20:05]--[2016-07-25 Mon 20:58] =>  0:53
+CLOCK: [2016-07-25 Mon 18:32]--[2016-07-25 Mon 19:42] =>  1:10
+CLOCK: [2016-07-25 Mon 16:42]--[2016-07-25 Mon 16:44] =>  0:02
+:END:
+*** DONE Support PHI-functions on the loop entry
+CLOSED: [2016-07-26 Die 08:40]
+:LOGBOOK:
+CLOCK: [2016-07-26 Die 08:22]--[2016-07-26 Die 08:40] =>  0:18
+CLOCK: [2016-07-26 Die 07:58]--[2016-07-26 Die 08:17] =>  0:19
+CLOCK: [2016-07-26 Die 00:19]--[2016-07-26 Die 00:22] =>  0:03
+:END:
+*** DONE Support nested loops analysis
+CLOSED: [2016-07-26 Die 14:57]
+:LOGBOOK:
+CLOCK: [2016-07-26 Die 13:09]--[2016-07-26 Die 13:24] =>  0:15
+CLOCK: [2016-07-26 Die 11:56]--[2016-07-26 Die 12:35] =>  0:39
+CLOCK: [2016-07-26 Die 11:18]--[2016-07-26 Die 11:53] =>  0:35
+CLOCK: [2016-07-26 Die 08:47]--[2016-07-26 Die 10:59] =>  2:12
+CLOCK: [2016-07-26 Die 08:40]--[2016-07-26 Die 08:41] =>  0:01
+:END:
