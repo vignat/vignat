@@ -1,0 +1,79 @@
+* Abstract
+* Introduction
+- Note taken on [2016-08-02 Die 10:14] \\
+  Running example: batcher.
+** Problem Statement
+Software network applications lack dependability (why, how?).
+** Solution Overview
+Optimistic symbolic execution.
+We offer a new approach to verify network applications. Specifically
+the applications that meet the following requirements:
+- no deep recursion
+- clear loops (limited repetition model)
+- clean state encapsulation into a set of well defined data structures
+- OS interaction strictly thourgh a well defined interface
+- Event processing model:
+  infinite loop, with short iterations dedicated to process a single event each
+  with short and simple data-structure and OS interaction patterns.
+- ...???
+** Contributions
+- Verification methodology
+- Crash-free, performant but basic NAPT (anything else?)
+- Verification tool (validator)
+** Roadmap
+* Solution
+TODO functoin call overhead vs. load from a memory
+Proposed methodology:
+1. Encapsulate all state (specifically: large or variable-length arrays; dynamic
+   index accessed memory (e.g. a port configuration stored into a single table,
+   and accessed during port enumeration)
+2. Implement and formally (very labour intensive) verify the data-structure
+   specifications
+3. Provide symbolic models, suitable for the use-case. Symbolic model is a
+   partial implementation that:
+   - exhibits at least as general behaviour as specified for a bounded sequence
+     of API calls
+   - utilizes a small statically defined amount of state
+4. Provide loop invariants for long loops (i.e. event loop and port-enumerating
+   loop). Invariants should be mostly a conjunction of the corresponding
+   invariants for the symbolic models.
+5. Run symbolic execution on the resulting application. Make sure it does not
+   report any bugs. False positives here may be caused by excess generality of
+   the models.
+6. Collect API call traces and validate with the help of the formal verification
+   engine. This step ensures the claim in the step #3 (the model is
+   general enough).
+
+* Prototype
+Patched Klee:
+- loop invariant support
+- API call trace prefix dump
+Patched VeriFast:
+- accumulated conditions dump
+Home-made validator: 
+1. Parse the Klee dumps
+2. Transform them into VeriFast tasks
+   - Narrow down the behaviour by searching the assignment for unbounded symbolic
+   variables.
+   - Insert helper lemmas to help formal verification.
+3. Run VeriFast to try out the spec in the place of the model, and verify the
+   behaviour.
+Shortcoming: TCB includes Klee + SMT solver + VeriFast + all our patches + our
+home-made Validator. The last two items are hardly tested.
+However, *TODO Note on the orthogonality of bugs*
+* Evaluation
+Consider different working areas:
+- empty table,
+- saturated table,
+- saturated hash,
+- overflow.
+** Throughput:
+*** uni-flow
+*** multi-flow
+** Latency:
+*** existing flow
+*** new flow
+
+* Related Work
+* Conclusion
+* Acknolegements
