@@ -17,13 +17,14 @@ struct Array2
 // In-place initialization
 void array2_init(struct Array2 *arr_out);
 ARRAY2_EL_TYPE *array2_begin_access(struct Array2 *arr, int index);
-void array2_end_access(struct Array2 *arr, int index);
+void array2_end_access(struct Array2 *arr);
 
 
 void array2_init(struct Array2 *arr_out)
 {
-  (void)arr_out;
-  //nothing
+  for (int i = 0; i < ARRAY2_CAPACITY; ++i) {
+    ARRAY2_EL_INIT(arr_out->data[i]);
+  }
 }
 
 ARRAY2_EL_TYPE *array2_begin_access(struct Array2 *arr, int index)
@@ -31,7 +32,7 @@ ARRAY2_EL_TYPE *array2_begin_access(struct Array2 *arr, int index)
   return arr->data + index;
 }
 
-void array2_end_access(struct Array2 *arr, int index)
+void array2_end_access(struct Array2 *arr)
 {
   (void)arr;
   (void)index;

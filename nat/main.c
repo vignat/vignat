@@ -63,7 +63,9 @@
 #define ARRAY1_EL_TYPE struct Batcher
 #define ARRAY1_CAPACITY RTE_MAX_ETHPORTS
 #define ARRAY1_SUFFIX _bat
+#define ARRAY1_EL_INIT (void)/* for now */
 #include "lib/containers/array1.h"
+#undef ARRAY1_EL_INIT
 #undef ARRAY1_SUFFIX
 #undef ARRAY1_CAPACITY
 #undef ARRAY1_EL_TYPE
@@ -88,7 +90,9 @@ struct lcore_conf {
 #define ARRAY2_EL_TYPE struct lcore_conf
 #define ARRAY2_CAPACITY RTE_MAX_LCORE
 #define ARRAY2_SUFFIX _lconf
+#define ARRAY2_EL_INIT (void)/*for now*/
 #include "lib/containers/array2.h"
+#undef ARRAY2_EL_INIT
 #undef ARRAY2_SUFFIX
 #undef ARRAY2_CAPACITY
 #undef ARRAY2_EL_TYPE
@@ -96,7 +100,7 @@ struct lcore_conf {
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
 #ifdef KLEE_VERIFICATION
-#  define LOG(...) 
+#  define LOG(...)
 #  define LOG_ADD(...)
 #else //KLEE_VERIFICATION
 #  define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
@@ -244,7 +248,7 @@ send_burst(struct lcore_conf *qconf, uint8_t port)
   try_send_burst_and_erase(qconf->tx_queue_id[port],
                            mbufs,
                            port);
-  array1_end_access(&qconf->tx_mbufs, port);
+  array1_end_access(&qconf->tx_mbufs);
   mbufs = 0;
 }
 
@@ -261,14 +265,14 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
   struct Batcher *mbufs = array1_begin_access(&qconf->tx_mbufs, port);
   batcher_push(mbufs, m);
   int is_full = batcher_full(mbufs);
-  array1_end_access(&qconf->tx_mbufs, port);
+  array1_end_access(&qconf->tx_mbufs);
   mbufs = 0;
 
     /* enough pkts to be sent */
   if (unlikely(is_full)) {
     send_burst(qconf, port);
   }
-  array2_end_access(&lcore_conf, lcore_id);
+  array2_end_access(&lcore_conf);
   qconf = 0;
   return 0;
 }
@@ -520,7 +524,7 @@ main_loop(__attribute__((unused)) void *dummy)
               struct Batcher *mbufs = array1_begin_access(&qconf->tx_mbufs,
                                                           portid);
               int is_empty = batcher_empty(mbufs);
-              array1_end_access(&qconf->tx_mbufs, portid);
+              array1_end_access(&qconf->tx_mbufs);
               mbufs = 0;
               if (is_empty)
                 continue;
@@ -585,7 +589,7 @@ main_loop(__attribute__((unused)) void *dummy)
     loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
                        current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
-    array2_end_access(&lcore_conf, lcore_id);
+    array2_end_access(&lcore_conf);
     qconf = 0;
     return 0;
 }
@@ -665,7 +669,7 @@ init_lcore_rx_queues(void)
                 lcore_params[i].queue_id;
             conf->n_rx_queue++;
         }
-        array2_end_access(&lcore_conf, lcore);
+        array2_end_access(&lcore_conf);
         conf = 0;
     }
     return 0;
@@ -1014,6 +1018,8 @@ main(int argc, char **argv)
     starting_time = start_time();
 #endif //KLEE_VERIFICATION
 
+    array2_init(&lcore_conf);
+
     /* initialize all ports */
     for (portid = 0; portid < nb_ports; portid++) {
         /* skip ports that are not enabled */
@@ -1070,7 +1076,7 @@ main(int argc, char **argv)
             struct lcore_conf *qconf;
             qconf = array2_begin_access(&lcore_conf, lcore_id);
             qconf->tx_queue_id[portid] = queueid;
-            array2_end_access(&lcore_conf, lcore_id);
+            array2_end_access(&lcore_conf);
             qconf = 0;
             queueid++;
         }
@@ -1107,7 +1113,7 @@ main(int argc, char **argv)
                 rte_exit(EXIT_FAILURE, "rte_eth_rx_queue_setup: err=%d,"
                         "port=%d\n", ret, portid);
         }
-        array2_end_access(&lcore_conf, lcore_id);
+        array2_end_access(&lcore_conf);
         qconf = 0;
     }
 
