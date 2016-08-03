@@ -965,6 +965,19 @@ check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
     }
 }
 
+#ifdef KLEE_VERIFICATION
+int lcore_conf_condition(struct lcore_conf *cell)
+{
+  int rez = (0 < cell->n_rx_queue) &
+    (cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
+  for (int i = 0; i < MAX_RX_QUEUE_PER_LCORE; ++i) {
+    rez = rez & (0 <= cell->rx_queue_list[i].port_id) &
+      (cell->rx_queue_list[i].port_id < RTE_MAX_ETHPORTS);
+  }
+  return rez;
+}
+#endif//KLEE_VERIFICATION
+
 int
 main(int argc, char **argv)
 {
@@ -1016,6 +1029,7 @@ main(int argc, char **argv)
 
 #ifdef KLEE_VERIFICATION
     starting_time = start_time();
+    array2_set_cell_condition(lcore_conf_condition);
 #endif //KLEE_VERIFICATION
 
     array2_init(&lcore_conf);
@@ -1102,7 +1116,8 @@ main(int argc, char **argv)
 
             socketid = (uint8_t)rte_lcore_to_socket_id(lcore_id);
 
-            printf("rxq=%d,%d,%d ", portid, queueid, socketid);
+            //Symbolic
+            //printf("rxq=%d,%d,%d ", portid, queueid, socketid);
             fflush(stdout);
 
             ret = rte_eth_rx_queue_setup(portid, queueid, nb_rxd,

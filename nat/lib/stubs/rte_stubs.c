@@ -35,7 +35,7 @@ int incoming_package_allocated;
 
 uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
                           struct rte_mbuf** pkts_burst, int max_burst){
-  klee_assert(portid < 2);
+  klee_assert(portid < RTE_MAX_ETHPORTS);
   int receive_one;
   klee_make_symbolic(&receive_one, sizeof(int), "receive_one");
   if (receive_one) {

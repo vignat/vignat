@@ -18,6 +18,7 @@ struct Array1
   ARRAY1_EL_TYPE data[ARRAY1_CAPACITY];
 };
 
+
 /*@
   //params: T1, P1
   predicate arrp1(list<T1> data, struct Array1* arr);
@@ -42,6 +43,47 @@ void array1_end_access(struct Array1 *arr);
 //@ ensures arrp1(update(index, x, lst), arr);
 
 
+#ifdef KLEE_VERIFICATION
+
+#include <klee/klee.h>
+
+ARRAY1_EL_TYPE array1_model_cell;
+int array1_allocated_index;
+int array1_index_allocated;
+
+void array1_init(struct Array1 *arr_out)
+{
+  klee_trace_ret();
+  klee_trace_param_i32((uint32_t)arr_out, "arr_out");
+  klee_make_symbolic(&array1_model_cell, sizeof(ARRAY1_EL_TYPE),
+                     "array1_model_cell");
+  array1_index_allocated = 0;
+}
+
+ARRAY1_EL_TYPE *array1_begin_access(struct Array1 *arr, int index)
+{
+  klee_trace_ret();
+  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_i32(index, "index");
+  if (array1_index_allocated) {
+    klee_assert(index == array1_allocated_index);
+  } else {
+    array1_allocated_index = index;
+    array1_index_allocated = 1;
+  }
+  return &array1_model_cell;
+}
+
+void array1_end_access(struct Array1 *arr)
+{
+  klee_trace_ret();
+  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_assert(array1_index_allocated);
+  //nothing
+}
+
+#else//KLEE_VERIFICATION
+
 
 void array1_init(struct Array1 *arr_out)
 {
@@ -58,8 +100,9 @@ ARRAY1_EL_TYPE *array1_begin_access(struct Array1 *arr, int index)
 void array1_end_access(struct Array1 *arr)
 {
   (void)arr;
-  (void)index;
   //nothing
 }
+
+#endif//KLEE_VERIFICATION
 
 #endif//_ARRAY1_H_INCLUDED_
