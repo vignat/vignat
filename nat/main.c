@@ -58,6 +58,40 @@
 #include "lib/flowmanager.h"
 #include "lib/expirator.h"
 #include "lib/my-time.h"
+#include "lib/containers/batcher.h"
+
+#define ARRAY1_EL_TYPE struct Batcher
+#define ARRAY1_CAPACITY RTE_MAX_ETHPORTS
+#define ARRAY1_SUFFIX _bat
+#include "lib/containers/array1.h"
+#undef ARRAY1_SUFFIX
+#undef ARRAY1_CAPACITY
+#undef ARRAY1_EL_TYPE
+
+
+struct lcore_rx_queue {
+  uint8_t port_id;
+  uint8_t queue_id;
+} __rte_cache_aligned;
+
+#define MAX_RX_QUEUE_PER_LCORE 16
+#define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
+#define MAX_RX_QUEUE_PER_PORT 128
+
+struct lcore_conf {
+  uint16_t n_rx_queue;
+  struct lcore_rx_queue rx_queue_list[MAX_RX_QUEUE_PER_LCORE];
+  uint16_t tx_queue_id[RTE_MAX_ETHPORTS];
+  struct Array1 tx_mbufs;
+} __rte_cache_aligned;
+
+#define ARRAY2_EL_TYPE struct lcore_conf
+#define ARRAY2_CAPACITY RTE_MAX_LCORE
+#define ARRAY2_SUFFIX _lconf
+#include "lib/containers/array2.h"
+#undef ARRAY2_SUFFIX
+#undef ARRAY2_CAPACITY
+#undef ARRAY2_EL_TYPE
 
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
@@ -73,10 +107,6 @@
 uint32_t starting_time;
 #endif
 
-//#define MAX_PKT_BURST     32
-//TODO: this is wrong, get back 32 when I wrap the batcher into
-// a formally verified module.
-#define MAX_PKT_BURST     2
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 
 /*
@@ -113,19 +143,10 @@ static int start_port = 1025;
 /* mask of enabled ports */
 static uint32_t enabled_port_mask = 0;
 
-struct mbuf_table {
-    uint16_t len;
-    struct rte_mbuf *m_table[MAX_PKT_BURST];
-};
-
-struct lcore_rx_queue {
-    uint8_t port_id;
-    uint8_t queue_id;
-} __rte_cache_aligned;
-
-#define MAX_RX_QUEUE_PER_LCORE 16
-#define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
-#define MAX_RX_QUEUE_PER_PORT 128
+/* struct mbuf_table { */
+/*     uint16_t len; */
+/*     struct rte_mbuf *m_table[MAX_PKT_BURST]; */
+/* }; */
 
 #define MEMPOOL_CACHE_SIZE 256
 
@@ -194,59 +215,62 @@ static struct rte_eth_conf port_conf = {
 
 static struct rte_mempool * pktmbuf_pool[NB_SOCKETS];
 
-struct lcore_conf {
-    uint16_t n_rx_queue;
-    struct lcore_rx_queue rx_queue_list[MAX_RX_QUEUE_PER_LCORE];
-    uint16_t tx_queue_id[RTE_MAX_ETHPORTS];
-    struct mbuf_table tx_mbufs[RTE_MAX_ETHPORTS];
-} __rte_cache_aligned;
+static struct Array2 lcore_conf;
 
-static struct lcore_conf lcore_conf[RTE_MAX_LCORE];
+/* Send out a burst of messages, and erase them, even if not all were sent
+   successfully.
+ */
+static void
+try_send_burst_and_erase(uint16_t queueid, struct Batcher *bat, uint8_t port)
+{
+  int count = 0;
+  struct rte_mbuf **batch = 0;
+  batcher_access_all(bat, &batch, &count);
+
+  int n_sent = rte_eth_tx_burst(port, queueid, batch, count);
+  if (unlikely(n_sent < count)) {
+    do {
+      rte_pktmbuf_free(batch[n_sent]);
+    } while (++n_sent < count);
+  }
+  batcher_clear(bat);
+}
 
 /* Send burst of packets on an output interface */
-static inline int
-send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
+static inline void
+send_burst(struct lcore_conf *qconf, uint8_t port)
 {
-    struct rte_mbuf **m_table;
-    int ret;
-    uint16_t queueid;
-
-    queueid = qconf->tx_queue_id[port];
-    m_table = (struct rte_mbuf **)qconf->tx_mbufs[port].m_table;
-
-    ret = rte_eth_tx_burst(port, queueid, m_table, n);
-    if (unlikely(ret < n)) {
-        do {
-            rte_pktmbuf_free(m_table[ret]);
-        } while (++ret < n);
-    }
-
-    return 0;
+  struct Batcher *mbufs = array1_begin_access(&qconf->tx_mbufs, port);
+  try_send_burst_and_erase(qconf->tx_queue_id[port],
+                           mbufs,
+                           port);
+  array1_end_access(&qconf->tx_mbufs, port);
+  mbufs = 0;
 }
 
 /* Enqueue a single packet, and send burst if queue is filled */
 static inline int
 send_single_packet(struct rte_mbuf *m, uint8_t port)
 {
-    uint32_t lcore_id;
-    uint16_t len;
-    struct lcore_conf *qconf;
+  uint32_t lcore_id;
+  struct lcore_conf *qconf;
 
-    lcore_id = rte_lcore_id();
+  lcore_id = rte_lcore_id();
 
-    qconf = &lcore_conf[lcore_id];
-    len = qconf->tx_mbufs[port].len;
-    qconf->tx_mbufs[port].m_table[len] = m;
-    len++;
+  qconf = array2_begin_access(&lcore_conf, lcore_id);
+  struct Batcher *mbufs = array1_begin_access(&qconf->tx_mbufs, port);
+  batcher_push(mbufs, m);
+  int is_full = batcher_full(mbufs);
+  array1_end_access(&qconf->tx_mbufs, port);
+  mbufs = 0;
 
     /* enough pkts to be sent */
-    if (unlikely(len == MAX_PKT_BURST)) {
-        send_burst(qconf, MAX_PKT_BURST, port);
-        len = 0;
-    }
-
-    qconf->tx_mbufs[port].len = len;
-    return 0;
+  if (unlikely(is_full)) {
+    send_burst(qconf, port);
+  }
+  array2_end_access(&lcore_conf, lcore_id);
+  qconf = 0;
+  return 0;
 }
 
 static uint16_t get_src_port(struct rte_mbuf *m) {
@@ -292,13 +316,11 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
 }
 
 static inline __attribute__((always_inline)) void
-simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
+simple_forward(struct rte_mbuf *m, uint8_t portid)
 {
   struct ether_hdr *eth_hdr;
   struct ipv4_hdr *ipv4_hdr;
   uint8_t dst_device;
-
-  (void)qconf;
 
   eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
@@ -449,7 +471,7 @@ main_loop(__attribute__((unused)) void *dummy)
     prev_tsc = 0;
 
     lcore_id = rte_lcore_id();
-    qconf = &lcore_conf[lcore_id];
+    qconf = array2_begin_access(&lcore_conf, lcore_id);
 
     if (qconf->n_rx_queue == 0) {
         LOG( "lcore %u has nothing to do\n", lcore_id);
@@ -478,11 +500,6 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
       loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                                  starting_time, max_flows, start_port);
-      //TODO: hide these into the batcher component.
-      klee_assume(0 <= lcore_conf->tx_mbufs[0].len);
-      klee_assume(0 <= lcore_conf->tx_mbufs[1].len);
-      klee_assume(lcore_conf->tx_mbufs[0].len < MAX_PKT_BURST);
-      klee_assume(lcore_conf->tx_mbufs[1].len < MAX_PKT_BURST);
 #endif//KLEE_VERIFICATION
 
       expire_flows(current_time());
@@ -500,12 +517,14 @@ main_loop(__attribute__((unused)) void *dummy)
              * portid), but it is not called so often
              */
             for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
-                if (qconf->tx_mbufs[portid].len == 0)
-                    continue;
-                send_burst(qconf,
-                    qconf->tx_mbufs[portid].len,
-                    portid);
-                qconf->tx_mbufs[portid].len = 0;
+              struct Batcher *mbufs = array1_begin_access(&qconf->tx_mbufs,
+                                                          portid);
+              int is_empty = batcher_empty(mbufs);
+              array1_end_access(&qconf->tx_mbufs, portid);
+              mbufs = 0;
+              if (is_empty)
+                continue;
+              send_burst(qconf, portid);
             }
 
             prev_tsc = cur_tsc;
@@ -521,10 +540,17 @@ main_loop(__attribute__((unused)) void *dummy)
         loop_enumeration_begin(get_dmap_pp(), get_dchain_pp(),
                                current_time(), max_flows, start_port,
                                i);
+        for (i = 0; klee_induce_invariants() & (i < qconf->n_rx_queue); ++i)
 #else //KLEE_VERIFICATION
         for (i = 0; i < qconf->n_rx_queue; ++i)
 #endif //KLEE_VERIFICATION
         {
+
+#ifdef KLEE_VERIFICATION
+          loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+                                     current_time(), max_flows, start_port);
+#endif//KLEE_VERIFICATION
+
             portid = qconf->rx_queue_list[i].port_id;
             queueid = qconf->rx_queue_list[i].queue_id;
             nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
@@ -541,12 +567,12 @@ main_loop(__attribute__((unused)) void *dummy)
                 for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
                     rte_prefetch0(rte_pktmbuf_mtod
                                   (pkts_burst[j + PREFETCH_OFFSET], void *));
-                    simple_forward(pkts_burst[j], portid, qconf);
+                    simple_forward(pkts_burst[j], portid);
                 }
 
                 /* Forward remaining prefetched packets */
                 for (; j < nb_rx; j++) {
-                    simple_forward(pkts_burst[j], portid, qconf);
+                    simple_forward(pkts_burst[j], portid);
                 }
             }
         }
@@ -559,6 +585,8 @@ main_loop(__attribute__((unused)) void *dummy)
     loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
                        current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
+    array2_end_access(&lcore_conf, lcore_id);
+    qconf = 0;
     return 0;
 }
 
@@ -624,18 +652,21 @@ init_lcore_rx_queues(void)
 
     for (i = 0; i < nb_lcore_params; ++i) {
         lcore = lcore_params[i].lcore_id;
-        nb_rx_queue = lcore_conf[lcore].n_rx_queue;
+        struct lcore_conf *conf = array2_begin_access(&lcore_conf, lcore);
+        nb_rx_queue = conf->n_rx_queue;
         if (nb_rx_queue >= MAX_RX_QUEUE_PER_LCORE) {
             printf("error: too many queues (%u) for lcore: %u\n",
                 (unsigned)nb_rx_queue + 1, (unsigned)lcore);
             return -1;
         } else {
-            lcore_conf[lcore].rx_queue_list[nb_rx_queue].port_id =
+            conf->rx_queue_list[nb_rx_queue].port_id =
                 lcore_params[i].port_id;
-            lcore_conf[lcore].rx_queue_list[nb_rx_queue].queue_id =
+            conf->rx_queue_list[nb_rx_queue].queue_id =
                 lcore_params[i].queue_id;
-            lcore_conf[lcore].n_rx_queue++;
+            conf->n_rx_queue++;
         }
+        array2_end_access(&lcore_conf, lcore);
+        conf = 0;
     }
     return 0;
 }
@@ -933,7 +964,6 @@ check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
 int
 main(int argc, char **argv)
 {
-    struct lcore_conf *qconf;
     struct rte_eth_dev_info dev_info;
     struct rte_eth_txconf *txconf;
     int ret;
@@ -1037,8 +1067,11 @@ main(int argc, char **argv)
                 rte_exit(EXIT_FAILURE, "rte_eth_tx_queue_setup: err=%d, "
                     "port=%d\n", ret, portid);
 
-            qconf = &lcore_conf[lcore_id];
+            struct lcore_conf *qconf;
+            qconf = array2_begin_access(&lcore_conf, lcore_id);
             qconf->tx_queue_id[portid] = queueid;
+            array2_end_access(&lcore_conf, lcore_id);
+            qconf = 0;
             queueid++;
         }
         printf("\n");
@@ -1052,7 +1085,8 @@ main(int argc, char **argv)
     for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id++) {
         if (rte_lcore_is_enabled(lcore_id) == 0)
             continue;
-        qconf = &lcore_conf[lcore_id];
+        struct lcore_conf *qconf;
+        qconf = array2_begin_access(&lcore_conf, lcore_id);
         printf("\nInitializing rx queues on lcore %u ... ", lcore_id );
         fflush(stdout);
         /* init RX queues */
@@ -1066,13 +1100,15 @@ main(int argc, char **argv)
             fflush(stdout);
 
             ret = rte_eth_rx_queue_setup(portid, queueid, nb_rxd,
-                    socketid,
-                    NULL,
-                    pktmbuf_pool[socketid]);
+                                         socketid,
+                                         NULL,
+                                         pktmbuf_pool[socketid]);
             if (ret < 0)
                 rte_exit(EXIT_FAILURE, "rte_eth_rx_queue_setup: err=%d,"
                         "port=%d\n", ret, portid);
         }
+        array2_end_access(&lcore_conf, lcore_id);
+        qconf = 0;
     }
 
     printf("\n");
