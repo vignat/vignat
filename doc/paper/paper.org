@@ -5,7 +5,10 @@
 ** Problem Statement
 Software network applications lack dependability (why, how?).
 ** Solution Overview
-Optimistic symbolic execution.
+*Optimistic* symbolic execution.
+Run symbolic execution with data structures approximated by specially crafted
+models, and loops reduced to a single iteration. This addresses infinite
+execution paths and symbolic pointer access problems.
 We offer a new approach to verify network applications. Specifically
 the applications that meet the following requirements:
 - no deep recursion
@@ -43,6 +46,9 @@ Proposed methodology:
 6. Collect API call traces and validate with the help of the formal verification
    engine. This step ensures the claim in the step #3 (the model is
    general enough).
+Shortcoming: extra indirections, introduced for generality, may hurt
+performance. May be eliminated by static inlining, but C is a difficult language
+for that.
 
 * Prototype
 Patched Klee:
