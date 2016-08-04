@@ -16,16 +16,12 @@ void batcher_access_all(struct Batcher *bat,
 {
   *vals_out = bat->batch;
   *count_out = bat->len;
-}
-
-void batcher_clear(struct Batcher *bat)
-{
   bat->len = 0;
 }
 
 int batcher_full(struct Batcher *bat)
 {
-  return (BATCHER_CAPACITY - 1) <= bat->len;
+  return BATCHER_CAPACITY <= bat->len;
 }
 
 int batcher_empty(struct Batcher *bat)

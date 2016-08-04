@@ -31,14 +31,7 @@ void array2_end_access(struct Array2 *arr);
 ARRAY2_EL_TYPE array2_model_cell;
 int array2_allocated_index;
 int array2_index_allocated;
-
-typedef int (*array2_cell_condition_type)(ARRAY2_EL_TYPE *cell);
-array2_cell_condition_type array2_cell_cond = 0;
-
-void array2_set_cell_condition(array2_cell_condition_type cond)
-{
-  array2_cell_cond = cond;
-}
+struct Array2 *array2_initialized;
 
 void array2_init(struct Array2 *arr_out)
 {
@@ -47,7 +40,8 @@ void array2_init(struct Array2 *arr_out)
   klee_make_symbolic(&array2_model_cell, sizeof(ARRAY2_EL_TYPE),
                      "array2_model_cell");
   array2_index_allocated = 0;
-  klee_assume(array2_cell_cond(&array2_model_cell));
+  ARRAY2_EL_INIT(&array2_model_cell);
+  array2_initialized = arr_out;
 }
 
 ARRAY2_EL_TYPE *array2_begin_access(struct Array2 *arr, int index)
@@ -56,6 +50,8 @@ ARRAY2_EL_TYPE *array2_begin_access(struct Array2 *arr, int index)
   klee_trace_ret();
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_trace_param_i32(index, "index");
+
+  klee_assert(arr == array2_initialized);
   if (array2_index_allocated) {
     klee_assert(index == array2_allocated_index);
   } else {
@@ -70,6 +66,7 @@ void array2_end_access(struct Array2 *arr)
   klee_trace_ret();
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_assert(array2_index_allocated);
+  klee_assert(arr == array2_initialized);
   //nothing
 }
 

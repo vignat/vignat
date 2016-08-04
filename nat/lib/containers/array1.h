@@ -9,6 +9,8 @@
 #  error "Must define the array1 capacity."
 #endif//ARRAY1_CAPACITY
 
+// ARRAY1_EL_INIT must have the contract converting char[] to
+// ARRAY1_EL_TYPE
 #ifndef ARRAY1_EL_INIT
 #  error "Must define the array1 element initializer function."
 #endif//ARRAY1_EL_INIT
@@ -50,14 +52,22 @@ void array1_end_access(struct Array1 *arr);
 ARRAY1_EL_TYPE array1_model_cell;
 int array1_allocated_index;
 int array1_index_allocated;
+struct Array1 *array1_initialized;
 
 void array1_init(struct Array1 *arr_out)
 {
-  klee_trace_ret();
-  klee_trace_param_i32((uint32_t)arr_out, "arr_out");
+  //No need to trace, since it is called from inside the
+  // array2_init, which is traced. the spec for array2_init will
+  // provide the necessary predicates, whilst array1_init is called
+  // in the formally verified domain.
+  //klee_trace_ret();
+  //klee_trace_param_i32((uint32_t)arr_out, "arr_out");
+
   klee_make_symbolic(&array1_model_cell, sizeof(ARRAY1_EL_TYPE),
                      "array1_model_cell");
   array1_index_allocated = 0;
+  ARRAY1_EL_INIT(&array1_model_cell);
+  array1_initialized = arr_out;
 }
 
 ARRAY1_EL_TYPE *array1_begin_access(struct Array1 *arr, int index)
@@ -65,6 +75,8 @@ ARRAY1_EL_TYPE *array1_begin_access(struct Array1 *arr, int index)
   klee_trace_ret();
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_trace_param_i32(index, "index");
+
+  klee_assert(arr == array1_initialized);
   if (array1_index_allocated) {
     klee_assert(index == array1_allocated_index);
   } else {
@@ -79,6 +91,7 @@ void array1_end_access(struct Array1 *arr)
   klee_trace_ret();
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_assert(array1_index_allocated);
+  klee_assert(arr == array1_initialized);
   //nothing
 }
 

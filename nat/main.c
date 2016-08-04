@@ -63,7 +63,7 @@
 #define ARRAY1_EL_TYPE struct Batcher
 #define ARRAY1_CAPACITY RTE_MAX_ETHPORTS
 #define ARRAY1_SUFFIX _bat
-#define ARRAY1_EL_INIT (void)/* for now */
+#define ARRAY1_EL_INIT batcher_init
 #include "lib/containers/array1.h"
 #undef ARRAY1_EL_INIT
 #undef ARRAY1_SUFFIX
@@ -87,10 +87,24 @@ struct lcore_conf {
   struct Array1 tx_mbufs;
 } __rte_cache_aligned;
 
+#ifdef KLEE_VERIFICATION
+void lcore_conf_condition(struct lcore_conf *cell)
+{
+  int rez = (0 < cell->n_rx_queue) &
+    (cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
+  for (int i = 0; i < MAX_RX_QUEUE_PER_LCORE; ++i) {
+    rez = rez & (0 <= cell->rx_queue_list[i].port_id) &
+      (cell->rx_queue_list[i].port_id < RTE_MAX_ETHPORTS);
+  }
+  klee_assume(rez);
+  array1_init(&cell->tx_mbufs);
+}
+#endif//KLEE_VERIFICATION
+
 #define ARRAY2_EL_TYPE struct lcore_conf
 #define ARRAY2_CAPACITY RTE_MAX_LCORE
 #define ARRAY2_SUFFIX _lconf
-#define ARRAY2_EL_INIT (void)/*for now*/
+#define ARRAY2_EL_INIT lcore_conf_condition
 #include "lib/containers/array2.h"
 #undef ARRAY2_EL_INIT
 #undef ARRAY2_SUFFIX
@@ -221,7 +235,7 @@ static struct rte_mempool * pktmbuf_pool[NB_SOCKETS];
 
 static struct Array2 lcore_conf;
 
-/* Send out a burst of messages, and erase them, even if not all were sent
+/* Send out a burst of messages and erase them, even if not all were sent
    successfully.
  */
 static void
@@ -229,7 +243,7 @@ try_send_burst_and_erase(uint16_t queueid, struct Batcher *bat, uint8_t port)
 {
   int count = 0;
   struct rte_mbuf **batch = 0;
-  batcher_access_all(bat, &batch, &count);
+  batcher_take_all(bat, &batch, &count);
 
   int n_sent = rte_eth_tx_burst(port, queueid, batch, count);
   if (unlikely(n_sent < count)) {
@@ -237,7 +251,6 @@ try_send_burst_and_erase(uint16_t queueid, struct Batcher *bat, uint8_t port)
       rte_pktmbuf_free(batch[n_sent]);
     } while (++n_sent < count);
   }
-  batcher_clear(bat);
 }
 
 /* Send burst of packets on an output interface */
@@ -504,6 +517,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
       loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                                  starting_time, max_flows, start_port);
+      array2_init(&lcore_conf);
 #endif//KLEE_VERIFICATION
 
       expire_flows(current_time());
@@ -553,6 +567,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
           loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                                      current_time(), max_flows, start_port);
+          array2_init(&lcore_conf);
 #endif//KLEE_VERIFICATION
 
             portid = qconf->rx_queue_list[i].port_id;
@@ -965,19 +980,6 @@ check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
     }
 }
 
-#ifdef KLEE_VERIFICATION
-int lcore_conf_condition(struct lcore_conf *cell)
-{
-  int rez = (0 < cell->n_rx_queue) &
-    (cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
-  for (int i = 0; i < MAX_RX_QUEUE_PER_LCORE; ++i) {
-    rez = rez & (0 <= cell->rx_queue_list[i].port_id) &
-      (cell->rx_queue_list[i].port_id < RTE_MAX_ETHPORTS);
-  }
-  return rez;
-}
-#endif//KLEE_VERIFICATION
-
 int
 main(int argc, char **argv)
 {
@@ -1002,6 +1004,8 @@ main(int argc, char **argv)
     for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
         dest_eth_addr[portid] = 0xffffffffffff;
     }
+    
+    array2_init(&lcore_conf);
 
     // TODO: moved w.r.t l3fwd. see if this still works.
     nb_ports = rte_eth_dev_count();
@@ -1029,10 +1033,7 @@ main(int argc, char **argv)
 
 #ifdef KLEE_VERIFICATION
     starting_time = start_time();
-    array2_set_cell_condition(lcore_conf_condition);
 #endif //KLEE_VERIFICATION
-
-    array2_init(&lcore_conf);
 
     /* initialize all ports */
     for (portid = 0; portid < nb_ports; portid++) {
