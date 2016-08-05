@@ -14,10 +14,7 @@
 #endif//ARRAY3_EL_INIT
 
 
-struct Array3
-{
-  ARRAY3_EL_TYPE data[ARRAY3_CAPACITY];
-};
+struct Array3;
 
 // In-place initialization
 void array3_init(struct Array3 *arr_out);
@@ -27,6 +24,11 @@ void array3_end_access(struct Array3 *arr);
 #ifdef KLEE_VERIFICATION
 
 #include <klee/klee.h>
+
+struct Array3
+{
+  char dummy;
+};
 
 ARRAY3_EL_TYPE array3_model_cell;
 int array3_allocated_index;
@@ -82,6 +84,10 @@ void array3_end_access(struct Array3 *arr)
 
 #else//KLEE_VERIFICATION
 
+struct Array3
+{
+  ARRAY3_EL_TYPE data[ARRAY3_CAPACITY];
+};
 
 void array3_init(struct Array3 *arr_out)
 {

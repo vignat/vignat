@@ -15,11 +15,7 @@
 #  error "Must define the array1 element initializer function."
 #endif//ARRAY1_EL_INIT
 
-struct Array1
-{
-  ARRAY1_EL_TYPE data[ARRAY1_CAPACITY];
-};
-
+struct Array1;
 
 /*@
   //params: T1, P1
@@ -48,6 +44,11 @@ void array1_end_access(struct Array1 *arr);
 #ifdef KLEE_VERIFICATION
 
 #include <klee/klee.h>
+
+struct Array1
+{
+  char dummy;
+};
 
 ARRAY1_EL_TYPE array1_model_cell;
 int array1_allocated_index;
@@ -97,6 +98,10 @@ void array1_end_access(struct Array1 *arr)
 
 #else//KLEE_VERIFICATION
 
+struct Array1
+{
+  ARRAY1_EL_TYPE data[ARRAY1_CAPACITY];
+};
 
 void array1_init(struct Array1 *arr_out)
 {
