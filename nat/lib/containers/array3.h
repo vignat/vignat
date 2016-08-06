@@ -58,8 +58,8 @@ void array3_reset(struct Array3 *arr)
 
 ARRAY3_EL_TYPE *array3_begin_access(struct Array3 *arr, int index)
 {
-  //TODO: trace ptr?
-  klee_trace_ret();
+  klee_trace_ret_ptr(sizeof(ARRAY3_EL_TYPE));
+  ARRAY3_EL_TRACE_BREAKDOWN;
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_trace_param_i32(index, "index");
 

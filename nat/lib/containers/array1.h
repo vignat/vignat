@@ -73,7 +73,7 @@ void array1_init(struct Array1 *arr_out)
 
 ARRAY1_EL_TYPE *array1_begin_access(struct Array1 *arr, int index)
 {
-  klee_trace_ret();
+  klee_trace_ret_ptr(sizeof(ARRAY1_EL_TYPE));
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_trace_param_i32(index, "index");
 

@@ -48,8 +48,8 @@ void array2_init(struct Array2 *arr_out)
 
 ARRAY2_EL_TYPE *array2_begin_access(struct Array2 *arr, int index)
 {
-  //TODO: trace ptr?
-  klee_trace_ret();
+  klee_trace_ret_ptr(sizeof(ARRAY2_EL_TYPE));
+  ARRAY2_EL_TRACE_BREAKDOWN;
   klee_trace_param_i32((uint32_t)arr, "arr");
   klee_trace_param_i32(index, "index");
 

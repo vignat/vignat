@@ -88,7 +88,14 @@ void lcore_rx_queue_init(struct lcore_rx_queue *cell)
 #define ARRAY3_EL_TYPE struct lcore_rx_queue
 #define ARRAY3_CAPACITY MAX_RX_QUEUE_PER_LCORE
 #define ARRAY3_EL_INIT lcore_rx_queue_init
+#define ARRAY3_EL_TRACE_BREAKDOWN {                                     \
+    klee_trace_ret_ptr_field(offsetof(struct lcore_rx_queue, port_id),  \
+                             sizeof(uint8_t), "port_id");               \
+    klee_trace_ret_ptr_field(offsetof(struct lcore_rx_queue, queue_id), \
+                             sizeof(uint8_t), "queue_id");              \
+  }
 #include "lib/containers/array3.h"
+#undef ARRAY3_EL_TRACE_BREAKDOWN
 #undef ARRAY3_EL_INIT
 #undef ARRAY3_CAPACITY
 #undef ARRAY3_EL_TYPE
@@ -123,7 +130,18 @@ void lcore_conf_condition(struct lcore_conf *cell)
 #define ARRAY2_CAPACITY RTE_MAX_LCORE
 #define ARRAY2_SUFFIX _lconf
 #define ARRAY2_EL_INIT lcore_conf_condition
+#define ARRAY2_EL_TRACE_BREAKDOWN {                                     \
+    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, n_rx_queue),   \
+                             sizeof(uint16_t), "n_rx_queue");           \
+    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, rx_queue_list), \
+                             sizeof(struct Array3), "rx_queue_list");   \
+    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, tx_queue_id),  \
+                             sizeof(struct Array4), "tx_queue_id");     \
+    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, tx_mbufs),     \
+                             sizeof(struct Array1), "tx_mbufs");        \
+  }
 #include "lib/containers/array2.h"
+#undef ARRAY2_EL_TRACE_BREAKDOWN
 #undef ARRAY2_EL_INIT
 #undef ARRAY2_SUFFIX
 #undef ARRAY2_CAPACITY
