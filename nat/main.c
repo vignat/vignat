@@ -93,10 +93,18 @@ void lcore_rx_queue_init(struct lcore_rx_queue *cell)
 #undef ARRAY3_CAPACITY
 #undef ARRAY3_EL_TYPE
 
+#define ARRAY4_EL_TYPE uint16_t
+#define ARRAY4_CAPACITY RTE_MAX_ETHPORTS
+#define ARRAY4_EL_INIT (void*)
+#include "lib/containers/array4.h"
+#undef ARRAY4_EL_INIT
+#undef ARRAY4_CAPACITY
+#undef ARRAY4_EL_TYPE
+
 struct lcore_conf {
   uint16_t n_rx_queue;
   struct Array3 rx_queue_list;
-  uint16_t tx_queue_id[RTE_MAX_ETHPORTS];
+  struct Array4 tx_queue_id;
   struct Array1 tx_mbufs;
 } __rte_cache_aligned;
 
@@ -106,6 +114,7 @@ void lcore_conf_condition(struct lcore_conf *cell)
   klee_assume(0 < cell->n_rx_queue);
   klee_assume(cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
   array3_init(&cell->rx_queue_list);
+  array4_init(&cell->tx_queue_id);
   array1_init(&cell->tx_mbufs);
 #endif//KLEE_VERIFICATION
 }
@@ -267,9 +276,11 @@ static inline void
 send_burst(struct lcore_conf *qconf, uint8_t port)
 {
   struct Batcher *mbufs = array1_begin_access(&qconf->tx_mbufs, port);
-  try_send_burst_and_erase(qconf->tx_queue_id[port],
+  uint16_t *queue_id = array4_begin_access(&qconf->tx_queue_id, port);
+  try_send_burst_and_erase(*queue_id,
                            mbufs,
                            port);
+  array4_end_access(&qconf->tx_queue_id);
   array1_end_access(&qconf->tx_mbufs);
   mbufs = 0;
 }
@@ -440,13 +451,8 @@ simple_forward(struct rte_mbuf *m, uint8_t portid)
 //        ++(ipv4_hdr->hdr_checksum);
 //#endif
 #ifdef KLEE_VERIFICATION
-      //A trivial reassignment to improve Klee preformance on symbolic
-      // indexing. Here I explicitly enumerate all possible values of
-      // dst_device (just two of them).
       klee_assert(dst_device >= 0);
       klee_assert(dst_device < RTE_MAX_ETHPORTS);
-      for (int pp = 0; pp < RTE_MAX_ETHPORTS; ++pp)
-        if (dst_device == pp) dst_device = pp;
 #endif //KLEE_VERIFICATION
       /* dst addr */
       *(uint64_t *)&eth_hdr->d_addr = dest_eth_addr[dst_device];
@@ -1112,7 +1118,14 @@ main(int argc, char **argv)
 
             struct lcore_conf *qconf;
             qconf = array2_begin_access(&lcore_conf, lcore_id);
-            qconf->tx_queue_id[portid] = queueid;
+#ifdef KLEE_VERIFICATION
+            array4_reset(&qconf->tx_queue_id);
+#endif//KLEE_VERIFICATION
+
+            uint16_t *tx_queue_id =
+              array4_begin_access(&qconf->tx_queue_id, portid);
+            *tx_queue_id = queueid;
+            array4_end_access(&qconf->tx_queue_id);
             array2_end_access(&lcore_conf);
             qconf = 0;
             queueid++;

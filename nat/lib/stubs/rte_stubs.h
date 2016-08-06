@@ -672,9 +672,7 @@ struct rte_eth_conf {
     /* ... and many many many more, but unrelevant */
 };
 
-//#define RTE_MAX_ETHPORTS 32
-//!!!TODO this is wrong. made only for reducing the verification time.
-#define RTE_MAX_ETHPORTS 2
+#define RTE_MAX_ETHPORTS 32
 
 #define ETHER_TYPE_IPv4 0x0800 /**< IPv4 Protocol. */
 
