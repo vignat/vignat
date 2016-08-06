@@ -783,11 +783,7 @@ ether_format_addr(char *buf, uint16_t size,
 
 #define unlikely(x) (x)
 
-//#define RTE_MAX_LCORE 128
-//TODO: !!! change it back to 128 !
-// reduced to make symbolic execution feasible.
-// come back here when I add the batcher abstraction.
-#define RTE_MAX_LCORE 1
+#define RTE_MAX_LCORE 128
 
 int rte_lcore_is_enabled(unsigned lcore_id);
 unsigned rte_get_master_lcore();
