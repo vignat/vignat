@@ -33,10 +33,7 @@
 #  include <rte_string_fns.h>
 #endif
 
-//#define MAX_PKT_BURST     32
-//TODO: this is wrong, get back 32 when I wrap the batcher into
-// a formally verified module.
-#define MAX_PKT_BURST     1
+#define MAX_PKT_BURST     32
 
 #define BATCHER_EL_TYPE struct rte_mbuf *
 #define BATCHER_CAPACITY MAX_PKT_BURST
