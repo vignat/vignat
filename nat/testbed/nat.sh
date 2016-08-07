@@ -14,6 +14,6 @@ make install -j2 T=x86_64-native-linuxapp-gcc DESTDIR=.
 export RTE_SDK=/home/vagrant/dpdk
 export RTE_TARGET=x86_64-native-linuxapp-gcc
 
-. rebuild-nat.sh
+. /nat/testbed/redeploy-nat.sh
 
 daemon -r /nat/testbed/run-nat.sh
