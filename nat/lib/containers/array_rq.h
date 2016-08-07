@@ -2,6 +2,8 @@
 #define _ARRAY_RQ_H_INCLUDED_
 
 #include <stdint.h>
+#include "lib/ignore.h"
+
 #define MAX_RX_QUEUE_PER_LCORE 16
 
 struct lcore_rx_queue {
@@ -14,11 +16,13 @@ struct lcore_rx_queue {
 ;
 #endif//_NO_VERIFAST_
 
-void lcore_rx_queue_init(struct lcore_rx_queue *cell)
+static void lcore_rx_queue_init(struct lcore_rx_queue *cell)
 {
 #ifdef KLEE_VERIFICATION
   klee_assume(0 <= cell->port_id);
   klee_assume(cell->port_id < RTE_MAX_ETHPORTS);
+#else//KLEE_VERIFICATION
+  IGNORE(cell);
 #endif//KLEE_VERIFICATION
 }
 
@@ -112,7 +116,7 @@ struct ArrayRq
 void array_rq_init(struct ArrayRq *arr_out)
 {
   for (int i = 0; i < ARRAY_RQ_CAPACITY; ++i) {
-    ARRAY_RQ_EL_INIT(arr_out->data[i]);
+    ARRAY_RQ_EL_INIT(&arr_out->data[i]);
   }
 }
 

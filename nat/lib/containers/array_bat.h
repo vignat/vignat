@@ -102,7 +102,7 @@ struct ArrayBat
 void array_bat_init(struct ArrayBat *arr_out)
 {
   for (int i = 0; i < ARRAY_BAT_CAPACITY; ++i) {
-    ARRAY_BAT_EL_INIT(arr_out->data[i]);
+    ARRAY_BAT_EL_INIT(&arr_out->data[i]);
   }
 }
 

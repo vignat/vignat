@@ -11,8 +11,8 @@ void batcher_push(struct Batcher *bat, BATCHER_EL_TYPE val)
   ++bat->len;
 }
 
-void batcher_access_all(struct Batcher *bat,
-                        BATCHER_EL_TYPE **vals_out, int *count_out)
+void batcher_take_all(struct Batcher *bat,
+                      BATCHER_EL_TYPE **vals_out, int *count_out)
 {
   *vals_out = bat->batch;
   *count_out = bat->len;

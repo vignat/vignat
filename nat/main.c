@@ -193,7 +193,7 @@ static struct rte_eth_conf port_conf = {
 
 static struct rte_mempool * pktmbuf_pool[NB_SOCKETS];
 
-static struct ArrayLcc lcore_conf;
+static ArrayLcc lcore_conf;
 
 /* Send out a burst of messages and erase them, even if not all were sent
    successfully.
@@ -454,7 +454,12 @@ main_loop(__attribute__((unused)) void *dummy)
 
     LOG( "entering main loop on lcore %u\n", lcore_id);
 
-    for (i = 0; klee_induce_invariants() & (i < qconf->n_rx_queue); i++) {
+    for (i = 0;
+#ifdef KLEE_VERIFICATION
+         klee_induce_invariants() &
+#endif//KLEE_VERIFICATION
+           (i < qconf->n_rx_queue);
+         i++) {
 #ifdef KLEE_VERIFICATION
       array_lcc_init(&lcore_conf);
 #endif //KLEE_VERIFICATION

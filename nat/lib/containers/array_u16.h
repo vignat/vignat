@@ -6,7 +6,7 @@
 
 #define ARRAY_U16_EL_TYPE uint16_t
 #define ARRAY_U16_CAPACITY RTE_MAX_ETHPORTS
-#define ARRAY_U16_EL_INIT (void*)
+#define ARRAY_U16_EL_INIT (void)
 
 struct ArrayU16;
 
@@ -87,7 +87,7 @@ struct ArrayU16
 void array_u16_init(struct ArrayU16 *arr_out)
 {
   for (int i = 0; i < ARRAY_U16_CAPACITY; ++i) {
-    ARRAY_U16_EL_INIT(arr_out->data[i]);
+    ARRAY_U16_EL_INIT(&arr_out->data[i]);
   }
 }
 
