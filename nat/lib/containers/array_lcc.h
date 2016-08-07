@@ -111,7 +111,8 @@ void array_lcc_end_access(ArrayLcc *arr)
 
 void array_lcc_init(ArrayLcc *arr_out)
 {
-  for (int i = 0; i < ARRAY_LCC_CAPACITY; ++i) {
+  int i;
+  for (i = 0; i < ARRAY_LCC_CAPACITY; ++i) {
     ARRAY_LCC_EL_INIT(&((*arr_out)[i]));
   }
 }

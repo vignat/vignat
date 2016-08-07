@@ -86,7 +86,8 @@ struct ArrayU16
 
 void array_u16_init(struct ArrayU16 *arr_out)
 {
-  for (int i = 0; i < ARRAY_U16_CAPACITY; ++i) {
+  int i;
+  for (i = 0; i < ARRAY_U16_CAPACITY; ++i) {
     ARRAY_U16_EL_INIT(&arr_out->data[i]);
   }
 }

@@ -115,7 +115,8 @@ struct ArrayRq
 
 void array_rq_init(struct ArrayRq *arr_out)
 {
-  for (int i = 0; i < ARRAY_RQ_CAPACITY; ++i) {
+  int i;
+  for (i = 0; i < ARRAY_RQ_CAPACITY; ++i) {
     ARRAY_RQ_EL_INIT(&arr_out->data[i]);
   }
 }
