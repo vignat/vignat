@@ -1,6 +1,11 @@
+#ifndef _STATIC_COMPONENT_PARAMS_H_INCLUDE_
+#define _STATIC_COMPONENT_PARAMS_H_INCLUDE_
+
 #ifdef KLEE_VERIFICATION
 #  include "lib/stubs/rte_stubs.h"
 #else//KLEE_VERIFICATION
+
+#ifdef _NO_VERIFAST_
 #  include <sys/queue.h>
 #  include <rte_common.h>
 #  include <rte_vect.h>
@@ -31,9 +36,16 @@
 #  include <rte_tcp.h>
 #  include <rte_udp.h>
 #  include <rte_string_fns.h>
+#else //_NO_VERIFAST_
+struct rte_mbuf {};
+#define RTE_MAX_ETHPORTS 32
+#define RTE_MAX_LCORE 128
+#endif //_NO_VERIFAST_
 #endif
 
 #define MAX_PKT_BURST     32
 
 #define BATCHER_EL_TYPE struct rte_mbuf *
 #define BATCHER_CAPACITY MAX_PKT_BURST
+
+#endif//_STATIC_COMPONENT_PARAMS_H_INCLUDE_

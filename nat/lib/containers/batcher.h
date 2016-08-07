@@ -23,7 +23,7 @@ struct Batcher
 
 // In-place initialization.
 void batcher_init(struct Batcher *bat_out);
-//@ requires bat_out |-> _;
+//@ requires *bat_out |-> _;
 //@ ensures batcherp(nil, bat_out);
 
 void batcher_push(struct Batcher *bat, BATCHER_EL_TYPE val);
@@ -34,7 +34,7 @@ void batcher_take_all(struct Batcher *bat,
                       BATCHER_EL_TYPE **vals_out, int *count_out);
 //@ requires batcherp(?b, bat);
 /*@ ensures batcherp(nil, bat) &*& *vals_out |-> ?vals &*&
-            *count_out |-> length(b) &*& vals[0..length(b)] |-> b @*/
+            *count_out |-> length(b) &*& vals[0..length(b)] |-> b; @*/
 
 int batcher_full(struct Batcher *bat);
 //@ requires batcherp(?b, bat);
