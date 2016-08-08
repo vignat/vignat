@@ -193,7 +193,7 @@ static struct rte_eth_conf port_conf = {
 
 static struct rte_mempool * pktmbuf_pool[NB_SOCKETS];
 
-static ArrayLcc lcore_conf;
+static struct ArrayLcc lcore_conf;
 
 /* Send out a burst of messages and erase them, even if not all were sent
    successfully.
