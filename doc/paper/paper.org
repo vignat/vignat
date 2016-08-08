@@ -1,5 +1,7 @@
 * Abstract
 * Introduction
+- Note taken on [2016-08-08 Mon 15:44] \\
+  Another possible running example: array
 - Note taken on [2016-08-02 Die 10:14] \\
   Running example: batcher.
 ** Problem Statement
