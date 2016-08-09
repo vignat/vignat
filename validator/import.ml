@@ -184,6 +184,12 @@ let rec get_var_decls_of_sexp exp t known_vars =
 let make_name_alist_from_var_decls (lst: var_spec list) =
   List.map lst ~f:(fun x -> (x.name,x))
 
+let get_vars_from_plain_val v ty known_vars =
+  (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
+  let decls = get_var_decls_of_sexp v ty known_vars in
+  map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
+
+
 let rec get_vars_from_struct_val v ty known_vars =
   match ty with
   | Str (_, fields) ->
@@ -195,9 +201,7 @@ let rec get_vars_from_struct_val v ty known_vars =
         ~f:(fun acc (v,t)->
           get_vars_from_struct_val v.value t acc)
   | ty ->
-    (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
-    let decls = get_var_decls_of_sexp v.full ty known_vars in
-    map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
+    get_vars_from_plain_val v.full ty known_vars
 
 let name_gen prefix = object
   val mutable cnt = 0
@@ -373,40 +377,34 @@ let get_vars ftype_of tpref arg_name_gen =
         allocated_args := String.Map.add !allocated_args
             ~key:addr ~data:(update_var_spec spec value)
     in
+    let get_pointee_vars addr ptee ptee_type accumulator =
+      let before_vars = match ptee.before with
+        | Some v ->
+          alloc_local_arg addr (get_struct_val_value v ptee_type);
+          get_vars_from_struct_val v ptee_type accumulator
+        | None -> failwith ("initial argument pointee value must" ^
+                              " be dumped for call " ^ call.fun_name)
+      in
+      get_vars_from_struct_val ptee.after ptee_type before_vars;
+    in
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
             let arg_type = get_fun_arg_type ftype_of call.fun_name i in
-            match arg.pointee with
-            | Some ptee ->
-              begin
+            match arg.ptr with
+            | Nonptr -> get_vars_from_plain_val arg.value arg_type acc
+            | Funptr _ -> acc
+            | Apathptr ->
+                let addr = (Sexp.to_string arg.value) in
                 let ptee_type = get_pointee arg_type in
-                assert(arg.is_ptr);
-                let addr = (Sexp.to_string arg.value.full) in
-                if ptee.is_fun_ptr then acc
-                else begin
-                  let value =
-                    match ptee.before with
-                    | Some v -> (get_struct_val_value v ptee_type)
-                    | None ->
-                      failwith ("arguments must be initialized for call " ^
-                                call.fun_name)
-                  in
-                  alloc_local_arg addr value;
-                  let before_vars =
-                    match ptee.before with
-                    | Some v -> get_vars_from_struct_val v ptee_type acc
-                    | None -> acc in
-                  match ptee.after with
-                  | Some v -> get_vars_from_struct_val v ptee_type before_vars
-                  | None -> before_vars
-                end
-              end
-            | None ->
-              assert(not arg.is_ptr);
-              get_vars_from_struct_val arg.value arg_type acc)
+                alloc_local_arg addr {v=Undef;t=ptee_type};
+                acc
+            | Curioptr ptee ->
+                let addr = (Sexp.to_string arg.value) in
+                let ptee_type = get_pointee arg_type in
+                get_pointee_vars addr ptee ptee_type acc)
     in
     let ret_vars = match call.ret with
-      | Some ret -> get_vars_from_struct_val
+      | Some ret -> get_vars_from_plain_val
                       ret.value (get_fun_ret_type ftype_of call.fun_name) arg_vars
       (*TODO: get also ret.pointee vars.*)
       | None -> arg_vars in
@@ -429,32 +427,24 @@ let compose_fcall_preamble ftype_of call args tmp_gen =
   (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
 
 let extract_fun_args ftype_of call =
+  let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
+    let arg_var = String.Map.find !allocated_args
+        ( Sexp.to_string arg.value) in
+    let ptee_t = get_pointee arg_type in
+    match arg_var with
+    | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=arg_type}
+    | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=arg_type}
+  in
   List.mapi call.args
     ~f:(fun i arg ->
         let a_type = get_fun_arg_type ftype_of call.fun_name i in
-        ( if arg.is_ptr then
-            match arg.pointee with
-            | Some ptee ->
-              begin
-                if ptee.is_fun_ptr then
-                  match ptee.fun_name with
-                  | Some n -> {v=Fptr n;t=a_type}
-                  | None -> {v=Fptr "fun???";t=a_type}
-                  else
-                    let arg_name = String.Map.find !allocated_args
-                        ( Sexp.to_string arg.value.full ) in
-                    let ptee_t = match a_type with
-                      | Ptr t -> t
-                      | _ -> failwith ("inconsistent function argument for " ^
-                                       call.fun_name)
-                    in
-                    match arg_name with
-                    | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=a_type}
-                    | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=a_type}
-              end
-            | None -> {v=Undef;t=a_type}
-          else
-            get_struct_val_value arg.value a_type))
+        match arg.ptr with
+        | Nonptr -> get_sexp_value arg.value a_type
+        | Funptr fname -> {v=Fptr fname;t=a_type}
+        | Apathptr ->
+          get_allocated_arg arg a_type
+        | Curioptr ptee ->
+          get_allocated_arg arg a_type)
 
 let compose_post_lemmas ftype_of call ret_name args tmp_gen =
   let ret_name = match ret_name with
@@ -466,24 +456,17 @@ let compose_post_lemmas ftype_of call ret_name args tmp_gen =
 
 let compose_args_post_conditions call =
   List.filter_map call.args ~f:(fun arg ->
-      match arg.pointee with
-      | Some ptee -> assert arg.is_ptr;
-        begin
-          match ptee.after with
-          | Some v -> assert (not ptee.is_fun_ptr);
-            let out_arg =
-              let key =Sexp.to_string arg.value.full in
-              match String.Map.find !allocated_args key with
-              | Some out_arg -> out_arg
-              | None -> failwith ("unknown argument " ^ key)
-            in
-            Some {name=out_arg.name;
-                  value=(get_struct_val_value v out_arg.value.t)}
-          | None -> assert ptee.is_fun_ptr;
-            None
-        end
-      | None -> assert (not arg.is_ptr);
-        None)
+      match arg.ptr with
+      | Nonptr -> None
+      | Funptr _ -> None
+      | Apathptr -> None
+      | Curioptr ptee ->
+        let out_arg =
+          let key = Sexp.to_string arg.value in
+          String.Map.find_exn !allocated_args key
+        in
+        Some {name=out_arg.name;
+              value=(get_struct_val_value ptee.after out_arg.value.t)})
 
 let extract_tip_ret_post_conditions call =
   List.map call.ret_context ~f:(fun sttmt ->
@@ -493,7 +476,7 @@ let get_ret_val ftype_of call =
   match call.ret with
   | Some ret ->
     let t = get_fun_ret_type ftype_of call.fun_name in
-    get_struct_val_value ret.value t
+    get_sexp_value ret.value t
   | None -> {v=Undef;t=Unknown}
 
 let gen_unique_tmp_name unique_postfix prefix =
@@ -606,7 +589,7 @@ let build_ir fun_types fin preamble boundary_fun =
                   /*@ requires true; @*/ \
                   /*@ ensures true; @*/\n{\n" in
   let export_point = "export_point" in
-  let free_vars = (get_vars ftype_of pref (name_gen "arg")) in
+  let free_vars = get_vars ftype_of pref (name_gen "arg") in
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref in
   let leaks = extract_leaks ftype_of
       ((List.map hist_calls ~f:(fun hc -> hc.context))@[tip_call.context]) in

@@ -10,25 +10,19 @@ val __struct_val_of_sexp__ : expr -> struct_val
 val struct_val_of_sexp : expr -> struct_val
 val sexp_of_field : field -> expr
 val sexp_of_struct_val : struct_val -> expr
-type ptee = {
-  is_fun_ptr : bool;
-  fun_name : bytes option;
-  before : struct_val option;
-  after : struct_val option;
-}
+type ptee = { before : struct_val option; after : struct_val; }
 val __ptee_of_sexp__ : expr -> ptee
 val ptee_of_sexp : expr -> ptee
 val sexp_of_ptee : ptee -> expr
-type arg = {
-  aname : bytes;
-  value : struct_val;
-  is_ptr : bool;
-  pointee : ptee option;
-}
+type pointer = Nonptr | Funptr of bytes | Apathptr | Curioptr of ptee
+val __pointer_of_sexp__ : expr -> pointer
+val pointer_of_sexp : expr -> pointer
+val sexp_of_pointer : pointer -> expr
+type arg = { aname : bytes; value : expr; ptr : pointer; }
 val __arg_of_sexp__ : expr -> arg
 val arg_of_sexp : expr -> arg
 val sexp_of_arg : arg -> expr
-type ret = { value : struct_val; is_ptr : bool; pointee : ptee option; }
+type ret = { value : expr; ptr : pointer; }
 val __ret_of_sexp__ : expr -> ret
 val ret_of_sexp : expr -> ret
 val sexp_of_ret : ret -> expr
