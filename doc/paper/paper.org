@@ -52,6 +52,37 @@ Proposed methodology:
 Shortcoming: extra indirections, introduced for generality, may hurt
 performance. May be eliminated by static inlining, but C is a difficult language
 for that.
+** Model validation criteria
+To validate a model under certain circumstances is to ensure it behaves
+according to the spec or more general. Specifically, if to the given case the
+input *I*, the spec conditions the case output *O_s*, and the model produces the
+case output *O_m*, the model is correct if *O_m* contains *O_s*.
+- The case input :: is the sequence of calls to the model public API. The calls
+     include function names, function inputs for all the function in the
+     sequence and function outputs for all but the last call.
+- The case output :: is the output of the last function call.
+- The function input :: is the function arguments (possibly expressed as
+     symbolic formulas), and path-conditions limiting these arguments (namely
+     the transitive closure of all path-conditions involving the symbols
+     mentioned in the arguments). For any pointer argument (which must have a
+     concrete value -- practical limitation), the pointee must be considered.
+     The numerical value of the pointer itself is ignored, because we forbit
+     pointer comparison with anything but null-pointer TODO: now do we check the
+     null-pointerness somehow?
+     TODO: what exactly do we do with pointees?
+- The function output :: is its return value, and the output pointer arguments'
+     pointee values, as well as the path-conditions limiting all the symbols
+     involved (transitive closure, as above).
+
+This validation criteria guarantees that the formally verified implementation
+will do nothing that the model did not try. So any behaviour (and may be some
+more) were checked during the symbolic execution, and it is 1) allowed and 2)
+does not cause the business logic to crash.
+
+NOTE: we do not care for the numerical pointer values, as memory layout does not
+matter for correctness. we care only for something else TODO whut?
+NOTE: we also do not care for leaks unless they happen on a specific border.
+such border is a loop invariant, where the trace gets cut.
 ** Assumptions
 - Currently we trust the application developer to put loop invariant assumptions
 and assertions in correct order and into the right places; link the application
@@ -62,7 +93,7 @@ correctly; use only verified components and interpret the verification result.
 - We assume correct hardware which does not crash on its own by a software
   unrelated cause
 - We assume correct compiler that implements the same language semantics used by
-  VeriFast and Klee(LLVM).
+  our tools -- VeriFast and Klee(LLVM).
 *** TCB:
 - Klee (+patches);
 - VeriFast (+patches);
