@@ -7,6 +7,13 @@
 ** Problem Statement
 Software network applications lack dependability (why, how?).
 ** Solution Overview
+- Note taken on [2016-08-10 Mit 20:03] \\
+  Idea for solution introduction: 
+  - model checking enumerates all the states, suffers from state explosion
+  - symbolic execution enumerates all paths, which group multiple states together,
+    suffers from path explosion, which happens on loops and symbolic pointers.
+  - our approach circumvent path explosion problem, by grouping states into a
+    small number of semantic groups, defined by the "symbolic models"
 *Optimistic* symbolic execution.
 Run symbolic execution with data structures approximated by specially crafted
 models, and loops reduced to a single iteration. This addresses infinite
