@@ -448,7 +448,7 @@ let compose_fcall_preamble ftype_of call args tmp_gen =
 let extract_fun_args ftype_of call =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
     let arg_var = String.Map.find !allocated_args
-        ( Sexp.to_string arg.value) in
+        (Sexp.to_string arg.value) in
     let ptee_t = get_pointee arg_type in
     match arg_var with
     | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=arg_type}
@@ -492,10 +492,26 @@ let extract_tip_ret_post_conditions call =
       get_sexp_value sttmt Boolean)
 
 let get_ret_val ftype_of call =
+  let make_ptr_to_pointee ret_val ret_type =
+    let ret_var = String.Map.find !allocated_args
+        (Sexp.to_string ret_val) in
+    let ptee_t = get_pointee ret_type in
+    match ret_var with
+    | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=ret_type}
+    | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=ret_type}
+  in
   match call.ret with
-  | Some ret ->
-    let t = get_fun_ret_type ftype_of call.fun_name in
-    get_sexp_value ret.value t
+  | Some ret -> begin
+      let t = get_fun_ret_type ftype_of call.fun_name in
+      match ret.ptr with
+      | Nonptr ->
+        get_sexp_value ret.value t
+      | Funptr _ -> failwith "TODO: support returned functions"
+      | Apathptr ->
+        make_ptr_to_pointee ret.value t
+      | Curioptr _ ->
+        make_ptr_to_pointee ret.value t
+    end
   | None -> {v=Undef;t=Unknown}
 
 let gen_unique_tmp_name unique_postfix prefix =
