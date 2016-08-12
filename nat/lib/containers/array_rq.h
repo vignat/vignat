@@ -106,12 +106,12 @@ void array_rq_end_access(struct ArrayRq *arr)
 
 #else//KLEE_VERIFICATION
 
-#ifdef _NO_VERIFAST_
-
 struct ArrayRq
 {
   ARRAY_RQ_EL_TYPE data[ARRAY_RQ_CAPACITY];
 };
+
+#ifdef _NO_VERIFAST_
 
 void array_rq_init(struct ArrayRq *arr_out)
 {

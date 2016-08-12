@@ -77,12 +77,12 @@ void array_u16_end_access(struct ArrayU16 *arr)
 
 #else//KLEE_VERIFICATION
 
-#ifdef _NO_VERIFAST_
-
 struct ArrayU16
 {
   ARRAY_U16_EL_TYPE data[ARRAY_U16_CAPACITY];
 };
+
+#ifdef _NO_VERIFAST_
 
 void array_u16_init(struct ArrayU16 *arr_out)
 {

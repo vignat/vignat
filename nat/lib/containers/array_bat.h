@@ -92,12 +92,12 @@ void array_bat_end_access(struct ArrayBat *arr)
 
 #else//KLEE_VERIFICATION
 
-#ifdef _NO_VERIFAST_
-
 struct ArrayBat
 {
   struct Batcher data[ARRAY_BAT_CAPACITY];
 };
+
+#ifdef _NO_VERIFAST_
 
 void array_bat_init(struct ArrayBat *arr_out)
 {

@@ -54,6 +54,15 @@ let flw_struct = Ir.Str ("flow", ["ik", int_key_struct;
                                   "int_device_id", Uint8;
                                   "ext_device_id", Uint8;
                                   "protocol", Uint8;])
+let arr_bat_struct = Ir.Str ( "ArrayBat", [] )
+let arr_lcc_struct = Ir.Str ( "ArrayLcc", [] )
+let arr_rq_struct = Ir.Str ( "ArrayRq", [] )
+let arr_u16_struct = Ir.Str ( "ArrayU16", [] )
+let batcher_struct = Ir.Str ( "Batcher", [] )
+let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
+                                                (* "rx_queue_list", arr_rq_struct; *)
+                                                (* "tx_queue_id", arr_u16_struct; *)
+                                                (* "tx_mbufs", arr_bat_struct *)])
 
 let fun_types =
   String.Map.of_alist_exn
@@ -566,7 +575,44 @@ let fun_types =
                                        rejuvenate_preserves_index_range(ch," ^
                                       (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
                                       ");\n}@*/");];
-                                 leaks = [];}
+                                 leaks = [];};
+     "array_bat_init", {ret_type = Void;
+                        arg_types = [Ptr arr_bat_struct;];
+                        lemmas_before = [];
+                        lemmas_after = [];
+                        leaks = [];};
+     "array_bat_begin_access", {ret_type = Ptr batcher_struct;
+                                arg_types = [Ptr arr_bat_struct; Sint32;];
+                                lemmas_before = [];
+                                lemmas_after = [];
+                                leaks = [];};
+     "array_bat_end_access", {ret_type = Void;
+                           arg_types = [Ptr arr_bat_struct;];
+                           lemmas_before = [];
+                           lemmas_after = [];
+                           leaks = [];};
+     "array_lcc_init", {ret_type = Void;
+                        arg_types = [Ptr arr_lcc_struct;];
+                        lemmas_before = [];
+                        lemmas_after = [];
+                        leaks = [leak "arrp_lcc(_, _)" ~id:"arrp_lcc"];};
+     "array_lcc_begin_access", {ret_type = Ptr lcore_conf_struct;
+                                arg_types = [Ptr arr_lcc_struct; Sint32;];
+                                lemmas_before = [];
+                                lemmas_after = [];
+                                leaks = [
+                                  leak "arrp_lcc_acc(_, _, _, _)"
+                                    ~id:"arrp_lcc_acc";
+                                  leak "lcore_confp(_, _)" ~id:"lcore_confp";
+                                  remove_leak "arrp_lcc";];};
+     "array_lcc_end_access", {ret_type = Void;
+                              arg_types = [Ptr arr_lcc_struct;];
+                              lemmas_before = [];
+                              lemmas_after = [];
+                              leaks = [
+                                leak "arrp_lcc(_, _)" ~id:"arrp_lcc";
+                                remove_leak "arrp_lcc_acc";
+                                remove_leak "lcore_confp"];};
     ]
 
 let fixpoints =

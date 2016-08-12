@@ -40,29 +40,57 @@ static void lcore_conf_condition(struct lcore_conf *cell)
 #define ARRAY_LCC_EL_TRACE_BREAKDOWN {                                  \
     klee_trace_ret_ptr_field(offsetof(struct lcore_conf, n_rx_queue),   \
                              sizeof(uint16_t), "n_rx_queue");           \
-    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, rx_queue_list), \
+    /*klee_trace_ret_ptr_field(offsetof(struct lcore_conf, rx_queue_list), \
                              sizeof(struct ArrayRq), "rx_queue_list");  \
     klee_trace_ret_ptr_field(offsetof(struct lcore_conf, tx_queue_id),  \
                              sizeof(struct ArrayU16), "tx_queue_id");   \
     klee_trace_ret_ptr_field(offsetof(struct lcore_conf, tx_mbufs),     \
-                             sizeof(struct ArrayBat), "tx_mbufs");      \
+    sizeof(struct ArrayBat), "tx_mbufs");*/                             \
   }
 
-struct ArrayLcc;
+#ifdef KLEE_VERIFICATION
+struct ArrayLcc {
+  char dummy;
+};
+#else//KLEE_VERIFICATION
+struct ArrayLcc
+{
+  ARRAY_LCC_EL_TYPE data[ARRAY_LCC_CAPACITY];
+};
+#endif//KLEE_VERIFICATION
+
+/*@
+  inductive lcore_confi = lcore_confi(int);
+  predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp);
+  @*/
+
+/*@
+//params: lcore_confi, lcore_confp
+predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc* arr);
+predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc* arr,
+                       int idx, ARRAY_LCC_EL_TYPE *el);
+@*/
 
 // In-place initialization
 void array_lcc_init(struct ArrayLcc *arr_out);
+/*@ requires chars(arr_out->data,
+             sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
+//@ ensures arrp_lcc(_, arr_out);
+
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index);
+//@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
+/*@ ensures arrp_lcc_acc(lst, arr, index, result) &*&
+            lcore_confp(nth(index, lst), result);
+  @*/
+
 void array_lcc_end_access(struct ArrayLcc *arr);
+/*@ requires arrp_lcc_acc(?lst, arr, ?idx, ?lcp) &*&
+             lcore_confp(?lc, lcp); @*/
+//@ ensures arrp_lcc(update(idx, lc, lst), arr);
 
 #ifdef KLEE_VERIFICATION
 
 #include <klee/klee.h>
-
-struct ArrayLcc
-{
-  char dummy;
-};
 
 ARRAY_LCC_EL_TYPE array_lcc_model_cell;
 int array_lcc_allocated_index;
@@ -72,7 +100,7 @@ struct ArrayLcc *array_lcc_initialized;
 void array_lcc_init(struct ArrayLcc *arr_out)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)arr_out, "arr_out");
+  klee_trace_param_just_ptr(arr_out, sizeof(struct ArrayLcc), "arr_out");
   klee_make_symbolic(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
                      "array_lcc_model_cell");
   array_lcc_index_allocated = 0;
@@ -84,7 +112,7 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
 {
   klee_trace_ret_ptr(sizeof(ARRAY_LCC_EL_TYPE));
   ARRAY_LCC_EL_TRACE_BREAKDOWN;
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayLcc), "arr");
   klee_trace_param_i32(index, "index");
 
   klee_assert(arr == array_lcc_initialized);
@@ -100,18 +128,13 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
 void array_lcc_end_access(struct ArrayLcc *arr)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayLcc), "arr");
   klee_assert(array_lcc_index_allocated);
   klee_assert(arr == array_lcc_initialized);
   //nothing
 }
 
 #else//KLEE_VERIFICATION
-
-struct ArrayLcc
-{
-  ARRAY_LCC_EL_TYPE data[ARRAY_LCC_CAPACITY];
-};
 
 #ifdef _NO_VERIFAST_
 
