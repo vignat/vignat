@@ -371,7 +371,7 @@ let rec get_struct_val_value valu t =
   | _ -> get_sexp_value valu.full t
 
 let get_vars ftype_of tpref arg_name_gen =
-  let get_vars known_vars call =
+  let get_vars is_tip known_vars call =
     let alloc_local_arg addr value =
       match String.Map.find !allocated_args addr with
       | None ->
@@ -388,17 +388,17 @@ let get_vars ftype_of tpref arg_name_gen =
         | Some v ->
           alloc_local_arg addr (get_struct_val_value v ptee_type);
           get_vars_from_struct_val v ptee_type accumulator
-        | None -> failwith("initial argument pointee value must" ^
+        | None -> failwith("Initial argument pointee value must" ^
                            " be dumped for call " ^ call.fun_name)
       in
-      get_vars_from_struct_val ptee.after ptee_type before_vars;
+      get_vars_from_struct_val ptee.after ptee_type before_vars
     in
     let get_ret_pointee_vars addr ptee ptee_type accumulator =
       assert(ptee.before = None);
       (*TODO: use another name generator to distinguish
         ret pointee stubs from the args *)
       alloc_local_arg addr (get_struct_val_value ptee.after ptee_type);
-      get_vars_from_struct_val ptee.after ptee_type accumulator;
+      get_vars_from_struct_val ptee.after ptee_type accumulator
     in
     let complex_value_vars value ptr t is_ret acc =
       match ptr with
@@ -412,7 +412,10 @@ let get_vars ftype_of tpref arg_name_gen =
       | Curioptr ptee ->
         let addr = (Sexp.to_string value) in
         let ptee_type = get_pointee t in
-        if is_ret then get_ret_pointee_vars addr ptee ptee_type acc
+        if is_ret then begin if is_tip then
+            get_ret_pointee_vars addr ptee ptee_type acc
+          else acc
+        end
         else get_arg_pointee_vars addr ptee ptee_type acc
     in
     let arg_vars = List.foldi call.args ~init:known_vars
@@ -437,9 +440,9 @@ let get_vars ftype_of tpref arg_name_gen =
     ret_ctxt_vars
   in
   let hist_vars = (List.fold tpref.history ~init:String.Map.empty
-                     ~f:get_vars) in
+                     ~f:(get_vars false)) in
   let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
-                    ~f:get_vars) in
+                    ~f:(get_vars true)) in
   tip_vars
 
 let compose_fcall_preamble ftype_of call args tmp_gen =
@@ -491,14 +494,20 @@ let extract_tip_ret_post_conditions call =
   List.map call.ret_context ~f:(fun sttmt ->
       get_sexp_value sttmt Boolean)
 
-let get_ret_val ftype_of call =
+let get_ret_val ftype_of call is_tip =
   let make_ptr_to_pointee ret_val ret_type =
-    let ret_var = String.Map.find !allocated_args
-        (Sexp.to_string ret_val) in
-    let ptee_t = get_pointee ret_type in
-    match ret_var with
-    | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=ret_type}
-    | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=ret_type}
+    if is_tip then
+      let ret_var = String.Map.find !allocated_args
+          (Sexp.to_string ret_val) in
+      let ptee_t = get_pointee ret_type in
+      match ret_var with
+      | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=ret_type}
+      | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=ret_type}
+    else
+      (* In hist calls there is no need for a stub variable to point to,
+         because we will only use the properties provided by the contract,
+         and not the constraints given in the trace.*)
+      {v=Undef;t=ret_type}
   in
   match call.ret with
   | Some ret -> begin
@@ -533,7 +542,7 @@ let extract_hist_call_context ftype_of call rname_gen index =
   let args_post_conditions = compose_args_post_conditions call in
   {context=extract_common_call_context ftype_of call ret_name args
        (string_of_int index);
-   result={args_post_conditions;ret_val=get_ret_val ftype_of call;
+   result={args_post_conditions;ret_val=get_ret_val ftype_of call false;
            post_statements=[]}}
 
 let tip_calls_context ftype_of calls rname_gen =
@@ -545,7 +554,7 @@ let tip_calls_context ftype_of calls rname_gen =
   let results = List.map calls ~f:(fun call ->
       let args_post_conditions = compose_args_post_conditions call in
       {args_post_conditions;
-       ret_val=get_ret_val ftype_of call;
+       ret_val=get_ret_val ftype_of call true;
        post_statements=(extract_tip_ret_post_conditions call);})
   in
   {context;results}
