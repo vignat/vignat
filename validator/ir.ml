@@ -4,7 +4,7 @@ open Core.Std
 module Sexp = Core.Std.Sexp
 
 type bop = Eq | Le | Lt | Ge | Gt
-         | Add | Sub
+         | Add | Sub | Mul
          | And with sexp
 
 
@@ -108,6 +108,7 @@ let render_bop = function
   | Gt -> ">"
   | Add -> "+"
   | Sub -> "-"
+  | Mul -> "*"
   | And -> "&&"
 
 let rec render_tterm (t:tterm) =

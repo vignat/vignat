@@ -29,14 +29,15 @@ rule read =
        | ','     {COMMA}
        | '('     {LPAREN}
        | ')'     {RPAREN}
-       | '<'     {BOP Ir.Lt}
-       | '>'     {BOP Ir.Gt}
-       | "<="    {BOP Ir.Le}
-       | ">="    {BOP Ir.Ge}
-       | '='     {BOP Ir.Eq}
-       | "<==>"  {BOP Ir.Eq}
-       | '-'     {BOP Ir.Sub}
-       | '+'     {BOP Ir.Add}
+       | '<'     {BOP_CMP Ir.Lt}
+       | '>'     {BOP_CMP Ir.Gt}
+       | "<="    {BOP_CMP Ir.Le}
+       | ">="    {BOP_CMP Ir.Ge}
+       | '='     {BOP_CMP Ir.Eq}
+       | "<==>"  {BOP_CMP Ir.Eq}
+       | '-'     {BOP_S Ir.Sub}
+       | '+'     {BOP_S Ir.Add}
+       | '*'     {BOP_M Ir.Mul}
        | '!'     {BANG}
        | '@'     {AT}
        | _       {raise (SyntaxError ("Unexpected char: " ^ (Lexing.lexeme lexbuf)))}

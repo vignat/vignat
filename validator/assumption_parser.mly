@@ -12,11 +12,13 @@ open Ir
 %token LCBR
 %token RCBR
 %token BANG
-%token <Ir.bop> BOP
+%token <Ir.bop> BOP_CMP
+%token <Ir.bop> BOP_S
+%token <Ir.bop> BOP_M
 %token AT
 %token EOF
 
-%right BOP BANG
+%right BOP_CMP BOP_S BOP_M BANG
 
 %start <(Ir.tterm list) list> execution_list
 
@@ -35,13 +37,15 @@ assumption_list:
   ;
 
 term:
-  | LPAREN; a = term; RPAREN             { a }
-  | lhs = tterm; p = BOP; rhs = tterm    { Bop (p, lhs, rhs) }
-  | BANG; a = tterm;                     { Not a }
-  | b = BOOL                             { Bool b }
-  | i = INT                              { Int i }
-  | i = ID                               { Id i }
-  | AT; f = at_apply                     { f }
+  | LPAREN; a = term; RPAREN              { a }
+  | lhs = tterm; p = BOP_CMP; rhs = tterm { Bop (p, lhs, rhs) }
+  | lhs = tterm; p = BOP_S; rhs = tterm   { Bop (p, lhs, rhs) }
+  | lhs = tterm; p = BOP_M; rhs = tterm   { Bop (p, lhs, rhs) }
+  | BANG; a = tterm;                      { Not a }
+  | b = BOOL                              { Bool b }
+  | i = INT                               { Int i }
+  | i = ID                                { Id i }
+  | AT; f = at_apply                      { f }
   | f = ID; LPAREN; al = arg_list; RPAREN
                     { Apply (f, al) }
   ;
