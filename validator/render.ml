@@ -12,7 +12,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 
-let render_fcall_preamble context =
+let render_fcall_with_lemmas context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
   (match context.ret_name with
    | Some name -> (ttype_to_str context.ret_type) ^
@@ -41,7 +41,7 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
    | None -> "") ^ "\n"
 
 let render_hist_fun_call {context;result} =
-  (render_fcall_preamble context) ^
+  (render_fcall_with_lemmas context) ^
   render_post_sttmts ~is_assert:false result ^
   render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
 
@@ -132,8 +132,8 @@ let render_equality_assumptions args =
                 ^ (render_tterm arg.value) ^ ");"))
 
 let render_tip_fun_call {context;results} export_point free_vars =
-  (render_fcall_preamble context) ^
-  "//The legibility of these assignments is ensured by analysis.ml\n" ^
+  (render_fcall_with_lemmas context) ^
+  "// The legibility of these assignments is ensured by analysis.ml\n" ^
   (render_equality_assumptions free_vars) ^ "\n" ^
   (render_export_point export_point) ^
   (match results with
@@ -142,8 +142,8 @@ let render_tip_fun_call {context;results} export_point free_vars =
      "\n" ^ (render_post_sttmts ~is_assert:true result)
    | res1 :: res2 :: [] ->
      render_2tip_post_assertions res1 res2 context.ret_name
-   | [] -> failwith "must be at least one tip call"
-   | _ -> failwith "more than two outcomes are not supported.") ^ "\n"
+   | [] -> failwith "There must be at least one tip call."
+   | _ -> failwith "More than two outcomes are not supported.") ^ "\n"
 
 
 let render_vars_declarations ( vars : var_spec list ) =
