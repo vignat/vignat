@@ -8,7 +8,10 @@ let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
 let infer_signed_type w =
   if String.equal w "w32" then Sint32
   else if String.equal w "w8" then Sint8
-  else failwith (w ^ " signed is not supported")
+  else Sunknown
+  (* TODO: this computation is sometimes is not necessary,
+     so this exception may break a problem free insuction.
+     else failwith (w ^ " signed is not supported")*)
 
 let infer_unsigned_type w =
   if String.equal w "w32" then Uint32
@@ -192,10 +195,13 @@ let get_vars_from_plain_val v ty known_vars =
 
 let rec get_vars_from_struct_val v ty known_vars =
   match ty with
-  | Str (_, fields) ->
+  | Str (name, fields) ->
     let ftypes = List.map fields ~f:snd in
-    if (List.length v.break_down) = 0 then
-      failwith "unreported structure breakdown."
+    if (List.length v.break_down) <>
+       (List.length fields)
+    then
+      failwith ("Mismatch between expected and traced breakdowns for " ^
+                name ^ ".")
     else
       List.fold (List.zip_exn v.break_down ftypes) ~init:known_vars
         ~f:(fun acc (v,t)->
@@ -377,40 +383,53 @@ let get_vars ftype_of tpref arg_name_gen =
         allocated_args := String.Map.add !allocated_args
             ~key:addr ~data:(update_var_spec spec value)
     in
-    let get_pointee_vars addr ptee ptee_type accumulator =
+    let get_arg_pointee_vars addr ptee ptee_type accumulator =
       let before_vars = match ptee.before with
         | Some v ->
           alloc_local_arg addr (get_struct_val_value v ptee_type);
           get_vars_from_struct_val v ptee_type accumulator
-        | None -> failwith ("initial argument pointee value must" ^
-                              " be dumped for call " ^ call.fun_name)
+        | None -> failwith("initial argument pointee value must" ^
+                           " be dumped for call " ^ call.fun_name)
       in
       get_vars_from_struct_val ptee.after ptee_type before_vars;
+    in
+    let get_ret_pointee_vars addr ptee ptee_type accumulator =
+      assert(ptee.before = None);
+      (*TODO: use another name generator to distinguish
+        ret pointee stubs from the args *)
+      alloc_local_arg addr (get_struct_val_value ptee.after ptee_type);
+      get_vars_from_struct_val ptee.after ptee_type accumulator;
+    in
+    let complex_value_vars value ptr t is_ret acc =
+      match ptr with
+      | Nonptr -> get_vars_from_plain_val value t acc
+      | Funptr _ -> acc
+      | Apathptr ->
+        let addr = (Sexp.to_string value) in
+        let ptee_type = get_pointee t in
+        alloc_local_arg addr {v=Undef;t=ptee_type};
+        acc
+      | Curioptr ptee ->
+        let addr = (Sexp.to_string value) in
+        let ptee_type = get_pointee t in
+        if is_ret then get_ret_pointee_vars addr ptee ptee_type acc
+        else get_arg_pointee_vars addr ptee ptee_type acc
     in
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
             let arg_type = get_fun_arg_type ftype_of call.fun_name i in
-            match arg.ptr with
-            | Nonptr -> get_vars_from_plain_val arg.value arg_type acc
-            | Funptr _ -> acc
-            | Apathptr ->
-                let addr = (Sexp.to_string arg.value) in
-                let ptee_type = get_pointee arg_type in
-                alloc_local_arg addr {v=Undef;t=ptee_type};
-                acc
-            | Curioptr ptee ->
-                let addr = (Sexp.to_string arg.value) in
-                let ptee_type = get_pointee arg_type in
-                get_pointee_vars addr ptee ptee_type acc)
+            complex_value_vars arg.value arg.ptr arg_type false acc)
     in
     let ret_vars = match call.ret with
-      | Some ret -> get_vars_from_plain_val
-                      ret.value (get_fun_ret_type ftype_of call.fun_name) arg_vars
-      (*TODO: get also ret.pointee vars.*)
+      | Some ret ->
+        complex_value_vars
+          ret.value ret.ptr
+          (get_fun_ret_type ftype_of call.fun_name) true arg_vars
       | None -> arg_vars in
     let add_vars_from_ctxt vars ctxt =
-      map_set_n_update_alist vars (make_name_alist_from_var_decls
-                               (get_var_decls_of_sexp ctxt Boolean vars)) in
+      map_set_n_update_alist vars
+        (make_name_alist_from_var_decls
+           (get_var_decls_of_sexp ctxt Boolean vars)) in
     let call_ctxt_vars =
       List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
     let ret_ctxt_vars =
