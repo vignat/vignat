@@ -222,6 +222,26 @@ let rec call_recursively_on_tterm f tterm =
   | Some tt -> {v=tt;t=tterm.t}
   | None -> tterm
 
+let rec collect_nodes f tterm =
+  match f tterm with
+  | Some x -> [x]
+  | None ->
+    match tterm.v with
+    | Bop (_,lhs,rhs) -> (collect_nodes f lhs) @ (collect_nodes f rhs)
+    | Apply (_,args) -> List.join (List.map args ~f:(collect_nodes f))
+    | Id _ -> []
+    | Struct (_,fields) ->
+      List.join (List.map fields ~f:(fun {name=_;value} ->
+          collect_nodes f value))
+    | Int _ -> []
+    | Bool _ -> []
+    | Not x -> collect_nodes f x
+    | Str_idx (str,_) -> collect_nodes f str
+    | Deref ptr -> collect_nodes f ptr
+    | Fptr _ -> []
+    | Addr v -> collect_nodes f v
+    | Cast (_,v) -> collect_nodes f v
+    | Undef -> []
 
 let rec term_contains_term super sub =
   if term_eq super sub then true else

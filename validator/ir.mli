@@ -114,6 +114,7 @@ val replace_term_in_term : term -> term -> term -> term
 val replace_term_in_tterm : term -> term -> tterm -> tterm
 val replace_term_in_tterms : term -> term -> tterm list -> tterm list
 val call_recursively_on_tterm : (term -> term option) -> tterm -> tterm
+val collect_nodes : (tterm -> 'a option) -> tterm -> 'a list
 val term_contains_term : term -> term -> bool
 val tterm_contains_term : tterm -> term -> bool
 val tterms_contain_term : tterm list -> term -> bool

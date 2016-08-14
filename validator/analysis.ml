@@ -352,7 +352,7 @@ let is_assignment_justified fixpoints var value executions =
       List.for_all mod_assumptions ~f:(fun mod_assumption ->
           match mod_assumption, value with
           | {t=Boolean;v=Bop (Eq, _, _);}, Addr _->
-            lprintf "skipping the ptrarith %s\n" (render_tterm mod_assumption);
+            lprintf "skipping the ptr-arith %s\n" (render_tterm mod_assumption);
             (* Numerical relations are not important for pointers *)
             (* TODO: the fixpoint related statements are currently stripped of
                the "= true" or "= false", which makes them somatimes
@@ -391,6 +391,17 @@ let replace__addr_verifast_specific executions =
                 when String.equal (vname ^ "_addr") addr -> None
               | sttmt ->
                 Some (replace__addr_within sttmt)))
+
+let get_verifast_dummy_variables executions =
+  List.join
+    (List.map executions
+       ~f:(fun execution ->
+           (List.join (List.map execution
+                         ~f:(collect_nodes (function
+                             | {v=Id x;t} when
+                                 String.is_prefix x ~prefix:"dummy" ->
+                               Some x
+                             | _ -> None))))))
 
 let induce_symbolic_assignments fixpoints ir executions =
   start_log ();
