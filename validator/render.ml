@@ -21,28 +21,32 @@ let render_fcall_with_lemmas context =
   (render_term context.application) ^ ";\n" ^
   (String.concat ~sep:"\n" context.post_lemmas) ^ "\n"
 
-let render_post_sttmts ~is_assert {args_post_conditions;
-                                   ret_val=_;post_statements} =
-  (String.concat ~sep:"\n" (List.map args_post_conditions
+let render_args_post_conditions ~is_assert apk =
+  (String.concat ~sep:"\n" (List.map apk
                               ~f:(fun {name;value} ->
                                   render_eq_sttmt ~is_assert
-                                    name value))) ^ "\n" ^
+                                    name value)))
+
+let render_post_assumptions post_statements =
   (String.concat ~sep:"\n" (List.map post_statements
                               ~f:(fun t ->
-                                  "/*@ " ^ (if is_assert
-                                            then "assert"
-                                            else "assume") ^
-                                  "(" ^ (render_tterm t) ^
+                                  "/*@ assume(" ^
+                                  (render_tterm t) ^
                                   ");@*/")))
 
+let render_tip_post_sttmts {args_post_conditions;
+                            ret_val=_;post_statements} =
+  (render_post_assumptions post_statements) ^ "\n" ^
+  (render_args_post_conditions ~is_assert:true args_post_conditions)
+
 let render_ret_equ_sttmt ~is_assert ret_name ret_val =
-  (match ret_name with
-   | Some name -> (render_eq_sttmt ~is_assert name ret_val)
-   | None -> "") ^ "\n"
+  match ret_name with
+  | Some name -> (render_eq_sttmt ~is_assert name ret_val) ^ "\n"
+  | None -> "\n"
 
 let render_hist_fun_call {context;result} =
   (render_fcall_with_lemmas context) ^
-  render_post_sttmts ~is_assert:false result ^
+  (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
   render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
 
 let find_false_eq_sttmts (sttmts:tterm list) =
@@ -73,11 +77,11 @@ let render_2tip_post_assertions res1 res2 ret_name =
       | Some (sttmt,fst) ->
         begin
           let res1_assertions =
-            (render_post_sttmts ~is_assert:true res1 ^ "\n" ^
+            (render_tip_post_sttmts res1 ^ "\n" ^
              render_ret_equ_sttmt ~is_assert:true ret_name res1.ret_val)
           in
           let res2_assertions =
-            (render_post_sttmts~is_assert:true res2 ^ "\n" ^
+            (render_tip_post_sttmts res2 ^ "\n" ^
              render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val)
           in
           let (pos_sttmts,neg_sttmts) =
@@ -100,8 +104,8 @@ let render_2tip_post_assertions res1 res2 ret_name =
       | None -> failwith "this can't be true!"
     in
     "if (" ^ rname ^ " == " ^ (render_tterm res1.ret_val) ^ ") {\n" ^
-    (render_post_sttmts ~is_assert:true res1) ^ "\n} else {\n" ^
-    (render_post_sttmts ~is_assert:true res2) ^ "\n" ^
+    (render_tip_post_sttmts res1) ^ "\n} else {\n" ^
+    (render_tip_post_sttmts res2) ^ "\n" ^
     (render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val) ^ "}\n"
 
 let render_export_point name =
@@ -138,8 +142,8 @@ let render_tip_fun_call {context;results} export_point free_vars =
   (render_export_point export_point) ^
   (match results with
    | result :: [] ->
-     (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val) ^
-     "\n" ^ (render_post_sttmts ~is_assert:true result)
+     (render_tip_post_sttmts result) ^ "\n" ^
+     (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val)
    | res1 :: res2 :: [] ->
      render_2tip_post_assertions res1 res2 context.ret_name
    | [] -> failwith "There must be at least one tip call."

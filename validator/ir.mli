@@ -59,19 +59,26 @@ type fun_call_context = {
 val __fun_call_context_of_sexp__ : Sexp.t -> fun_call_context
 val fun_call_context_of_sexp : Sexp.t -> fun_call_context
 val sexp_of_fun_call_context : fun_call_context -> Sexp.t
-type call_result = {
+type hist_call_result = {
+  args_post_conditions : var_spec list;
+  ret_val : tterm;
+}
+val __hist_call_result_of_sexp__ : Sexp.t -> hist_call_result
+val hist_call_result_of_sexp : Sexp.t -> hist_call_result
+val sexp_of_hist_call_result : hist_call_result -> Sexp.t
+type tip_result = {
   args_post_conditions : var_spec list;
   ret_val : tterm;
   post_statements : tterm list;
 }
-val __call_result_of_sexp__ : Sexp.t -> call_result
-val call_result_of_sexp : Sexp.t -> call_result
-val sexp_of_call_result : call_result -> Sexp.t
-type hist_call = { context : fun_call_context; result : call_result; }
+val __tip_result_of_sexp__ : Sexp.t -> tip_result
+val tip_result_of_sexp : Sexp.t -> tip_result
+val sexp_of_tip_result : tip_result -> Sexp.t
+type hist_call = { context : fun_call_context; result : hist_call_result; }
 val __hist_call_of_sexp__ : Sexp.t -> hist_call
 val hist_call_of_sexp : Sexp.t -> hist_call
 val sexp_of_hist_call : hist_call -> Sexp.t
-type tip_call = { context : fun_call_context; results : call_result list; }
+type tip_call = { context : fun_call_context; results : tip_result list; }
 val __tip_call_of_sexp__ : Sexp.t -> tip_call
 val tip_call_of_sexp : Sexp.t -> tip_call
 val sexp_of_tip_call : tip_call -> Sexp.t

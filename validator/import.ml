@@ -490,10 +490,6 @@ let compose_args_post_conditions call =
         Some {name=out_arg.name;
               value=(get_struct_val_value ptee.after out_arg.value.t)})
 
-let extract_tip_ret_post_conditions call =
-  List.map call.ret_context ~f:(fun sttmt ->
-      get_sexp_value sttmt Boolean)
-
 let get_ret_val ftype_of call is_tip =
   let make_ptr_to_pointee ret_val ret_type =
     if is_tip then
@@ -535,27 +531,56 @@ let extract_common_call_context ftype_of call ret_name args unique_postfix =
   let post_lemmas = compose_post_lemmas ftype_of call ret_name arg_names tmp_gen in
   {pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
-let extract_hist_call_context ftype_of call rname_gen index =
+let extract_hist_call ftype_of call rname_gen index =
   let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
     else Some rname_gen#generate in
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
   {context=extract_common_call_context ftype_of call ret_name args
        (string_of_int index);
-   result={args_post_conditions;ret_val=get_ret_val ftype_of call false;
-           post_statements=[]}}
+   result={args_post_conditions;ret_val=get_ret_val ftype_of call false}}
 
-let tip_calls_context ftype_of calls rname_gen =
+let convert_ctxt_list l = List.map l ~f:(fun e ->
+    (get_sexp_value e Boolean))
+
+let split_common_assumptions a1 a2 =
+  let as1 = convert_ctxt_list a1 in
+  let as2 = convert_ctxt_list a2 in
+  List.partition_tf as1 ~f:(fun assumption ->
+      List.exists as2 ~f:(fun other -> other = assumption))
+
+let extract_tip_calls ftype_of calls rname_gen =
   let call = List.hd_exn calls in
   let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
     else Some rname_gen#generate in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context ftype_of call ret_name args "tip" in
-  let results = List.map calls ~f:(fun call ->
+  let results =
+    match calls with
+    | [] -> failwith "There must be at least one tip call."
+    | tip :: [] ->
       let args_post_conditions = compose_args_post_conditions call in
-      {args_post_conditions;
-       ret_val=get_ret_val ftype_of call true;
-       post_statements=(extract_tip_ret_post_conditions call);})
+      [{args_post_conditions;
+        ret_val=get_ret_val ftype_of call true;
+        post_statements=[(* All this statements must be about the model internal
+                            state, so we can assume them at the very beginning:
+                            in the context_assumptions. *)];}]
+    | tip1 :: tip2 :: [] ->
+      let args_post_conditions1 = compose_args_post_conditions tip1 in
+      let args_post_conditions2 = compose_args_post_conditions tip2 in
+      let (_,tip1_distinct_ctxt) =
+        split_common_assumptions tip1.ret_context tip2.ret_context
+      in
+      let (_,tip2_distinct_ctxt) =
+        split_common_assumptions tip2.ret_context tip1.ret_context
+      in
+      [{args_post_conditions=args_post_conditions1;
+        ret_val=get_ret_val ftype_of tip1 true;
+        post_statements=tip1_distinct_ctxt;};
+       {args_post_conditions=args_post_conditions2;
+        ret_val=get_ret_val ftype_of tip2 true;
+        post_statements=tip2_distinct_ctxt;}]
+    | _ -> failwith "More than two tip calls is not supported."
   in
   {context;results}
 
@@ -563,39 +588,45 @@ let extract_calls_info ftype_of tpref =
   let rez_gen = name_gen "rez" in
   let hist_funs =
     (List.mapi tpref.history ~f:(fun ind call ->
-         extract_hist_call_context ftype_of call rez_gen ind))
+         extract_hist_call ftype_of call rez_gen ind))
   in
-  let tip_calls = tip_calls_context ftype_of tpref.tip_calls rez_gen in
+  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rez_gen in
   hist_funs, tip_calls
 
 let collect_context pref =
-  let collect_ctxt_list l = List.map l ~f:(fun e ->
-      (get_sexp_value e Boolean))
-  in
   (List.join (List.map pref.history ~f:(fun call ->
-      (collect_ctxt_list call.call_context) @
-      (collect_ctxt_list call.ret_context)))) @
+      (convert_ctxt_list call.call_context) @
+      (convert_ctxt_list call.ret_context)))) @
   (match pref.tip_calls with
-   | hd :: _ -> (collect_ctxt_list hd.call_context)
-   | [] -> failwith "Must have at least one tip call.")
-
-let extract_leaks ftype_of ccontexts =
-  let leak_map =
-    List.fold ccontexts ~init:String.Map.empty ~f:(fun acc {ret_name;application;_} ->
-        match application with
-        | Apply (fname,args) ->
-          let args = List.map args ~f:render_tterm in
-          let spec = (ftype_of fname) in
-          let ret_name = match ret_name with Some name -> name | None -> "" in
-          List.fold spec.leaks ~init:acc ~f:(fun acc l ->
-              l ret_name args acc)
-        | _ -> failwith "call context application must be Apply")
-  in
-  String.Map.data leak_map
+   | hd :: [] -> (convert_ctxt_list hd.call_context) @ (convert_ctxt_list hd.ret_context)
+   | hd1 :: hd2 :: [] ->
+     let call_context = convert_ctxt_list hd1.call_context in
+     assert (call_context = (convert_ctxt_list hd2.call_context));
+     let (common_ret_context,_) = split_common_assumptions
+         hd1.ret_context hd2.ret_context
+     in
+     call_context @ common_ret_context
+   | [] -> failwith "There must be at least one tip call."
+   | _ -> failwith "More than two tip alternative tipcalls are not supported.")
 
 let strip_context call =
   {fun_name = call.fun_name; args = call.args;
    ret = None; call_context = []; ret_context = []}
+
+let extract_leaks ftype_of ccontexts =
+  let leak_map =
+    List.fold ccontexts ~init:String.Map.empty
+      ~f:(fun acc {ret_name;application;_} ->
+          match application with
+          | Apply (fname,args) ->
+            let args = List.map args ~f:render_tterm in
+            let spec = (ftype_of fname) in
+            let ret_name = match ret_name with Some name -> name | None -> "" in
+            List.fold spec.leaks ~init:acc ~f:(fun acc l ->
+                l ret_name args acc)
+          | _ -> failwith "call context application must be Apply")
+  in
+  String.Map.data leak_map
 
 let get_relevant_segment pref boundary_fun =
   let rec last_relevant_seg hist candidat =

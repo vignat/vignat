@@ -43,9 +43,11 @@ with sexp
 
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
-  | Sint32 -> "int" | Sint8 -> "char" | Uint32 -> "uint32_t" | Uint16 -> "uint16_t"
-  | Uint8 -> "uint8_t" | Void -> "void" | Str (name, _) -> "struct " ^ name
-  | Ctm name -> name | Fptr name -> name ^ "*" | Boolean -> "bool" | Unknown -> "???"
+  | Sint32 -> "int" | Sint8 -> "char"
+  | Uint32 -> "uint32_t" | Uint16 -> "uint16_t" | Uint8 -> "uint8_t"
+  | Void -> "void" | Str (name, _) -> "struct " ^ name
+  | Ctm name -> name | Fptr name -> name ^ "*" | Boolean -> "bool"
+  | Unknown -> "???"
   | Sunknown -> "s??" | Uunknown -> "u??"
 
 let is_void = function | Void -> true | _ -> false
@@ -60,7 +62,12 @@ type fun_call_context = {
   ret_type:ttype;
 } with sexp
 
-type call_result = {
+type hist_call_result = {
+  args_post_conditions:var_spec list;
+  ret_val:tterm;
+} with sexp
+
+type tip_result = {
   args_post_conditions:var_spec list;
   ret_val:tterm;
   post_statements:tterm list;
@@ -68,11 +75,11 @@ type call_result = {
 
 type hist_call = {
   context:fun_call_context;
-  result:call_result;
+  result:hist_call_result;
 } with sexp
 
 type tip_call = {context:fun_call_context;
-                 results:call_result list} with sexp
+                 results:tip_result list} with sexp
 
 type ir = {
   preamble:string;
