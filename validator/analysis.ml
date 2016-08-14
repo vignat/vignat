@@ -352,6 +352,7 @@ let is_assignment_justified fixpoints var value executions =
       List.for_all mod_assumptions ~f:(fun mod_assumption ->
           match mod_assumption, value with
           | {t=Boolean;v=Bop (Eq, _, _);}, Addr _->
+            lprintf "skipping the ptrarith %s\n" (render_tterm mod_assumption);
             (* Numerical relations are not important for pointers *)
             (* TODO: the fixpoint related statements are currently stripped of
                the "= true" or "= false", which makes them somatimes
@@ -369,9 +370,38 @@ let is_assignment_justified fixpoints var value executions =
   lprintf "%s\n" (if valid then "justified" else "unjustified");
   valid
 
+let replace__addr_verifast_specific executions =
+  let replace__addr_within sttmt =
+    call_recursively_on_tterm
+      (function
+        | Id x when String.is_suffix x ~suffix:"_addr" ->
+          (* TODO: t actually may be deduced if we were given the full
+             tterm, not just the value part, that requires another
+             call_recursively_on_tterm function. *)
+          Some (Addr {v=Id (String.chop_suffix_exn x ~suffix:"_addr");t=Unknown})
+        | _ -> None)
+      sttmt
+  in
+  List.map executions
+    ~f:(fun execution ->
+        List.filter_map execution
+          ~f:(function
+              | {v=Bop (Eq,{v=Id vname;t=_},
+                        {v=Id addr;t=_});t=_}
+                when String.equal (vname ^ "_addr") addr -> None
+              | sttmt ->
+                Some (replace__addr_within sttmt)))
+
 let induce_symbolic_assignments fixpoints ir executions =
   start_log ();
-  let fr_var_names = List.map (String.Map.data ir.free_vars) ~f:(fun spec -> spec.name) in
+  let executions = replace__addr_verifast_specific executions in
+  let fr_var_names =
+    (List.map (String.Map.data ir.free_vars)
+       ~f:(fun spec -> spec.name)) @
+    (match ir.tip_call.context.ret_name with
+     | Some name -> [name]
+     | None -> [])
+  in
   lprintf "free vars: \n";
   lprint_list fr_var_names;
   let assertion_lists = List.map ir.tip_call.results ~f:(fun result ->
