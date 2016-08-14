@@ -66,9 +66,22 @@ struct ArrayLcc
 
 /*@
 //params: lcore_confi, lcore_confp
-predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc* arr);
-predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc* arr,
-                       int idx, ARRAY_LCC_EL_TYPE *el);
+predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc *arr);
+predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr,
+                       int idx);
+fixpoint ARRAY_LCC_EL_TYPE *arrp_the_missing_cell_lcc(struct ArrayLcc *arr,
+                                                      int idx);
+lemma void construct_lcc_element(ARRAY_LCC_EL_TYPE *p);
+requires p->n_rx_queue |-> ?nrq &*&
+         0 < nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
+         chars((char*)(p->rx_queue_list.data), 16*sizeof(struct lcore_rx_queue), _) &*&
+         struct_ArrayRq_padding(&p->rx_queue_list) &*&
+         chars((char*)(p->tx_queue_id.data), 32*sizeof(uint16_t), _) &*&
+         struct_ArrayU16_padding(&p->tx_queue_id) &*&
+         chars((char*)p->tx_mbufs.data, 32*sizeof(struct Batcher), _) &*&
+         struct_ArrayBat_padding(&p->tx_mbufs) &*&
+         struct_lcore_conf_padding(p);
+ensures lcore_confp(_, p);
 @*/
 
 // In-place initialization
@@ -79,13 +92,14 @@ void array_lcc_init(struct ArrayLcc *arr_out);
 
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index);
 //@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
-/*@ ensures arrp_lcc_acc(lst, arr, index, result) &*&
+/*@ ensures arrp_lcc_acc(lst, arr, index) &*&
+            result == arrp_the_missing_cell_lcc(arr, index) &*&
             lcore_confp(nth(index, lst), result);
   @*/
 
 void array_lcc_end_access(struct ArrayLcc *arr);
-/*@ requires arrp_lcc_acc(?lst, arr, ?idx, ?lcp) &*&
-             lcore_confp(?lc, lcp); @*/
+/*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
+             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
 //@ ensures arrp_lcc(update(idx, lc, lst), arr);
 
 #ifdef KLEE_VERIFICATION
