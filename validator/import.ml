@@ -465,32 +465,10 @@ let extract_fun_args ftype_of call =
         | Funptr fname -> {v=Fptr fname;t=a_type}
         | Apathptr ->
           get_allocated_arg arg a_type
-        | Curioptr ptee ->
+        | Curioptr _ ->
           get_allocated_arg arg a_type)
 
-let compose_post_lemmas ftype_of call ret_name args tmp_gen =
-  let ret_name = match ret_name with
-    | Some ret_name -> ret_name
-    | None -> ""
-  in
-  List.map (ftype_of call.fun_name).lemmas_after
-    ~f:(fun l -> l ret_name args tmp_gen)
-
-let compose_args_post_conditions call =
-  List.filter_map call.args ~f:(fun arg ->
-      match arg.ptr with
-      | Nonptr -> None
-      | Funptr _ -> None
-      | Apathptr -> None
-      | Curioptr ptee ->
-        let out_arg =
-          let key = Sexp.to_string arg.value in
-          String.Map.find_exn !allocated_args key
-        in
-        Some {name=out_arg.name;
-              value=(get_struct_val_value ptee.after out_arg.value.t)})
-
-let get_ret_val ftype_of call is_tip =
+let get_ret_val ftype_of call ~is_tip =
   let make_ptr_to_pointee ret_val ret_type =
     if is_tip then
       let ret_var = String.Map.find !allocated_args
@@ -519,16 +497,43 @@ let get_ret_val ftype_of call is_tip =
     end
   | None -> {v=Undef;t=Unknown}
 
+let compose_post_lemmas ~is_tip ftype_of call ret_name args tmp_gen =
+  let ret_name = match ret_name with
+    | Some ret_name -> ret_name
+    | None -> ""
+  in
+  let result = render_tterm (get_ret_val ftype_of call ~is_tip) in
+  List.map (ftype_of call.fun_name).lemmas_after
+    ~f:(fun l -> l ret_name result args tmp_gen)
+
+let compose_args_post_conditions call =
+  List.filter_map call.args ~f:(fun arg ->
+      match arg.ptr with
+      | Nonptr -> None
+      | Funptr _ -> None
+      | Apathptr -> None
+      | Curioptr ptee ->
+        let out_arg =
+          let key = Sexp.to_string arg.value in
+          String.Map.find_exn !allocated_args key
+        in
+        Some {name=out_arg.name;
+              value=(get_struct_val_value ptee.after out_arg.value.t)})
+
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
 
-let extract_common_call_context ftype_of call ret_name args unique_postfix =
+let extract_common_call_context
+    ~is_tip ftype_of call ret_name args unique_postfix =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call.fun_name in
   let arg_names = List.map args ~f:render_tterm in
   let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
   let application = Apply (call.fun_name,args) in
-  let post_lemmas = compose_post_lemmas ftype_of call ret_name arg_names tmp_gen in
+  let post_lemmas =
+    compose_post_lemmas
+      ~is_tip ftype_of call ret_name arg_names tmp_gen
+  in
   {pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
 let extract_hist_call ftype_of call rname_gen index =
@@ -536,9 +541,9 @@ let extract_hist_call ftype_of call rname_gen index =
     else Some rname_gen#generate in
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
-  {context=extract_common_call_context ftype_of call ret_name args
-       (string_of_int index);
-   result={args_post_conditions;ret_val=get_ret_val ftype_of call false}}
+  {context=extract_common_call_context
+       ~is_tip:false ftype_of call ret_name args (string_of_int index);
+   result={args_post_conditions;ret_val=get_ret_val ftype_of call ~is_tip:false}}
 
 let convert_ctxt_list l = List.map l ~f:(fun e ->
     (get_sexp_value e Boolean))
@@ -554,14 +559,16 @@ let extract_tip_calls ftype_of calls rname_gen =
   let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
     else Some rname_gen#generate in
   let args = extract_fun_args ftype_of call in
-  let context = extract_common_call_context ftype_of call ret_name args "tip" in
+  let context = extract_common_call_context
+      ~is_tip:true ftype_of call ret_name args "tip"
+  in
   let results =
     match calls with
     | [] -> failwith "There must be at least one tip call."
     | tip :: [] ->
-      let args_post_conditions = compose_args_post_conditions call in
+      let args_post_conditions = compose_args_post_conditions tip in
       [{args_post_conditions;
-        ret_val=get_ret_val ftype_of call true;
+        ret_val=get_ret_val ftype_of tip ~is_tip:true;
         post_statements=[(* All this statements must be about the model internal
                             state, so we can assume them at the very beginning:
                             in the context_assumptions. *)];}]
@@ -575,10 +582,10 @@ let extract_tip_calls ftype_of calls rname_gen =
         split_common_assumptions tip2.ret_context tip1.ret_context
       in
       [{args_post_conditions=args_post_conditions1;
-        ret_val=get_ret_val ftype_of tip1 true;
+        ret_val=get_ret_val ftype_of tip1 ~is_tip:true;
         post_statements=tip1_distinct_ctxt;};
        {args_post_conditions=args_post_conditions2;
-        ret_val=get_ret_val ftype_of tip2 true;
+        ret_val=get_ret_val ftype_of tip2 ~is_tip:true;
         post_statements=tip2_distinct_ctxt;}]
     | _ -> failwith "More than two tip calls is not supported."
   in
@@ -642,7 +649,7 @@ let get_relevant_segment pref boundary_fun =
   | [] -> failwith "must have at least one tip call."
   | hd :: _ ->
     if (String.equal hd.fun_name boundary_fun) then
-      {history=[]; tip_calls = List.map pref.tip_calls strip_context}
+      {history=[]; tip_calls = List.map pref.tip_calls ~f:strip_context}
     else
       match last_relevant_seg pref.history [] with
       | bnd :: rest ->

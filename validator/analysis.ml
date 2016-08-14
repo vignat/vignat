@@ -350,9 +350,21 @@ let is_assignment_justified fixpoints var value executions =
       lprintf "with\n";
       List.iter orig_assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass));
       List.for_all mod_assumptions ~f:(fun mod_assumption ->
-          List.exists orig_assumptions
-            ~f:(fun assumption ->
-                term_eq assumption.v mod_assumption.v)))
+          match mod_assumption, value with
+          | {t=Boolean;v=Bop (Eq, _, _);}, Addr _->
+            (* Numerical relations are not important for pointers *)
+            (* TODO: the fixpoint related statements are currently stripped of
+               the "= true" or "= false", which makes them somatimes
+               indistinguissable from predicates. We need to keep that
+               information, to make sure we respect predicates and skip the
+               fixpoints operating on pointers. We need also to make sure, that
+               thes skipped fixpoints do not also check for some other
+               non-pointer numerical property. *)
+            true
+          | _ ->
+            List.exists orig_assumptions
+              ~f:(fun assumption ->
+                  term_eq assumption.v mod_assumption.v)))
   in
   lprintf "%s\n" (if valid then "justified" else "unjustified");
   valid
