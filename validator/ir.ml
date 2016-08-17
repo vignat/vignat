@@ -92,12 +92,7 @@ type ir = {
   tip_call:tip_call;
   leaks:string list;
   export_point:string;
-} with sexp
-
-type task = {
-  exists_such:tterm list;
-  filename:string;
-  export_point:string;
+  finishing:bool;
 } with sexp
 
 let strip_outside_parens str =

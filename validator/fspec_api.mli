@@ -30,5 +30,6 @@ module type Spec =
     val fun_types : fun_spec Core.Std.String.Map.t
     val fixpoints : Ir.tterm Core.Std.String.Map.t
     val boundary_fun : bytes
+    val finishing_fun : bytes
   end
 val spec : (module Spec) option ref

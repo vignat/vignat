@@ -93,18 +93,11 @@ type ir = {
   tip_call : tip_call;
   leaks : bytes list;
   export_point : bytes;
+  finishing : bool;
 }
 val __ir_of_sexp__ : Sexp.t -> ir
 val ir_of_sexp : Sexp.t -> ir
 val sexp_of_ir : ir -> Sexp.t
-type task = {
-  exists_such : tterm list;
-  filename : bytes;
-  export_point : bytes;
-}
-val __task_of_sexp__ : Sexp.t -> task
-val task_of_sexp : Sexp.t -> task
-val sexp_of_task : task -> Sexp.t
 val strip_outside_parens : bytes -> bytes
 val render_bop : bop -> bytes
 val render_tterm : tterm -> bytes

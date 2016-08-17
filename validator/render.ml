@@ -188,6 +188,12 @@ let render_allocated_args args =
        ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
                        (spec.name) ^ ";")) ^ "\n"
 
+let render_final finishing =
+  if finishing then
+    "/* This sequence must terminate correctly: no need for assume(false);"
+  else
+    "//@ assume(false);\n"
+
 let render_ir ir fout =
   Out_channel.with_file fout ~f:(fun cout ->
       Out_channel.output_string cout ir.preamble;
@@ -204,4 +210,5 @@ let render_ir ir fout =
                                         ir.tip_call ir.export_point
                                         ir.free_vars);
       Out_channel.output_string cout (render_leaks ir.leaks);
+      Out_channel.output_string cout (render_final ir.finishing);
       Out_channel.output_string cout "}\n")

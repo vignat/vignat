@@ -656,7 +656,10 @@ let get_relevant_segment pref boundary_fun =
         {history = strip_context bnd :: rest; tip_calls = pref.tip_calls}
       | [] -> pref
 
-let build_ir fun_types fin preamble boundary_fun =
+let is_the_last_function_finishing pref finishing_fun =
+  String.equal (List.hd_exn pref.tip_calls).fun_name finishing_fun
+
+let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
     | Some spec -> spec
@@ -666,6 +669,7 @@ let build_ir fun_types fin preamble boundary_fun =
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin))
       boundary_fun
   in
+  let finishing = is_the_last_function_finishing pref finishing_fun in
   let preamble = preamble ^
                  "void to_verify()\
                   /*@ requires true; @*/ \
@@ -681,4 +685,4 @@ let build_ir fun_types fin preamble boundary_fun =
   let arguments = !allocated_args in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
-   leaks;export_point}
+   leaks;export_point;finishing}
