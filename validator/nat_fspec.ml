@@ -601,7 +601,12 @@ let fun_types =
                                 lemmas_before = [];
                                 lemmas_after = [
                                   (fun _ ret_val _ _ ->
-                                  "//@ construct_lcc_element(" ^ ret_val ^");")];
+                                     "//@ construct_lcc_element(" ^ ret_val ^");");
+                                  (fun _ ret_val _ _ ->
+                                     "//@ close some_lcore_confp(" ^ ret_val ^");");
+                                  (fun ret_var _ _ _ ->
+                                     "//@ close some_lcore_confp(" ^ ret_var ^");");
+                                ];
                                 leaks = [
                                   leak "arrp_lcc_acc(_, _, _, _)"
                                     ~id:"arrp_lcc_acc";
