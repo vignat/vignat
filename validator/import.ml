@@ -620,21 +620,6 @@ let strip_context call =
   {fun_name = call.fun_name; args = call.args;
    ret = None; call_context = []; ret_context = []}
 
-let extract_leaks ftype_of ccontexts =
-  let leak_map =
-    List.fold ccontexts ~init:String.Map.empty
-      ~f:(fun acc {ret_name;application;_} ->
-          match application with
-          | Apply (fname,args) ->
-            let args = List.map args ~f:render_tterm in
-            let spec = (ftype_of fname) in
-            let ret_name = match ret_name with Some name -> name | None -> "" in
-            List.fold spec.leaks ~init:acc ~f:(fun acc l ->
-                l ret_name args acc)
-          | _ -> failwith "call context application must be Apply")
-  in
-  String.Map.data leak_map
-
 let get_relevant_segment pref boundary_fun =
   let rec last_relevant_seg hist candidat =
     match hist with
@@ -677,12 +662,10 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let export_point = "export_point" in
   let free_vars = get_vars ftype_of pref (name_gen "arg") in
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref in
-  let leaks = extract_leaks ftype_of
-      ((List.map hist_calls ~f:(fun hc -> hc.context))@[tip_call.context]) in
   let cmplxs = !allocated_complex_vals in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let arguments = !allocated_args in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
-   leaks;export_point;finishing}
+   export_point;finishing}

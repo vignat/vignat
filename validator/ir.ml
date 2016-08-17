@@ -90,7 +90,6 @@ type ir = {
   context_assumptions:tterm list;
   hist_calls:hist_call list;
   tip_call:tip_call;
-  leaks:string list;
   export_point:string;
   finishing:bool;
 } with sexp

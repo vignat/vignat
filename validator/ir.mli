@@ -91,7 +91,6 @@ type ir = {
   context_assumptions : tterm list;
   hist_calls : hist_call list;
   tip_call : tip_call;
-  leaks : bytes list;
   export_point : bytes;
   finishing : bool;
 }

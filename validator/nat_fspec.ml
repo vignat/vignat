@@ -69,13 +69,11 @@ let fun_types =
     ["current_time", {ret_type = Uint32;
                       arg_types = [];
                       lemmas_before = [];
-                      lemmas_after = [];
-                      leaks = [];};
+                      lemmas_after = [];};
      "start_time", {ret_type = Uint32;
                     arg_types = [];
                     lemmas_before = [];
-                    lemmas_after = [];
-                    leaks = [leak "last_time(_)" ~id:"last_time"];};
+                    lemmas_after = [];};
      "dmap_allocate", {ret_type = Sint32;
                        arg_types =
                          [Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
@@ -156,16 +154,11 @@ let fun_types =
                                 ((nat_ext_fp)(start_port));"];
                        lemmas_after = [
                          tx_l "empty_dmap_cap\
-                               <int_k,ext_k,flw>(1024);";];
-                       leaks = [
-                         on_rez_nz_leak "dmappingp<int_k, ext_k, flw>\
-                                         (_,_,_,_,_,_,_,_,_,_,_,_,_,_)"
-                           ~id:"dmappingp";];};
+                               <int_k,ext_k,flw>(1024);";];};
      "dmap_set_entry_condition", {ret_type = Void;
                                   arg_types = [Ptr (Ctm "entry_condition")];
                                   lemmas_before = [];
-                                  lemmas_after = [];
-                                  leaks = [];};
+                                  lemmas_after = [];};
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = [Sint32; Ptr (Ptr dchain_struct)];
                          lemmas_before = [];
@@ -173,13 +166,7 @@ let fun_types =
                            on_rez_nz (fun _ _ ->
                                "empty_dmap_dchain_coherent\
                                 <int_k,ext_k,flw>(1024);");
-                           tx_l "index_range_of_empty(1024, 0);";];
-                         leaks = [
-                           on_rez_nz_leak "double_chainp(_,_)"
-                             ~id:"double_chainp";
-                           on_rez_nz_leak "dmap_dchain_coherent(_,_)"
-                             ~id:"dmap_dchain_coherent";
-                         ];};
+                           tx_l "index_range_of_empty(1024, 0);";];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
@@ -197,12 +184,7 @@ let fun_types =
                                      List.nth_exn args 2 ^ ", " ^
                                      List.nth_exn args 3 ^ ", " ^
                                      List.nth_exn args 4 ^ "); @*/")];
-                                lemmas_after = [];
-                                leaks = [
-                                  remove_leak "dmappingp";
-                                  remove_leak "double_chainp";
-                                  remove_leak "last_time";
-                                  remove_leak "dmap_dchain_coherent"];};
+                                lemmas_after = [];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
@@ -223,16 +205,7 @@ let fun_types =
                                      "//@ assume(" ^
                                      List.nth_exn args 4 ^ " == start_port);");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
-                                  tx_l "coherent_same_cap(map, chain);";];
-                                leaks = [
-                                  leak "last_time(_)" ~id:"last_time";
-                                  leak "dmappingp<int_k, ext_k, flw>\
-                                        (_,_,_,_,_,_,_,_,_,_,_,_,_,_)"
-                                    ~id:"dmappingp";
-                                  leak "double_chainp(_,_)"
-                                    ~id:"double_chainp";
-                                  leak "dmap_dchain_coherent(_,_)"
-                                    ~id:"dmap_dchain_coherent"];};
+                                  tx_l "coherent_same_cap(map, chain);";];};
      "dmap_get_b", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
                     lemmas_before = [
@@ -269,8 +242,7 @@ let fun_types =
                          last_index_key := Ext;
                          last_indexing_succ_ret_var := ret_var;
                          "");
-                    ];
-                    leaks = [];};
+                    ];};
      "dmap_get_a", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Sint32;];
                     lemmas_before = [
@@ -308,8 +280,7 @@ let fun_types =
                          last_index_key := Int;
                          last_indexing_succ_ret_var := ret_var;
                          "");
-                    ];
-                    leaks = [];};
+                    ];};
      "dmap_put", {ret_type = Sint32;
                   arg_types = [Ptr dmap_struct; Ptr flw_struct; Sint32;];
                   lemmas_before = [
@@ -421,9 +392,7 @@ let fun_types =
                        !last_time_for_index_alloc ^
                        ", " ^ (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ ");\
                         }@*/");
-                  ]
-                  ;
-                  leaks = [];};
+                  ];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         lemmas_before = [
@@ -457,8 +426,7 @@ let fun_types =
                               @*/");
                           tx_l "open int_k_p(_,_);";
                           tx_l "open ext_k_p(_,_);";
-                        ];
-                        leaks = [];};
+                        ];};
      "expire_items", {ret_type = Sint32;
                       arg_types = [Ptr dchain_struct;
                                    Ptr dmap_struct;
@@ -521,8 +489,7 @@ let fun_types =
                            ");\n");
                         ];
                       lemmas_after = [
-                      ];
-                      leaks = [];};
+                      ];};
      "dchain_allocate_new_index", {ret_type = Sint32;
                                    arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];
                                    lemmas_before = [
@@ -546,8 +513,7 @@ let fun_types =
                                         last_time_for_index_alloc :=
                                           (List.nth_exn args 2);
                                         "");
-                                   ];
-                                   leaks = [];};
+                                   ];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
                                  arg_types = [Ptr dchain_struct; Sint32; Uint32;];
                                  lemmas_before = [
@@ -574,28 +540,23 @@ let fun_types =
                                       ");\n\
                                        rejuvenate_preserves_index_range(ch," ^
                                       (List.nth_exn args 1) ^ ", " ^ (List.nth_exn args 2) ^
-                                      ");\n}@*/");];
-                                 leaks = [];};
+                                      ");\n}@*/");];};
      "array_bat_init", {ret_type = Void;
                         arg_types = [Ptr arr_bat_struct;];
                         lemmas_before = [];
-                        lemmas_after = [];
-                        leaks = [];};
+                        lemmas_after = [];};
      "array_bat_begin_access", {ret_type = Ptr batcher_struct;
                                 arg_types = [Ptr arr_bat_struct; Sint32;];
                                 lemmas_before = [];
-                                lemmas_after = [];
-                                leaks = [];};
+                                lemmas_after = [];};
      "array_bat_end_access", {ret_type = Void;
                            arg_types = [Ptr arr_bat_struct;];
                            lemmas_before = [];
-                           lemmas_after = [];
-                           leaks = [];};
+                           lemmas_after = [];};
      "array_lcc_init", {ret_type = Void;
                         arg_types = [Ptr arr_lcc_struct;];
                         lemmas_before = [];
-                        lemmas_after = [];
-                        leaks = [leak "arrp_lcc(_, _)" ~id:"arrp_lcc"];};
+                        lemmas_after = [];};
      "array_lcc_begin_access", {ret_type = Ptr lcore_conf_struct;
                                 arg_types = [Ptr arr_lcc_struct; Sint32;];
                                 lemmas_before = [];
@@ -606,20 +567,11 @@ let fun_types =
                                      "//@ close some_lcore_confp(" ^ ret_val ^");");
                                   (fun ret_var _ _ _ ->
                                      "//@ close some_lcore_confp(" ^ ret_var ^");");
-                                ];
-                                leaks = [
-                                  leak "arrp_lcc_acc(_, _, _, _)"
-                                    ~id:"arrp_lcc_acc";
-                                  leak "lcore_confp(_, _)" ~id:"lcore_confp";
-                                  remove_leak "arrp_lcc";];};
+                                ];};
      "array_lcc_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_lcc_struct;];
                               lemmas_before = [];
-                              lemmas_after = [];
-                              leaks = [
-                                leak "arrp_lcc(_, _)" ~id:"arrp_lcc";
-                                remove_leak "arrp_lcc_acc";
-                                remove_leak "lcore_confp"];};
+                              lemmas_after = [];};
     ]
 
 let fixpoints =
@@ -689,6 +641,7 @@ struct
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"
+  let finishing_fun = "loop_invariant_consume"
 end
 
 (* Register the module *)

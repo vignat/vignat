@@ -179,9 +179,6 @@ let render_context_assumptions assumptions  =
   String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
     "//@ assume(" ^ (render_tterm t) ^ ");")) ^ "\n"
 
-let render_leaks leaks =
-  String.concat ~sep:"\n" leaks ^ "\n"
-
 let render_allocated_args args =
   String.concat ~sep:"\n"
     (List.map (String.Map.data args)
@@ -209,6 +206,5 @@ let render_ir ir fout =
       Out_channel.output_string cout (render_tip_fun_call
                                         ir.tip_call ir.export_point
                                         ir.free_vars);
-      Out_channel.output_string cout (render_leaks ir.leaks);
       Out_channel.output_string cout (render_final ir.finishing);
       Out_channel.output_string cout "}\n")
