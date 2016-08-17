@@ -290,9 +290,13 @@ let apply_assignments assignments ir =
   {ir with
    free_vars = List.fold assignments ~init:ir.free_vars
        ~f:(fun acc (name,value) ->
-           let prev = String.Map.find_exn acc name in
-           String.Map.add acc ~key:name
-             ~data:{name;value={t=prev.value.t;v=value}})}
+           match String.Map.find acc name with
+           | Some prev ->
+             String.Map.add acc ~key:name
+               ~data:{name;value={t=prev.value.t;v=value}}
+           | None ->
+             String.Map.add acc ~key:name
+         ~data:{name;value={t=Unknown;v=value}})}
 
 let apply_assignments_to_statements assignments statements =
   List.fold assignments ~init:statements
