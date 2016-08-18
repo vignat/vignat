@@ -371,7 +371,7 @@ let rec get_struct_val_value valu t =
   | _ -> get_sexp_value valu.full t
 
 let get_vars ftype_of tpref arg_name_gen =
-  let get_vars is_tip known_vars call =
+  let get_vars ~is_tip known_vars call =
     let alloc_local_arg addr value =
       match String.Map.find !allocated_args addr with
       | None ->
@@ -412,9 +412,9 @@ let get_vars ftype_of tpref arg_name_gen =
       | Curioptr ptee ->
         let addr = (Sexp.to_string value) in
         let ptee_type = get_pointee t in
-        if is_ret then begin if is_tip then
+        if is_ret then begin (* if is_tip then *)
             get_ret_pointee_vars addr ptee ptee_type acc
-          else acc
+          (* else acc *)
         end
         else get_arg_pointee_vars addr ptee ptee_type acc
     in
@@ -440,15 +440,15 @@ let get_vars ftype_of tpref arg_name_gen =
     ret_ctxt_vars
   in
   let hist_vars = (List.fold tpref.history ~init:String.Map.empty
-                     ~f:(get_vars false)) in
+                     ~f:(get_vars ~is_tip:false)) in
   let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
-                    ~f:(get_vars true)) in
+                    ~f:(get_vars ~is_tip:true)) in
   tip_vars
 
 let compose_fcall_preamble ftype_of call args tmp_gen =
   (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
 
-let extract_fun_args ftype_of call =
+let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
     let arg_var = String.Map.find !allocated_args
         (Sexp.to_string arg.value) in
@@ -504,9 +504,10 @@ let compose_post_lemmas ~is_tip ftype_of call ret_name args tmp_gen =
   in
   let result = render_tterm (get_ret_val ftype_of call ~is_tip) in
   List.map (ftype_of call.fun_name).lemmas_after
-    ~f:(fun l -> l ret_name result args tmp_gen)
+    ~f:(fun l -> l {ret_name;ret_val=result;
+                    args;tmp_gen;is_tip})
 
-let compose_args_post_conditions call =
+let compose_args_post_conditions (call:Trace_prefix.call_node) =
   List.filter_map call.args ~f:(fun arg ->
       match arg.ptr with
       | Nonptr -> None

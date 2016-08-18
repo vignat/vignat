@@ -1,9 +1,16 @@
-type lemma = bytes -> bytes -> bytes list -> (bytes -> bytes) -> bytes
+type lemma_params = {
+  ret_name : bytes;
+  ret_val : bytes;
+  args : bytes list;
+  tmp_gen : bytes -> bytes;
+  is_tip : bool;
+}
+type lemma = lemma_params -> bytes
 type blemma = bytes list -> (bytes -> bytes) -> bytes
-val tx_l : bytes -> 'a -> 'b -> 'c -> 'd -> bytes
+val tx_l : bytes -> 'a -> bytes
 val tx_bl : bytes -> 'a -> 'b -> bytes
-val on_rez_nonzero : bytes -> bytes -> 'a -> 'b -> 'c -> bytes
-val on_rez_nz : ('a -> 'b -> bytes) -> bytes -> 'c -> 'a -> 'b -> bytes
+val on_rez_nonzero : bytes -> lemma_params -> bytes
+val on_rez_nz : (lemma_params -> bytes) -> lemma_params -> bytes
 type fun_spec = {
   ret_type : Ir.ttype;
   arg_types : Ir.ttype list;
