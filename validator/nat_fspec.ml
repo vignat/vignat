@@ -567,11 +567,17 @@ let fun_types =
                                 lemmas_before = [];
                                 lemmas_after = [
                                   (fun params ->
-                                     "//@ construct_lcc_element(" ^ params.ret_val ^");");
+                                     if params.is_tip then
+                                       "//@ construct_lcc_element(" ^ params.ret_val ^");"
+                                     else "");
                                   (fun params ->
-                                     "//@ close some_lcore_confp(" ^ params.ret_val ^");");
+                                     if params.is_tip then
+                                       "//@ close some_lcore_confp(" ^ params.ret_val ^");"
+                                     else "");
                                   (fun params ->
-                                     "//@ close some_lcore_confp(" ^ params.ret_name ^");");
+                                     if params.is_tip then
+                                       "//@ close some_lcore_confp(" ^ params.ret_name ^");"
+                                     else "");
                                 ];};
      "array_lcc_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_lcc_struct;];
