@@ -47,7 +47,9 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
 let render_hist_fun_call {context;result} =
   (render_fcall_with_lemmas context) ^
   (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
-  render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
+  match result.ret_val.t with
+  | Ptr _ -> "/* Do not render the return ptee assumption for hist calls */\n"
+  | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
 
 let find_false_eq_sttmts (sttmts:tterm list) =
   List.filter sttmts ~f:(fun sttmt ->
