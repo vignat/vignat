@@ -63,8 +63,8 @@ void array_rq_init(struct ArrayRq *arr_out)
   // formally verified domain.
   /* klee_trace_ret(); */
   /* klee_trace_param_i32((uint32_t)arr_out, "arr_out"); */
-  /* klee_make_symbolic(&array_rq_model_cell, sizeof(ARRAY_RQ_EL_TYPE), */
-  /*                    "array_rq_model_cell"); */
+  klee_make_symbolic(&array_rq_model_cell, sizeof(ARRAY_RQ_EL_TYPE),
+                     "array_rq_model_cell");
   array_rq_index_allocated = 0;
   ARRAY_RQ_EL_INIT(&array_rq_model_cell);
   array_rq_initialized = arr_out;
@@ -73,6 +73,8 @@ void array_rq_init(struct ArrayRq *arr_out)
 void array_rq_reset(struct ArrayRq *arr)
 {
   // No need for tracing, this is a shadow control function.
+  klee_make_symbolic(&array_rq_model_cell, sizeof(ARRAY_RQ_EL_TYPE),
+                     "array_rq_model_cell");
   array_rq_index_allocated = 0;
   ARRAY_RQ_EL_INIT(&array_rq_model_cell);
   array_rq_initialized = arr;
