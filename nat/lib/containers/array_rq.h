@@ -84,7 +84,7 @@ ARRAY_RQ_EL_TYPE *array_rq_begin_access(struct ArrayRq *arr, int index)
 {
   klee_trace_ret_ptr(sizeof(ARRAY_RQ_EL_TYPE));
   ARRAY_RQ_EL_TRACE_BREAKDOWN;
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayRq), "arr");
   klee_trace_param_i32(index, "index");
 
   klee_assert(arr == array_rq_initialized);
@@ -100,7 +100,7 @@ ARRAY_RQ_EL_TYPE *array_rq_begin_access(struct ArrayRq *arr, int index)
 void array_rq_end_access(struct ArrayRq *arr)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayRq), "arr");
   klee_assert(array_rq_index_allocated);
   klee_assert(arr == array_rq_initialized);
   //nothing

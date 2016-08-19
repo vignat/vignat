@@ -53,7 +53,7 @@ void array_u16_reset(struct ArrayU16 *arr)
 ARRAY_U16_EL_TYPE *array_u16_begin_access(struct ArrayU16 *arr, int index)
 {
   klee_trace_ret_ptr(sizeof(ARRAY_U16_EL_TYPE));
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayU16), "arr");
   klee_trace_param_i32(index, "index");
 
   klee_assert(arr == array_u16_initialized);
@@ -69,7 +69,7 @@ ARRAY_U16_EL_TYPE *array_u16_begin_access(struct ArrayU16 *arr, int index)
 void array_u16_end_access(struct ArrayU16 *arr)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayU16), "arr");
   klee_assert(array_u16_index_allocated);
   klee_assert(arr == array_u16_initialized);
   //nothing

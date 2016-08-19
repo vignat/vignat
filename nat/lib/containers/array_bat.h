@@ -68,7 +68,7 @@ void array_bat_init(struct ArrayBat *arr_out)
 ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index)
 {
   klee_trace_ret_ptr(sizeof(ARRAY_BAT_EL_TYPE));
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayBat), "arr");
   klee_trace_param_i32(index, "index");
 
   klee_assert(arr == array_bat_initialized);
@@ -84,7 +84,7 @@ ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index)
 void array_bat_end_access(struct ArrayBat *arr)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)arr, "arr");
+  klee_trace_param_just_ptr(arr, sizeof(struct ArrayBat), "arr");
   klee_assert(array_bat_index_allocated);
   klee_assert(arr == array_bat_initialized);
   //nothing
