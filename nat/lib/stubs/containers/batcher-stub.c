@@ -22,7 +22,7 @@ void batcher_init(struct Batcher* bat_out)
 void batcher_push(struct Batcher *bat, BATCHER_EL_TYPE val)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)bat, "bat");
+  klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
   //TODO: A proper tracing here.
   klee_trace_param_i32((uint32_t)val, "val");
 
@@ -37,9 +37,9 @@ void batcher_take_all(struct Batcher *bat,
                       int *count_out)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)bat, "bat");
+  klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
   //TODO: A proper tracing here.
-  klee_trace_param_i32((uint32_t)vals_out, "vals_out");
+  klee_trace_param_just_ptr(vals_out, sizeof(BATCHER_EL_TYPE*), "vals_out");
   klee_trace_param_ptr(count_out, sizeof(int), "count_out");
 
   klee_assert(bat == batcher_initialized);
@@ -50,18 +50,25 @@ void batcher_take_all(struct Batcher *bat,
   alloc_len = 0;
 }
 
+void batcher_empty(struct Batcher *bat)
+{
+  klee_trace_ret();
+  klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
+  alloc_len = 0;
+}
+
 int batcher_full(struct Batcher *bat)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)bat, "bat");
+  klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
   klee_assert(bat == batcher_initialized);
   return BATCHER_CAPACITY <= alloc_len;
 }
 
-int batcher_empty(struct Batcher *bat)
+int batcher_is_empty(struct Batcher *bat)
 {
   klee_trace_ret();
-  klee_trace_param_i32((uint32_t)bat, "bat");
+  klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
   klee_assert(bat == batcher_initialized);
   return alloc_len <= 0;
 }

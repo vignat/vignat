@@ -211,6 +211,7 @@ try_send_burst_and_erase(uint16_t queueid, struct Batcher *bat, uint8_t port)
       rte_pktmbuf_free(batch[n_sent]);
     } while (++n_sent < count);
   }
+  batcher_empty(bat);
 }
 
 /* Send burst of packets on an output interface */
@@ -505,7 +506,7 @@ main_loop(__attribute__((unused)) void *dummy)
             for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
               struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs,
                                                           portid);
-              int is_empty = batcher_empty(mbufs);
+              int is_empty = batcher_is_empty(mbufs);
               array_bat_end_access(&qconf->tx_mbufs);
               mbufs = 0;
               if (is_empty)
