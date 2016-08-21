@@ -40,8 +40,114 @@ void log_int_key(const struct int_key *key);
 void log_ext_key(const struct ext_key *key);
 void log_flow(const struct flow *f);
 
-#define MAX_FLOWS (1024)
+#ifdef KLEE_VERIFICATION
 
+#include <klee/klee.h>
+
+struct str_field_descr int_key_descrs[] = {
+  {offsetof(struct int_key, int_src_port), sizeof(uint16_t), "int_src_port"},
+  {offsetof(struct int_key, dst_port), sizeof(uint16_t), "dst_port"},
+  {offsetof(struct int_key, int_src_ip), sizeof(uint32_t), "int_src_ip"},
+  {offsetof(struct int_key, dst_ip), sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct int_key, int_device_id), sizeof(uint8_t), "int_device_id"},
+  {offsetof(struct int_key, protocol), sizeof(uint8_t), "protocol"},
+};
+struct str_field_descr ext_key_descrs[] = {
+  {offsetof(struct ext_key, ext_src_port), sizeof(uint16_t), "ext_src_port"},
+  {offsetof(struct ext_key, dst_port), sizeof(uint16_t), "dst_port"},
+  {offsetof(struct ext_key, ext_src_ip), sizeof(uint32_t), "ext_src_ip"},
+  {offsetof(struct ext_key, dst_ip), sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct ext_key, ext_device_id), sizeof(uint8_t), "ext_device_id"},
+  {offsetof(struct ext_key, protocol), sizeof(uint8_t), "protocol"},
+};
+struct nested_field_descr flow_nests[] = {
+  {offsetof(struct flow, ik), offsetof(struct int_key, int_src_port),
+   sizeof(uint16_t), "int_src_port"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, dst_port),
+   sizeof(uint16_t), "dst_port"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, int_src_ip),
+   sizeof(uint32_t), "int_src_ip"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, dst_ip),
+   sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, int_device_id),
+   sizeof(uint8_t), "int_device_id"},
+  {offsetof(struct flow, ik), offsetof(struct int_key, protocol),
+   sizeof(uint8_t), "protocol"},
+
+  {offsetof(struct flow, ek), offsetof(struct ext_key, ext_src_port),
+   sizeof(uint16_t), "ext_src_port"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, dst_port),
+   sizeof(uint16_t), "dst_port"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, ext_src_ip),
+   sizeof(uint32_t), "ext_src_ip"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, dst_ip),
+   sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, ext_device_id),
+   sizeof(uint8_t), "ext_device_id"},
+  {offsetof(struct flow, ek), offsetof(struct ext_key, protocol),
+   sizeof(uint8_t), "protocol"},
+};
+
+struct str_field_descr flow_descrs[] = {
+  {offsetof(struct flow, ik), sizeof(struct int_key), "ik"},
+  {offsetof(struct flow, ek), sizeof(struct ext_key), "ek"},
+  {offsetof(struct flow, int_src_port), sizeof(uint16_t), "int_src_port"},
+  {offsetof(struct flow, ext_src_port), sizeof(uint16_t), "ext_src_port"},
+  {offsetof(struct flow, dst_port), sizeof(uint16_t), "dst_port"},
+  {offsetof(struct flow, int_src_ip), sizeof(uint32_t), "int_src_ip"},
+  {offsetof(struct flow, ext_src_ip), sizeof(uint32_t), "ext_src_ip"},
+  {offsetof(struct flow, dst_ip), sizeof(uint32_t), "dst_ip"},
+  {offsetof(struct flow, int_device_id), sizeof(uint8_t), "int_device_id"},
+  {offsetof(struct flow, ext_device_id), sizeof(uint8_t), "ext_device_id"},
+  {offsetof(struct flow, protocol), sizeof(uint8_t), "protocol"},
+};
+
+int flow_consistency(void* key_a, void* key_b, int index, void* value) {
+  struct int_key* int_key = key_a;
+  struct ext_key* ext_key = key_b;
+  struct flow* flow = value;
+  return
+#if 0 //Semantics - inessential for the crash-freedom.
+    ( int_key->int_src_port == flow->int_src_port ) &
+    ( int_key->dst_port == flow->dst_port ) &
+    ( int_key->int_src_ip == flow->int_src_ip ) &
+    ( int_key->dst_ip == flow->dst_ip ) &
+    ( int_key->int_device_id == flow->int_device_id ) &
+    ( int_key->protocol == flow->protocol ) &
+
+    ( int_key->int_src_port == flow->ik.int_src_port ) &
+    ( int_key->dst_port == flow->ik.dst_port ) &
+    ( int_key->int_src_ip == flow->ik.int_src_ip ) &
+    ( int_key->dst_ip == flow->ik.dst_ip ) &
+    ( int_key->int_device_id == flow->ik.int_device_id ) &
+    ( int_key->protocol == flow->ik.protocol ) &
+
+    //(0 == memcmp(int_key, &flow->ik, sizeof(struct int_key))) &
+    ( ext_key->ext_src_port == flow->ext_src_port ) &
+    ( ext_key->dst_port == flow->dst_port ) &
+    ( ext_key->ext_src_ip == flow->ext_src_ip ) &
+    ( ext_key->dst_ip == flow->dst_ip ) &
+    ( ext_key->ext_device_id == flow->ext_device_id ) &
+    ( ext_key->protocol == flow->protocol ) &
+
+    ( ext_key->ext_src_port == flow->ek.ext_src_port ) &
+    ( ext_key->dst_port == flow->ek.dst_port ) &
+    ( ext_key->ext_src_ip == flow->ek.ext_src_ip ) &
+    ( ext_key->dst_ip == flow->ek.dst_ip ) &
+    ( ext_key->ext_device_id == flow->ek.ext_device_id ) &
+    ( ext_key->protocol == flow->ek.protocol ) &
+#endif//0 -- inessential for crash freedom part.
+    ( 0 <= flow->int_device_id) &
+          (flow->int_device_id < RTE_MAX_ETHPORTS) &
+    ( 0 <= flow->ext_device_id) & //FIXME: Klee translates this to signed variable
+          (flow->ext_device_id < RTE_MAX_ETHPORTS) &
+    ( ext_key->ext_src_port == starting_port + index) &
+    ( flow->ext_src_port == starting_port + index ) &
+    ( flow->ek.ext_src_port == starting_port + index );
+    //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
+}
+
+#endif//KLEE_VERIFICATION
 
 /*@
   inductive int_k = ikc(int, int, int, int, int, int);

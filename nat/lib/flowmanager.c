@@ -20,51 +20,6 @@ uint32_t expiration_time = 0; /*seconds*/
 struct DoubleChain* chain;
 
 #ifdef KLEE_VERIFICATION
-int flow_consistency(void* key_a, void* key_b, int index, void* value) {
-  struct int_key* int_key = key_a;
-  struct ext_key* ext_key = key_b;
-  struct flow* flow = value;
-  return
-#if 0 //Semantic - inessential for the crash-freedom.
-    ( int_key->int_src_port == flow->int_src_port ) &
-    ( int_key->dst_port == flow->dst_port ) &
-    ( int_key->int_src_ip == flow->int_src_ip ) &
-    ( int_key->dst_ip == flow->dst_ip ) &
-    ( int_key->int_device_id == flow->int_device_id ) &
-    ( int_key->protocol == flow->protocol ) &
-
-    ( int_key->int_src_port == flow->ik.int_src_port ) &
-    ( int_key->dst_port == flow->ik.dst_port ) &
-    ( int_key->int_src_ip == flow->ik.int_src_ip ) &
-    ( int_key->dst_ip == flow->ik.dst_ip ) &
-    ( int_key->int_device_id == flow->ik.int_device_id ) &
-    ( int_key->protocol == flow->ik.protocol ) &
-
-    //(0 == memcmp(int_key, &flow->ik, sizeof(struct int_key))) &
-    ( ext_key->ext_src_port == flow->ext_src_port ) &
-    ( ext_key->dst_port == flow->dst_port ) &
-    ( ext_key->ext_src_ip == flow->ext_src_ip ) &
-    ( ext_key->dst_ip == flow->dst_ip ) &
-    ( ext_key->ext_device_id == flow->ext_device_id ) &
-    ( ext_key->protocol == flow->protocol ) &
-
-    ( ext_key->ext_src_port == flow->ek.ext_src_port ) &
-    ( ext_key->dst_port == flow->ek.dst_port ) &
-    ( ext_key->ext_src_ip == flow->ek.ext_src_ip ) &
-    ( ext_key->dst_ip == flow->ek.dst_ip ) &
-    ( ext_key->ext_device_id == flow->ek.ext_device_id ) &
-    ( ext_key->protocol == flow->ek.protocol ) &
-#endif//0 -- inessential for crash freedom part.
-    ( 0 <= flow->int_device_id) &
-          (flow->int_device_id < RTE_MAX_ETHPORTS) &
-    ( 0 <= flow->ext_device_id) & //FIXME: Klee translates this to signed variable
-          (flow->ext_device_id < RTE_MAX_ETHPORTS) &
-    ( ext_key->ext_src_port == starting_port + index) &
-    ( flow->ext_src_port == starting_port + index ) &
-    ( flow->ek.ext_src_port == starting_port + index );
-    //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
-}
-
 struct DoubleChain** get_dchain_pp(void) {
   return &chain;
 }
