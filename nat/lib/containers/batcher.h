@@ -59,16 +59,35 @@ void batcher_take_all(struct Batcher *bat,
             *count_out |-> length(b) &*& valsp(vals, length(b), b) &*&
             length(b) <= BATCHER_CAPACITY; @*/
 
+/**
+   Return the ownership to the internal array of elements, obtained by
+   batcher_take_all, and empty the batcher. This prepares it to the subsequent
+   pushes.
+
+   @param bat - a pointer to the batcher.
+ */
 void batcher_empty(struct Batcher *bat);
 /*@ requires batcher_accp(bat, ?len) &*&
              vals(batcher_contents(bat), len, _); @*/
 //@ ensures batcherp(nil, bat);
 
+/**
+   Check whether the batcher is full already.
+
+   @param bat - a pointer to the batcher.
+   @returns 1 if the batcher is full, and 0 otherwise.
+ */
 int batcher_full(struct Batcher *bat);
 //@ requires batcherp(?b, bat);
 /*@ ensures batcherp(b, bat) &*&
             result == (length(b) == BATCHER_CAPACITY ? 1 : 0); @*/
 
+/**
+   Check whether the batcher is empty.
+
+   @param bat - a pointer to the batcher.
+   @returns 1 if there are no elements in the batcher, 0 otherwise.
+ */
 int batcher_is_empty(struct Batcher *bat);
 //@ requires batcherp(?b, bat);
 //@ ensures batcherp(b, bat) &*& result == (b == nil ? 1 : 0);

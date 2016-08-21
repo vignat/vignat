@@ -14,7 +14,9 @@
 #endif //KLEE_VERIFICATION
 
 void log_ip(uint32_t addr) {
-    LOG_ADD( "%d.%d.%d.%d", addr&0xff, (addr>>8)&0xff, (addr>>16)&0xff, (addr>>24)&0xff);
+    LOG_ADD( "%d.%d.%d.%d",
+             addr&0xff, (addr>>8)&0xff,
+             (addr>>16)&0xff, (addr>>24)&0xff);
 }
 
 void log_int_key(const struct int_key *key) {

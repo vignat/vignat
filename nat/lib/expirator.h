@@ -5,6 +5,17 @@
 #include "containers/double-map.h"
 #include "coherence.h"
 
+/**
+  The function takes "coherent" chain allocator and hash map, and current time.
+  It removes flows older than time simultaneously from the allocator and the
+  map.
+  @param chain - DoubleChain index allocator. Items in the allocator are
+                 tagged with timestamps.
+  @param map - DoubleMap hash table holding flows synchronized with the allocator.
+  @param time - Current number of seconds since the Epoch.
+
+  @returns the number of expired flows.
+ */
 int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                  struct DoubleMap* map,
                                  uint32_t time);

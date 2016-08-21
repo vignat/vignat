@@ -2,6 +2,11 @@
 #define _FLOW_H_INCLUDED_
 #include <stdint.h>
 
+/**
+  The "internal" key - the part of the flow ID, related to the internal network.
+  Used in a hash map to identify flows for packets coming from the internal
+  network.
+*/
 struct int_key {
   uint16_t int_src_port;
   uint16_t dst_port;
@@ -11,6 +16,11 @@ struct int_key {
   uint8_t protocol;
 };
 
+/**
+  The "external" key - the part of the flow ID, related to the external network.
+  Used in a hash map to identify flows for packets coming from the external
+  network.
+*/
 struct ext_key {
   uint16_t ext_src_port;
   uint16_t dst_port;
@@ -20,6 +30,11 @@ struct ext_key {
   uint8_t protocol;
 };
 
+/**
+  The flow ID. A 7-tuple holding all elements necessary to identify both sides
+  of a flow: the internal and the external. This structure helps NAT to
+  translate between internal and external 5-tuples.
+ */
 struct flow {
   // This incapsulation simplifies memory management, but may hurt locality.
   struct int_key ik;//2.5x redundancy.
@@ -35,6 +50,9 @@ struct flow {
   uint8_t protocol;
 };
 
+/**
+  Logging functions for the structures defined above.
+*/
 void log_ip(uint32_t addr);
 void log_int_key(const struct int_key *key);
 void log_ext_key(const struct ext_key *key);
@@ -44,6 +62,11 @@ void log_flow(const struct flow *f);
 
 #include <klee/klee.h>
 
+/*
+  Metainformation about the structures above. Used for detailed traces in Klee
+  symbolic execution engine. See dmap_set_layout in the
+  double-map-stub-control.h
+ */
 struct str_field_descr int_key_descrs[] = {
   {offsetof(struct int_key, int_src_port), sizeof(uint16_t), "int_src_port"},
   {offsetof(struct int_key, dst_port), sizeof(uint16_t), "dst_port"},
@@ -313,24 +336,72 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value) {
   ensures chars((void*)p, sizeof(struct flow), _);
   @*/
 
+/**
+  Equality comparison function for the int_key's.
+  Necessary for DoubleMap, hence the generalized signature.
+  @param a - pointer to the first int_key
+  @param b - pointer to second int_key
+  @returns 1 if *a equals *b; and 1 otherwise.
+*/
 int int_key_eq(void* a, void* b);
 //@ requires [?f1]int_k_p(a, ?ak) &*& [?f2]int_k_p(b, ?bk);
 //@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+
+/**
+  Equality comparison function for the ext_key's.
+  Necessary for DoubleMap, hence the generalized signature.
+  @param a - pointer to the first ext_key
+  @param b - pointer to second ext_key
+  @returns 1 if *a equals *b; and 1 otherwise.
+*/
 int ext_key_eq(void* a, void* b);
 //@ requires [?f1]ext_k_p(a, ?ak) &*& [?f2]ext_k_p(b, ?bk);
 //@ ensures [f1]ext_k_p(a, ak) &*& [f2]ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
 
+
+/**
+  Hash function for int_key's.
+  Necessary for DoubleMap, hence the generalized signature.
+
+  @param ik - pointer to the int_key.
+  @returns integer - a hash computed for *ik. For equal keys the hash values are
+  guaranteed to be equal.
+*/
 int int_key_hash(void* ik);
 //@ requires [?f]int_k_p(ik, ?k);
 //@ ensures [f]int_k_p(ik, k) &*& result == int_hash(k);
+
+/**
+   Hash function for ext_key's.
+   Necessary for DoubleMap, hence the generalized signature.
+
+   @param ek - pointer to the ext_key.
+   @returns integer - a hash computed for *ek. For equal keys the hash values are
+   guaranteed to be equal.
+*/
 int ext_key_hash(void* ek);
 //@ requires [?f]ext_k_p(ek, ?k);
 //@ ensures [f]ext_k_p(ek, k) &*& result == ext_hash(k);
 
+/**
+   Free the resources, acquired by the flow ID. In practice, does nothing.
+   Necessary for DoubleMap, hence the generalized signature.
+   It does not free memory itself.
+
+   @param flwp - pointer to the flow to be destroyed.
+*/
 void flow_destroy(void* flwp);
 //@ requires flw_p(flwp, ?flw);
 //@ ensures chars(flwp, sizeof(struct flow), _);
 
+/**
+   Given the flow ID, get the internal and external keys.
+   Necessary for DoubleMap, hence the generalized signature.
+
+   @param flwp - the pointer to the flow ID.
+   @param ikpp - the output pointer for the internal key extracted from the flow.
+   @param ekpp - the output pointer for the external key extracted from the flow.
+*/
 void flow_extract_keys(void* flwp, void** ikpp, void** ekpp);
 //@ requires [?f]flw_p(flwp, ?flw) &*& *ikpp |-> _ &*& *ekpp |-> _;
 /*@ ensures [f]flow_p(flwp, flw) &*& *ikpp |-> ?ikp &*& *ekpp |-> ?ekp &*&
@@ -338,6 +409,16 @@ void flow_extract_keys(void* flwp, void** ikpp, void** ekpp);
             true == flow_keys_offsets_fp(flwp, ikp, ekp) &*&
             ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
 
+/**
+   The opposite of flow_extract_keys. In practice does nothing.
+   Necessary for DoubleMap, hence the generalized signature.
+
+   @param flwp - the pointer to the flow ID.
+   @param ikp - pointer to the internal key, must be the one extracted
+                previously.
+   @param ekp - pointer to the external key, must be the one extracted
+                previously.
+*/
 void flow_pack_keys(void* flwp, void* ikp, void* ekp);
 /*@ requires [?f]flow_p(flwp, ?flw) &*&
              [f]int_k_p(ikp, ?ik) &*& [f]ext_k_p(ekp, ?ek) &*&
@@ -345,6 +426,14 @@ void flow_pack_keys(void* flwp, void* ikp, void* ekp);
              ik == flw_get_ik(flw) &*& ek == flw_get_ek(flw); @*/
 //@ ensures [f]flw_p(flwp, flw);
 
+/**
+   Copy the flow ID.
+   Necessary for DoubleMap, hence the generalized signature.
+
+   @param dst - output pointer for the copy of the flow. Must point to
+                a preallocated sufficient memory chunk.
+   @param src - the flow to be copied.
+*/
 void flow_cpy(char* dst, void* src);
 //@ requires [?fr]flw_p(src, ?f) &*& dst[0..sizeof(struct flow)] |-> _;
 //@ ensures [fr]flw_p(src, f) &*& flw_p((void*)dst, f);
