@@ -206,8 +206,9 @@ let rec get_vars_from_struct_val v ty known_vars =
       List.fold (List.zip_exn v.break_down ftypes) ~init:known_vars
         ~f:(fun acc (v,t)->
           get_vars_from_struct_val v.value t acc)
-  | ty ->
-    get_vars_from_plain_val v.full ty known_vars
+  | ty -> match v.full with
+    | Some v -> get_vars_from_plain_val v ty known_vars
+    | None -> known_vars
 
 let name_gen prefix = object
   val mutable cnt = 0
@@ -368,10 +369,12 @@ let rec get_struct_val_value valu t =
       in
       {v=Struct (strname, fields);t}
     end
-  | _ -> get_sexp_value valu.full t
+  | _ -> match valu.full with
+    | Some v -> get_sexp_value v t
+    | None -> {t;v=Undef}
 
 let get_vars ftype_of tpref arg_name_gen =
-  let get_vars ~is_tip known_vars call =
+  let get_vars ~is_tip known_vars (call:Trace_prefix.call_node) =
     let alloc_local_arg addr value =
       match String.Map.find !allocated_args addr with
       | None ->
@@ -384,17 +387,14 @@ let get_vars ftype_of tpref arg_name_gen =
             ~key:addr ~data:(update_var_spec spec value)
     in
     let get_arg_pointee_vars addr ptee ptee_type accumulator =
-      let before_vars = match ptee.before with
-        | Some v ->
-          alloc_local_arg addr (get_struct_val_value v ptee_type);
-          get_vars_from_struct_val v ptee_type accumulator
-        | None -> failwith("Initial argument pointee value must" ^
-                           " be dumped for call " ^ call.fun_name)
+      let before_vars =
+        get_vars_from_struct_val ptee.before ptee_type accumulator
       in
       get_vars_from_struct_val ptee.after ptee_type before_vars
     in
     let get_ret_pointee_vars addr ptee ptee_type accumulator =
-      assert(ptee.before = None);
+      assert(ptee.before.full = None);
+      assert(ptee.before.break_down = []);
       (*TODO: use another name generator to distinguish
         ret pointee stubs from the args *)
       alloc_local_arg addr (get_struct_val_value ptee.after ptee_type);

@@ -2,15 +2,15 @@ type expr = Core_kernel.Core_sexp.t
 val __expr_of_sexp__ : expr -> expr
 val expr_of_sexp : expr -> expr
 val sexp_of_expr : expr -> expr
-type field = { fname : bytes; value : struct_val; }
-and struct_val = { full : expr; break_down : field list; }
+type field = { fname : bytes; value : struct_val; addr : int64; }
+and struct_val = { full : expr option; break_down : field list; }
 val __field_of_sexp__ : expr -> field
 val field_of_sexp : expr -> field
 val __struct_val_of_sexp__ : expr -> struct_val
 val struct_val_of_sexp : expr -> struct_val
 val sexp_of_field : field -> expr
 val sexp_of_struct_val : struct_val -> expr
-type ptee = { before : struct_val option; after : struct_val; }
+type ptee = { before : struct_val; after : struct_val; }
 val __ptee_of_sexp__ : expr -> ptee
 val ptee_of_sexp : expr -> ptee
 val sexp_of_ptee : ptee -> expr
