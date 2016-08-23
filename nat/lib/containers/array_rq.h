@@ -38,10 +38,39 @@ static void lcore_rx_queue_init(struct lcore_rx_queue *cell)
 
 struct ArrayRq;
 
+/*@
+  inductive rx_queuei = rx_queuei(int,int);
+  predicate rx_queuep(rx_queuei rq, struct lcore_rx_queue *lrq);
+  predicate some_rx_queuep(struct lcore_rx_queue *lrq) = rx_queuep(_, lrq);
+  @*/
+
+/*@
+  predicate arrp_rq(list<rx_queuei> data, struct ArrayRq *arr);
+  predicate arrp_rq_acc(list<rx_queuei> data, struct ArrayRq *arr, int idx);
+
+  fixpoint ARRAY_RQ_EL_TYPE *arrp_the_missing_cell_rq(struct ArrayRq *arr,
+                                                      int idx);
+
+  lemma void construct_rq_element(ARRAY_RQ_EL_TYPE *p);
+  requires p->port_id |-> ?pid &*&
+           0 <= pid &*& pid <= RTE_MAX_ETHPORTS &*&
+           p->queue_id |-> _ &*&
+           struct_lcore_rx_queue_padding(p);
+  ensures rx_queuep(_, p);
+  @*/
+
 // In-place initialization
 void array_rq_init(struct ArrayRq *arr_out);
 ARRAY_RQ_EL_TYPE *array_rq_begin_access(struct ArrayRq *arr, int index);
+//@ requires arrp_rq(?lst, arr) &*& 0 <= index &*& index < ARRAY_RQ_CAPACITY;
+/*@ ensures arrp_rq_acc(lst, arr, index) &*&
+            result == arrp_the_missing_cell_rq(arr, index) &*&
+            rx_queuep(nth(index, lst), result); @*/
+
 void array_rq_end_access(struct ArrayRq *arr);
+/*@ requires arrp_rq_acc(?lst, arr, ?idx) &*&
+             rx_queuep(?rq, arrp_the_missing_cell_rq(arr, idx)); @*/
+//@ ensures arrp_rq(update(idx, rq, lst), arr);
 
 #ifdef KLEE_VERIFICATION
 

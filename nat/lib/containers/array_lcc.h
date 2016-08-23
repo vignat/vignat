@@ -61,7 +61,10 @@ struct ArrayLcc
 
 /*@
   inductive lcore_confi = lcore_confi(int);
-  predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp);
+  predicate pure_lcore_confp(lcore_confi lc, struct lcore_conf *lcp);
+  predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp) =
+      pure_lcore_confp(lc, lcp) &*&
+      arrp_rq(_, &lcp->rx_queue_list);
   predicate some_lcore_confp(struct lcore_conf *lcp) = lcore_confp(_, lcp);
   @*/
 
@@ -83,7 +86,6 @@ requires p->n_rx_queue |-> ?nrq &*&
          struct_ArrayBat_padding(&p->tx_mbufs) &*&
          struct_lcore_conf_padding(p);
 ensures lcore_confp(_, p);
-
 
 @*/
 
