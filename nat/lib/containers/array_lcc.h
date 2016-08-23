@@ -40,12 +40,15 @@ static void lcore_conf_condition(struct lcore_conf *cell)
 #define ARRAY_LCC_EL_TRACE_BREAKDOWN {                                  \
     klee_trace_ret_ptr_field(offsetof(struct lcore_conf, n_rx_queue),   \
                              sizeof(uint16_t), "n_rx_queue");           \
-    /*klee_trace_ret_ptr_field(offsetof(struct lcore_conf, rx_queue_list), \
-                             sizeof(struct ArrayRq), "rx_queue_list");  \
-    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, tx_queue_id),  \
-                             sizeof(struct ArrayU16), "tx_queue_id");   \
-    klee_trace_ret_ptr_field(offsetof(struct lcore_conf, tx_mbufs),     \
-    sizeof(struct ArrayBat), "tx_mbufs");*/                             \
+    klee_trace_ret_ptr_field_just_ptr                                   \
+      (offsetof(struct lcore_conf, rx_queue_list),                      \
+       sizeof(struct ArrayRq), "rx_queue_list");                        \
+    klee_trace_ret_ptr_field_just_ptr                                   \
+      (offsetof(struct lcore_conf, tx_queue_id),                        \
+       sizeof(struct ArrayU16), "tx_queue_id");                         \
+    klee_trace_ret_ptr_field_just_ptr                                   \
+      (offsetof(struct lcore_conf, tx_mbufs),                           \
+       sizeof(struct ArrayBat), "tx_mbufs");                            \
   }
 
 #ifdef KLEE_VERIFICATION
