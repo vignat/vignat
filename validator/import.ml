@@ -3,7 +3,8 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
-let allocated_args : var_spec String.Map.t ref = ref String.Map.empty
+let allocated_args : var_spec list ref = ref []
+let known_addresses : tterm Int64.Map.t ref = ref Int64.Map.empty
 
 let infer_signed_type w =
   if String.equal w "w32" then Sint32
@@ -145,16 +146,19 @@ let rec guess_type_l exps =
     end
   | [] -> Unknown
 
+let update_tterm known given =
+  let t_final = match known.t with
+    | Unknown -> given.t
+    | Sunknown | Uunknown -> if given.t = Unknown then known.t else given.t
+    | _ -> known.t in
+  let v_final = match known.v with
+    | Undef -> given.v
+    | _ -> known.v in
+  {t=t_final;v=v_final}
+
 let update_var_spec (spec:var_spec) v =
-  let t_final = match spec.value.t with
-    | Unknown -> v.t
-    | Sunknown | Uunknown -> if v.t = Unknown then spec.value.t else v.t
-    | _ -> spec.value.t in
-  let v_final = match spec.value.v with
-    | Undef -> v.v
-    | _ -> spec.value.v in
   {name = spec.name;
-   value = {v=v_final; t=t_final};}
+   value = (update_tterm spec.value v);}
 
 let failback_type t1 t2 =
   match t1 with
@@ -363,7 +367,7 @@ let rec get_struct_val_value valu t =
     (* | None -> <^^^ this was working a while ago, may be it should be
        left somewhere *)
       let fields = List.map2_exn valu.break_down fields
-          ~f:(fun {fname;value} (name,t) ->
+          ~f:(fun {fname;value;_} (name,t) ->
               assert(String.equal name fname);
               {name;value=(get_struct_val_value value t)})
       in
@@ -373,18 +377,31 @@ let rec get_struct_val_value valu t =
     | Some v -> get_sexp_value v t
     | None -> {t;v=Undef}
 
+let rec add_to_known_addresses base_value breakdown addr=
+  let prev = match Int64.Map.find !known_addresses addr with
+    | Some value -> value
+    | None -> {t=Unknown;v=Undef}
+  in
+  known_addresses := Int64.Map.add !known_addresses
+      ~key:addr ~data:(update_tterm prev base_value);
+  List.iter breakdown ~f:(fun {fname;value;addr} ->
+      let b_value = {t=Unknown;v=Str_idx (base_value,fname)} in
+      add_to_known_addresses b_value value.break_down addr)
+
 let get_vars ftype_of tpref arg_name_gen =
   let get_vars ~is_tip known_vars (call:Trace_prefix.call_node) =
-    let alloc_local_arg addr value =
-      match String.Map.find !allocated_args addr with
-      | None ->
-        let p_name = arg_name_gen#generate in
-        allocated_args := String.Map.add !allocated_args
-            ~key:addr ~data:{name = p_name;
-                             value};
-      | Some spec ->
-        allocated_args := String.Map.add !allocated_args
-            ~key:addr ~data:(update_var_spec spec value)
+    let alloc_local_arg addr str_value tterm =
+      let addr = (Int64.of_string addr) in
+      match Int64.Map.find !known_addresses addr with
+      | Some spec -> known_addresses :=
+          Int64.Map.add !known_addresses
+            ~key:addr ~data:(update_tterm spec tterm)
+      | None -> let p_name = arg_name_gen#generate in
+        allocated_args := {name=p_name;value=tterm}::!allocated_args;
+        add_to_known_addresses
+          {v=Id p_name;t=tterm.t}
+          str_value.break_down
+          addr;
     in
     let get_arg_pointee_vars addr ptee ptee_type accumulator =
       let before_vars =
@@ -397,7 +414,8 @@ let get_vars ftype_of tpref arg_name_gen =
       assert(ptee.before.break_down = []);
       (*TODO: use another name generator to distinguish
         ret pointee stubs from the args *)
-      alloc_local_arg addr (get_struct_val_value ptee.after ptee_type);
+      alloc_local_arg addr ptee.after
+        (get_struct_val_value ptee.after ptee_type);
       get_vars_from_struct_val ptee.after ptee_type accumulator
     in
     let complex_value_vars value ptr t is_ret acc =
@@ -407,7 +425,7 @@ let get_vars ftype_of tpref arg_name_gen =
       | Apathptr ->
         let addr = (Sexp.to_string value) in
         let ptee_type = get_pointee t in
-        alloc_local_arg addr {v=Undef;t=ptee_type};
+        alloc_local_arg addr {full=None;break_down=[]} {v=Undef;t=ptee_type};
         acc
       | Curioptr ptee ->
         let addr = (Sexp.to_string value) in
@@ -450,11 +468,11 @@ let compose_fcall_preamble ftype_of call args tmp_gen =
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
-    let arg_var = String.Map.find !allocated_args
-        (Sexp.to_string arg.value) in
+    let arg_var = Int64.Map.find !known_addresses
+        (Int64.of_string (Sexp.to_string arg.value)) in
     let ptee_t = get_pointee arg_type in
     match arg_var with
-    | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=arg_type}
+    | Some n -> {v=Addr n;t=arg_type}
     | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=arg_type}
   in
   List.mapi call.args
@@ -471,11 +489,11 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
 let get_ret_val ftype_of call ~is_tip =
   let make_ptr_to_pointee ret_val ret_type =
     if is_tip then
-      let ret_var = String.Map.find !allocated_args
-          (Sexp.to_string ret_val) in
+      let ret_var = Int64.Map.find !known_addresses
+          (Int64.of_string (Sexp.to_string ret_val)) in
       let ptee_t = get_pointee ret_type in
       match ret_var with
-      | Some n -> {v=Addr {v=(Id n.name);t=ptee_t};t=ret_type}
+      | Some n -> {v=Addr n;t=ret_type}
       | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=ret_type}
     else
       (* In hist calls there is no need for a stub variable to point to,
@@ -515,11 +533,15 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
       | Apathptr -> None
       | Curioptr ptee ->
         let out_arg =
-          let key = Sexp.to_string arg.value in
-          String.Map.find_exn !allocated_args key
+          let key = Int64.of_string (Sexp.to_string arg.value) in
+          Int64.Map.find_exn !known_addresses key
         in
-        Some {name=out_arg.name;
-              value=(get_struct_val_value ptee.after out_arg.value.t)})
+        match out_arg with
+        | {t;v=Id name} ->
+          Some {name;
+                value=(get_struct_val_value ptee.after t)}
+        | _ -> failwith ("the output arg pointer is no just an address of" ^
+                         "a locally built var, it is smth more complex."))
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
@@ -667,6 +689,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let arguments = !allocated_args in
+  let known_addresses = !known_addresses in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
-   export_point;finishing}
+   export_point;finishing;known_addresses}

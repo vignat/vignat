@@ -126,7 +126,7 @@ let rec render_assignment var =
 
 let render_assignments args =
   String.concat ~sep:"\n"
-    (List.map (String.Map.data args) ~f:(fun arg ->
+    (List.map args ~f:(fun arg ->
        render_assignment arg ^ ";"))
 
 let render_equality_assumptions args =
@@ -183,7 +183,7 @@ let render_context_assumptions assumptions  =
 
 let render_allocated_args args =
   String.concat ~sep:"\n"
-    (List.map (String.Map.data args)
+    (List.map args
        ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
                        (spec.name) ^ ";")) ^ "\n"
 
