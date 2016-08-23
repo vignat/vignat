@@ -1,3 +1,5 @@
+#ifndef _DOUBLE_MAP_STUB_CONTROL_H_INCLUDED_
+#define _DOUBLE_MAP_STUB_CONTROL_H_INCLUDED_
 //@ #include "lib/predicates.gh"
 
 typedef int entry_condition(void* key_a, void* key_b, int index, void* value);
@@ -27,3 +29,5 @@ void dmap_set_layout(struct str_field_descr* key_a_fields, int key_a_count,
 struct DoubleMap;
 
 void dmap_reset(struct DoubleMap* map, int capacity);
+
+#endif//_DOUBLE_MAP_STUB_CONTROL_H_INCLUDED_

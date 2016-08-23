@@ -1,5 +1,4 @@
-#include <rte_log.h>
-#include <rte_byteorder.h>
+#include "lib/static-component-params.h"
 
 #include "flow.h"
 
