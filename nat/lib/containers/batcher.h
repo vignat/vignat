@@ -18,6 +18,10 @@ struct Batcher
 };
 
 /*@
+  predicate valsp(BATCHER_EL_TYPE* arr, int len, list<BATCHER_EL_TYPE> lst);
+  @*/
+
+/*@
   predicate batcherp(list<BATCHER_EL_TYPE> batch, struct Batcher* bat);
   predicate batcher_accp(struct Batcher* bat, int len);
   fixpoint BATCHER_EL_TYPE* batcher_contents(struct Batcher* bat);
@@ -68,7 +72,7 @@ void batcher_take_all(struct Batcher *bat,
  */
 void batcher_empty(struct Batcher *bat);
 /*@ requires batcher_accp(bat, ?len) &*&
-             vals(batcher_contents(bat), len, _); @*/
+             valsp(batcher_contents(bat), len, _); @*/
 //@ ensures batcherp(nil, bat);
 
 /**
