@@ -831,8 +831,8 @@ parse_args(int argc, char **argv, unsigned nb_ports)
           start_port = (int)strtol(optarg, &port_end, 10);
           if ((optarg[0] == '\0') || (port_end == NULL) || (*port_end != '\0'))
             return -1;
-          if (max_flows <= 0) {
-            printf("number of flows bound must be positive.");
+          if (start_port <= 0) {
+            printf("A port can not be nonpositive.");
             return -1;
           }
         } else {
