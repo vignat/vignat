@@ -587,11 +587,24 @@ let fun_types =
                                arg_types = [Ptr arr_rq_struct; Sint32;];
                                lemmas_before = [
                                  tx_bl "open lcore_confp(_, ret1);"];
-                               lemmas_after = [];};
+                               lemmas_after = [
+                                 (fun params ->
+                                    if params.is_tip then
+                                      "//@ construct_rq_element(" ^ params.ret_val ^ ");"
+                                    else "");
+                                 (fun params ->
+                                    if params.is_tip then
+                                      "//@ close some_rx_queuep(" ^ params.ret_val ^ ");"
+                                    else "");
+                                 (fun params ->
+                                    if params.is_tip then
+                                      "//@ close some_rx_queuep(" ^ params.ret_name ^ ");"
+                                    else "")];};
      "array_rq_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_rq_struct;];
                               lemmas_before = [];
-                              lemmas_after = [];};
+                             lemmas_after = [
+                               tx_l "close lcore_confp(_, ret1);"];};
     ]
 
 let fixpoints =
