@@ -10,48 +10,56 @@ BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 
 analyze_result() {
-    RESULT=$1
-    FNAME=$2
-    if [ -e "$RESULT" ]; then
-        if grep -q "0 errors found" $RESULT; then
+    VL_RESULT=$1
+    VF_RESULT=$2
+    FNAME=$3
+    if [ -e "$VF_RESULT" ]; then
+        if grep -q "0 errors found" $VF_RESULT; then
             echo $FNAME success >> $REPORT_FNAME
         else
-            if grep -q "Assertion might not hold" $RESULT; then
+            if grep -q "Assertion might not hold" $VF_RESULT; then
                 echo $FNAME assertion fail >> $REPORT_FNAME
-            elif grep -q "No matching heap chunks" $RESULT; then
+            elif grep -q "No matching heap chunks" $VF_RESULT; then
                 echo $FNAME nochunks fail >> $REPORT_FNAME
-            elif grep -q "No matching pointsto chunk" $RESULT; then
+            elif grep -q "No matching pointsto chunk" $VF_RESULT; then
                 echo $FNAME nochunks fail >> $REPORT_FNAME
-            elif grep -q "Function leaks heap chunks" $RESULT; then
+            elif grep -q "Function leaks heap chunks" $VF_RESULT; then
                 echo $FNAME leak fail >> $REPORT_FNAME
-            elif grep -q "Cannot prove" $RESULT; then
+            elif grep -q "Cannot prove" $VF_RESULT; then
                 echo $FNAME unproven fail >> $REPORT_FNAME
-            elif grep -q "Cannot read a ghost variable in a non-pure context" $RESULT; then
+            elif grep -q "Cannot read a ghost variable in a non-pure context" $VF_RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
-            elif grep -q "No such variable, constructor, regular function," $RESULT; then
+            elif grep -q "No such variable, constructor, regular function," $VF_RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
-            elif grep -q "Incorrect number of arguments" $RESULT; then
+            elif grep -q "Incorrect number of arguments" $VF_RESULT; then
                 echo $FNAME syntax fail >> $REPORT_FNAME
-            elif grep -q "Parse error." $RESULT; then
+            elif grep -q "Parse error." $VF_RESULT; then
                 echo $FNAME parser fail >> $REPORT_FNAME
-            elif grep -q "Type mismatch." $RESULT; then
+            elif grep -q "Type mismatch." $VF_RESULT; then
                 echo $FNAME type fail >> $REPORT_FNAME
-            elif grep -q "Wrong number of arguments" $RESULT; then
+            elif grep -q "Wrong number of arguments" $VF_RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
-            elif grep -q "No such function" $RESULT; then
+            elif grep -q "No such function" $VF_RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
-            elif grep -q "Too many patterns" $RESULT; then
+            elif grep -q "Too many patterns" $VF_RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
-            elif grep -1 "Potential arithmetic" $RESULT; then
+            elif grep -q "Potential arithmetic" $VF_RESULT; then
                 echo $FNAME arith fail >> $REPORT_FNAME
+            elif grep -q "No such file or directory" $VF_RESULT &&
+                 grep -q "Uncaught exception" $VL_RESULT; then
+                echo $FNAME validator exception >> $REPORT_FNAME
             else
                 echo $FNAME unknown fail >> $REPORT_FNAME
             fi
-            cat $RESULT
+            cat $VF_RESULT
         fi
     else
-        echo "Unknown error: the report file $RESULT not found."
-        echo $FNAME unknown fail >> $REPORT_FNAME
+        if grep -q "Uncaught exception" $VL_RESULT; then
+            echo $FNAME validator exception >> $REPORT_FNAME
+        else
+            echo "Unknown error: the result file $VF_RESULT not found."
+            echo $FNAME unknown fail >> $REPORT_FNAME
+        fi
     fi
 }
 
@@ -59,7 +67,7 @@ show_result(){
     FNAME=$1
     RESULT=$2
     PROCESSED=$(cat $REPORT_FNAME | wc -l)
-    echo "[${PROCESSED}/${TOT_FILES}] $FNAME : $(cat $VALID_RESULT)"
+    echo "[${PROCESSED}/${TOT_FILES}] $FNAME : $RESULT"
 }
 
 validate_file() {
@@ -72,8 +80,8 @@ validate_file() {
     CMD1="$BASE_DIR/validator.byte $FSPEC_PLUGIN $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST $SPEC_DIR"
     CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
     echo "(cd $BASE_DIR && make all) && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
-    $CMD1 > $VALID_RESULT && $CMD2 > $VERIF_RESULT
-    analyze_result $VERIF_RESULT $FNAME
+    $CMD1 2>&1 | tee $VALID_RESULT && $CMD2 &> $VERIF_RESULT
+    analyze_result $VALID_RESULT $VERIF_RESULT $FNAME
     show_result $FNAME $(cat $VALID_RESULT)
 }
 
@@ -138,6 +146,7 @@ PARSER=$(grep -c "parser fail" $REPORT_FNAME)
 TYPE=$(grep -c "type fail" $REPORT_FNAME)
 SPEC=$(grep -c "spec fail" $REPORT_FNAME)
 ARITH=$(grep -c "arith fail" $REPORT_FNAME)
+VLEXCEPT=$(grep -c "validator exception" $REPORT_FNAME)
 UNKNOWN=$(grep -c "unknown fail" $REPORT_FNAME)
 
 echo "Test completed."
@@ -152,4 +161,5 @@ echo "type mismatch: $TYPE"
 echo "parse errs:    $PARSER"
 echo "spec errs:     $SPEC"
 echo "arithmetic:    $ARITH"
+echo "vl exception:  $VLEXCEPT"
 echo "unknown fail:  $UNKNOWN"
