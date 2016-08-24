@@ -130,6 +130,7 @@ let rec render_tterm (t:tterm) =
   | Int i -> string_of_int i
   | Bool b -> string_of_bool b
   | Not t -> "!(" ^ (render_tterm t) ^ ")"
+  | Str_idx ({v=Deref x;t},field_name) -> "(" ^ (render_tterm x) ^ ")->" ^ field_name
   | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
   | Deref t -> "*(" ^ (render_tterm t) ^ ")"
   | Fptr f -> f

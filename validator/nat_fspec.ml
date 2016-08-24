@@ -585,7 +585,8 @@ let fun_types =
                               lemmas_after = [];};
      "array_rq_begin_access", {ret_type = Ptr lcore_rx_queue_struct;
                                arg_types = [Ptr arr_rq_struct; Sint32;];
-                               lemmas_before = [];
+                               lemmas_before = [
+                                 tx_bl "open lcore_confp(_, ret1);"];
                                lemmas_after = [];};
      "array_rq_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_rq_struct;];

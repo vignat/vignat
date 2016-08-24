@@ -3,7 +3,7 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
-let allocated_args : var_spec list ref = ref []
+(*let allocated_args : var_spec list ref = ref []*)
 let known_addresses : tterm Int64.Map.t ref = ref Int64.Map.empty
 
 let infer_signed_type w =
@@ -377,32 +377,19 @@ let rec get_struct_val_value valu t =
     | Some v -> get_sexp_value v t
     | None -> {t;v=Undef}
 
-let rec add_to_known_addresses base_value breakdown addr=
+let rec add_to_known_addresses base_value breakdown addr =
   let prev = match Int64.Map.find !known_addresses addr with
     | Some value -> value
     | None -> {t=Unknown;v=Undef}
   in
   known_addresses := Int64.Map.add !known_addresses
-      ~key:addr ~data:(update_tterm prev base_value);
+      ~key:addr ~data:(update_tterm base_value prev);
   List.iter breakdown ~f:(fun {fname;value;addr} ->
       let b_value = {t=Unknown;v=Str_idx (base_value,fname)} in
       add_to_known_addresses b_value value.break_down addr)
 
-let get_vars ftype_of tpref arg_name_gen =
+let get_basic_vars ftype_of tpref =
   let get_vars ~is_tip known_vars (call:Trace_prefix.call_node) =
-    let alloc_local_arg addr str_value tterm =
-      let addr = (Int64.of_string addr) in
-      match Int64.Map.find !known_addresses addr with
-      | Some spec -> known_addresses :=
-          Int64.Map.add !known_addresses
-            ~key:addr ~data:(update_tterm spec tterm)
-      | None -> let p_name = arg_name_gen#generate in
-        allocated_args := {name=p_name;value=tterm}::!allocated_args;
-        add_to_known_addresses
-          {v=Id p_name;t=tterm.t}
-          str_value.break_down
-          addr;
-    in
     let get_arg_pointee_vars addr ptee ptee_type accumulator =
       let before_vars =
         get_vars_from_struct_val ptee.before ptee_type accumulator
@@ -414,8 +401,6 @@ let get_vars ftype_of tpref arg_name_gen =
       assert(ptee.before.break_down = []);
       (*TODO: use another name generator to distinguish
         ret pointee stubs from the args *)
-      alloc_local_arg addr ptee.after
-        (get_struct_val_value ptee.after ptee_type);
       get_vars_from_struct_val ptee.after ptee_type accumulator
     in
     let complex_value_vars value ptr t is_ret acc =
@@ -423,9 +408,6 @@ let get_vars ftype_of tpref arg_name_gen =
       | Nonptr -> get_vars_from_plain_val value t acc
       | Funptr _ -> acc
       | Apathptr ->
-        let addr = (Sexp.to_string value) in
-        let ptee_type = get_pointee t in
-        alloc_local_arg addr {full=None;break_down=[]} {v=Undef;t=ptee_type};
         acc
       | Curioptr ptee ->
         let addr = (Sexp.to_string value) in
@@ -463,6 +445,88 @@ let get_vars ftype_of tpref arg_name_gen =
                     ~f:(get_vars ~is_tip:true)) in
   tip_vars
 
+let allocate_tip_ret_dummies ftype_of tip_calls rets =
+  let alloc_dummy_for_call (rets, acc_dummies) call =
+    let ret_type = get_fun_ret_type ftype_of call.fun_name in
+    let add_the_dummy_to_tables value =
+      let name = (Int.Map.find_exn rets call.id).name in
+      let dummy_name = "tip_ret_dummy"^(Int.to_string call.id) in
+      (Int.Map.add rets ~key:call.id
+         ~data:{name;value={t=ret_type;v=Addr {v=Id dummy_name;
+                                               t=get_pointee ret_type}}},
+       Int.Map.add acc_dummies ~key:call.id
+         ~data:{name=dummy_name;value=value})
+    in
+    match call.ret with
+    | Some {value=_;ptr=Apathptr} ->
+      add_the_dummy_to_tables {t=get_pointee ret_type;v=Undef}
+    | Some {value=_;ptr=Curioptr ptee} ->
+      let t = get_pointee ret_type in
+      add_the_dummy_to_tables (get_struct_val_value ptee.after t)
+    | _ -> (rets, acc_dummies)
+  in
+  List.fold tip_calls ~init:(rets, Int.Map.empty) ~f:alloc_dummy_for_call
+
+let allocate_rets ftype_of tpref ret_name_gen =
+  let alloc_call_ret acc_rets call =
+    let ret_type = get_fun_ret_type ftype_of call.fun_name in
+    match call.ret with
+    | Some {value;ptr;} ->
+      let name = ret_name_gen#generate in
+      let data = match ptr with
+        | Nonptr -> {name;value=get_sexp_value value ret_type}
+        | Funptr _ -> failwith "TODO:support funptr retuns."
+        | Apathptr ->
+          let addr = Int64.of_string (Sexp.to_string value) in
+          known_addresses := Int64.Map.add !known_addresses
+              ~key:addr ~data:{t=ret_type;v=Id name};
+          {name;value={t=ret_type;v=Addr {t=get_pointee ret_type;v=Undef}}}
+        | Curioptr ptee ->
+          let addr = Int64.of_string (Sexp.to_string value) in
+          add_to_known_addresses {v=Deref {v=Id name;t=ret_type};
+                                  t=get_pointee ret_type}
+            ptee.after.break_down addr;
+          {name;value={t=ret_type;v=Addr (get_struct_val_value
+                                            ptee.after (get_pointee ret_type))}}
+      in
+      Int.Map.add acc_rets ~key:call.id ~data
+    | None -> acc_rets
+  in
+  List.fold (tpref.history@[List.hd_exn tpref.tip_calls])
+    ~init:Int.Map.empty ~f:alloc_call_ret
+
+let allocate_args ftype_of tpref arg_name_gen =
+  let alloc_call_args (call:Trace_prefix.call_node) =
+    let alloc_arg addr str_value tterm =
+      match Int64.Map.find !known_addresses addr with
+      | Some spec -> known_addresses :=
+          Int64.Map.add !known_addresses
+            ~key:addr ~data:(update_tterm spec tterm);
+        None
+      | None -> let p_name = arg_name_gen#generate in
+        add_to_known_addresses
+          {v=Id p_name;t=tterm.t}
+          str_value.break_down
+          addr;
+        Some {name=p_name;value=tterm}
+    in
+    List.filter_mapi call.args ~f:(fun i {aname;value;ptr;} ->
+        match ptr with
+        | Nonptr -> None
+        | Funptr _ -> None
+        | Apathptr ->
+          let addr = Int64.of_string (Sexp.to_string value) in
+          let t = get_fun_arg_type ftype_of call.fun_name i in
+          let ptee_type = get_pointee t in
+          alloc_arg addr {full=None;break_down=[]} {v=Undef;t=ptee_type;}
+        | Curioptr ptee ->
+          let addr = Int64.of_string (Sexp.to_string value) in
+          let t = get_fun_arg_type ftype_of call.fun_name i in
+          let ptee_type = get_pointee t in
+          alloc_arg addr ptee.before (get_struct_val_value ptee.after ptee_type))
+  in
+  List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
+
 let compose_fcall_preamble ftype_of call args tmp_gen =
   (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
 
@@ -486,43 +550,14 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
         | Curioptr _ ->
           get_allocated_arg arg a_type)
 
-let get_ret_val ftype_of call ~is_tip =
-  let make_ptr_to_pointee ret_val ret_type =
-    if is_tip then
-      let ret_var = Int64.Map.find !known_addresses
-          (Int64.of_string (Sexp.to_string ret_val)) in
-      let ptee_t = get_pointee ret_type in
-      match ret_var with
-      | Some n -> {v=Addr n;t=ret_type}
-      | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=ret_type}
-    else
-      (* In hist calls there is no need for a stub variable to point to,
-         because we will only use the properties provided by the contract,
-         and not the constraints given in the trace.*)
-      {v=Undef;t=ret_type}
+let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
+  let ret_spec = match ret_spec with
+    | Some ret_spec -> ret_spec
+    | None -> {name="";value={v=Undef;t=Unknown}}
   in
-  match call.ret with
-  | Some ret -> begin
-      let t = get_fun_ret_type ftype_of call.fun_name in
-      match ret.ptr with
-      | Nonptr ->
-        get_sexp_value ret.value t
-      | Funptr _ -> failwith "TODO: support returned functions"
-      | Apathptr ->
-        make_ptr_to_pointee ret.value t
-      | Curioptr _ ->
-        make_ptr_to_pointee ret.value t
-    end
-  | None -> {v=Undef;t=Unknown}
-
-let compose_post_lemmas ~is_tip ftype_of call ret_name args tmp_gen =
-  let ret_name = match ret_name with
-    | Some ret_name -> ret_name
-    | None -> ""
-  in
-  let result = render_tterm (get_ret_val ftype_of call ~is_tip) in
+  let result = render_tterm ret_spec.value in
   List.map (ftype_of call.fun_name).lemmas_after
-    ~f:(fun l -> l {ret_name;ret_val=result;
+    ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
                     args;tmp_gen;is_tip})
 
 let compose_args_post_conditions (call:Trace_prefix.call_node) =
@@ -547,7 +582,7 @@ let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
 
 let extract_common_call_context
-    ~is_tip ftype_of call ret_name args unique_postfix =
+    ~is_tip ftype_of call ret_spec args unique_postfix =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call.fun_name in
   let arg_names = List.map args ~f:render_tterm in
@@ -555,18 +590,27 @@ let extract_common_call_context
   let application = Apply (call.fun_name,args) in
   let post_lemmas =
     compose_post_lemmas
-      ~is_tip ftype_of call ret_name arg_names tmp_gen
+      ~is_tip ftype_of call ret_spec arg_names tmp_gen
+  in
+  let ret_name = match ret_spec with
+    | Some ret_spec -> Some ret_spec.name
+    | None -> None
   in
   {pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
-let extract_hist_call ftype_of call rname_gen index =
-  let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
-    else Some rname_gen#generate in
+let extract_hist_call ftype_of call rets =
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
-  {context=extract_common_call_context
-       ~is_tip:false ftype_of call ret_name args (string_of_int index);
-   result={args_post_conditions;ret_val=get_ret_val ftype_of call ~is_tip:false}}
+  let uniq = string_of_int call.id in
+  match Int.Map.find rets call.id with
+  | Some ret ->
+    {context=extract_common_call_context
+         ~is_tip:false ftype_of call (Some ret) args uniq;
+     result={args_post_conditions;ret_val=ret.value}}
+  | None ->
+    {context=extract_common_call_context
+         ~is_tip:false ftype_of call None args uniq;
+     result={args_post_conditions;ret_val={t=Unknown;v=Undef;}}}
 
 let convert_ctxt_list l = List.map l ~f:(fun e ->
     (get_sexp_value e Boolean))
@@ -577,13 +621,19 @@ let split_common_assumptions a1 a2 =
   List.partition_tf as1 ~f:(fun assumption ->
       List.exists as2 ~f:(fun other -> other = assumption))
 
-let extract_tip_calls ftype_of calls rname_gen =
+let extract_tip_calls ftype_of calls rets tip_dummies =
   let call = List.hd_exn calls in
-  let ret_name = if is_void (get_fun_ret_type ftype_of call.fun_name) then None
-    else Some rname_gen#generate in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context
-      ~is_tip:true ftype_of call ret_name args "tip"
+      ~is_tip:true ftype_of call (Int.Map.find rets call.id) args "tip"
+  in
+  let get_ret_val call =
+    match Int.Map.find tip_dummies call.id with
+    | Some dummy -> {v=Addr {v=Id dummy.name;t=dummy.value.t};
+                     t=Ptr dummy.value.t}
+    | None -> match Int.Map.find rets call.id with
+      | Some ret -> ret.value
+      | None -> {t=Unknown;v=Undef;}
   in
   let results =
     match calls with
@@ -591,7 +641,7 @@ let extract_tip_calls ftype_of calls rname_gen =
     | tip :: [] ->
       let args_post_conditions = compose_args_post_conditions tip in
       [{args_post_conditions;
-        ret_val=get_ret_val ftype_of tip ~is_tip:true;
+        ret_val=get_ret_val tip;
         post_statements=[(* All this statements must be about the model internal
                             state, so we can assume them at the very beginning:
                             in the context_assumptions. *)];}]
@@ -605,22 +655,21 @@ let extract_tip_calls ftype_of calls rname_gen =
         split_common_assumptions tip2.ret_context tip1.ret_context
       in
       [{args_post_conditions=args_post_conditions1;
-        ret_val=get_ret_val ftype_of tip1 ~is_tip:true;
+        ret_val=get_ret_val tip1;
         post_statements=tip1_distinct_ctxt;};
        {args_post_conditions=args_post_conditions2;
-        ret_val=get_ret_val ftype_of tip2 ~is_tip:true;
+        ret_val=get_ret_val tip2;
         post_statements=tip2_distinct_ctxt;}]
     | _ -> failwith "More than two tip calls is not supported."
   in
   {context;results}
 
-let extract_calls_info ftype_of tpref =
-  let rez_gen = name_gen "rez" in
+let extract_calls_info ftype_of tpref rets tip_dummies =
   let hist_funs =
-    (List.mapi tpref.history ~f:(fun ind call ->
-         extract_hist_call ftype_of call rez_gen ind))
+    (List.map tpref.history ~f:(fun call ->
+         extract_hist_call ftype_of call rets))
   in
-  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rez_gen in
+  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets tip_dummies in
   hist_funs, tip_calls
 
 let collect_context pref =
@@ -641,7 +690,8 @@ let collect_context pref =
 
 let strip_context call =
   {fun_name = call.fun_name; args = call.args;
-   ret = None; call_context = []; ret_context = []}
+   ret = None; call_context = []; ret_context = [];
+   id = call.id}
 
 let get_relevant_segment pref boundary_fun =
   let rec last_relevant_seg hist candidat =
@@ -667,6 +717,14 @@ let get_relevant_segment pref boundary_fun =
 let is_the_last_function_finishing pref finishing_fun =
   String.equal (List.hd_exn pref.tip_calls).fun_name finishing_fun
 
+let distribute_ids pref =
+  let tips_start_from = List.length pref.history in
+  {history =
+     List.mapi pref.history ~f:(fun i call -> {call with id = i});
+   tip_calls =
+     List.mapi pref.tip_calls ~f:(fun i call ->
+         {call with id = tips_start_from + i})}
+
 let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
@@ -677,19 +735,22 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin))
       boundary_fun
   in
+  let pref = distribute_ids pref in
   let finishing = is_the_last_function_finishing pref finishing_fun in
   let preamble = preamble ^
                  "void to_verify()\
                   /*@ requires true; @*/ \
                   /*@ ensures true; @*/\n{\n" in
   let export_point = "export_point" in
-  let free_vars = get_vars ftype_of pref (name_gen "arg") in
-  let (hist_calls,tip_call) = extract_calls_info ftype_of pref in
+  let free_vars = get_basic_vars ftype_of pref in
+  let arguments = allocate_args ftype_of pref (name_gen "arg") in
+  let rets = allocate_rets ftype_of pref (name_gen "ret") in
+  let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in
+  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets tip_dummies in
   let cmplxs = !allocated_complex_vals in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
-  let arguments = !allocated_args in
   let known_addresses = !known_addresses in
-  {preamble;free_vars;arguments;tmps;
+  {preamble;free_vars;arguments=(arguments@(Int.Map.data tip_dummies));tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing;known_addresses}
