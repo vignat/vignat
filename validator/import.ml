@@ -467,12 +467,12 @@ let allocate_tip_ret_dummies ftype_of tip_calls rets =
   in
   List.fold tip_calls ~init:(rets, Int.Map.empty) ~f:alloc_dummy_for_call
 
-let allocate_rets ftype_of tpref ret_name_gen =
+let allocate_rets ftype_of tpref =
   let alloc_call_ret acc_rets call =
     let ret_type = get_fun_ret_type ftype_of call.fun_name in
     match call.ret with
     | Some {value;ptr;} ->
-      let name = ret_name_gen#generate in
+      let name = "ret"^(Int.to_string call.id) in
       let data = match ptr with
         | Nonptr -> {name;value=get_sexp_value value ret_type}
         | Funptr _ -> failwith "TODO:support funptr retuns."
@@ -492,7 +492,7 @@ let allocate_rets ftype_of tpref ret_name_gen =
       Int.Map.add acc_rets ~key:call.id ~data
     | None -> acc_rets
   in
-  List.fold (tpref.history@[List.hd_exn tpref.tip_calls])
+  List.fold ((List.hd_exn tpref.tip_calls)::(List.rev tpref.history))
     ~init:Int.Map.empty ~f:alloc_call_ret
 
 let allocate_args ftype_of tpref arg_name_gen =
@@ -744,7 +744,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
   let arguments = allocate_args ftype_of pref (name_gen "arg") in
-  let rets = allocate_rets ftype_of pref (name_gen "ret") in
+  let rets = allocate_rets ftype_of pref in
   let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets tip_dummies in
   let cmplxs = !allocated_complex_vals in
