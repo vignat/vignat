@@ -60,9 +60,9 @@ let arr_rq_struct = Ir.Str ( "ArrayRq", [] )
 let arr_u16_struct = Ir.Str ( "ArrayU16", [] )
 let batcher_struct = Ir.Str ( "Batcher", [] )
 let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
-                                                (* "rx_queue_list", arr_rq_struct; *)
-                                                (* "tx_queue_id", arr_u16_struct; *)
-                                                (* "tx_mbufs", arr_bat_struct *)])
+                                                "rx_queue_list", arr_rq_struct;
+                                                "tx_queue_id", arr_u16_struct;
+                                                "tx_mbufs", arr_bat_struct;])
 let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
                                                         "queue_id", Uint8])
 
