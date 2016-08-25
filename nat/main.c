@@ -638,13 +638,15 @@ get_port_n_rx_queues(const uint8_t port)
 static int
 init_lcore_rx_queues(void)
 {
-    uint16_t i, nb_rx_queue;
+    uint16_t i, nb_rx_queue = 0;
     uint8_t lcore;
 
     for (i = 0; i < nb_lcore_params; ++i) {
       lcore = lcore_params[i].lcore_id;
+      klee_assert(lcore==0); //TODO:Only single core supported for now.
+      //For multicore, need to count the n_rx_queue for each core
+      //separately.
       struct lcore_conf *conf = array_lcc_begin_access(&lcore_conf, lcore);
-      nb_rx_queue = conf->n_rx_queue;
       if (nb_rx_queue >= MAX_RX_QUEUE_PER_LCORE) {
         printf("error: too many queues (%u) for lcore: %u\n",
                (unsigned)nb_rx_queue + 1, (unsigned)lcore);
@@ -658,11 +660,14 @@ init_lcore_rx_queues(void)
         rx_queue->port_id = lcore_params[i].port_id;
         rx_queue->queue_id = lcore_params[i].queue_id;
         array_rq_end_access(&conf->rx_queue_list);
-        conf->n_rx_queue++;
+        nb_rx_queue++;
       }
       array_lcc_end_access(&lcore_conf);
       conf = 0;
     }
+    struct lcore_conf *conf = array_lcc_begin_access(&lcore_conf, 0);
+    conf->n_rx_queue = nb_rx_queue;
+    array_lcc_end_access(&lcore_conf);
     return 0;
 }
 
