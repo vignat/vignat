@@ -10,10 +10,29 @@
 
 struct ArrayU16;
 
+/*@
+  predicate some_u16p(uint16_t *p) = u_short_integer(p, _);
+  @*/
+
+/*@
+  predicate arrp_u16(list<uint16_t> data, struct ArrayU16 *arr);
+  predicate arrp_u16_acc(list<uint16_t> data, struct ArrayU16 *arr, int idx);
+
+  fixpoint ARRAY_U16_EL_TYPE *arrp_the_missing_cell_u16(struct ArrayU16 *arr,
+                                                        int idx);
+  @*/
+
 // In-place initialization
 void array_u16_init(struct ArrayU16 *arr_out);
 ARRAY_U16_EL_TYPE *array_u16_begin_access(struct ArrayU16 *arr, int index);
+//@ requires arrp_u16(?lst, arr) &*& 0 <= index &*& index < ARRAY_U16_CAPACITY;
+/*@ ensures arrp_u16_acc(lst, arr, index) &*&
+            result == arrp_the_missing_cell_u16(arr, index) &*&
+            u_short_integer(result, nth(index, lst)); @*/
 void array_u16_end_access(struct ArrayU16 *arr);
+/*@ requires arrp_u16_acc(?lst, arr, ?idx) &*&
+             u_short_integer(arrp_the_missing_cell_u16(arr, idx), ?u16); @*/
+//@ ensures arrp_u16(update(idx, u16, lst), arr);
 
 #ifdef KLEE_VERIFICATION
 
@@ -35,8 +54,8 @@ void array_u16_init(struct ArrayU16 *arr_out)
   // formally verified domain.
   /* klee_trace_ret(); */
   /* klee_trace_param_i32((uint32_t)arr_out, "arr_out"); */
-  /* klee_make_symbolic(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE), */
-  /*                    "array_u16_model_cell"); */
+  klee_make_symbolic(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
+                     "array_u16_model_cell");
   array_u16_index_allocated = 0;
   ARRAY_U16_EL_INIT(&array_u16_model_cell);
   array_u16_initialized = arr_out;
@@ -45,6 +64,8 @@ void array_u16_init(struct ArrayU16 *arr_out)
 void array_u16_reset(struct ArrayU16 *arr)
 {
   // No need for tracing, this is a shadow control function.
+  klee_make_symbolic(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
+                     "array_u16_model_cell");
   array_u16_index_allocated = 0;
   ARRAY_U16_EL_INIT(&array_u16_model_cell);
   array_u16_initialized = arr;

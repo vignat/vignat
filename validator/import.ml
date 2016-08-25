@@ -204,7 +204,11 @@ let rec get_vars_from_struct_val v ty known_vars =
     if (List.length v.break_down) <>
        (List.length fields)
     then
-      failwith ("Mismatch between expected and traced breakdowns for " ^
+      failwith ("Mismatch between expected (" ^
+                (Int.to_string (List.length fields)) ^
+                ") and traced (" ^
+                (Int.to_string (List.length v.break_down)) ^
+                ") breakdowns for " ^
                 name ^ ".")
     else
       List.fold (List.zip_exn v.break_down ftypes) ~init:known_vars

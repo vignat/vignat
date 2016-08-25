@@ -67,7 +67,8 @@ struct ArrayLcc
   predicate pure_lcore_confp(lcore_confi lc, struct lcore_conf *lcp);
   predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp) =
       pure_lcore_confp(lc, lcp) &*&
-      arrp_rq(_, &lcp->rx_queue_list);
+      arrp_rq(_, &lcp->rx_queue_list) &*&
+      arrp_u16(_, &lcp->tx_queue_id);
   predicate some_lcore_confp(struct lcore_conf *lcp) = lcore_confp(_, lcp);
   @*/
 
@@ -83,7 +84,7 @@ requires p->n_rx_queue |-> ?nrq &*&
          0 < nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
          chars((char*)(p->rx_queue_list.data), 16*sizeof(struct lcore_rx_queue), _) &*&
          struct_ArrayRq_padding(&p->rx_queue_list) &*&
-         chars((char*)(p->tx_queue_id.data), 32*sizeof(uint16_t), _) &*&
+         ushorts((unsigned short*)(p->tx_queue_id.data), 32, _) &*&
          struct_ArrayU16_padding(&p->tx_queue_id) &*&
          chars((char*)p->tx_mbufs.data, 32*sizeof(struct Batcher), _) &*&
          struct_ArrayBat_padding(&p->tx_mbufs) &*&

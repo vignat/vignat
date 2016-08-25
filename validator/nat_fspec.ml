@@ -64,7 +64,7 @@ let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
                                                 "tx_queue_id", arr_u16_struct;
                                                 "tx_mbufs", arr_bat_struct;])
 let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
-                                                        "queue_id", Uint8])
+                                                        "queue_id", Uint8;])
 
 let fun_types =
   String.Map.of_alist_exn
@@ -605,6 +605,24 @@ let fun_types =
                               lemmas_before = [];
                              lemmas_after = [
                                tx_l "close lcore_confp(_, ret1);"];};
+     "array_u16_begin_access", {ret_type = Ptr Uint16;
+                               arg_types = [Ptr arr_u16_struct; Sint32;];
+                                lemmas_before = [
+                                  tx_bl "open lcore_confp(_, ret1);"];
+                               lemmas_after = [
+                                 (fun params ->
+                                    if params.is_tip then
+                                      "//@ close some_u16p(" ^ params.ret_val ^ ");"
+                                    else "");
+                                 (fun params ->
+                                    if params.is_tip then
+                                      "//@ close some_u16p(" ^ params.ret_name ^ ");"
+                                    else "")];};
+     "array_u16_end_access", {ret_type = Void;
+                              arg_types = [Ptr arr_u16_struct;];
+                              lemmas_before = [];
+                              lemmas_after = [
+                                tx_l "close lcore_confp(_, ret1);"];};
     ]
 
 let fixpoints =
