@@ -275,8 +275,8 @@ let not_stronger op1 op2 =
 let prepare_assertions tip_res tip_ret_name tip_ret_type =
   let exists_such =
     (List.map tip_res.args_post_conditions
-       ~f:(fun spec -> {v=Bop (Eq,{v=Id spec.name;t=Unknown},
-                               spec.value);
+       ~f:(fun spec -> {v=Bop (Eq,spec.lhs,
+                               spec.rhs);
                         t=Boolean})) @
     tip_res.post_statements
   in

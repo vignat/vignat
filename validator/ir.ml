@@ -41,6 +41,8 @@ and tterm = {v:term; t:ttype}
 and var_spec = {name: string; value:tterm}
 with sexp
 
+type eq_condition = {lhs: tterm; rhs: tterm} with sexp
+
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
   | Sint32 -> "int" | Sint8 -> "char"
@@ -63,12 +65,12 @@ type fun_call_context = {
 } with sexp
 
 type hist_call_result = {
-  args_post_conditions:var_spec list;
+  args_post_conditions:eq_condition list;
   ret_val:tterm;
 } with sexp
 
 type tip_result = {
-  args_post_conditions:var_spec list;
+  args_post_conditions:eq_condition list;
   ret_val:tterm;
   post_statements:tterm list;
 } with sexp
@@ -113,6 +115,14 @@ let render_bop = function
   | Mul -> "*"
   | And -> "&&"
 
+let rec simplify_term term =
+  match term with
+  | Apply (fname,args) -> Apply (fname, (List.map args ~f:(fun {v;t}->
+      {v=simplify_term v;t})))
+  | Deref {t=_;v=Addr x} -> simplify_term x.v
+  | Str_idx (x,fname) -> Str_idx ({v=simplify_term x.v;t=x.t}, fname)
+  | _ -> term
+
 let rec render_tterm (t:tterm) =
   match t.v with  (*strip parens: account for weird VeriFast parser*)
   | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
@@ -130,6 +140,8 @@ let rec render_tterm (t:tterm) =
   | Int i -> string_of_int i
   | Bool b -> string_of_bool b
   | Not t -> "!(" ^ (render_tterm t) ^ ")"
+  | Str_idx ({v=Id x;t=_}, field_name) -> x ^ "." ^ field_name
+  | Str_idx ({v=Deref {v=Id x;t=_};t=_},field_name) -> x ^ "->" ^ field_name
   | Str_idx ({v=Deref x;t},field_name) -> "(" ^ (render_tterm x) ^ ")->" ^ field_name
   | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
   | Deref t -> "*(" ^ (render_tterm t) ^ ")"

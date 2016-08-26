@@ -391,15 +391,19 @@ let rec get_struct_val_value valu t =
     | None -> {t;v=Undef}
 
 let rec add_to_known_addresses base_value breakdown addr =
+  List.iter breakdown ~f:(fun {fname;value;addr} ->
+      let b_value = {t=Unknown;v=Addr {t=Unknown;
+                                       v=Str_idx ({t=Unknown;
+                                                   v=Deref base_value},fname)}} in
+      add_to_known_addresses b_value value.break_down addr);
+  (* The order is important here, if we do not want to replace
+     the pointer to the base_value by a pointer to its field. *)
   let prev = match Int64.Map.find !known_addresses addr with
     | Some value -> value
     | None -> {t=Unknown;v=Undef}
   in
   known_addresses := Int64.Map.add !known_addresses
-      ~key:addr ~data:(update_tterm base_value prev);
-  List.iter breakdown ~f:(fun {fname;value;addr} ->
-      let b_value = {t=Unknown;v=Str_idx (base_value,fname)} in
-      add_to_known_addresses b_value value.break_down addr)
+      ~key:addr ~data:(update_tterm base_value prev)
 
 let get_basic_vars ftype_of tpref =
   let get_vars ~is_tip known_vars (call:Trace_prefix.call_node) =
@@ -498,8 +502,7 @@ let allocate_rets ftype_of tpref =
           {name;value={t=ret_type;v=Addr {t=get_pointee ret_type;v=Undef}}}
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
-          add_to_known_addresses {v=Deref {v=Id name;t=ret_type};
-                                  t=get_pointee ret_type}
+          add_to_known_addresses {v=Id name;t=ret_type}
             ptee.after.break_down addr;
           {name;value={t=ret_type;v=Addr (get_struct_val_value
                                             ptee.after (get_pointee ret_type))}}
@@ -529,7 +532,7 @@ let allocate_args ftype_of tpref arg_name_gen =
         None
       | None -> let p_name = arg_name_gen#generate in
         add_to_known_addresses
-          {v=Id p_name;t=tterm.t}
+          {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
           str_value.break_down
           addr;
         Some {name=p_name;value=tterm}
@@ -560,7 +563,7 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
         (Int64.of_string (Sexp.to_string arg.value)) in
     let ptee_t = get_pointee arg_type in
     match arg_var with
-    | Some n -> {v=Addr n;t=arg_type}
+    | Some n -> n
     | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=arg_type}
   in
   List.mapi call.args
@@ -595,13 +598,8 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
           let key = Int64.of_string (Sexp.to_string arg.value) in
           Int64.Map.find_exn !known_addresses key
         in
-        match out_arg with
-        | {t;v=Id name} ->
-          Some {name;
-                value=(get_struct_val_value ptee.after t)}
-        | x -> failwith ("The output arg pointer is no just an address of" ^
-                         " a locally built var, it is smth more complex:" ^
-                         (render_tterm x) ^ "."))
+        Some {lhs={v=simplify_term (Deref out_arg);t=Ptr out_arg.t};
+              rhs=(get_struct_val_value ptee.after (get_pointee out_arg.t))})
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
@@ -612,7 +610,7 @@ let extract_common_call_context
   let ret_type = get_fun_ret_type ftype_of call.fun_name in
   let arg_names = List.map args ~f:render_tterm in
   let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
-  let application = Apply (call.fun_name,args) in
+  let application = simplify_term (Apply (call.fun_name,args)) in
   let post_lemmas =
     compose_post_lemmas
       ~is_tip ftype_of call ret_spec arg_names tmp_gen

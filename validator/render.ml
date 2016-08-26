@@ -8,8 +8,8 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
     (*TODO: check that the types of Str (_,fts)
       are the same as in fields*)
     String.concat (List.map fields ~f:(fun {name;value} ->
-      render_eq_sttmt ~is_assert (out_arg ^ "." ^ name) value))
-  | _ -> "//@ " ^ head ^ "(" ^ out_arg ^ " == " ^
+      render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=Unknown} value))
+  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_lemmas context =
@@ -23,9 +23,9 @@ let render_fcall_with_lemmas context =
 
 let render_args_post_conditions ~is_assert apk =
   (String.concat ~sep:"\n" (List.map apk
-                              ~f:(fun {name;value} ->
+                              ~f:(fun {lhs;rhs;} ->
                                   render_eq_sttmt ~is_assert
-                                    name value)))
+                                    lhs rhs)))
 
 let render_post_assumptions post_statements =
   (String.concat ~sep:"\n" (List.map post_statements
@@ -41,7 +41,7 @@ let render_tip_post_sttmts {args_post_conditions;
 
 let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   match ret_name with
-  | Some name -> (render_eq_sttmt ~is_assert name ret_val) ^ "\n"
+  | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
   | None -> "\n"
 
 let render_hist_fun_call {context;result} =

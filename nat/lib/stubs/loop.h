@@ -38,6 +38,7 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
           dmap_dchain_coherent(m, ch) &*&
           arrp_lcc_acc(_, arr_lcc, lcore_id) &*&
           cur_lcc == arrp_the_missing_cell_lcc(arr_lcc, lcore_id) &*&
+          lcore_id == 0 &*& //<-- We are verifying for a single core.
           some_lcore_confp(cur_lcc) &*&
           last_time(time) &*&
           dchain_high_fp(ch) <= time &*&
@@ -63,7 +64,9 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              evproc_loop_invariant(mp, chp, arr_lcc, lcore_id, cur_lcc,
                                    time, max_flows, start_port); @*/
-/*@ ensures *m |-> mp &*& *ch |-> chp; @*/
+/*@ ensures *m |-> mp &*& *ch |-> chp &*&
+            chars(arr_lcc->data,
+                  sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _); @*/
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
                             struct ArrayLcc* arr_lcc, unsigned int* lcore_id,

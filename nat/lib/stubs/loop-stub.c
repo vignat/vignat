@@ -34,10 +34,10 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_ret();
   klee_trace_param_ptr(m, sizeof(struct DoubleMap*), "m");
   klee_trace_param_ptr(ch, sizeof(struct DoubleChain*), "ch");
-  klee_trace_param_ptr(arr_lcc, sizeof(struct ArrayLcc), "arr_lcc");
+  klee_trace_param_just_ptr(arr_lcc, sizeof(struct ArrayLcc), "arr_lcc");
   klee_trace_param_i32(lcore_id, "lcore_id");
-  klee_trace_param_ptr(cur_lcc, sizeof(struct lcore_conf), "cur_lcc");
-  ARRAY_LCC_EL_TRACE_ARG_BREAKDOWN(cur_lcc);
+  klee_trace_param_just_ptr(cur_lcc, sizeof(struct lcore_conf), "cur_lcc");
+  //ARRAY_LCC_EL_TRACE_ARG_BREAKDOWN(cur_lcc);
   klee_trace_param_i32(time, "time");
   klee_trace_param_i32(max_flows, "max_flows");
   klee_trace_param_i32(start_port, "start_port");
@@ -51,8 +51,8 @@ void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_ret();
   klee_trace_param_ptr(m, sizeof(struct DoubleMap*), "m");
   klee_trace_param_ptr(ch, sizeof(struct DoubleChain*), "ch");
-  klee_trace_param_ptr(arr_lcc, sizeof(struct ArrayLcc), "arr_lcc");
-  klee_trace_param_ptr(lcore_id, sizeof(struct lcore_conf), "lcore_id");
+  klee_trace_param_just_ptr(arr_lcc, sizeof(struct ArrayLcc), "arr_lcc");
+  klee_trace_param_ptr(lcore_id, sizeof(unsigned int), "lcore_id");
   klee_trace_param_ptr(cur_lcc, sizeof(struct lcore_conf), "cur_lcc");
   ARRAY_LCC_EL_TRACE_ARG_BREAKDOWN(cur_lcc);
   klee_trace_param_ptr(time, sizeof(uint32_t), "time");

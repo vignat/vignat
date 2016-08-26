@@ -180,8 +180,11 @@ let fun_types =
                                              Sint32];
                                 lemmas_before = [
                                   (fun args _ ->
+                                     "/*@ close some_lcore_confp(" ^
+                                     List.nth_exn args 4 ^ "); @*/");
+                                  (fun args _ ->
                                      "//@ assume(start_port == " ^
-                                     List.nth_exn args 4 ^");\n");
+                                     List.nth_exn args 7 ^");");
                                   (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
@@ -208,16 +211,16 @@ let fun_types =
                                 lemmas_after = [
                                   (fun params ->
                                      "/*@ open evproc_loop_invariant(?mp, \
-                                      ?chp, *" ^
+                                      ?chp, " ^
                                      List.nth_exn params.args 2 ^ ", *" ^
                                      List.nth_exn params.args 3 ^ ", " ^
-                                     List.nth_exn params.args 4 ^ ", " ^
+                                     List.nth_exn params.args 4 ^ ", *" ^
                                      List.nth_exn params.args 5 ^ ", " ^
                                      List.nth_exn params.args 6 ^ ", " ^
                                      List.nth_exn params.args 7 ^");@*/");
                                   (fun params ->
                                      "//@ assume(" ^
-                                     List.nth_exn params.args 4 ^ " == start_port);");
+                                     List.nth_exn params.args 7 ^ " == start_port);");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";];};
      "dmap_get_b", {ret_type = Sint32;

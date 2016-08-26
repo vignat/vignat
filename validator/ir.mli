@@ -46,6 +46,10 @@ val var_spec_of_sexp : Sexp.t -> var_spec
 val sexp_of_term : term -> Sexp.t
 val sexp_of_tterm : tterm -> Sexp.t
 val sexp_of_var_spec : var_spec -> Sexp.t
+type eq_condition = { lhs : tterm; rhs : tterm; }
+val __eq_condition_of_sexp__ : Sexp.t -> eq_condition
+val eq_condition_of_sexp : Sexp.t -> eq_condition
+val sexp_of_eq_condition : eq_condition -> Sexp.t
 val ttype_to_str : ttype -> bytes
 val is_void : ttype -> bool
 val get_pointee : ttype -> ttype
@@ -60,14 +64,14 @@ val __fun_call_context_of_sexp__ : Sexp.t -> fun_call_context
 val fun_call_context_of_sexp : Sexp.t -> fun_call_context
 val sexp_of_fun_call_context : fun_call_context -> Sexp.t
 type hist_call_result = {
-  args_post_conditions : var_spec list;
+  args_post_conditions : eq_condition list;
   ret_val : tterm;
 }
 val __hist_call_result_of_sexp__ : Sexp.t -> hist_call_result
 val hist_call_result_of_sexp : Sexp.t -> hist_call_result
 val sexp_of_hist_call_result : hist_call_result -> Sexp.t
 type tip_result = {
-  args_post_conditions : var_spec list;
+  args_post_conditions : eq_condition list;
   ret_val : tterm;
   post_statements : tterm list;
 }
@@ -100,6 +104,7 @@ val ir_of_sexp : Sexp.t -> ir
 val sexp_of_ir : ir -> Sexp.t
 val strip_outside_parens : bytes -> bytes
 val render_bop : bop -> bytes
+val simplify_term : term -> term
 val render_tterm : tterm -> bytes
 val render_term : term -> bytes
 val term_eq : term -> term -> bool
