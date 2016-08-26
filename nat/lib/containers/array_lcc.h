@@ -131,6 +131,16 @@ void array_lcc_init(struct ArrayLcc *arr_out)
   array_lcc_initialized = arr_out;
 }
 
+void array_lcc_reset(struct ArrayLcc *arr)
+{
+  //Non traceable function.
+  klee_assert(arr == array_lcc_initialized);
+  klee_make_symbolic(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
+                     "array_lcc_model_cell");
+  array_lcc_index_allocated = 0;
+  ARRAY_LCC_EL_INIT(&array_lcc_model_cell);
+}
+
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
 {
   klee_trace_ret_ptr(sizeof(ARRAY_LCC_EL_TYPE));

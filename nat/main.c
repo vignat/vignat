@@ -455,6 +455,10 @@ main_loop(__attribute__((unused)) void *dummy)
 
     LOG( "entering main loop on lcore %u\n", lcore_id);
 
+#ifdef KLEE_VERIFICATION
+    klee_assert(qconf->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
+#endif//KLEE_VERIFICATION
+
     for (i = 0;
 #ifdef KLEE_VERIFICATION
          klee_induce_invariants() &
@@ -462,7 +466,9 @@ main_loop(__attribute__((unused)) void *dummy)
            (i < qconf->n_rx_queue);
          i++) {
 #ifdef KLEE_VERIFICATION
-      array_lcc_init(&lcore_conf);
+      klee_assume(qconf->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
+      array_lcc_reset(&lcore_conf);
+      klee_assume(0 <= i);
 #endif //KLEE_VERIFICATION
 
       struct lcore_rx_queue *rx_queue =
@@ -472,6 +478,10 @@ main_loop(__attribute__((unused)) void *dummy)
       LOG( " -- lcoreid=%u portid=%hhu rxqueueid=%hhu\n", lcore_id,
            portid, queueid);
       array_rq_end_access(&qconf->rx_queue_list);
+#ifdef KLEE_VERIFICATION
+      klee_assert(qconf->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
+      klee_assert(0 <= i);
+#endif//KLEE_VERIFICATION
     }
 
 #ifdef KLEE_VERIFICATION
@@ -486,7 +496,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
       loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                                  starting_time, max_flows, start_port);
-      array_lcc_init(&lcore_conf);
+      array_lcc_reset(&lcore_conf);
 #endif//KLEE_VERIFICATION
 
       expire_flows(current_time());
@@ -534,7 +544,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
           loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                                      current_time(), max_flows, start_port);
-          array_lcc_init(&lcore_conf);
+          array_lcc_reset(&lcore_conf);
           klee_assume(i < qconf->n_rx_queue);
           klee_assume(0 <= i);
 #endif//KLEE_VERIFICATION
