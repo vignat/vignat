@@ -177,8 +177,14 @@ let rec get_var_decls_of_sexp exp t known_vars =
     match exp with
     | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
       when (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
-      let ty = failback_type (determine_type (infer_type_class f) w) t in
-      (List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars)))
+      if String.equal f "ZExt" then
+        match tl with
+        | [tl] -> get_var_decls_of_sexp tl Uunknown known_vars
+        | _ -> failwith "ZExt may have only one argumen (besides w..)."
+      else
+        let ty = failback_type (determine_type (infer_type_class f) w) t in
+        (List.join (List.map tl ~f:(fun e ->
+             get_var_decls_of_sexp e ty known_vars)))
     | Sexp.List (Sexp.Atom f :: tl) ->
       let ty = failback_type (infer_type_class f)
           (failback_type (guess_type_l tl) t)
