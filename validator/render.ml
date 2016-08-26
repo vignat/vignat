@@ -189,7 +189,7 @@ let render_allocated_args args =
 
 let render_final finishing =
   if finishing then
-    "/* This sequence must terminate correctly: no need for assume(false);"
+    "/* This sequence must terminate correctly: no need for assume(false); */\n"
   else
     "//@ assume(false);\n"
 

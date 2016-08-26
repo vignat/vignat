@@ -356,6 +356,9 @@ let rec get_sexp_value exp t =
     (*FIXME: and here, but really that is a bool expression, I know it*)
     (*TODO: check t is really Boolean here*)
     {v=Bop (And,(get_sexp_value lhs Boolean),(get_sexp_value rhs Boolean));t}
+  | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom lhs; rhs;]
+    when (String.equal f "Concat") && (String.equal lhs "0") ->
+    get_sexp_value rhs t
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> {v=Id name;t}
@@ -496,8 +499,17 @@ let allocate_rets ftype_of tpref =
       Int.Map.add acc_rets ~key:call.id ~data
     | None -> acc_rets
   in
-  List.fold ((List.hd_exn tpref.tip_calls)::(List.rev tpref.history))
-    ~init:Int.Map.empty ~f:alloc_call_ret
+  let rets =
+    List.fold (tpref.tip_calls@(List.rev tpref.history))
+      ~init:Int.Map.empty ~f:alloc_call_ret
+  in
+  List.fold tpref.tip_calls ~init:rets
+    ~f:(fun rets call ->
+        if call.ret = None then
+          rets
+        else
+          let ret = Int.Map.find_exn rets call.id in
+          Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"})
 
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
@@ -751,10 +763,10 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let rets = allocate_rets ftype_of pref in
   let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets tip_dummies in
-  let cmplxs = !allocated_complex_vals in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let known_addresses = !known_addresses in
+  let cmplxs = !allocated_complex_vals in
   {preamble;free_vars;arguments=(arguments@(Int.Map.data tip_dummies));tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing;known_addresses}
