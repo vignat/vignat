@@ -64,6 +64,10 @@
 #include "lib/containers/array-rq.h"
 #include "lib/containers/array-u16.h"
 #include "lib/containers/array-lcc.h"
+#include "lib/containers/array-bat-impl.h"
+#include "lib/containers/array-rq-impl.h"
+#include "lib/containers/array-u16-impl.h"
+#include "lib/containers/array-lcc-impl.h"
 
 #define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
 #define MAX_RX_QUEUE_PER_PORT 128
@@ -483,6 +487,7 @@ main_loop(__attribute__((unused)) void *dummy)
 
 #ifdef KLEE_VERIFICATION
     loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
+                         &lcore_conf, lcore_id, qconf,
                          starting_time, max_flows, start_port);
     while (klee_induce_invariants())
 #else //KLEE_VERIFICATION
@@ -492,6 +497,7 @@ main_loop(__attribute__((unused)) void *dummy)
 
 #ifdef KLEE_VERIFICATION
       loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+                                 &lcore_conf, lcore_id, qconf,
                                  starting_time, max_flows, start_port);
       array_lcc_reset(&lcore_conf);
 #endif//KLEE_VERIFICATION
@@ -530,6 +536,7 @@ main_loop(__attribute__((unused)) void *dummy)
 #ifdef KLEE_VERIFICATION
         klee_make_symbolic(&i, sizeof(int), "queue_num_i");
         loop_enumeration_begin(get_dmap_pp(), get_dchain_pp(),
+                               &lcore_conf, lcore_id, qconf,
                                current_time(), max_flows, start_port,
                                i);
         for (i = 0; klee_induce_invariants() & (i < qconf->n_rx_queue); ++i)
@@ -540,6 +547,7 @@ main_loop(__attribute__((unused)) void *dummy)
 
 #ifdef KLEE_VERIFICATION
           loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+                                     &lcore_conf, lcore_id, qconf,
                                      current_time(), max_flows, start_port);
           array_lcc_reset(&lcore_conf);
           klee_assume(i < qconf->n_rx_queue);
@@ -576,11 +584,13 @@ main_loop(__attribute__((unused)) void *dummy)
         }
 #ifdef KLEE_VERIFICATION
         loop_enumeration_end(get_dmap_pp(), get_dchain_pp(),
+                             &lcore_conf, lcore_id, qconf,
                              current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
     }
 #ifdef KLEE_VERIFICATION
     loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
+                       &lcore_conf, lcore_id, qconf,
                        current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
     array_lcc_end_access(&lcore_conf);

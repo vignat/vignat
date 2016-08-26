@@ -172,6 +172,9 @@ let fun_types =
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
+                                             Ptr arr_lcc_struct;
+                                             Uint32;
+                                             Ptr lcore_conf_struct;
                                              Uint32;
                                              Sint32;
                                              Sint32];
@@ -185,11 +188,17 @@ let fun_types =
                                      List.nth_exn args 1 ^ ", " ^
                                      List.nth_exn args 2 ^ ", " ^
                                      List.nth_exn args 3 ^ ", " ^
-                                     List.nth_exn args 4 ^ "); @*/")];
+                                     List.nth_exn args 4 ^ ", " ^
+                                     List.nth_exn args 5 ^ ", " ^
+                                     List.nth_exn args 6 ^ ", " ^
+                                     List.nth_exn args 7 ^ "); @*/")];
                                 lemmas_after = [];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
+                                             Ptr arr_lcc_struct;
+                                             Ptr Uint32;
+                                             Ptr lcore_conf_struct;
                                              Ptr Uint32;
                                              Sint32;
                                              Sint32];
@@ -200,9 +209,12 @@ let fun_types =
                                   (fun params ->
                                      "/*@ open evproc_loop_invariant(?mp, \
                                       ?chp, *" ^
-                                     List.nth_exn params.args 2 ^ ", " ^
+                                     List.nth_exn params.args 2 ^ ", *" ^
                                      List.nth_exn params.args 3 ^ ", " ^
-                                     List.nth_exn params.args 4 ^ ");@*/");
+                                     List.nth_exn params.args 4 ^ ", " ^
+                                     List.nth_exn params.args 5 ^ ", " ^
+                                     List.nth_exn params.args 6 ^ ", " ^
+                                     List.nth_exn params.args 7 ^");@*/");
                                   (fun params ->
                                      "//@ assume(" ^
                                      List.nth_exn params.args 4 ^ " == start_port);");
@@ -567,14 +579,15 @@ let fun_types =
                                 lemmas_before = [];
                                 lemmas_after = [
                                   (fun params ->
+                                     "last_lcc = " ^ params.ret_name ^ ";\n");
+                                  (fun params ->
                                      if params.is_tip then
                                        "//@ construct_lcc_element(" ^ params.ret_val ^");"
                                      else "");
                                   (fun params ->
                                      if params.is_tip then
                                        "//@ close some_lcore_confp(" ^ params.ret_val ^");"
-                                     else "");
-                                  (fun params ->
+                                     else ""); (fun params ->
                                      if params.is_tip then
                                        "//@ close some_lcore_confp(" ^ params.ret_name ^");"
                                      else "");
@@ -586,7 +599,7 @@ let fun_types =
      "array_rq_begin_access", {ret_type = Ptr lcore_rx_queue_struct;
                                arg_types = [Ptr arr_rq_struct; Sint32;];
                                lemmas_before = [
-                                 tx_bl "open lcore_confp(_, ret1);"];
+                                 tx_bl "open lcore_confp(_, last_lcc);"];
                                lemmas_after = [
                                  (fun params ->
                                     if params.is_tip then
@@ -604,11 +617,11 @@ let fun_types =
                               arg_types = [Ptr arr_rq_struct;];
                               lemmas_before = [];
                              lemmas_after = [
-                               tx_l "close lcore_confp(_, ret1);"];};
+                               tx_l "close lcore_confp(_, last_lcc);"];};
      "array_u16_begin_access", {ret_type = Ptr Uint16;
                                arg_types = [Ptr arr_u16_struct; Sint32;];
                                 lemmas_before = [
-                                  tx_bl "open lcore_confp(_, ret1);"];
+                                  tx_bl "open lcore_confp(_, last_lcc);"];
                                lemmas_after = [
                                  (fun params ->
                                     if params.is_tip then
@@ -622,7 +635,7 @@ let fun_types =
                               arg_types = [Ptr arr_u16_struct;];
                               lemmas_before = [];
                               lemmas_after = [
-                                tx_l "close lcore_confp(_, ret1);"];};
+                                tx_l "close lcore_confp(_, last_lcc);"];};
     ]
 
 let fixpoints =
@@ -688,7 +701,11 @@ let fixpoints =
 
 module Iface : Fspec_api.Spec =
 struct
-  let preamble = In_channel.read_all "preamble.tmpl"
+  let preamble = (In_channel.read_all "preamble.tmpl") ^
+                 "void to_verify()\
+                  /*@ requires true; @*/ \
+                  /*@ ensures true; @*/\n{\n\
+                  struct lcore_conf *last_lcc;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"

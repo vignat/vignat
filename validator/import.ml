@@ -431,6 +431,8 @@ let get_basic_vars ftype_of tpref =
         end
         else get_arg_pointee_vars addr ptee ptee_type acc
     in
+    assert((List.length call.args) =
+           (List.length (ftype_of call.fun_name).arg_types));
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
             let arg_type = get_fun_arg_type ftype_of call.fun_name i in
@@ -597,8 +599,9 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
         | {t;v=Id name} ->
           Some {name;
                 value=(get_struct_val_value ptee.after t)}
-        | _ -> failwith ("the output arg pointer is no just an address of" ^
-                         "a locally built var, it is smth more complex."))
+        | x -> failwith ("The output arg pointer is no just an address of" ^
+                         " a locally built var, it is smth more complex:" ^
+                         (render_tterm x) ^ "."))
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
@@ -759,10 +762,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   in
   let pref = distribute_ids pref in
   let finishing = is_the_last_function_finishing pref finishing_fun in
-  let preamble = preamble ^
-                 "void to_verify()\
-                  /*@ requires true; @*/ \
-                  /*@ ensures true; @*/\n{\n" in
+  let preamble = preamble in
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
   let arguments = allocate_args ftype_of pref (name_gen "arg") in

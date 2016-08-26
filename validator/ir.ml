@@ -52,7 +52,7 @@ let rec ttype_to_str = function
 
 let is_void = function | Void -> true | _ -> false
 
-let get_pointee = function | Ptr t -> t | _ -> failwith "not a plain pointer"
+let get_pointee = function | Ptr t -> t | x -> failwith ((ttype_to_str x) ^ " is not a plain pointer")
 
 type fun_call_context = {
   pre_lemmas:string list;
