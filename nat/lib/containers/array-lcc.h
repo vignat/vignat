@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include "lib/ignore.h"
 #include "lib/static-component-params.h"
-#include "lib/containers/array_rq.h"
-#include "lib/containers/array_u16.h"
-#include "lib/containers/array_bat.h"
+#include "lib/containers/array-rq.h"
+#include "lib/containers/array-u16.h"
+#include "lib/containers/array-bat.h"
 
 struct lcore_conf {
   uint16_t n_rx_queue;

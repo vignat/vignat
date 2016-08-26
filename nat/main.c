@@ -60,13 +60,10 @@
 #include "lib/my-time.h"
 #include "lib/containers/batcher.h"
 
-#include "lib/containers/array_bat.h"
-
-#include "lib/containers/array_rq.h"
-
-#include "lib/containers/array_u16.h"
-
-#include "lib/containers/array_lcc.h"
+#include "lib/containers/array-bat.h"
+#include "lib/containers/array-rq.h"
+#include "lib/containers/array-u16.h"
+#include "lib/containers/array-lcc.h"
 
 #define MAX_TX_QUEUE_PER_PORT RTE_MAX_ETHPORTS
 #define MAX_RX_QUEUE_PER_PORT 128
