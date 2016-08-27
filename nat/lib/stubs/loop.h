@@ -45,6 +45,9 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
           dmap_cap_fp(m) == max_flows &*&
           max_flows < INT_MAX;
 
+lemma void make_chars_appear(char* ptr, int len);
+requires 0 < len;
+ensures chars(ptr, len, _);
 @*/
 
 void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
@@ -64,9 +67,7 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              evproc_loop_invariant(mp, chp, arr_lcc, lcore_id, cur_lcc,
                                    time, max_flows, start_port); @*/
-/*@ ensures *m |-> mp &*& *ch |-> chp &*&
-            chars(arr_lcc->data,
-                  sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _); @*/
+/*@ ensures *m |-> mp &*& *ch |-> chp; @*/
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
                             struct ArrayLcc* arr_lcc, unsigned int* lcore_id,

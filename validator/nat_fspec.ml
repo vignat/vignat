@@ -9,6 +9,8 @@ let last_index_key = ref Int
 let last_indexing_succ_ret_var = ref ""
 
 let last_time_for_index_alloc = ref ""
+let the_array_lcc_is_local = ref true
+
 
 let gen_get_fp map_name =
   match !last_index_key with
@@ -195,7 +197,17 @@ let fun_types =
                                      List.nth_exn args 5 ^ ", " ^
                                      List.nth_exn args 6 ^ ", " ^
                                      List.nth_exn args 7 ^ "); @*/")];
-                                lemmas_after = [];};
+                                lemmas_after = [
+                                  (fun params ->
+                                     if !the_array_lcc_is_local then
+                                       "/*@ make_chars_appear((" ^
+                                       List.nth_exn params.args 2 ^
+                                       ")->data,\
+                                        sizeof(ARRAY_LCC_EL_TYPE)*\
+                                        ARRAY_LCC_CAPACITY);\n\
+                                        // This unproven lemma covers for the \
+                                        local struct ArrayLcc arr_lcc\n@*/"
+                                     else "")];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
@@ -210,6 +222,9 @@ let fun_types =
                                      "int start_port;\n");];
                                 lemmas_after = [
                                   (fun params ->
+                                     the_array_lcc_is_local := false;
+                                     "");
+                                  (fun params ->
                                      "/*@ open evproc_loop_invariant(?mp, \
                                       ?chp, " ^
                                      List.nth_exn params.args 2 ^ ", *" ^
@@ -221,6 +236,9 @@ let fun_types =
                                   (fun params ->
                                      "//@ assume(" ^
                                      List.nth_exn params.args 7 ^ " == start_port);");
+                                  (fun params ->
+                                     "/*@ open some_lcore_confp(" ^
+                                     List.nth_exn params.args 4 ^ "); @*/");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";];};
      "dmap_get_b", {ret_type = Sint32;
@@ -576,7 +594,10 @@ let fun_types =
      "array_lcc_init", {ret_type = Void;
                         arg_types = [Ptr arr_lcc_struct;];
                         lemmas_before = [];
-                        lemmas_after = [];};
+                        lemmas_after = [
+                          (fun params ->
+                             the_array_lcc_is_local := true;
+                             "");];};
      "array_lcc_begin_access", {ret_type = Ptr lcore_conf_struct;
                                 arg_types = [Ptr arr_lcc_struct; Sint32;];
                                 lemmas_before = [];
