@@ -20,7 +20,8 @@ unsigned rte_lcore_id(){
 }
 
 uint64_t rte_rdtsc(){
-    return 0;
+  //TODO: this prevents the simulation of sending leftover packets, (or all?)
+  return 0;
 }
 
 struct user_buf {

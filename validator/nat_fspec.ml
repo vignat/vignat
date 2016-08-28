@@ -225,6 +225,9 @@ let fun_types =
                                      the_array_lcc_is_local := false;
                                      "");
                                   (fun params ->
+                                     "last_lcc = " ^
+                                     List.nth_exn params.args 4 ^ ";\n");
+                                  (fun params ->
                                      "/*@ open evproc_loop_invariant(?mp, \
                                       ?chp, " ^
                                      List.nth_exn params.args 2 ^ ", *" ^
@@ -245,8 +248,12 @@ let fun_types =
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
                     lemmas_before = [
                       capture_map "cur_map" 0;
-                      tx_bl "close (ext_k_p(&arg4, ekc(user_buf0_36, user_buf0_34,\
-                             user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));"];
+                      (fun args _ ->
+                         "/*@ close ext_k_p(" ^ List.nth_exn args 1 ^
+                         ", ekc(user_buf0_36, user_buf0_34, " ^
+                         "user_buf0_30, user_buf0_26, (" ^ List.nth_exn args 1 ^
+                         ")->ext_device_id,\
+                          user_buf0_23)); @*/"); ];
                     lemmas_after = [
                       tx_l "open (ext_k_p(_,_));";
                       on_rez_nz
@@ -254,13 +261,17 @@ let fun_types =
                            "{\n dmap_get_k2_limits(" ^
                            (params.tmp_gen "cur_map") ^
                            ", ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));\n}");
+                            user_buf0_30, user_buf0_26, (" ^
+                           List.nth_exn params.args 1 ^
+                           ")->ext_device_id, user_buf0_23));\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n dmap_get_k2_get_val(" ^
                            (params.tmp_gen "cur_map") ^
                            ",ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23));\n}");
+                            user_buf0_30, user_buf0_26, (" ^
+                           List.nth_exn params.args 1 ^
+                           ")->ext_device_id, user_buf0_23));\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n assert dmap_dchain_coherent(" ^
@@ -269,11 +280,15 @@ let fun_types =
                             coherent_dmap_used_dchain_allocated(" ^
                            (params.tmp_gen "cur_map") ^ ", cur_ch, dmap_get_k2_fp(" ^
                            (params.tmp_gen "cur_map") ^ ", ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)));\n}");
+                            user_buf0_30, user_buf0_26, (" ^
+                           List.nth_exn params.args 1 ^
+                           ")->ext_device_id, user_buf0_23)));\n}");
                       (fun params ->
                          last_index_gotten :=
                            "ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, cmplx1, user_buf0_23)";
+                            user_buf0_30, user_buf0_26, (" ^
+                           List.nth_exn params.args 1 ^
+                           ")->ext_device_id, user_buf0_23)";
                          last_index_key := Ext;
                          last_indexing_succ_ret_var := params.ret_name;
                          "");
@@ -282,8 +297,12 @@ let fun_types =
                     arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Sint32;];
                     lemmas_before = [
                       capture_map "cur_map" 0;
-                      tx_bl "close (int_k_p(&arg4, ikc(user_buf0_34, user_buf0_36,\
-                             user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));"];
+                      (fun args _ ->
+                         "/*@ close int_k_p(" ^ List.nth_exn args 1 ^
+                         ", ikc(user_buf0_34, user_buf0_36,\
+                          user_buf0_26, user_buf0_30, (" ^ List.nth_exn args 1 ^
+                         ")->int_device_id, user_buf0_23)); @*/"
+                      );];
                     lemmas_after = [
                       tx_l "open (int_k_p(_,_));";
                       on_rez_nz
@@ -291,13 +310,15 @@ let fun_types =
                            "{\n dmap_get_k1_limits(" ^
                            (params.tmp_gen "cur_map") ^
                            ", ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));\n}");
+                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
+                           ")->int_device_id, user_buf0_23));\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n dmap_get_k1_get_val(" ^
                            (params.tmp_gen "cur_map") ^
                            ", ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23));\n}");
+                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
+                           ")->int_device_id, user_buf0_23));\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n assert dmap_dchain_coherent(" ^
@@ -307,11 +328,13 @@ let fun_types =
                            ", cur_ch, dmap_get_k1_fp(" ^
                            (params.tmp_gen "cur_map") ^
                            ", ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)));\n}");
+                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
+                           ")->int_device_id, user_buf0_23)));\n}");
                       (fun params ->
                          last_index_gotten :=
                            "ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, cmplx1, user_buf0_23)";
+                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
+                           ")->int_device_id, user_buf0_23)";
                          last_index_key := Int;
                          last_indexing_succ_ret_var := params.ret_name;
                          "");
