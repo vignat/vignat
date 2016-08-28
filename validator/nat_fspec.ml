@@ -350,15 +350,21 @@ let fun_types =
                     capture_map_ex "cur_map" "vk1" "vk2" 0;
                     (fun args _ -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
                     ".ik, ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                     user_buf0_30, cmplx1, user_buf0_23));@*/");
+                     user_buf0_30, " ^
+                           !last_device_id ^
+                           ", user_buf0_23));@*/");
                     (fun args _ -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
                     ".ek, ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23));@*/");
                     (fun args _ -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
                     ", flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26, user_buf0_30,\
-                     cmplx1, user_buf0_23), ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                     " ^
+                           !last_device_id ^
+                           ", user_buf0_23), ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                      1, user_buf0_23), user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\
-                     184789184, user_buf0_30, cmplx1, 1, user_buf0_23));@*/");
+                     184789184, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", 1, user_buf0_23));@*/");
                     (fun args tmp ->
                        "/*@{\n\
                         assert dmap_dchain_coherent(" ^
@@ -402,11 +408,15 @@ let fun_types =
                     (fun args tmp ->
                        "/*@ dmap_put_preserves_cap(" ^ (tmp "cur_map") ^
                        ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
+                        user_buf0_26, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23)," ^
+                        184789184, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", 1, user_buf0_23)," ^
                        (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ "); @*/");
                     (fun _ tmp ->
                       "/*@ {\n\
@@ -425,11 +435,15 @@ let fun_types =
                        (params.tmp_gen "cur_map") ^
                        "," ^ (List.nth_exn params.args 2) ^ ",\
                         flwc(ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
+                        user_buf0_26, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\n" ^
+                        184789184, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", 1, user_buf0_23),\n" ^
                        (params.tmp_gen "vk1") ^ ", " ^
                        (params.tmp_gen "vk2") ^ ");\n}@*/");
                     (fun params ->
@@ -442,15 +456,21 @@ let fun_types =
                        (params.tmp_gen "cur_map") ^
                        ", cur_ch,\
                         ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
+                        user_buf0_26, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\
                         flwc(ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
+                        user_buf0_26, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", user_buf0_23),\n\
                         ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
                         1, user_buf0_23),\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, cmplx1, 1, user_buf0_23),\
+                        184789184, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", 1, user_buf0_23),\
                        " ^ (List.nth_exn params.args 2) ^ ", " ^
                        !last_time_for_index_alloc ^
                        ", " ^ (params.tmp_gen "vk1") ^ ", " ^
@@ -483,7 +503,11 @@ let fun_types =
                              (gen_get_fp (params.tmp_gen "cur_map")) ^
                              ");\n\
                               }}@*/");
-                          tx_l "assert(0 <= cmplx1 && cmplx1 < RTE_NUM_DEVICES);";
+                          (fun _ -> "assert(0 <= " ^
+                                    !last_device_id ^
+                                    " && " ^
+                                    !last_device_id ^
+                                    " < RTE_NUM_DEVICES);");
                           (fun params ->
                              "/*@\
                               open flw_p(" ^ (List.nth_exn params.args 2) ^

@@ -10,19 +10,16 @@
 
 #include "lib/coherence.h"
 
-//TODO: coerce this with the definition in rte_stubs.h
-#define RTE_NUM_DEVICES 2
-
 /*@
 fixpoint bool nat_int_fp(int_k ik, int index) {
     return 0 <= int_k_get_idid(ik) &&
-           int_k_get_idid(ik) < RTE_NUM_DEVICES;
+           int_k_get_idid(ik) < RTE_MAX_ETHPORTS;
 }
 
 fixpoint bool nat_ext_fp(int start_port, ext_k ek, int index) {
     return ext_k_get_esp(ek) == start_port + index &&
            0 <= ext_k_get_edid(ek) &&
-           ext_k_get_edid(ek) < RTE_NUM_DEVICES;
+           ext_k_get_edid(ek) < RTE_MAX_ETHPORTS;
 }
 
 
