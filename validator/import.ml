@@ -3,6 +3,16 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
+type 'x confidence = Sure of 'x | Tentative of 'x | Noidea
+
+type t_width = W1 | W8 | W16 | W32
+type t_sign = Sgn | Unsgn
+type type_guess = {w:t_width confidence;
+                   s:t_sign confidence;
+                   precise: ttype}
+
+type typed_var = {vname:string; t: type_guess;}
+
 (*let allocated_args : var_spec list ref = ref []*)
 let known_addresses : tterm Int64.Map.t ref = ref Int64.Map.empty
 
@@ -10,7 +20,7 @@ let infer_signed_type w =
   if String.equal w "w32" then Sint32
   else if String.equal w "w8" then Sint8
   else Sunknown
-  (* TODO: this computation is sometimes is not necessary,
+  (* TODO: this computation sometimes is not necessary,
      so this exception may break a problem free insuction.
      else failwith (w ^ " signed is not supported")*)
 
@@ -20,12 +30,12 @@ let infer_unsigned_type w =
   else if String.equal w "w8" then Uint8
   else failwith (w ^ " unsigned is not supported")
 
-let infer_type_class f =
-  if String.equal f "Sle" then Sunknown
-  else if String.equal f "Slt" then Sunknown
-  else if String.equal f "Ule" then Uunknown
-  else if String.equal f "Ult" then Uunknown
-  else Unknown
+let infer_type_sign f =
+  if String.equal f "Sle" then Sure Sgn
+  else if String.equal f "Slt" then Sure Sgn
+  else if String.equal f "Ule" then Sure Unsgn
+  else if String.equal f "Ult" then Sure Unsgn
+  else Noidea
 
 let expand_shorted_sexp sexp =
   let rec get_defs sexp =
@@ -115,15 +125,6 @@ let get_read_width_of_sexp exp =
           String.equal rd "Read") -> Some w
   | _ -> None
 
-let determine_type t w =
-  (* We support only unsigned short anyway. *)
-  if String.equal w "w16" then Uint16
-  else
-    match t with
-    | Sunknown | Sint32 | Sint8 -> infer_signed_type w
-    | Uunknown | Uint32 | Uint16 | Uint8 -> infer_unsigned_type w
-    | _ -> t
-
 let map_set_n_update_alist mp lst =
   List.fold lst ~init:mp ~f:(fun acc (key,data) ->
       String.Map.add acc ~key ~data)
@@ -132,29 +133,26 @@ let is_int str =
   try ignore (int_of_string str); true
   with _ -> false
 
-let guess_type exp known_vars =
+let guess_sign exp known_vars =
   match get_var_name_of_sexp exp with
   | Some v -> begin match String.Map.find known_vars v with
-      | Some spec -> spec.value.t
-      | None -> Unknown
+      | Some spec -> spec.t.s
+      | None -> Noidea
     end
   | None -> match exp with
-  | Sexp.Atom str ->
-    if (String.equal str "true") ||
-       (String.equal str "false") then Boolean
-    else if is_int str then Sint32 (*TODO: set uint for out-of-signed-range value*)
-    else Unknown
-  | _ -> Unknown
+    | Sexp.Atom x -> if is_int x then Tentative Unsgn
+      else Noidea
+    | _ -> Noidea
 
-let rec guess_type_l exps known_vars =
+let rec guess_sign_l exps known_vars =
   match exps with
-  | hd :: tl -> begin match guess_type hd known_vars with
-      | Unknown -> guess_type_l tl known_vars
-      | t -> t
+  | hd :: tl -> begin match guess_sign hd known_vars with
+      | Noidea -> guess_sign_l tl known_vars
+      | s -> s
     end
-  | [] -> Unknown
+  | [] -> Noidea
 
-let update_tterm known given =
+let update_tterm (known:tterm) (given:tterm) =
   let t_final = match known.t with
     | Unknown -> given.t
     | Sunknown | Uunknown -> if given.t = Unknown then known.t else given.t
@@ -164,59 +162,110 @@ let update_tterm known given =
     | _ -> known.v in
   {t=t_final;v=v_final}
 
-let update_var_spec (spec:var_spec) v =
-  {name = spec.name;
-   value = (update_tterm spec.value v);}
+let choose_guess g1 g2 =
+  match g1,g2 with
+  | Noidea, _ -> g2
+  | Sure _, _ -> g1
+  | Tentative _, Sure _ -> g2
+  | Tentative _, _ -> g1
+
+let update_ttype (known:type_guess) given =
+  match known.precise,given.precise with
+  | Unknown,Unknown ->
+    let w = choose_guess known.w given.w in
+    let s = choose_guess known.s given.s in
+    {precise=Unknown;w;s}
+  | Unknown,_ -> given
+  | _,Unknown -> known
+  | _,_ -> known
+
+
+let update_var_spec (spec:typed_var) t =
+  {vname = spec.vname;
+   t = (update_ttype spec.t t);}
 
 let failback_type t1 t2 =
   match t1 with
   | Unknown -> t2
   | _ -> t1
 
-let rec get_var_decls_of_sexp exp t known_vars =
+let convert_str_to_width_confidence w =
+  if String.equal w "w1" then Sure W1
+  else if String.equal w "w8" then Sure W8
+  else if String.equal w "w16" then Sure W16
+  else if String.equal w "w32" then Sure W32
+  else Noidea
+
+let is_bool_fun fname =
+  if String.equal fname "Eq" then true
+  else if String.equal fname "Sle" then true
+  else if String.equal fname "Slt" then true
+  else if String.equal fname "Ule" then true
+  else if String.equal fname "Ult" then true
+  else false
+
+let sign_to_str s =
+  match s with
+  | Noidea -> "??"
+  | Tentative Sgn -> "-?"
+  | Sure Sgn -> "-!"
+  | Tentative Unsgn -> "+?"
+  | Sure Unsgn -> "+!"
+
+let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.Map.t) : typed_var list =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
     begin match String.Map.find known_vars name with
-      | Some spec -> [update_var_spec spec {v=Undef;t=(determine_type t w)}]
-      | None -> [{name = name; value={v=Undef;t=determine_type t w}}]
+      | Some spec -> [update_var_spec spec {precise;s;w=convert_str_to_width_confidence w}]
+      | None -> [{vname = name; t={precise;s;w=convert_str_to_width_confidence w}}]
     end
   | None, None ->
     begin
     match exp with
     | Sexp.List [Sexp.Atom f; lhs; rhs]
-      when String.equal f "Eq" ->
-      (* let t = guess_type_l [lhs;rhs] known_vars in *)
-      (get_var_decls_of_sexp lhs Unknown known_vars) @
-      (get_var_decls_of_sexp rhs Unknown known_vars)
+      when is_bool_fun f->
+      let s = choose_guess (infer_type_sign f) (guess_sign_l [lhs;rhs] known_vars) in
+      (get_var_decls_of_sexp lhs {s;w=Noidea;precise=Unknown;} known_vars) @
+      (get_var_decls_of_sexp rhs {s;w=Noidea;precise=Unknown;} known_vars)
     | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
       when (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
       if String.equal f "ZExt" then
         match tl with
-        | [tl] -> get_var_decls_of_sexp tl Uunknown known_vars
+        | [tl] -> get_var_decls_of_sexp
+                    tl {s=(Sure Unsgn);w=Noidea;precise=Unknown} known_vars
         | _ -> failwith "ZExt may have only one argument (besides w..)."
       else
-        let ty = failback_type (determine_type (infer_type_class f) w) t in
+        let si = choose_guess (infer_type_sign f) s in
         (List.join (List.map tl ~f:(fun e ->
-             get_var_decls_of_sexp e ty known_vars)))
+             get_var_decls_of_sexp e {s=si;w=Noidea;precise} known_vars)))
     | Sexp.List (Sexp.Atom f :: tl) ->
-      let ty = failback_type (infer_type_class f)
-          (failback_type (guess_type_l tl known_vars) t)
+      let si = choose_guess (infer_type_sign f)
+          (choose_guess (guess_sign_l tl known_vars) s)
       in
-      List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars))
+      List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e {s=si;w=Noidea;precise} known_vars))
     | _ -> []
     end
   | _,_ -> failwith "inconsistency in get_var_name/get_read_width"
 
-let make_name_alist_from_var_decls (lst: var_spec list) =
-  List.map lst ~f:(fun x -> (x.name,x))
+let make_name_alist_from_var_decls (lst: typed_var list) =
+  List.map lst ~f:(fun x -> (x.vname,x))
 
-let get_vars_from_plain_val v ty known_vars =
+let get_vars_from_plain_val v type_guess known_vars =
   (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
-  let decls = get_var_decls_of_sexp v ty known_vars in
+  let decls = get_var_decls_of_sexp v type_guess known_vars in
   map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
 
+let type_guess_of_ttype t = match t with
+  | Sint32 -> {s=Sure Sgn;w=Sure W32;precise=t}
+  | Sint8 -> {s=Sure Sgn;w=Sure W8;precise=t}
+  | Uint32 -> {s=Sure Unsgn;w=Sure W32;precise=t}
+  | Uint16 -> {s=Sure Unsgn;w=Sure W16;precise=t}
+  | Uint8 -> {s=Sure Unsgn;w=Sure W8;precise=t}
+  | Sunknown -> {s=Sure Sgn;w=Noidea;precise=Unknown}
+  | Uunknown -> {s=Sure Unsgn;w=Noidea;precise=Unknown}
+  | Unknown | _ -> {s=Noidea;w=Noidea;precise=t}
 
-let rec get_vars_from_struct_val v ty known_vars =
+let rec get_vars_from_struct_val v (ty:ttype) (known_vars:typed_var String.Map.t) =
   match ty with
   | Str (name, fields) ->
     let ftypes = List.map fields ~f:snd in
@@ -234,7 +283,8 @@ let rec get_vars_from_struct_val v ty known_vars =
         ~f:(fun acc (v,t)->
           get_vars_from_struct_val v.value t acc)
   | ty -> match v.full with
-    | Some v -> get_vars_from_plain_val v ty known_vars
+    | Some v ->
+      get_vars_from_plain_val v (type_guess_of_ttype ty) known_vars
     | None -> known_vars
 
 let name_gen prefix = object
@@ -292,14 +342,6 @@ let eliminate_false_eq_0 exp t =
     e
   | _ -> exp
 
-let is_bool_fun fname =
-  if String.equal fname "Eq" then true
-  else if String.equal fname "Sle" then true
-  else if String.equal fname "Slt" then true
-  else if String.equal fname "Ule" then true
-  else if String.equal fname "Ult" then true
-  else false
-
 let rec is_bool_expr exp =
   match exp with
   | Sexp.List [Sexp.Atom f; _; _] when is_bool_fun f -> true
@@ -310,22 +352,33 @@ let rec is_bool_expr exp =
     is_bool_expr e
   | _ -> false
 
+(* TODO: elaborate. *)
+let guess_type exp = Unknown
+
+let rec guess_type_l exps =
+  match exps with
+  | hd :: tl -> begin match guess_type hd with
+      | Unknown -> guess_type_l tl
+      | s -> s
+    end
+  | [] -> Unknown
+
 let rec get_sexp_value exp t =
   let exp = expand_shorted_sexp exp in
   let exp = eliminate_false_eq_0 exp t in
   match exp with
   | Sexp.Atom v ->
     begin
-      let t = match t with Unknown|Sunknown|Uunknown ->
-        guess_type exp String.Map.empty |_->t
+      let t = match t with
+        |Unknown|Sunknown|Uunknown -> guess_type exp
+        |_ -> t
       in
       match t with
       | Sint32 -> {v=Int (get_sint_in_bounds v);t}
-      | Boolean ->
-        if String.equal v "true" then {v=Bool true;t}
-        else if String.equal v "false" then {v=Bool false;t}
+      | _ ->
+        if String.equal v "true" then {v=Bool true;t=Boolean}
+        else if String.equal v "false" then {v=Bool false;t=Boolean}
         else {v=Id v; t}
-      | _ -> {v=Id v;t}
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
@@ -363,7 +416,7 @@ let rec get_sexp_value exp t =
     {v=Bop (Lt,(get_sexp_value lhs Uunknown),(get_sexp_value rhs Uunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
-    let ty = guess_type_l [lhs;rhs] String.Map.empty in
+    let ty = guess_type_l [lhs;rhs] in
     {v=Bop (Eq,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t}
   | Sexp.List [Sexp.Atom f; _; e]
     when String.equal f "ZExt" ->
@@ -433,9 +486,9 @@ let get_basic_vars ftype_of tpref =
         ret pointee stubs from the args *)
       get_vars_from_struct_val ptee.after ptee_type accumulator
     in
-    let complex_value_vars value ptr t is_ret acc =
+    let complex_value_vars value ptr (t:ttype) is_ret acc =
       match ptr with
-      | Nonptr -> get_vars_from_plain_val value t acc
+      | Nonptr -> get_vars_from_plain_val value (type_guess_of_ttype t) acc
       | Funptr _ -> acc
       | Apathptr ->
         acc
@@ -464,7 +517,7 @@ let get_basic_vars ftype_of tpref =
     let add_vars_from_ctxt vars ctxt =
       map_set_n_update_alist vars
         (make_name_alist_from_var_decls
-           (get_var_decls_of_sexp ctxt Boolean vars)) in
+           (get_var_decls_of_sexp ctxt {s=Noidea;w=Sure W1;precise=Boolean} vars)) in
     let call_ctxt_vars =
       List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
     let ret_ctxt_vars =
@@ -477,7 +530,7 @@ let get_basic_vars ftype_of tpref =
                     ~f:(get_vars ~is_tip:true)) in
   tip_vars
 
-let allocate_tip_ret_dummies ftype_of tip_calls rets =
+let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
   let alloc_dummy_for_call (rets, acc_dummies) call =
     let ret_type = get_fun_ret_type ftype_of call.fun_name in
     let add_the_dummy_to_tables value =
@@ -550,7 +603,7 @@ let allocate_args ftype_of tpref arg_name_gen =
           addr;
         Some {name=p_name;value=tterm}
     in
-    List.filter_mapi call.args ~f:(fun i {aname;value;ptr;} ->
+    List.filter_mapi call.args ~f:(fun i {aname=_;value;ptr;} ->
         match ptr with
         | Nonptr -> None
         | Funptr _ -> None
@@ -761,6 +814,34 @@ let distribute_ids pref =
      List.mapi pref.tip_calls ~f:(fun i call ->
          {call with id = tips_start_from + i})}
 
+let ttype_of_guess = function
+  | {precise=Unknown;s=Tentative Sgn;w;}
+  | {precise=Unknown;s=Sure Sgn;w;} -> begin match w with
+      | Noidea -> Sunknown
+      | Sure W1 | Tentative W1 -> Boolean
+      | Sure W8 | Tentative W8 -> Sint8
+      | Sure W16 | Tentative W16 -> Sunknown
+      | Sure W32 | Tentative W32 -> Sint32
+      end
+  | {precise=Unknown;s=Tentative Unsgn;w;}
+  | {precise=Unknown;s=Sure Unsgn;w;} -> begin match w with
+      | Noidea -> Uunknown
+      | Sure W1 | Tentative W1 -> Boolean
+      | Sure W8 | Tentative W8 -> Uint8
+      | Sure W16 | Tentative W16 -> Uint16
+      | Sure W32 | Tentative W32 -> Uint32
+      end
+  | {precise=Unknown;s=Noidea;w=Sure W1;}
+  | {precise=Unknown;s=Noidea;w=Tentative W1;} -> Boolean
+  | {precise=Unknown;s=Noidea;w=_;} -> Unknown
+  | {precise;s=_;w=_} -> precise
+
+let typed_vars_to_varspec free_vars =
+  List.fold (String.Map.data free_vars) ~init:String.Map.empty
+    ~f:(fun acc {vname;t;} ->
+        String.Map.add acc ~key:vname
+          ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
+
 let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
@@ -784,6 +865,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let context_assumptions = collect_context pref in
   let known_addresses = !known_addresses in
   let cmplxs = !allocated_complex_vals in
+  let free_vars = typed_vars_to_varspec free_vars in
   {preamble;free_vars;arguments=(arguments@(Int.Map.data tip_dummies));tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing;known_addresses}

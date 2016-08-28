@@ -54,7 +54,7 @@ let render_hist_fun_call {context;result} =
 let find_false_eq_sttmts (sttmts:tterm list) =
   List.filter sttmts ~f:(fun sttmt ->
       match sttmt.v with
-      | Bop (Eq,{v=Bool false;t=Boolean},_) -> true
+      | Bop (Eq,{v=Bool false;t=_},_) -> true
       | _ -> false)
 
 let find_complementary_sttmts sttmts1 sttmts2 =
