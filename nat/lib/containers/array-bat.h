@@ -21,14 +21,22 @@ struct ArrayBat
 };
 #endif//KLEE_VERIFICATION
 
+/*@ predicate some_batcherp(struct Batcher* p) = batcherp(_, p);
+  @*/
+
 /*@
   //params: list<struct rte_mbuf*> , batcherp
   predicate arrp_bat(list<list<struct rte_mbuf*> > data, struct ArrayBat *arr);
   predicate arrp_bat_acc(list<list<struct rte_mbuf*> > data, struct ArrayBat *arr,
-                         int idx, ARRAY_BAT_EL_TYPE *el);
+                         int idx);
 
   fixpoint ARRAY_BAT_EL_TYPE *arrp_the_missing_cell_bat(struct ArrayBat *arr,
                                                         int idx);
+  lemma void construct_bat_element(ARRAY_BAT_EL_TYPE *p);
+  requires p->len |-> ?l &*&
+           pointers((void*)&p->batch, BATCHER_CAPACITY, _) &*&
+           struct_Batcher_padding(p);
+  ensures batcherp(_, p);
   @*/
 
 

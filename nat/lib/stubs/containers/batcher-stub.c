@@ -61,7 +61,11 @@ int batcher_full(struct Batcher *bat)
   klee_trace_ret();
   klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
   klee_assert(bat == batcher_initialized);
-  return BATCHER_CAPACITY <= alloc_len;
+  // Explicit decision here, for validator to recognize 2 possibilities.
+  if (BATCHER_CAPACITY <= alloc_len)
+    return 1;
+  return 0;
+  //return BATCHER_CAPACITY <= alloc_len;
 }
 
 int batcher_is_empty(struct Batcher *bat)

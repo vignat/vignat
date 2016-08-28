@@ -183,6 +183,7 @@ let fun_types =
                                              Sint32;
                                              Sint32];
                                 lemmas_before = [
+                                  tx_bl "close lcore_confp(_, last_lcc);";
                                   (fun args _ ->
                                      "/*@ close some_lcore_confp(" ^
                                      List.nth_exn args 4 ^ "); @*/");
@@ -198,7 +199,8 @@ let fun_types =
                                      List.nth_exn args 4 ^ ", " ^
                                      List.nth_exn args 5 ^ ", " ^
                                      List.nth_exn args 6 ^ ", " ^
-                                     List.nth_exn args 7 ^ "); @*/")];
+                                     List.nth_exn args 7 ^ "); @*/");
+                                ];
                                 lemmas_after = [
                                   (fun params ->
                                      if !the_array_lcc_is_local then
@@ -245,7 +247,9 @@ let fun_types =
                                      "/*@ open some_lcore_confp(" ^
                                      List.nth_exn params.args 4 ^ "); @*/");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
-                                  tx_l "coherent_same_cap(map, chain);";];};
+                                  tx_l "coherent_same_cap(map, chain);";
+                                  tx_l "open lcore_confp(_, last_lcc);";
+                                ];};
      "dmap_get_b", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
                     lemmas_before = [
@@ -640,14 +644,23 @@ let fun_types =
                         lemmas_after = [];};
      "array_bat_begin_access", {ret_type = Ptr batcher_struct;
                                 arg_types = [Ptr arr_bat_struct; Sint32;];
-                                lemmas_before = [
-                                  tx_bl "open lcore_confp(_, last_lcc);"];
-                                lemmas_after = [];};
+                                lemmas_before = [];
+                                lemmas_after = [
+                                  (fun params ->
+                                     if params.is_tip then
+                                       "//@ construct_bat_element(" ^ params.ret_val ^");"
+                                     else "");
+                                  (fun params ->
+                                     if params.is_tip then
+                                       "//@ close some_batcherp(" ^ params.ret_val ^");"
+                                     else ""); (fun params ->
+                                     if params.is_tip then
+                                       "//@ close some_batcherp(" ^ params.ret_name ^");"
+                                     else "");];};
      "array_bat_end_access", {ret_type = Void;
                            arg_types = [Ptr arr_bat_struct;];
                            lemmas_before = [];
-                           lemmas_after = [
-                               tx_l "close lcore_confp(_, last_lcc);"];};
+                           lemmas_after = [];};
      "array_lcc_init", {ret_type = Void;
                         arg_types = [Ptr arr_lcc_struct;];
                         lemmas_before = [];
@@ -672,15 +685,19 @@ let fun_types =
                                      if params.is_tip then
                                        "//@ close some_lcore_confp(" ^ params.ret_name ^");"
                                      else "");
+                                  (fun params ->
+                                     if params.is_tip then "" else
+                                       "//@ open lcore_confp(_, last_lcc);");
                                 ];};
      "array_lcc_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_lcc_struct;];
-                              lemmas_before = [];
+                              lemmas_before = [
+                               tx_bl "close lcore_confp(_, last_lcc);";
+                              ];
                               lemmas_after = [];};
      "array_rq_begin_access", {ret_type = Ptr lcore_rx_queue_struct;
                                arg_types = [Ptr arr_rq_struct; Sint32;];
-                               lemmas_before = [
-                                 tx_bl "open lcore_confp(_, last_lcc);"];
+                               lemmas_before = [];
                                lemmas_after = [
                                  (fun params ->
                                     if params.is_tip then
@@ -697,12 +714,10 @@ let fun_types =
      "array_rq_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_rq_struct;];
                               lemmas_before = [];
-                             lemmas_after = [
-                               tx_l "close lcore_confp(_, last_lcc);"];};
+                             lemmas_after = [];};
      "array_u16_begin_access", {ret_type = Ptr Uint16;
                                arg_types = [Ptr arr_u16_struct; Sint32;];
-                                lemmas_before = [
-                                  tx_bl "open lcore_confp(_, last_lcc);"];
+                                lemmas_before = [];
                                lemmas_after = [
                                  (fun params ->
                                     if params.is_tip then
@@ -715,8 +730,7 @@ let fun_types =
      "array_u16_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_u16_struct;];
                               lemmas_before = [];
-                              lemmas_after = [
-                                tx_l "close lcore_confp(_, last_lcc);"];};
+                              lemmas_after = [];};
      "batcher_push", {ret_type = Void;
                       arg_types = [Ptr batcher_struct; Ptr rte_mbuf_struct;];
                       lemmas_before = [];
