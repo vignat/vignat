@@ -5,17 +5,17 @@ void array_bat_init(struct ArrayBat *arr_out);
 //@ requires true;
 /* @ requires arr_out->data |-> ?data &*&
              chars(data, ARRAY_BAT_CAPACITY*sizeof(ARRAY_BAT_EL_TYPE), _); @*/
-//@ ensures arrp1(_, arr_out);
+//@ ensures arrp_bat(_, arr_out);
 
 ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index);
-//@ requires arrp1(?lst, arr) &*& 0 <= index &*& index < ARRAY_BAT_CAPACITY;
-/*@ ensures arrp1_acc(lst, arr, index, result) &*&
+//@ requires arrp_bat(?lst, arr) &*& 0 <= index &*& index < ARRAY_BAT_CAPACITY;
+/*@ ensures arrp_bat_acc(lst, arr, index, result) &*&
             batcherp(nth(index, lst), result); @*/
 
 void array_bat_end_access(struct ArrayBat *arr);
-/*@ requires arrp1_acc(?lst, arr, ?index, ?ptr) &*&
+/*@ requires arrp_bat_acc(?lst, arr, ?index, ?ptr) &*&
              batcherp(?x, ptr); @*/
-//@ ensures arrp1(update(index, x, lst), arr);
+//@ ensures arrp_bat(update(index, x, lst), arr);
 
 
 #ifdef KLEE_VERIFICATION

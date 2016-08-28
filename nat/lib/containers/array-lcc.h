@@ -68,7 +68,8 @@ struct ArrayLcc
   predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp) =
       pure_lcore_confp(lc, lcp) &*&
       arrp_rq(_, &lcp->rx_queue_list) &*&
-      arrp_u16(_, &lcp->tx_queue_id);
+      arrp_u16(_, &lcp->tx_queue_id) &*&
+      arrp_bat(_, &lcp->tx_mbufs);
   predicate some_lcore_confp(struct lcore_conf *lcp) = lcore_confp(_, lcp);
   @*/
 

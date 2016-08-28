@@ -23,9 +23,12 @@ struct ArrayBat
 
 /*@
   //params: list<struct rte_mbuf*> , batcherp
-  predicate arrp1(list<list<struct rte_mbuf*> > data, struct ArrayBat* arr);
-  predicate arrp1_acc(list<list<struct rte_mbuf*> > data, struct ArrayBat* arr,
-                      int idx, ARRAY_BAT_EL_TYPE *el);
+  predicate arrp_bat(list<list<struct rte_mbuf*> > data, struct ArrayBat *arr);
+  predicate arrp_bat_acc(list<list<struct rte_mbuf*> > data, struct ArrayBat *arr,
+                         int idx, ARRAY_BAT_EL_TYPE *el);
+
+  fixpoint ARRAY_BAT_EL_TYPE *arrp_the_missing_cell_bat(struct ArrayBat *arr,
+                                                        int idx);
   @*/
 
 

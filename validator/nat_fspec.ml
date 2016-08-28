@@ -640,12 +640,14 @@ let fun_types =
                         lemmas_after = [];};
      "array_bat_begin_access", {ret_type = Ptr batcher_struct;
                                 arg_types = [Ptr arr_bat_struct; Sint32;];
-                                lemmas_before = [];
+                                lemmas_before = [
+                                  tx_bl "open lcore_confp(_, last_lcc);"];
                                 lemmas_after = [];};
      "array_bat_end_access", {ret_type = Void;
                            arg_types = [Ptr arr_bat_struct;];
                            lemmas_before = [];
-                           lemmas_after = [];};
+                           lemmas_after = [
+                               tx_l "close lcore_confp(_, last_lcc);"];};
      "array_lcc_init", {ret_type = Void;
                         arg_types = [Ptr arr_lcc_struct;];
                         lemmas_before = [];
