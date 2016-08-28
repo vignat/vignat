@@ -141,6 +141,8 @@ let rec render_tterm (t:tterm) =
   | Bool b -> string_of_bool b
   | Not t -> "!(" ^ (render_tterm t) ^ ")"
   | Str_idx ({v=Id x;t=_}, field_name) -> x ^ "." ^ field_name
+  | Str_idx ({v=Str_idx ({v=Id x;t=_}, fname1);t=_}, fname2) ->
+    x ^ "." ^ fname1 ^ "." ^ fname2
   | Str_idx ({v=Deref {v=Id x;t=_};t=_},field_name) -> x ^ "->" ^ field_name
   | Str_idx ({v=Deref x;t},field_name) -> "(" ^ (render_tterm x) ^ ")->" ^ field_name
   | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
