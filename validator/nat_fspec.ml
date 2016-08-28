@@ -7,6 +7,7 @@ type map_key = Int | Ext
 let last_index_gotten = ref ""
 let last_index_key = ref Int
 let last_indexing_succ_ret_var = ref ""
+let last_device_id = ref ""
 
 let last_time_for_index_alloc = ref ""
 let the_array_lcc_is_local = ref true
@@ -249,6 +250,8 @@ let fun_types =
                     lemmas_before = [
                       capture_map "cur_map" 0;
                       (fun args _ ->
+                         last_device_id :=
+                           "(" ^ List.nth_exn args 1 ^ ")->ext_device_id";
                          "/*@ close ext_k_p(" ^ List.nth_exn args 1 ^
                          ", ekc(user_buf0_36, user_buf0_34, " ^
                          "user_buf0_30, user_buf0_26, (" ^ List.nth_exn args 1 ^
@@ -298,6 +301,8 @@ let fun_types =
                     lemmas_before = [
                       capture_map "cur_map" 0;
                       (fun args _ ->
+                         last_device_id :=
+                           "(" ^ List.nth_exn args 1 ^ ")->int_device_id";
                          "/*@ close int_k_p(" ^ List.nth_exn args 1 ^
                          ", ikc(user_buf0_34, user_buf0_36,\
                           user_buf0_26, user_buf0_30, (" ^ List.nth_exn args 1 ^
@@ -501,7 +506,9 @@ let fun_types =
                             dmap_erase_all_has_trans(" ^
                            (tmp "cur_map") ^
                            ", ikc(user_buf0_34,\
-                            user_buf0_36, user_buf0_26, user_buf0_30, cmplx1, user_buf0_23),\n\
+                            user_buf0_36, user_buf0_26, user_buf0_30, " ^
+                           !last_device_id ^
+                           ", user_buf0_23),\n\
                             dchain_get_expired_indexes_fp(" ^
                            (tmp "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
