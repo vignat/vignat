@@ -84,7 +84,9 @@ void batcher_empty(struct Batcher *bat);
 int batcher_full(struct Batcher *bat);
 //@ requires batcherp(?b, bat);
 /*@ ensures batcherp(b, bat) &*&
-            result == (length(b) == BATCHER_CAPACITY ? 1 : 0); @*/
+            (length(b) == BATCHER_CAPACITY ?
+             result == 1 :
+             result == 0); @*/
 
 /**
    Check whether the batcher is empty.
@@ -94,6 +96,6 @@ int batcher_full(struct Batcher *bat);
  */
 int batcher_is_empty(struct Batcher *bat);
 //@ requires batcherp(?b, bat);
-//@ ensures batcherp(b, bat) &*& result == (b == nil ? 1 : 0);
+//@ ensures batcherp(b, bat) &*& (b == nil ? result == 1 : result == 0);
 
 #endif//_BATCHER_H_INCLUDED_
