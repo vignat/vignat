@@ -23,8 +23,7 @@ void batcher_push(struct Batcher *bat, BATCHER_EL_TYPE val)
 {
   klee_trace_ret();
   klee_trace_param_just_ptr(bat, sizeof(struct Batcher), "bat");
-  //TODO: A proper tracing here.
-  klee_trace_param_i32((uint32_t)val, "val");
+  klee_trace_param_just_ptr(val, sizeof(struct rte_mbuf), "val");
 
   klee_assert(bat == batcher_initialized);
   klee_assert(alloc_len < BATCHER_CAPACITY);

@@ -231,14 +231,8 @@ send_burst(struct lcore_conf *qconf, uint8_t port)
 
 /* Enqueue a single packet, and send burst if queue is filled */
 static inline int
-send_single_packet(struct rte_mbuf *m, uint8_t port)
+send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
 {
-  uint32_t lcore_id;
-  struct lcore_conf *qconf;
-
-  lcore_id = rte_lcore_id();
-
-  qconf = array_lcc_begin_access(&lcore_conf, lcore_id);
   struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs, port);
   batcher_push(mbufs, m);
   int is_full = batcher_full(mbufs);
@@ -249,8 +243,6 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
   if (unlikely(is_full)) {
     send_burst(qconf, port);
   }
-  array_lcc_end_access(&lcore_conf);
-  qconf = 0;
   return 0;
 }
 
@@ -297,7 +289,7 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
 }
 
 static inline __attribute__((always_inline)) void
-simple_forward(struct rte_mbuf *m, uint8_t portid)
+simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 {
   struct ether_hdr *eth_hdr;
   struct ipv4_hdr *ipv4_hdr;
@@ -418,7 +410,7 @@ simple_forward(struct rte_mbuf *m, uint8_t portid)
       ipv4_hdr->hdr_checksum = rte_ipv4_cksum(ipv4_hdr);
 
 
-      send_single_packet(m, dst_device);
+      send_single_packet(m, dst_device, qconf);
     } else {
       LOG( "Non TCP, nor UDP packet, dsicard \n");
       /* Free the mbuf that contains no TCP, nor UDP datagramm */
@@ -566,19 +558,19 @@ main_loop(__attribute__((unused)) void *dummy)
 
                 /* Prefetch first packets */
                 for (j = 0; j < PREFETCH_OFFSET && j < nb_rx; j++) {
-                    rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[j], void *));
+                  rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[j], void *));
                 }
 
                 /* Prefetch and forward already prefetched packets */
                 for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
-                    rte_prefetch0(rte_pktmbuf_mtod
-                                  (pkts_burst[j + PREFETCH_OFFSET], void *));
-                    simple_forward(pkts_burst[j], portid);
+                  rte_prefetch0(rte_pktmbuf_mtod
+                                (pkts_burst[j + PREFETCH_OFFSET], void *));
+                  simple_forward(pkts_burst[j], portid, qconf);
                 }
 
                 /* Forward remaining prefetched packets */
                 for (; j < nb_rx; j++) {
-                    simple_forward(pkts_burst[j], portid);
+                  simple_forward(pkts_burst[j], portid, qconf);
                 }
             }
         }

@@ -508,7 +508,7 @@ let fun_types =
                                     !last_device_id ^
                                     " && " ^
                                     !last_device_id ^
-                                    " < RTE_NUM_DEVICES);");
+                                    " < RTE_MAX_ETHPORTS);");
                           (fun params ->
                              "/*@\
                               open flw_p(" ^ (List.nth_exn params.args 2) ^
