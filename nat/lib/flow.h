@@ -240,12 +240,6 @@ int flow_consistency(void* key_a, void* key_b,
   }
   @*/
 
-/*@
-  lemma void flow_to_chars(struct flow* p);
-  requires flw_p(p, _);
-  ensures chars((void*)p, sizeof(struct flow), _);
-  @*/
-
 /**
   Equality comparison function for the int_key's.
   Necessary for DoubleMap, hence the generalized signature.

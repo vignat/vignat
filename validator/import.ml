@@ -101,7 +101,7 @@ let to_symbol str =
 
 let get_var_name_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.Atom pos; Sexp.Atom name]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom wid; Sexp.Atom pos; Sexp.Atom name]
     when ( String.equal rd "ReadLSB" ||
            String.equal rd "Read") -> Some (to_symbol name ^ "_" ^
                                             pos(* FIXME: '^ w' - this reveals a bug where
@@ -116,10 +116,13 @@ let get_read_width_of_sexp exp =
   | _ -> None
 
 let determine_type t w =
-  match t with
-  | Sunknown -> infer_signed_type w
-  | Uunknown -> infer_unsigned_type w
-  | _ -> t
+  (* We support only unsigned short anyway. *)
+  if String.equal w "w16" then Uint16
+  else
+    match t with
+    | Sunknown | Sint32 | Sint8 -> infer_signed_type w
+    | Uunknown | Uint32 | Uint16 | Uint8 -> infer_unsigned_type w
+    | _ -> t
 
 let map_set_n_update_alist mp lst =
   List.fold lst ~init:mp ~f:(fun acc (key,data) ->
@@ -129,8 +132,13 @@ let is_int str =
   try ignore (int_of_string str); true
   with _ -> false
 
-let guess_type exp =
-  match exp with
+let guess_type exp known_vars =
+  match get_var_name_of_sexp exp with
+  | Some v -> begin match String.Map.find known_vars v with
+      | Some spec -> spec.value.t
+      | None -> Unknown
+    end
+  | None -> match exp with
   | Sexp.Atom str ->
     if (String.equal str "true") ||
        (String.equal str "false") then Boolean
@@ -138,10 +146,10 @@ let guess_type exp =
     else Unknown
   | _ -> Unknown
 
-let rec guess_type_l exps =
+let rec guess_type_l exps known_vars =
   match exps with
-  | hd :: tl -> begin match guess_type hd with
-      | Unknown -> guess_type_l tl
+  | hd :: tl -> begin match guess_type hd known_vars with
+      | Unknown -> guess_type_l tl known_vars
       | t -> t
     end
   | [] -> Unknown
@@ -175,19 +183,24 @@ let rec get_var_decls_of_sexp exp t known_vars =
   | None, None ->
     begin
     match exp with
+    | Sexp.List [Sexp.Atom f; lhs; rhs]
+      when String.equal f "Eq" ->
+      (* let t = guess_type_l [lhs;rhs] known_vars in *)
+      (get_var_decls_of_sexp lhs Unknown known_vars) @
+      (get_var_decls_of_sexp rhs Unknown known_vars)
     | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
       when (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
       if String.equal f "ZExt" then
         match tl with
         | [tl] -> get_var_decls_of_sexp tl Uunknown known_vars
-        | _ -> failwith "ZExt may have only one argumen (besides w..)."
+        | _ -> failwith "ZExt may have only one argument (besides w..)."
       else
         let ty = failback_type (determine_type (infer_type_class f) w) t in
         (List.join (List.map tl ~f:(fun e ->
              get_var_decls_of_sexp e ty known_vars)))
     | Sexp.List (Sexp.Atom f :: tl) ->
       let ty = failback_type (infer_type_class f)
-          (failback_type (guess_type_l tl) t)
+          (failback_type (guess_type_l tl known_vars) t)
       in
       List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e ty known_vars))
     | _ -> []
@@ -304,7 +317,7 @@ let rec get_sexp_value exp t =
   | Sexp.Atom v ->
     begin
       let t = match t with Unknown|Sunknown|Uunknown ->
-        guess_type exp |_->t
+        guess_type exp String.Map.empty |_->t
       in
       match t with
       | Sint32 -> {v=Int (get_sint_in_bounds v);t}
@@ -350,7 +363,7 @@ let rec get_sexp_value exp t =
     {v=Bop (Lt,(get_sexp_value lhs Uunknown),(get_sexp_value rhs Uunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
-    let ty = guess_type_l [lhs;rhs] in
+    let ty = guess_type_l [lhs;rhs] String.Map.empty in
     {v=Bop (Eq,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t}
   | Sexp.List [Sexp.Atom f; _; e]
     when String.equal f "ZExt" ->

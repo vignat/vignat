@@ -159,7 +159,6 @@ void flow_destroy(void* flwp)
   //do nothing
   //@ open flw_p(flwp, _);
   //@ open_struct((struct flow*)flwp);
-  // @ flow_to_bytes(flwp);
 }
 
 #ifdef KLEE_VERIFICATION

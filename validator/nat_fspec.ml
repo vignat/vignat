@@ -494,7 +494,7 @@ let fun_types =
                              ", cur_ch);\n\
                               }@*/");
                           (fun args _ ->
-                             "//@ flow_to_chars(" ^
+                             "//@ open_struct(" ^
                              (List.nth_exn args 2) ^ ");")];
                         lemmas_after = [
                           (fun params ->
