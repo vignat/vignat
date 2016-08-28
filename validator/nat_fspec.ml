@@ -68,6 +68,7 @@ let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
                                                 "tx_mbufs", arr_bat_struct;])
 let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
                                                         "queue_id", Uint8;])
+let rte_mbuf_struct = Ir.Str ( "rte_mbuf", [] )
 
 let fun_types =
   String.Map.of_alist_exn
@@ -714,6 +715,28 @@ let fun_types =
                               lemmas_before = [];
                               lemmas_after = [
                                 tx_l "close lcore_confp(_, last_lcc);"];};
+     "batcher_push", {ret_type = Void;
+                      arg_types = [Ptr batcher_struct; Ptr rte_mbuf_struct;];
+                      lemmas_before = [];
+                      lemmas_after = [];};
+     "batcher_take_all", {ret_type = Void;
+                          arg_types = [Ptr batcher_struct;
+                                       Ptr (Ptr (Ptr rte_mbuf_struct));
+                                       Ptr Sint32];
+                          lemmas_before = [];
+                          lemmas_after = [];};
+     "batcher_empty", {ret_type = Void;
+                       arg_types = [Ptr batcher_struct;];
+                       lemmas_before = [];
+                       lemmas_after = [];};
+     "batcher_full", {ret_type = Sint32;
+                      arg_types = [Ptr batcher_struct;];
+                      lemmas_before = [];
+                      lemmas_after = [];};
+     "batcher_is_empty", {ret_type = Sint32;
+                          arg_types = [Ptr batcher_struct;];
+                          lemmas_before = [];
+                         lemmas_after = [];}
     ]
 
 let fixpoints =
