@@ -111,7 +111,7 @@ let to_symbol str =
 
 let get_var_name_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom wid; Sexp.Atom pos; Sexp.Atom name]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.Atom pos; Sexp.Atom name]
     when ( String.equal rd "ReadLSB" ||
            String.equal rd "Read") -> Some (to_symbol name ^ "_" ^
                                             pos(* FIXME: '^ w' - this reveals a bug where
@@ -353,7 +353,7 @@ let rec is_bool_expr exp =
   | _ -> false
 
 (* TODO: elaborate. *)
-let guess_type exp = Unknown
+let guess_type _ = Unknown
 
 let rec guess_type_l exps =
   match exps with
@@ -472,14 +472,14 @@ let rec add_to_known_addresses base_value breakdown addr =
       ~key:addr ~data:(update_tterm base_value prev)
 
 let get_basic_vars ftype_of tpref =
-  let get_vars ~is_tip known_vars (call:Trace_prefix.call_node) =
-    let get_arg_pointee_vars addr ptee ptee_type accumulator =
+  let get_vars known_vars (call:Trace_prefix.call_node) =
+    let get_arg_pointee_vars ptee ptee_type accumulator =
       let before_vars =
         get_vars_from_struct_val ptee.before ptee_type accumulator
       in
       get_vars_from_struct_val ptee.after ptee_type before_vars
     in
-    let get_ret_pointee_vars addr ptee ptee_type accumulator =
+    let get_ret_pointee_vars ptee ptee_type accumulator =
       assert(ptee.before.full = None);
       assert(ptee.before.break_down = []);
       (*TODO: use another name generator to distinguish
@@ -493,13 +493,11 @@ let get_basic_vars ftype_of tpref =
       | Apathptr ->
         acc
       | Curioptr ptee ->
-        let addr = (Sexp.to_string value) in
         let ptee_type = get_pointee t in
-        if is_ret then begin (* if is_tip then *)
-            get_ret_pointee_vars addr ptee ptee_type acc
-          (* else acc *)
+        if is_ret then begin
+          get_ret_pointee_vars ptee ptee_type acc
         end
-        else get_arg_pointee_vars addr ptee ptee_type acc
+        else get_arg_pointee_vars ptee ptee_type acc
     in
     assert((List.length call.args) =
            (List.length (ftype_of call.fun_name).arg_types));
@@ -524,10 +522,9 @@ let get_basic_vars ftype_of tpref =
       List.fold call.ret_context ~f:add_vars_from_ctxt ~init:call_ctxt_vars in
     ret_ctxt_vars
   in
-  let hist_vars = (List.fold tpref.history ~init:String.Map.empty
-                     ~f:(get_vars ~is_tip:false)) in
-  let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars
-                    ~f:(get_vars ~is_tip:true)) in
+  let hist_vars = (List.fold tpref.history
+                     ~init:String.Map.empty ~f:get_vars) in
+  let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars ~f:get_vars) in
   tip_vars
 
 let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
@@ -670,6 +667,14 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
 
+let take_extra_ptrs_into_account ptrs =
+  List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
+      match Int64.Map.find !known_addresses value with
+      | None -> None
+      | Some x -> match get_struct_val_value ptee.before (get_pointee x.t) with
+        | {v=Undef;t=_} -> None
+        | y -> Some {lhs={v=Deref x;t=y.t};rhs=y})
+
 let extract_common_call_context
     ~is_tip ftype_of call ret_spec args unique_postfix =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
@@ -677,6 +682,7 @@ let extract_common_call_context
   let arg_names = List.map args ~f:render_tterm in
   let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
   let application = simplify_term (Apply (call.fun_name,args)) in
+  let extra_pre_conditions = take_extra_ptrs_into_account call.extra_ptrs in
   let post_lemmas =
     compose_post_lemmas
       ~is_tip ftype_of call ret_spec arg_names tmp_gen
@@ -685,7 +691,7 @@ let extract_common_call_context
     | Some ret_spec -> Some ret_spec.name
     | None -> None
   in
-  {pre_lemmas;application;post_lemmas;ret_name;ret_type}
+  {extra_pre_conditions;pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
 let extract_hist_call ftype_of call rets =
   let args = extract_fun_args ftype_of call in
@@ -778,9 +784,8 @@ let collect_context pref =
    | _ -> failwith "More than two tip alternative tipcalls are not supported.")
 
 let strip_context call =
-  {fun_name = call.fun_name; args = call.args;
-   ret = None; call_context = []; ret_context = [];
-   id = call.id}
+  (* TODO: why do we erase the return value? *)
+  {call with ret = None; call_context = []; ret_context = [];}
 
 let get_relevant_segment pref boundary_fun =
   let rec last_relevant_seg hist candidat =

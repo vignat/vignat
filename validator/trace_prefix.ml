@@ -18,9 +18,12 @@ with sexp
 
 type arg = {aname: string; value: expr; ptr: pointer;} with sexp
 
+type extra_ptr = {pname: string; value: int64; ptee: ptee;} with sexp
+
 type ret = {value: expr; ptr: pointer;} with sexp
 
 type call_node = {fun_name: string; args: arg list; ret: ret option;
+                  extra_ptrs: extra_ptr list;
                   call_context: expr list; ret_context: expr list;
                   id: int with default(0)} with sexp
 

@@ -54,6 +54,7 @@ val ttype_to_str : ttype -> bytes
 val is_void : ttype -> bool
 val get_pointee : ttype -> ttype
 type fun_call_context = {
+  extra_pre_conditions : eq_condition list;
   pre_lemmas : bytes list;
   application : term;
   post_lemmas : bytes list;

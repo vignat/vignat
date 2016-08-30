@@ -44,7 +44,13 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
   | None -> "\n"
 
+let render_extra_pre_conditions context =
+  String.concat
+    (List.map context.extra_pre_conditions ~f:(fun {lhs;rhs} ->
+       (render_eq_sttmt ~is_assert:false lhs rhs)))
+
 let render_hist_fun_call {context;result} =
+  (render_extra_pre_conditions context) ^
   (render_fcall_with_lemmas context) ^
   (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
   match result.ret_val.t with

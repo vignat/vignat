@@ -22,6 +22,10 @@ type arg = { aname : bytes; value : expr; ptr : pointer; }
 val __arg_of_sexp__ : expr -> arg
 val arg_of_sexp : expr -> arg
 val sexp_of_arg : arg -> expr
+type extra_ptr = { pname : bytes; value : int64; ptee : ptee; }
+val __extra_ptr_of_sexp__ : expr -> extra_ptr
+val extra_ptr_of_sexp : expr -> extra_ptr
+val sexp_of_extra_ptr : extra_ptr -> expr
 type ret = { value : expr; ptr : pointer; }
 val __ret_of_sexp__ : expr -> ret
 val ret_of_sexp : expr -> ret
@@ -30,6 +34,7 @@ type call_node = {
   fun_name : bytes;
   args : arg list;
   ret : ret option;
+  extra_ptrs : extra_ptr list;
   call_context : expr list;
   ret_context : expr list;
   id : int;
