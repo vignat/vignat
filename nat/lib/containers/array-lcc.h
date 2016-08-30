@@ -50,6 +50,19 @@ struct lcore_conf {
       (arg, offsetof(struct lcore_conf, tx_mbufs),                      \
        sizeof(struct ArrayBat), "tx_mbufs");                            \
   }
+#define ARRAY_LCC_EL_TRACE_EP_BREAKDOWN(ep) {                           \
+    klee_trace_extra_ptr_field(ep, offsetof(struct lcore_conf, n_rx_queue), \
+                               sizeof(uint16_t), "n_rx_queue");         \
+    klee_trace_extra_ptr_field_just_ptr                                 \
+      (ep, offsetof(struct lcore_conf, rx_queue_list),                  \
+       sizeof(struct ArrayRq), "rx_queue_list");                        \
+    klee_trace_extra_ptr_field_just_ptr                                 \
+      (ep, offsetof(struct lcore_conf, tx_queue_id),                    \
+       sizeof(struct ArrayU16), "tx_queue_id");                         \
+    klee_trace_extra_ptr_field_just_ptr                                 \
+      (ep, offsetof(struct lcore_conf, tx_mbufs),                       \
+       sizeof(struct ArrayBat), "tx_mbufs");                            \
+  }
 
 #ifdef KLEE_VERIFICATION
 struct ArrayLcc {
@@ -67,6 +80,8 @@ struct ArrayLcc
   predicate pure_lcore_confp(lcore_confi lc, struct lcore_conf *lcp);
   predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp) =
       pure_lcore_confp(lc, lcp) &*&
+      lcp->n_rx_queue |-> ?nrq &*&
+      0 < nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
       arrp_rq(_, &lcp->rx_queue_list) &*&
       arrp_u16(_, &lcp->tx_queue_id) &*&
       arrp_bat(_, &lcp->tx_mbufs);
