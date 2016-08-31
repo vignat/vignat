@@ -20,6 +20,7 @@ ARRAY_U16_EL_TYPE array_u16_model_cell;
 int array_u16_allocated_index;
 int array_u16_index_allocated;
 struct ArrayU16 *array_u16_initialized;
+int array_u16_cell_is_exposed = 1;
 
 void array_u16_init(struct ArrayU16 *arr_out)
 {
@@ -27,21 +28,31 @@ void array_u16_init(struct ArrayU16 *arr_out)
   // formally verified domain.
   /* klee_trace_ret(); */
   /* klee_trace_param_i32((uint32_t)arr_out, "arr_out"); */
+  if (!array_u16_cell_is_exposed)
+    klee_allow_access(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE));
   klee_make_symbolic(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
                      "array_u16_model_cell");
   array_u16_index_allocated = 0;
   ARRAY_U16_EL_INIT(&array_u16_model_cell);
   array_u16_initialized = arr_out;
+  klee_forbid_access(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
+                     "array u16 private state");
+  array_u16_cell_is_exposed = 0;
 }
 
 void array_u16_reset(struct ArrayU16 *arr)
 {
   // No need for tracing, this is a shadow control function.
+  klee_assert(!array_u16_cell_is_exposed);
+  klee_allow_access(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE));
   klee_make_symbolic(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
                      "array_u16_model_cell");
   array_u16_index_allocated = 0;
   ARRAY_U16_EL_INIT(&array_u16_model_cell);
   array_u16_initialized = arr;
+  klee_forbid_access(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
+                     "array u16 private state");
+  array_u16_cell_is_exposed = 0;
 }
 
 ARRAY_U16_EL_TYPE *array_u16_begin_access(struct ArrayU16 *arr, int index)
@@ -57,6 +68,8 @@ ARRAY_U16_EL_TYPE *array_u16_begin_access(struct ArrayU16 *arr, int index)
     array_u16_allocated_index = index;
     array_u16_index_allocated = 1;
   }
+  klee_allow_access(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE));
+  array_u16_cell_is_exposed = 1;
   return &array_u16_model_cell;
 }
 
@@ -66,6 +79,11 @@ void array_u16_end_access(struct ArrayU16 *arr)
   klee_trace_param_just_ptr(arr, sizeof(struct ArrayU16), "arr");
   klee_assert(array_u16_index_allocated);
   klee_assert(arr == array_u16_initialized);
+  klee_trace_extra_ptr(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
+                       "returned_u16_cell");
+  klee_forbid_access(&array_u16_model_cell, sizeof(ARRAY_U16_EL_TYPE),
+                     "array u16 private state");
+  array_u16_cell_is_exposed = 0;
   //nothing
 }
 

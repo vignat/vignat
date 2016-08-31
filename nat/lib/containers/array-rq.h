@@ -25,6 +25,12 @@ struct lcore_rx_queue {
     klee_trace_ret_ptr_field(offsetof(struct lcore_rx_queue, queue_id), \
                              sizeof(uint8_t), "queue_id");              \
   }
+#define ARRAY_RQ_EL_TRACE_EP_BREAKDOWN(ep) {                            \
+    klee_trace_extra_ptr_field(ep, offsetof(struct lcore_rx_queue, port_id), \
+                               sizeof(uint8_t), "port_id");             \
+    klee_trace_extra_ptr_field(ep, offsetof(struct lcore_rx_queue, queue_id), \
+                               sizeof(uint8_t), "queue_id");            \
+  }
 
 #ifdef KLEE_VERIFICATION
 struct ArrayRq
@@ -40,7 +46,11 @@ struct ArrayRq
 
 /*@
   inductive rx_queuei = rx_queuei(int,int);
-  predicate rx_queuep(rx_queuei rq, struct lcore_rx_queue *lrq);
+  predicate rx_queuep_bare_bones(rx_queuei rq, struct lcore_rx_queue *lrq);
+  predicate rx_queuep(rx_queuei rq, struct lcore_rx_queue *lrq) =
+            rx_queuep_bare_bones(rq, lrq) &*&
+            lrq->port_id |-> ?pi &*&
+            lrq->queue_id |-> ?qi;
   predicate some_rx_queuep(struct lcore_rx_queue *lrq) = rx_queuep(_, lrq);
   @*/
 

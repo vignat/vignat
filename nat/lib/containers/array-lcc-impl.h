@@ -40,7 +40,7 @@ ARRAY_LCC_EL_TYPE array_lcc_model_cell;
 int array_lcc_allocated_index;
 int array_lcc_index_allocated;
 struct ArrayLcc *array_lcc_initialized;
-int cell_is_exposed;
+int array_lcc_cell_is_exposed;
 
 void array_lcc_init(struct ArrayLcc *arr_out)
 {
@@ -52,21 +52,21 @@ void array_lcc_init(struct ArrayLcc *arr_out)
   ARRAY_LCC_EL_INIT(&array_lcc_model_cell);
   array_lcc_initialized = arr_out;
   klee_forbid_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
-                     "private state");
-  cell_is_exposed = 0;
+                     "array lcc private state");
+  array_lcc_cell_is_exposed = 0;
 }
 
 void array_lcc_reset(struct ArrayLcc *arr)
 {
   //Non traceable function.
   klee_assert(arr == array_lcc_initialized);
-  if (!cell_is_exposed)
+  if (!array_lcc_cell_is_exposed)
     klee_allow_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE));
   klee_make_symbolic(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
                      "array_lcc_model_cell");
   array_lcc_index_allocated = 0;
   ARRAY_LCC_EL_INIT(&array_lcc_model_cell);
-  if (!cell_is_exposed)
+  if (!array_lcc_cell_is_exposed)
     klee_forbid_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
                        "private state");
 }
@@ -86,7 +86,7 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
     array_lcc_index_allocated = 1;
   }
   klee_allow_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE));
-  cell_is_exposed = 1;
+  array_lcc_cell_is_exposed = 1;
   return &array_lcc_model_cell;
 }
 
@@ -102,7 +102,7 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 
   klee_forbid_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
                      "private state");
-  cell_is_exposed = 1;
+  array_lcc_cell_is_exposed = 1;
   //nothing
 }
 

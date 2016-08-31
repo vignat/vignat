@@ -700,6 +700,8 @@ let fun_types =
                                lemmas_before = [];
                                lemmas_after = [
                                  (fun params ->
+                                    "last_rq = " ^ params.ret_name ^ ";\n");
+                                 (fun params ->
                                     if params.is_tip then
                                       "//@ construct_rq_element(" ^ params.ret_val ^ ");"
                                     else "");
@@ -710,10 +712,16 @@ let fun_types =
                                  (fun params ->
                                     if params.is_tip then
                                       "//@ close some_rx_queuep(" ^ params.ret_name ^ ");"
-                                    else "")];};
+                                    else "");
+                                 (fun params ->
+                                    if params.is_tip then "" else
+                                      "//@ open rx_queuep(_, last_rq);");
+                               ];};
      "array_rq_end_access", {ret_type = Void;
-                              arg_types = [Ptr arr_rq_struct;];
-                              lemmas_before = [];
+                             arg_types = [Ptr arr_rq_struct;];
+                             lemmas_before = [
+                               tx_bl "close rx_queuep(_, last_rq);";
+                             ];
                              lemmas_after = [];};
      "array_u16_begin_access", {ret_type = Ptr Uint16;
                                arg_types = [Ptr arr_u16_struct; Sint32;];
@@ -822,7 +830,8 @@ struct
                  "void to_verify()\
                   /*@ requires true; @*/ \
                   /*@ ensures true; @*/\n{\n\
-                  struct lcore_conf *last_lcc;\n"
+                  struct lcore_conf *last_lcc;\n\
+                  struct lcore_rx_queue *last_rq;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"

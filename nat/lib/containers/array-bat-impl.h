@@ -27,6 +27,7 @@ ARRAY_BAT_EL_TYPE array_bat_model_cell;
 int array_bat_allocated_index;
 int array_bat_index_allocated;
 struct ArrayBat *array_bat_initialized;
+int array_bat_cell_is_exposed = 1;
 
 void array_bat_init(struct ArrayBat *arr_out)
 {
@@ -34,14 +35,17 @@ void array_bat_init(struct ArrayBat *arr_out)
   // array2_init, which is traced. the spec for array2_init will
   // provide the necessary predicates, whilst array_bat_init is called
   // in the formally verified domain.
-  //klee_trace_ret();
-  //klee_trace_param_i32((uint32_t)arr_out, "arr_out");
 
+  if (!array_bat_cell_is_exposed)
+    klee_allow_access(&array_bat_model_cell, sizeof(ARRAY_BAT_EL_TYPE));
   klee_make_symbolic(&array_bat_model_cell, sizeof(ARRAY_BAT_EL_TYPE),
                      "array_bat_model_cell");
   array_bat_index_allocated = 0;
   ARRAY_BAT_EL_INIT(&array_bat_model_cell);
   array_bat_initialized = arr_out;
+  klee_forbid_access(&array_bat_model_cell, sizeof(ARRAY_BAT_EL_TYPE),
+                     "array bat private state");
+  array_bat_cell_is_exposed = 0;
 }
 
 ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index)
@@ -57,6 +61,8 @@ ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index)
     array_bat_allocated_index = index;
     array_bat_index_allocated = 1;
   }
+  klee_allow_access(&array_bat_model_cell, sizeof(ARRAY_BAT_EL_TYPE));
+  array_bat_cell_is_exposed = 1;
   return &array_bat_model_cell;
 }
 
@@ -66,6 +72,10 @@ void array_bat_end_access(struct ArrayBat *arr)
   klee_trace_param_just_ptr(arr, sizeof(struct ArrayBat), "arr");
   klee_assert(array_bat_index_allocated);
   klee_assert(arr == array_bat_initialized);
+
+  klee_forbid_access(&array_bat_model_cell, sizeof(ARRAY_BAT_EL_TYPE),
+                     "array bat private state");
+  array_bat_cell_is_exposed = 0;
   //nothing
 }
 
