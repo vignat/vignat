@@ -44,10 +44,22 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
   | None -> "\n"
 
+let rec render_assignment {lhs;rhs;} =
+  match rhs.v with
+  | Struct (_, fvals) ->
+    String.concat ~sep: "\n"
+      (List.map fvals
+         ~f:(fun {name;value} ->
+             render_assignment
+               {lhs={v=Str_idx (lhs, name);t=Unknown};
+                rhs=value;}))
+  | Undef -> "";
+  | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
+
 let render_extra_pre_conditions context =
   String.concat
-    (List.map context.extra_pre_conditions ~f:(fun {lhs;rhs} ->
-       (render_eq_sttmt ~is_assert:false lhs rhs)))
+    (List.map context.extra_pre_conditions ~f:(fun eq_cond ->
+       (render_assignment eq_cond)))
 
 let render_hist_fun_call {context;result} =
   (render_extra_pre_conditions context) ^
@@ -119,21 +131,11 @@ let render_2tip_post_assertions res1 res2 ret_name =
 let render_export_point name =
   "int " ^ name ^ ";\n"
 
-let rec render_assignment var =
-  match var.value.v with
-  | Struct (_, fvals) ->
-    (*TODO: make sure that the var_value.t is also Str .*)
-    String.concat ~sep:"\n"
-      (List.map fvals
-         ~f:(fun {name;value} ->
-             render_assignment {name=(var.name ^ "." ^ name);value} ^ ";"))
-  | Undef -> ""
-  | _ -> var.name ^ " = " ^ (render_tterm var.value)
-
 let render_assignments args =
   String.concat ~sep:"\n"
     (List.map args ~f:(fun arg ->
-       render_assignment arg ^ ";"))
+         render_assignment {lhs={v=Id arg.name;t=Unknown;};
+                            rhs=arg.value}))
 
 let render_equality_assumptions args =
   String.concat ~sep:"\n"
