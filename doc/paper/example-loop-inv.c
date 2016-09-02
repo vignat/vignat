@@ -1,8 +1,6 @@
 #include <klee/klee.h>
 #include "packet.h"
 
-bool packet_is_ok(struct packet* p) { return p->port != 9;}
-
 #define CAP 512
 
 int main() {
