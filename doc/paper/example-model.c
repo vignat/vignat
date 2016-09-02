@@ -1,30 +1,33 @@
-
 #include <klee/klee.h>
+#include "packet.h"
 
 #define CAP 512
 
-struct Array {
-  int data[CAP];
-};
+bool ring_full() { return klee_int("full"); }
 
-int array_read(struct Array* arr, int i) {
-  int ret = klee_range(0, 4, "ret");
-  return ret;
+bool ring_empty() { return klee_int("empty"); }
+
+bool ring_push(struct packet* p) {
+  klee_assert(p->port != 9);
+  return klee_int("pushed");
 }
 
-void array_write(struct Array* arr, int i, int val) {
-  klee_assert(0 <= val && val < 4);
+void ring_pop(struct packet* p) {
+  klee_make_symbolic(p, sizeof(struct packet), "popped_packet");
+  klee_assume(p->port != 9);
 }
 
 int main() {
-  struct Array data;
   {
-    int i = klee_range(0, CAP, "i");
-    int x = array_read(&data, i);
-    ++x;
-    if (x == 4) x = 2;
-    array_write(&data, i, x);
-    assert(x < 4);
+    struct packet p;
+    if (!ring_full())
+      if (receive_packet(&p) && p.port != 9)
+        ring_push(&p);
+    if (!ring_empty() && can_send_packet()) {
+      ring_pop(&p);
+      assert(p.port != 9);
+      send_packet(&p);
+    }
   }
   return 0;
 }

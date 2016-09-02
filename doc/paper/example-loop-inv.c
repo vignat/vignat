@@ -1,20 +1,33 @@
 #include <klee/klee.h>
+#include "packet.h"
+
+bool packet_is_ok(struct packet* p) { return p->port != 9;}
 
 #define CAP 512
 
 int main() {
-  int data[CAP] = {};
-  for (int i = 0; i < CAP; ++i) klee_assert(data[i] < 4);
-  klee_make_symbolic(data, sizeof(data), "data");
-  for (int i = 0; i < CAP; ++i) klee_assume(data[i] < 4);
+  struct packet packets[CAP] = {};
+  int begin = 0, end = 0;
+
+  for (int i = 0; i < (end + CAP - begin)%CAP; ++i)
+    klee_assert(packets[(i+begin)%CAP].port != 9);
+  klee_make_symbolic(packets, sizeof(packets), "packets");
+  begin = klee_range(0, CAP, "begin");
+  end = klee_range(0, CAP, "end");
+  for (int i = 0; i < (end + CAP - begin)%CAP; ++i)
+    klee_assume(packets[(i+begin)%CAP].port != 9);
   {
-    int i = klee_range(0, CAP, "i");
-    int x = data[i];
-    ++x;
-    if (x == 4) x = 2;
-    data[i] = x;
-    assert(x < 4);
+    if (end != (begin - 1) || !(end == CAP - 1 && begin == 0)) {
+      if (receive_packet(packets + end) && packets[end].port != 9)
+        end = (end + 1)%CAP;
+    }
+    if (end != begin && can_send_packet()) {
+      assert(packets[begin].port != 9);
+      send_packet(packets + begin);
+      begin = (begin + 1)%CAP;
+    }
   }
-  for (int i = 0; i < CAP; ++i) klee_assert(data[i] < 4);
+  for (int i = 0; i < (end + CAP - begin)%CAP; ++i)
+    klee_assert(packets[(i+begin)%CAP].port != 9);
   return 0;
 }

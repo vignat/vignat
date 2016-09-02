@@ -1,17 +1,22 @@
 #include <klee/klee.h>
+#include "packet.h"
 
 #define CAP 512
 
 int main() {
-  int data[CAP] = {};
+  struct packet packets[CAP] = {};
+  int begin = 0, end = 0;
 
   while(1) {
-    int i = klee_range(0,CAP,"i");
-    int x = data[i];
-    ++x;
-    if (x == 4) x = 2;
-    data[i] = x;
-    assert(x < 4);
+    if (end != (begin - 1) || !(end == CAP - 1 && begin == 0)) {
+      if (receive_packet(packets + end) && packets[end].port != 9)
+        end = (end + 1)%CAP;
+    }
+    if (end != begin && can_send_packet()) {
+      assert(packets[begin].port != 9);
+      send_packet(packets + begin);
+      begin = (begin + 1)%CAP;
+    }
   }
   return 0;
 }
