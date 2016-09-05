@@ -1,3 +1,3 @@
 sudo apt-get update
-sudo apt-get install -y tcpdump hping3 python-scapy wget iperf3 traceroute
+sudo apt-get install -y tcpdump hping3 python-scapy wget iperf3 traceroute netperf
 
