@@ -7,9 +7,8 @@ bool ring_full() { return klee_int("full"); }
 
 bool ring_empty() { return klee_int("empty"); }
 
-bool ring_push(struct packet* p) {
-  klee_assert(p->port != 9);
-  return klee_int("pushed");
+void ring_push(struct packet* p) {
+  klee_assert(p->port != 9); //Unnecessary.
 }
 
 void ring_pop(struct packet* p) {
