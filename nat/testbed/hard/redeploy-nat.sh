@@ -1,5 +1,5 @@
 
-export RTE_SDK=/home/ubuntu/dpdk
+export RTE_SDK=/home/necto/dpdk
 export RTE_TARGET=x86_64-native-linuxapp-gcc
 
 ######---------------------------------######
@@ -113,7 +113,7 @@ bind_nics_to_igb_uio()
 #
 ######---------------------------------######
 
-cd /home/ubuntu/vnds/nat
+cd /home/necto/vnds/nat
 
 rm build -rf && make
 
