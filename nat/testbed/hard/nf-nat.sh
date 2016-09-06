@@ -1,3 +1,7 @@
+pkill -9 nat
+sudo ~/dpdk/tools/dpdk_nic_bind.py -u 0000:02:00.1
+sudo ~/dpdk/tools/dpdk_nic_bind.py -u 0000:02:00.2
+
 ifconfig em2 up
 ip addr add 192.168.2.2/24 dev em2
 ifconfig em3 up
