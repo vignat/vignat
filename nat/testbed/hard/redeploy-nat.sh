@@ -115,7 +115,8 @@ bind_nics_to_igb_uio()
 
 cd /home/necto/vnds/nat
 
-rm build -rf && make
+sudo rm build -rf
+make
 
 set_numa_pages
 load_igb_uio_module

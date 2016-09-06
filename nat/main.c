@@ -652,7 +652,9 @@ init_lcore_rx_queues(void)
 
     for (i = 0; i < nb_lcore_params; ++i) {
       lcore = lcore_params[i].lcore_id;
+#ifdef KLEE_VERIFICATION
       klee_assert(lcore==0); //TODO:Only single core supported for now.
+#endif//KLEE_VERIFICATION
       //For multicore, need to count the n_rx_queue for each core
       //separately.
       struct lcore_conf *conf = array_lcc_begin_access(&lcore_conf, lcore);
