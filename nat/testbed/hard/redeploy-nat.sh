@@ -121,8 +121,8 @@ make
 set_numa_pages
 load_igb_uio_module
 
-sudo ifconfig eth0 down
-sudo ifconfig eth1 down
+sudo ifconfig em2 down
+sudo ifconfig em3 down
 
-bind_nics_to_igb_uio '0000:00:05.0'
-bind_nics_to_igb_uio '0000:00:09.0'
+bind_nics_to_igb_uio '0000:02:00.1'
+bind_nics_to_igb_uio '0000:02:00.2'
