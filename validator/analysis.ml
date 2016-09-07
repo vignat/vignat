@@ -286,6 +286,24 @@ let prepare_assertions tip_res tip_ret_name tip_ret_type =
             tip_res.ret_val);t=Boolean} :: exists_such
   | None -> exists_such
 
+let prepare_output_vars tip_res tip_ret_name =
+  let arg_symbols =
+    List.fold tip_res.args_post_conditions ~init:String.Set.empty
+      ~f:(fun vars spec ->
+          String.Set.union vars (String.Set.of_list (get_ids_from_tterm spec.lhs)))
+  in
+  match tip_ret_name with
+  | Some ret_name -> Set.add arg_symbols ret_name
+  | None -> arg_symbols
+
+let prepare_output_params tip_res =
+  let arg_symbols =
+    List.fold tip_res.args_post_conditions ~init:String.Set.empty
+      ~f:(fun vars spec ->
+          String.Set.union vars (String.Set.of_list (get_ids_from_tterm spec.rhs)))
+  in
+  String.Set.union (String.Set.of_list (get_ids_from_tterm tip_res.ret_val)) arg_symbols
+
 let apply_assignments assignments ir =
   {ir with
    free_vars = List.fold assignments ~init:ir.free_vars
@@ -340,61 +358,81 @@ let guess_assignments assumptions assertions vars =
       | Some assignment -> [assignment]
       | None -> []))
 
-let is_assignment_justified fixpoints var value executions =
-  lprintf "justifying assignment %s = %s\n" var (render_term value);
-  let valid = List.for_all executions ~f:(fun assumptions ->
-      let orig_assumptions = assumptions |> simplify fixpoints [Id var; value] in
-      let rel_assumptions = take_relevant orig_assumptions [var] |> fst |>
-                            simplify fixpoints [Id var]
-      in
-      let mod_assumptions =
-        replace_term_in_tterms (Id var) value orig_assumptions in
-      lprintf "comparing:\n";
-      List.iter rel_assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass));
-      lprintf "with\n";
-      List.iter orig_assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass));
-      List.for_all mod_assumptions ~f:(fun mod_assumption ->
-          match mod_assumption, value with
-          | {t=Boolean;v=Bop (Eq, _, _);}, Addr _->
-            lprintf "skipping the ptr-arith %s\n" (render_tterm mod_assumption);
-            (* Numerical relations are not important for pointers *)
-            (* TODO: the fixpoint related statements are currently stripped of
-               the "= true" or "= false", which makes them somatimes
-               indistinguissable from predicates. We need to keep that
-               information, to make sure we respect predicates and skip the
-               fixpoints operating on pointers. We need also to make sure, that
-               thes skipped fixpoints do not also check for some other
-               non-pointer numerical property. *)
-            true
-          | _ ->
-            List.exists orig_assumptions
-              ~f:(fun assumption ->
-                  term_eq assumption.v mod_assumption.v)))
-  in
-  lprintf "%s\n" (if valid then "justified" else "unjustified");
-  valid
+(* let is_assignment_justified fixpoints var value executions = *)
+(*   lprintf "justifying assignment %s = %s\n" var (render_term value); *)
+(*   let valid = List.for_all executions ~f:(fun assumptions -> *)
+(*       let orig_assumptions = assumptions |> simplify fixpoints [Id var; value] in *)
+(*       let rel_assumptions = take_relevant orig_assumptions [var] |> fst |> *)
+(*                             simplify fixpoints [Id var] *)
+(*       in *)
+(*       let mod_assumptions = *)
+(*         replace_term_in_tterms (Id var) value orig_assumptions in *)
+(*       lprintf "comparing:\n"; *)
+(*       List.iter rel_assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass)); *)
+(*       lprintf "with\n"; *)
+(*       List.iter orig_assumptions ~f:(fun ass -> lprintf "%s\n" (render_tterm ass)); *)
+(*       List.for_all mod_assumptions ~f:(fun mod_assumption -> *)
+(*           match mod_assumption, value with *)
+(*           | {t=Boolean;v=Bop (Eq, _, _);}, Addr _-> *)
+(*             lprintf "skipping the ptr-arith %s\n" (render_tterm mod_assumption); *)
+(*             (\* Numerical relations are not important for pointers *\) *)
+(*             (\* TODO: the fixpoint related statements are currently stripped of *)
+(*                the "= true" or "= false", which makes them somatimes *)
+(*                indistinguissable from predicates. We need to keep that *)
+(*                information, to make sure we respect predicates and skip the *)
+(*                fixpoints operating on pointers. We need also to make sure, that *)
+(*                thes skipped fixpoints do not also check for some other *)
+(*                non-pointer numerical property. *\) *)
+(*             true *)
+(*           | _ -> *)
+(*             List.exists orig_assumptions *)
+(*               ~f:(fun assumption -> *)
+(*                   term_eq assumption.v mod_assumption.v))) *)
+(*   in *)
+(*   lprintf "%s\n" (if valid then "justified" else "unjustified"); *)
+(*   valid *)
 
-let replace__addr_verifast_specific executions =
-  let replace__addr_within sttmt =
-    call_recursively_on_tterm
-      (function
-        | Id x when String.is_suffix x ~suffix:"_addr" ->
-          (* TODO: t actually may be deduced if we were given the full
-             tterm, not just the value part, that requires another
-             call_recursively_on_tterm function. *)
-          Some (Addr {v=Id (String.chop_suffix_exn x ~suffix:"_addr");t=Unknown})
-        | _ -> None)
-      sttmt
-  in
-  List.map executions
-    ~f:(fun execution ->
-        List.filter_map execution
-          ~f:(function
+let replace__addr_with_prefixed_var sttmt =
+  call_recursively_on_tterm
+    (function
+      | Addr {v=Id x;t=_} -> Some (Id (x ^ "_addr"))
+      | _ -> None) sttmt
+
+let replace__addr_verifast_specific executions ir =
+  let (addrs,executions) = List.fold executions ~init:([],[])
+      ~f:(fun (addrs,executions) execution ->
+          let (addrs,assumptions) = 
+          List.fold execution ~init:(addrs,[]) ~f:(fun (addrs,assumptions) assumption ->
+              match assumption with
               | {v=Bop (Eq,{v=Id vname;t=_},
                         {v=Id addr;t=_});t=_}
-                when String.equal (vname ^ "_addr") addr -> None
-              | sttmt ->
-                Some (replace__addr_within sttmt)))
+                when String.equal (vname ^ "_addr") addr -> ((vname,addr)::addrs,assumptions)
+              | _ -> (addrs, assumption::assumptions))
+          in
+          (addrs,assumptions::executions))
+  in
+  let executions = List.map (List.rev executions)
+      ~f:(List.map ~f:replace__addr_with_prefixed_var)
+  in
+  let deal_with_addrs sttmt =
+    List.fold addrs
+      ~init:(replace__addr_with_prefixed_var
+               sttmt)
+      ~f:(fun st (vname,addr) ->
+          replace_term_in_tterm (Id addr) (Id vname) st)
+  in
+  let ir =
+    {ir with
+     tip_call =
+       {ir.tip_call with
+        results = List.map ir.tip_call.results ~f:(fun rez ->
+            {rez with ret_val=deal_with_addrs rez.ret_val})}}
+  in
+  (List.map executions
+    ~f:(fun execution ->
+        List.fold addrs ~init:execution ~f:(fun execution (vname,addr) ->
+             replace_term_in_tterms (Id addr) (Id vname) execution)),
+   ir)
 
 let get_verifast_dummy_variables executions =
   List.join
@@ -407,49 +445,128 @@ let get_verifast_dummy_variables executions =
                                Some x
                              | _ -> None))))))
 
+let get_vars assumptions result ret_name =
+  let output_vars = prepare_output_vars result ret_name in
+  (* TODO: here I should really take all the vars mentioned in the trace history,
+     excluding the vars in the tip output *)
+  let (_,bound_vars) = take_relevant assumptions (String.Set.to_list output_vars) in
+  printf "bound vars:\n";
+  List.iter bound_vars ~f:(fun v -> printf "%s\n" v);
+  let output_params = prepare_output_params result in
+  let (_,output_params) = take_relevant assumptions (String.Set.to_list output_params) in
+  (output_vars,
+   Set.diff (String.Set.of_list output_params) (String.Set.of_list bound_vars))
+
+let find_assignments assertion free_vars =
+  [assertion] (*TODO*)
+
+let are_assignments_justified assignments assumptions =
+  let (_,justified) =
+    List.fold assignments ~init:(assumptions,true)
+      ~f:(fun (assumptions,justified) assignment ->
+          if justified then
+            (assignment::assumptions,
+             (Z3_query.is_assignment_justified assignment assumptions))
+          else (assumptions,false))
+  in
+  justified
+
+let induce_assignments_for_exec fixpoints assumptions result ret_name ret_type =
+  let assertion_list = (prepare_assertions result ret_name ret_type) |>
+                       canonicalize fixpoints
+  in
+  let (output_vars,free_vars) = get_vars assumptions result ret_name in
+  let (_,_,unjustified_assertion) = List.fold assertion_list
+      ~init:([],free_vars,None)
+      ~f:(fun (assignments,free_vars,unjustified_assertion) assertion ->
+          match unjustified_assertion with
+          | Some _ -> (assignments,free_vars,unjustified_assertion)
+          | None ->
+            printf "free vars: \n";
+            List.iter (Set.to_list free_vars) ~f:(fun v ->
+              printf "%s\n" v);
+            let new_assignments = find_assignments assertion free_vars in
+            if (are_assignments_justified new_assignments (assignments@assumptions)) then
+              let assignments = new_assignments@assignments in
+              let (_,bound_vars) = take_relevant (assignments@assumptions) (String.Set.to_list output_vars) in
+              let free_vars = Set.diff free_vars (String.Set.of_list bound_vars) in
+              if (Z3_query.is_assertion_justified
+                    assertion (assumptions@assignments)) then
+                (assignments,free_vars,None)
+              else
+                (assignments,free_vars,Some assertion)
+            else (assignments,free_vars,Some assertion))
+  in
+  unjustified_assertion
+
+
 let induce_symbolic_assignments fixpoints ir executions =
-  start_log ();
-  let executions = replace__addr_verifast_specific executions in
-  let fr_var_names =
-    (List.map (String.Map.data ir.free_vars)
-       ~f:(fun spec -> spec.name)) @
-    (match ir.tip_call.context.ret_name with
-     | Some name -> [name]
-     | None -> [])
+  let (executions,ir) = replace__addr_verifast_specific executions ir in
+  let (_,unjustified_assertion) = List.fold ir.tip_call.results
+      ~init:(executions,None)
+      ~f:(fun (executions,unjustified_assertion) result->
+          match unjustified_assertion with
+          | Some _ -> ([],unjustified_assertion)
+          | None -> begin match executions with
+              | [] -> failwith ("The number of executions must " ^
+                                "match the number of tip call results")
+              | hd :: tl -> (tl,
+                             induce_assignments_for_exec
+                               fixpoints hd result
+                               ir.tip_call.context.ret_name
+                               ir.tip_call.context.ret_type)
+            end)
   in
-  lprintf "free vars: \n";
-  lprint_list fr_var_names;
-  let assertion_lists = List.map ir.tip_call.results ~f:(fun result ->
-      (prepare_assertions result
-         ir.tip_call.context.ret_name
-         ir.tip_call.context.ret_type) |>
-      canonicalize fixpoints)
-  in
-  let assignments = List.fold assertion_lists ~init:[]
-      ~f:(fun assignments assertions ->
-          lprintf "working with assertions:\n";
-          lprint_list (List.map assertions ~f:render_tterm);
-          List.fold executions ~init:assignments
-            ~f:(fun assignments assumptions ->
-                let vars = String.Set.to_list
-                    (String.Set.diff (String.Set.of_list fr_var_names)
-                       (String.Set.of_list (List.map assignments ~f:fst)))
-                in
-                let var_ids = List.map vars ~f:(fun name -> Id name) in
-                let assumptions = assumptions |> simplify fixpoints var_ids
-                in
-                lprintf "\nassuming assignments:\n";
-                lprint_list (List.map assignments
-                               ~f:(fun a -> (fst a) ^ " = " ^
-                                            (render_term (snd a))));
-                lprintf "\nworking with assumptions:\n";
-                lprint_list (List.map assumptions ~f:render_tterm);
-                lprintf "\n|-|-|- vars:\n";
-                lprint_list vars;
-                assignments@(guess_assignments assumptions assertions vars)))
-  in
-  lprintf "\n\n JUSTIFYING \n\n";
-  let justified_assignments = List.filter assignments ~f:(fun (var,value) ->
-      is_assignment_justified fixpoints var value executions)
-  in
-  apply_assignments justified_assignments ir;
+  match unjustified_assertion with
+  | Some assertion ->
+    Printf.printf "unable find assignments for this to hold: %s\n"
+      (render_tterm assertion);
+    false
+  | None -> true
+
+(* let induce_symbolic_assignments fixpoints ir executions = *)
+(*   start_log (); *)
+(*   let executions = replace__addr_verifast_specific executions in *)
+(*   let fr_var_names = *)
+(*     (List.map (String.Map.data ir.free_vars) *)
+(*        ~f:(fun spec -> spec.name)) @ *)
+(*     (match ir.tip_call.context.ret_name with *)
+(*      | Some name -> [name] *)
+(*      | None -> []) *)
+(*   in *)
+(*   lprintf "free vars: \n"; *)
+(*   lprint_list fr_var_names; *)
+(*   let assertion_lists = List.map ir.tip_call.results ~f:(fun result -> *)
+(*       (prepare_assertions result *)
+(*          ir.tip_call.context.ret_name *)
+(*          ir.tip_call.context.ret_type) |> *)
+(*       canonicalize fixpoints) *)
+(*   in *)
+(*   let assignments = List.fold assertion_lists ~init:[] *)
+(*       ~f:(fun assignments assertions -> *)
+(*           lprintf "working with assertions:\n"; *)
+(*           lprint_list (List.map assertions ~f:render_tterm); *)
+(*           List.fold executions ~init:assignments *)
+(*             ~f:(fun assignments assumptions -> *)
+(*                 let vars = String.Set.to_list *)
+(*                     (String.Set.diff (String.Set.of_list fr_var_names) *)
+(*                        (String.Set.of_list (List.map assignments ~f:fst))) *)
+(*                 in *)
+(*                 let var_ids = List.map vars ~f:(fun name -> Id name) in *)
+(*                 let assumptions = assumptions |> simplify fixpoints var_ids *)
+(*                 in *)
+(*                 lprintf "\nassuming assignments:\n"; *)
+(*                 lprint_list (List.map assignments *)
+(*                                ~f:(fun a -> (fst a) ^ " = " ^ *)
+(*                                             (render_term (snd a)))); *)
+(*                 lprintf "\nworking with assumptions:\n"; *)
+(*                 lprint_list (List.map assumptions ~f:render_tterm); *)
+(*                 lprintf "\n|-|-|- vars:\n"; *)
+(*                 lprint_list vars; *)
+(*                 assignments@(guess_assignments assumptions assertions vars))) *)
+(*   in *)
+(*   lprintf "\n\n JUSTIFYING \n\n"; *)
+(*   let justified_assignments = List.filter assignments ~f:(fun (var,value) -> *)
+(*       is_assignment_justified fixpoints var value executions) *)
+(*   in *)
+(*   apply_assignments justified_assignments ir; *)

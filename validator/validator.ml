@@ -29,15 +29,19 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
           assumptions_fname lino_fname export_out_fname
           proj_root
       in
-      let ir = Analysis.induce_symbolic_assignments
+      let justified = Analysis.induce_symbolic_assignments
           Spec.fixpoints ir vf_assumptions
       in
-      Render.render_ir ir fout;
-      match Verifier.verify_file
-              verifast_bin fout verify_out_fname proj_root
-      with
-      | Verifier.Valid -> printf "\\/alid.\n"
-      | Verifier.Invalid cause -> printf "Failed: %s\n" cause
+      if justified then
+        printf "\\/alid.\n"
+      else
+        printf "Failed.\n"
+      (* Render.render_ir ir fout; *)
+      (* match Verifier.verify_file *)
+      (*         verifast_bin fout verify_out_fname proj_root *)
+      (* with *)
+      (* | Verifier.Valid -> printf "\\/alid.\n" *)
+      (* | Verifier.Invalid cause -> printf "Failed: %s\n" cause *)
     end
 
 let load_plug fname =
