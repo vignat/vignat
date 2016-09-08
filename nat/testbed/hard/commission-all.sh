@@ -1,6 +1,6 @@
 . ./config.sh
 
-scp config.sh $CLIENT_HOST:config.ch
+scp config.sh $CLIENT_HOST:config.sh
 scp client-commission.sh $CLIENT_HOST:client-commission.sh
 scp client-provision-for-nat.sh $CLIENT_HOST:client-provision-for-nat.sh
 ssh $CLIENT_HOST 'sh ~/client-commission.sh'
