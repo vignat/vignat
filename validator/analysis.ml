@@ -428,7 +428,7 @@ let replace__addr_verifast_specific executions ir =
         | {t=_;v=Not {t=_;v=Bop (Eq,{t=_;v=Id _},
                                  {t=_;v=Id x})}}
           when String.is_suffix x ~suffix:"_addr" ->
-          Printf.printf "removing : %s\n" (render_tterm sttmt);
+          lprintf "removing : %s\n" (render_tterm sttmt);
           false
         | _ -> true)
   in
@@ -462,8 +462,8 @@ let get_vars assumptions result ret_name =
   (* TODO: here I should really take all the vars mentioned in the trace history,
      excluding the vars in the tip output *)
   let (_,bound_vars) = take_relevant assumptions (String.Set.to_list output_vars) in
-  printf "bound vars:\n";
-  List.iter bound_vars ~f:(fun v -> printf "%s\n" v);
+  lprintf "bound vars:\n";
+  lprint_list bound_vars;
   let output_params = prepare_output_params result in
   let (_,output_params) = take_relevant assumptions (String.Set.to_list output_params) in
   (output_vars,
@@ -494,9 +494,8 @@ let induce_assignments_for_exec fixpoints assumptions result ret_name ret_type =
           match unjustified_assertion with
           | Some _ -> (assignments,free_vars,unjustified_assertion)
           | None ->
-            printf "free vars: \n";
-            List.iter (Set.to_list free_vars) ~f:(fun v ->
-              printf "%s\n" v);
+            lprintf "free vars: \n";
+            lprint_list (Set.to_list free_vars);
             let new_assignments = find_assignments assertion free_vars in
             if (are_assignments_justified new_assignments (assignments@assumptions)) then
               let assignments = new_assignments@assignments in

@@ -15,6 +15,47 @@ open Z3.Arithmetic.Integer
 open Z3.Arithmetic.Real
 open Z3.BitVector
 
+let output_queries = false
+
+let show_vars vars =
+  if output_queries then begin
+    Printf.printf ";vars:\n";
+    List.iter (Map.data vars) ~f:(fun v ->
+        Printf.printf "(declare-fun %s () Int)\n" (Expr.to_string v))
+  end
+
+let show_funs funs =
+  if output_queries then begin
+    Printf.printf ";funs:\n";
+    List.iter (Map.data funs) ~f:(fun f ->
+        Printf.printf "%s\n" (FuncDecl.to_string f));
+  end
+
+let show_assumptions assumptions =
+  if output_queries then begin
+    Printf.printf "\n\n;assumptions:\n";
+    List.iter assumptions ~f:(fun ass ->
+        Printf.printf "(assert %s)\n" (Expr.to_string ass));
+  end
+
+let show_assignment assgn =
+  if output_queries then begin
+    Printf.printf ";assignment:\n (assert %s)\n" (Expr.to_string assgn);
+  end
+
+let show_theorem theorem =
+  if output_queries then begin
+    Printf.printf ";theorem:\n (assert %s)\n" (Expr.to_string theorem);
+  end
+
+let show_result result solver =
+  if output_queries then begin
+    match result with
+    | SATISFIABLE -> Printf.printf "sat\n"
+    | UNSATISFIABLE -> Printf.printf "unsat\n"
+    | UNKNOWN -> Printf.printf "unknown: %s\n"
+                   (Solver.get_reason_unknown solver)
+  end
 
 let register_symbs_z3 sttmts ctx ints =
   let var_map = ref String.Map.empty in
@@ -90,48 +131,37 @@ let is_assignment_justified assignment (assumptions : Ir.tterm list) =
   let ctx = (mk_context cfg) in
   let ints = Integer.mk_sort ctx in
   let (vars,funs) = register_symbs_z3 (assignment::assumptions) ctx ints in
-  Printf.printf ";vars:\n";
-  List.iter (Map.data vars) ~f:(fun v ->
-    Printf.printf "(declare-fun %s () Int)\n" (Expr.to_string v));
-  Printf.printf ";funs:\n";
-  List.iter (Map.data funs) ~f:(fun f ->
-    Printf.printf "%s\n" (FuncDecl.to_string f));
+  show_vars vars; show_funs funs;
   let assumptions = List.map assumptions ~f:(fun ass -> statement_to_z3 ass ctx vars funs ints) in
   let assgn = statement_to_z3 assignment ctx vars funs ints in
-  Printf.printf "\n\n;assumptions:\n";
-  List.iter assumptions ~f:(fun ass -> Printf.printf "(assert %s)\n" (Expr.to_string ass));
-  Printf.printf ";assignment:\n (assert %s)\n" (Expr.to_string assgn);
+  show_assumptions assumptions; show_assignment assgn;
   let solver = Solver.mk_solver ctx None in
   List.iter assumptions ~f:(fun ass -> Solver.add solver [ass]);
   Solver.add solver [assgn];
-  (* Solver.add solver assumptions; *)
+  let result = (Solver.check solver []) in
+  show_result result solver;
   match (Solver.check solver []) with
-  | SATISFIABLE -> Printf.printf "sat\n"; true
-  | UNSATISFIABLE -> Printf.printf "unsat\n"; false
-  | UNKNOWN -> Printf.printf "unknown: %s\n" (Solver.get_reason_unknown solver); false
+  | SATISFIABLE -> true
+  | UNSATISFIABLE -> false
+  | UNKNOWN -> false
 
 let is_assertion_justified (assertion:Ir.tterm) (assumptions : Ir.tterm list) =
   let cfg = [("model", "true"); ("proof", "false")] in
   let ctx = (mk_context cfg) in
   let ints = Integer.mk_sort ctx in
   let (vars,funs) = register_symbs_z3 (assertion::assumptions) ctx ints in
-  Printf.printf ";vars:\n";
-  List.iter (Map.data vars) ~f:(fun v ->
-    Printf.printf "(declare-fun %s () Int)\n" (Expr.to_string v));
-  Printf.printf ";funs:\n";
-  List.iter (Map.data funs) ~f:(fun f ->
-    Printf.printf "%s\n" (FuncDecl.to_string f));
+  show_vars vars; show_funs funs;
   let assumptions = List.map assumptions ~f:(fun ass -> statement_to_z3 ass ctx vars funs ints) in
   let hypothesis = statement_to_z3 assertion ctx vars funs ints in
   let theorem = Boolean.mk_not ctx hypothesis in
-  Printf.printf "\n\n;assumptions:\n";
-  List.iter assumptions ~f:(fun ass -> Printf.printf "(assert %s)\n" (Expr.to_string ass));
-  Printf.printf ";theorem:\n (assert %s)\n" (Expr.to_string theorem);
+  show_assumptions assumptions;
+  show_theorem theorem;
   let solver = Solver.mk_solver ctx None in
   List.iter assumptions ~f:(fun ass -> Solver.add solver [ass]);
   Solver.add solver [theorem];
-  (* Solver.add solver assumptions; *)
-  match (Solver.check solver []) with
-  | SATISFIABLE -> Printf.printf "sat\n"; false
-  | UNSATISFIABLE -> Printf.printf "unsat\n"; true
-  | UNKNOWN -> Printf.printf "unknown: %s\n" (Solver.get_reason_unknown solver); false
+  let result = (Solver.check solver []) in
+  show_result result solver;
+  match result with
+  | SATISFIABLE -> false
+  | UNSATISFIABLE -> true
+  | UNKNOWN -> false
