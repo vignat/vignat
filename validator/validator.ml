@@ -9,7 +9,7 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
   let module Spec = (val spec_mod) in
   let assumptions_fname = intermediate_pref ^ ".assumptions.vf" in
   let lino_fname = intermediate_pref ^ ".lino.int" in
-  let export_out_fname = intermediate_pref ^ ".export.stdout" in
+  let export_out_fname = intermediate_pref ^ ".verifast.stdout" in
   let verify_out_fname = intermediate_pref ^ ".verify.stdout" in
   let ir_fname = intermediate_pref ^ ".ir" in
   let intermediate_fout = intermediate_pref ^ ".tmp.c" in
@@ -36,12 +36,6 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
         printf "\\/alid.\n"
       else
         printf "Failed.\n"
-      (* Render.render_ir ir fout; *)
-      (* match Verifier.verify_file *)
-      (*         verifast_bin fout verify_out_fname proj_root *)
-      (* with *)
-      (* | Verifier.Valid -> printf "\\/alid.\n" *)
-      (* | Verifier.Invalid cause -> printf "Failed: %s\n" cause *)
     end
 
 let load_plug fname =

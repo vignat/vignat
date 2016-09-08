@@ -13,8 +13,10 @@ analyze_result() {
     VL_RESULT=$1
     VF_RESULT=$2
     FNAME=$3
-    if [ -e "$VF_RESULT" ]; then
-        if grep -q "0 errors found" $VF_RESULT; then
+    if [ -e "$VL_RESULT" ]; then
+        if grep -q "Valid" $VL_RESULT; then
+            echo $FNAME success >> $REPORT_FNAME
+        elif grep -q "\\\\/alid" $VL_RESULT; then
             echo $FNAME success >> $REPORT_FNAME
         else
             if grep -q "Assertion might not hold" $VF_RESULT; then
@@ -41,12 +43,9 @@ analyze_result() {
                 echo $FNAME spec fail >> $REPORT_FNAME
             elif grep -q "No such function" $VF_RESULT; then
                 echo $FNAME spec fail >> $REPORT_FNAME
-            elif grep -q "Too many patterns" $VF_RESULT; then
-                echo $FNAME spec fail >> $REPORT_FNAME
             elif grep -q "Potential arithmetic" $VF_RESULT; then
                 echo $FNAME arith fail >> $REPORT_FNAME
-            elif grep -q "No such file or directory" $VF_RESULT &&
-                 grep -q "Uncaught exception" $VL_RESULT; then
+            elif grep -q "Uncaught exception" $VL_RESULT; then
                 echo $FNAME validator exception >> $REPORT_FNAME
             else
                 echo $FNAME unknown fail >> $REPORT_FNAME
@@ -54,12 +53,7 @@ analyze_result() {
             cat $VF_RESULT
         fi
     else
-        if grep -q "Uncaught exception" $VL_RESULT; then
-            echo $FNAME validator exception >> $REPORT_FNAME
-        else
-            echo "Unknown error: the result file $VF_RESULT not found."
-            echo $FNAME unknown fail >> $REPORT_FNAME
-        fi
+        echo $FNAME unknown fail >> $REPORT_FNAME
     fi
 }
 
@@ -78,9 +72,9 @@ validate_file() {
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
     cp $FNAME $UNIQUE_PREFIX.src
     CMD1="$BASE_DIR/validator.byte $FSPEC_PLUGIN $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST $SPEC_DIR"
-    CMD2="$VERIFAST -c -I $SPEC_DIR $SRC_FNAME"
-    echo "(cd $BASE_DIR && make all) && $CMD1 && $CMD2" > "${UNIQUE_PREFIX}.cmd"
-    $CMD1 2>&1 | tee $VALID_RESULT && $CMD2 &> $VERIF_RESULT
+    echo "(cd $BASE_DIR && make all) && $CMD1" > "${UNIQUE_PREFIX}.cmd"
+    $CMD1 2>&1 | tee $VALID_RESULT
+    VERIF_RESULT="${UNIQUE_PREFIX}.verifast.stdout"
     analyze_result $VALID_RESULT $VERIF_RESULT $FNAME
     show_result $FNAME $(cat $VALID_RESULT)
 }
