@@ -13,14 +13,14 @@
 #  include "stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
 
-#ifdef KLEE_VERIFICATION
+#if (defined KLEE_VERIFICATION) || (defined NOLOG)
 #  define LOG(...)
 #  define LOG_ADD(...)
-#else //KLEE_VERIFICATION
+#else //KLEE_VERIFICATION || NOLOG
 #  define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 #  define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
 #  define LOG_ADD(...) printf(__VA_ARGS__)
-#endif //KLEE_VERIFICATION
+#endif //KLEE_VERIFICATION || NOLOG
 
 struct DoubleMap *flow_map;
 

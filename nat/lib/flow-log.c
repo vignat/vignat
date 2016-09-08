@@ -2,17 +2,20 @@
 
 #include "flow.h"
 
-#ifdef KLEE_VERIFICATION
+#if (defined KLEE_VERIFICATION) || (defined NOLOG)
 #define LOG(...) 
 #define LOG_ADD(...)
-#else //KLEE_VERIFICATION
+#else //KLEE_VERIFICATION || NOLOG
 #define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
 
 #define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
 #define LOG_ADD(...) printf(__VA_ARGS__)
-#endif //KLEE_VERIFICATION
+#endif //KLEE_VERIFICATION || NOLOG
 
-void log_ip(uint32_t addr) {
+inline void log_ip(uint32_t addr) {
+#ifdef NOLOG
+    (void)addr;
+#endif//NOLOG
     LOG_ADD( "%d.%d.%d.%d",
              addr&0xff, (addr>>8)&0xff,
              (addr>>16)&0xff, (addr>>24)&0xff);

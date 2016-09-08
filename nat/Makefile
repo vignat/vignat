@@ -44,6 +44,7 @@ APP = nat
 # all source are stored in SRCS-y
 SRCS-y := main.c lib/flowtable.c lib/flowmanager.c lib/flow.c lib/flow-log.c lib/containers/map.c lib/containers/double-chain.c lib/containers/double-chain-impl.c lib/containers/double-map.c lib/expirator.c lib/my-time.c lib/containers/batcher.c
 
+USER_FLAGS += -D NOLOG
 CFLAGS += $(USER_FLAGS)
 CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -I..
