@@ -1,16 +1,13 @@
-scp client-commission.sh icnalsp3s1.epfl.ch:client-commission.sh
-scp client-provision.sh icnalsp3s1.epfl.ch:client-provision.sh
-ssh icnalsp3s1.epfl.ch 'sh ~/client-commission.sh'
+. config.sh
 
-scp nat-commission.sh icnalsp3s2.epfl.ch:nat-commission.sh
-scp nf-nat.sh icnalsp3s2.epfl.ch:nf-nat.sh
-ssh icnalsp3s2.epfl.ch 'sh ~/nat-commission.sh'
+scp config.sh $CLIENT_HOST:config.ch
+scp client-commission.sh $CLIENT_HOST:client-commission.sh
+scp client-provision-for-nat.sh $CLIENT_HOST:client-provision-for-nat.sh
+ssh $CLIENT_HOST 'sh ~/client-commission.sh'
 
-scp server-commission.sh icnalsp3s3.epfl.ch:server-commission.sh
-scp server-provision.sh icnalsp3s3.epfl.ch:server-provision.sh
-ssh icnalsp3s3.epfl.ch 'sh ~/server-commission.sh'
+scp config.sh $SERVER_HOST:config.sh
+scp server-commission.sh $SERVER_HOST:server-commission.sh
+scp server-provision-for-nat.sh $SERVER_HOST:server-provision-for-nat.sh
+ssh $SERVER_HOST 'sh ~/server-commission.sh'
 
-# the network:
-# client{icnalsp3s1}[em3] 192.168.3.5 -- 192.168.3.2 [em3]nat{icnalsp3s2}
-# nat{icnalsp3s2}[em2] 192.168.2.2 -- 192.168.2.10 [em2]server{icnalsp3s3}
-# server{icnalsp3s3}[em3] 192.168.0.10 -- 192.168.0.5 [em2]client{icnalsp3s1}
+. nat-commission.sh

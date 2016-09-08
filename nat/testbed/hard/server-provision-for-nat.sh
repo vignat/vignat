@@ -1,9 +1,10 @@
-NAT_EXTERNAL_MAC=00:1e:67:92:29:6c
-ifconfig em2 up
-ip addr flush dev em2
-ip addr add 192.168.2.10/24 dev em2
-ifconfig em3 up
-ip addr flush dev em3
-ip addr add 192.168.0.10/24 dev em3
-arp -s 192.168.2.2 $NAT_EXTERNAL_MAC
+. config.sh
+
+ifconfig $DEVICE_INDIRECT up
+ip addr flush dev $DEVICE_INDIRECT
+ip addr add $SERVER_IP_INDIRECT/24 dev $DEVICE_INDIRECT
+ifconfig $DEVICE_DIRECT up
+ip addr flush dev $DEVICE_DIRECT
+ip addr add $SERVER_IP_DIRECT/24 dev $DEVICE_DIRECT
+arp -s NAT_IP_EXTERNAL $NAT_EXTERNAL_MAC
 #hping3 192.168.33.10 -k -p 47882 -s 0

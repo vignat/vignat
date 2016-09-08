@@ -1,6 +1,5 @@
 
-export RTE_SDK=/home/necto/dpdk
-export RTE_TARGET=x86_64-native-linuxapp-gcc
+. config.sh
 
 ######---------------------------------######
 #    Taken from the dpdk/tools/setup.sh
@@ -113,10 +112,10 @@ bind_nics_to_igb_uio()
 #
 ######---------------------------------######
 
-sudo pkill -9 /home/necto/vnds/nat/build/nat
+sudo pkill -9 $NAT_SRC_PATH/build/nat
 sudo pkill -9 /home/necto/vnb-nat/build/nat
 
-cd /home/necto/vnds/nat
+cd $NAT_SRC_PATH
 
 sudo rm build -rf
 make
@@ -124,8 +123,8 @@ make
 set_numa_pages
 load_igb_uio_module
 
-sudo ifconfig em2 down
-sudo ifconfig em3 down
+sudo ifconfig $NAT_DEVICE_INTERNAL down
+sudo ifconfig $NAT_DEVICE_EXTERNAL down
 
-bind_nics_to_igb_uio '0000:02:00.1'
-bind_nics_to_igb_uio '0000:02:00.2'
+bind_nics_to_igb_uio $NAT_PCI_INTERNAL
+bind_nics_to_igb_uio $NAT_PCI_EXTERNAL

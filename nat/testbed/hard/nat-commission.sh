@@ -1,8 +1,8 @@
 sudo apt-get update
 sudo apt-get install -y tcpdump git wget build-essential libpcap-dev linux-headers-3.13.0-93 linux-headers-3.13.0-93-generic libglib2.0-dev daemon iperf3 netperf
 
-wget http://dpdk.org/browse/dpdk/snapshot/dpdk-2.2.0.tar.gz -O dpdk.tar.gz
-tar xf dpdk.tar.gz
+wget http://fast.dpdk.org/rel/dpdk-16.07.tar.xz -O dpdk.tar.xz
+tar xf dpdk.tar.xz
 mv dpdk-* dpdk
 rm dpdk.tar.gz
 
