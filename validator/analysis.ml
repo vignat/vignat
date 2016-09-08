@@ -421,6 +421,17 @@ let replace__addr_verifast_specific executions ir =
       ~f:(fun st (vname,addr) ->
           replace_term_in_tterm (Id addr) (Id vname) st)
   in
+  let remove_p1_neq_p2_for_addrs sttmts =
+    (* TODO: make sure it does not delete important inequalities. *)
+    List.filter sttmts ~f:(fun sttmt ->
+        match sttmt with
+        | {t=_;v=Not {t=_;v=Bop (Eq,{t=_;v=Id _},
+                                 {t=_;v=Id x})}}
+          when String.is_suffix x ~suffix:"_addr" ->
+          Printf.printf "removing : %s\n" (render_tterm sttmt);
+          false
+        | _ -> true)
+  in
   let ir =
     {ir with
      tip_call =
@@ -430,8 +441,9 @@ let replace__addr_verifast_specific executions ir =
   in
   (List.map executions
     ~f:(fun execution ->
-        List.fold addrs ~init:execution ~f:(fun execution (vname,addr) ->
-             replace_term_in_tterms (Id addr) (Id vname) execution)),
+         let execution = remove_p1_neq_p2_for_addrs execution in
+         List.fold addrs ~init:execution ~f:(fun execution (vname,addr) ->
+              replace_term_in_tterms (Id addr) (Id vname) execution)),
    ir)
 
 let get_verifast_dummy_variables executions =
