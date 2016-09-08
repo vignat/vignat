@@ -1,9 +1,15 @@
 #!/bin/bash
 
-. ./config.sh
+CONFIG_PATH=$1
 
-EXPTIME=$1
-MAX_FLOWS=$2
+if [ -z $CONFIG_PATH ]; then
+    CONFIG_PATH=.
+fi
+
+. $CONFIG_PATH/config.sh
+
+EXPTIME=$2
+MAX_FLOWS=$3
 
 if [ -z $EXPTIME ]; then
     EXPTIME=10
