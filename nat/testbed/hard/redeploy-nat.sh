@@ -1,5 +1,5 @@
 
-. config.sh
+. ./config.sh
 
 ######---------------------------------######
 #    Taken from the dpdk/tools/setup.sh

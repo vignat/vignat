@@ -1,4 +1,4 @@
-. config.sh
+. ./config.sh
 
 ifconfig $DEVICE_INDIRECT up
 ip addr flush dev $DEVICE_INDIRECT

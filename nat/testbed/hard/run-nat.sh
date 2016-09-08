@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. config.sh
+. ./config.sh
 
 EXPTIME=$1
 MAX_FLOWS=$2
