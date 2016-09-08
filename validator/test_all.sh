@@ -19,6 +19,7 @@ analyze_result() {
         elif grep -q "\\\\/alid" $VL_RESULT; then
             echo $FNAME success >> $REPORT_FNAME
         else
+            cat $VF_RESULT
             if grep -q "Assertion might not hold" $VF_RESULT; then
                 echo $FNAME assertion fail >> $REPORT_FNAME
             elif grep -q "No matching heap chunks" $VF_RESULT; then
@@ -47,10 +48,11 @@ analyze_result() {
                 echo $FNAME arith fail >> $REPORT_FNAME
             elif grep -q "Uncaught exception" $VL_RESULT; then
                 echo $FNAME validator exception >> $REPORT_FNAME
+                cat $VL_RESULT
             else
                 echo $FNAME unknown fail >> $REPORT_FNAME
+                cat $VL_RESULT
             fi
-            cat $VF_RESULT
         fi
     else
         echo $FNAME unknown fail >> $REPORT_FNAME
@@ -73,7 +75,7 @@ validate_file() {
     cp $FNAME $UNIQUE_PREFIX.src
     CMD1="$BASE_DIR/validator.byte $FSPEC_PLUGIN $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST $SPEC_DIR"
     echo "(cd $BASE_DIR && make all) && $CMD1" > "${UNIQUE_PREFIX}.cmd"
-    $CMD1 2>&1 | tee $VALID_RESULT
+    $CMD1 &> $VALID_RESULT
     VERIF_RESULT="${UNIQUE_PREFIX}.verifast.stdout"
     analyze_result $VALID_RESULT $VERIF_RESULT $FNAME
     show_result $FNAME $(cat $VALID_RESULT)
