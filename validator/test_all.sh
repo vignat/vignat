@@ -18,6 +18,8 @@ analyze_result() {
             echo $FNAME success >> $REPORT_FNAME
         elif grep -q "\\\\/alid" $VL_RESULT; then
             echo $FNAME success >> $REPORT_FNAME
+        elif grep -q "Inconsistent" $VL_RESULT; then
+            echo $FNAME inconsistent >> $REPORT_FNAME
         else
             cat $VF_RESULT
             if grep -q "Assertion might not hold" $VF_RESULT; then
@@ -144,10 +146,12 @@ SPEC=$(grep -c "spec fail" $REPORT_FNAME)
 ARITH=$(grep -c "arith fail" $REPORT_FNAME)
 VLEXCEPT=$(grep -c "validator exception" $REPORT_FNAME)
 UNKNOWN=$(grep -c "unknown fail" $REPORT_FNAME)
+INCONSISTENT=$(grep -c "inconsistent")
 
 echo "Test completed."
 echo "total:         $TOT"
 echo "success:       $SUCC"
+echo "inconsistent:  $INCONSISTENT"
 echo "assertion:     $ASSERT"
 echo "no chunks:     $NOCHUNKS"
 echo "cannot prove:  $UNPROVEN"

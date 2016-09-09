@@ -12,7 +12,14 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
   let export_out_fname = intermediate_pref ^ ".verifast.stdout" in
   let verify_out_fname = intermediate_pref ^ ".verify.stdout" in
   let ir_fname = intermediate_pref ^ ".ir" in
-  let intermediate_fout = intermediate_pref ^ ".tmp.c" in
+  let intermediate_fout = intermediate_pref ^ ".c" in
+  ignore (Sys.command ("rm -f " ^
+                       assumptions_fname ^ " " ^
+                       lino_fname ^ " " ^
+                       export_out_fname ^ " " ^
+                       verify_out_fname ^ " " ^
+                       ir_fname ^ " " ^
+                       intermediate_fout));
   let ir = Import.build_ir Spec.fun_types fin Spec.preamble Spec.boundary_fun Spec.finishing_fun in
   Out_channel.write_all ir_fname ~data:(Sexp.to_string (sexp_of_ir ir));
   Render.render_ir ir intermediate_fout;
@@ -20,8 +27,10 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
           verifast_bin intermediate_fout verify_out_fname proj_root
   with
   | Verifier.Valid ->
-    ignore (Sys.command ("cp " ^ intermediate_fout ^ " " ^ fout));
-    printf "Valid.\n"
+    if (Sys.command ("test -e " ^ assumptions_fname)) = 0 then
+      printf "Valid.\n"
+    else
+      printf "Inconsistent.\n"
   | Verifier.Invalid _ ->
     begin
       let vf_assumptions = Verifier.export_assumptions
