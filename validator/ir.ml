@@ -90,7 +90,6 @@ type ir = {
   preamble:string;
   free_vars:var_spec String.Map.t;
   arguments:var_spec list;
-  known_addresses: tterm Int64.Map.t;
   tmps:var_spec String.Map.t;
   cmplxs:var_spec String.Map.t;
   context_assumptions:tterm list;

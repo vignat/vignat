@@ -91,7 +91,6 @@ type ir = {
   preamble : bytes;
   free_vars : var_spec Core.Std.String.Map.t;
   arguments : var_spec list;
-  known_addresses : tterm Core.Std.Int64.Map.t;
   tmps : var_spec Core.Std.String.Map.t;
   cmplxs : var_spec Core.Std.String.Map.t;
   context_assumptions : tterm list;
