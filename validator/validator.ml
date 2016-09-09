@@ -25,12 +25,10 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
   Render.render_ir ir intermediate_fout;
   match Verifier.verify_file
           verifast_bin intermediate_fout verify_out_fname proj_root
+          ir.export_point lino_fname
   with
-  | Verifier.Valid ->
-    if (Sys.command ("test -e " ^ assumptions_fname)) = 0 then
-      printf "Valid.\n"
-    else
-      printf "Inconsistent.\n"
+  | Verifier.Valid -> printf "Valid.\n"
+  | Verifier.Inconsistent -> printf "Inconsistent.\n"
   | Verifier.Invalid _ ->
     begin
       let vf_assumptions = Verifier.export_assumptions

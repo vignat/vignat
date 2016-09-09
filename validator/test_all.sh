@@ -146,7 +146,7 @@ SPEC=$(grep -c "spec fail" $REPORT_FNAME)
 ARITH=$(grep -c "arith fail" $REPORT_FNAME)
 VLEXCEPT=$(grep -c "validator exception" $REPORT_FNAME)
 UNKNOWN=$(grep -c "unknown fail" $REPORT_FNAME)
-INCONSISTENT=$(grep -c "inconsistent")
+INCONSISTENT=$(grep -c "inconsistent" $REPORT_FNAME)
 
 echo "Test completed."
 echo "total:         $TOT"
