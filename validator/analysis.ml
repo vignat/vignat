@@ -514,25 +514,27 @@ let induce_assignments_for_exec fixpoints assumptions result ret_name ret_type =
 
 let induce_symbolic_assignments fixpoints ir executions =
   let (executions,ir) = replace__addr_verifast_specific executions ir in
-  let (_,unjustified_assertion) = List.fold ir.tip_call.results
-      ~init:(executions,None)
-      ~f:(fun (executions,unjustified_assertion) result->
+  assert(not (List.is_empty ir.tip_call.results));
+  let unjustified_assertion =
+    List.fold executions ~init:None
+      ~f:(fun unjustified_assertion exec ->
           match unjustified_assertion with
-          | Some _ -> ([],unjustified_assertion)
-          | None -> begin match executions with
-              | [] -> failwith ("The number of executions must " ^
-                                "no more then the number of tip call results")
-              | hd :: [] -> (executions,
+          | Some _ -> unjustified_assertion
+          | None ->
+            let rec find_good results last_unjustified =
+              match results with
+              | [] -> last_unjustified
+              | hd :: tl -> begin match
                              induce_assignments_for_exec
-                               fixpoints hd result
+                               fixpoints exec hd
                                ir.tip_call.context.ret_name
-                               ir.tip_call.context.ret_type)
-              | hd :: tl -> (tl,
-                             induce_assignments_for_exec
-                               fixpoints hd result
-                               ir.tip_call.context.ret_name
-                               ir.tip_call.context.ret_type)
-            end)
+                               ir.tip_call.context.ret_type
+                  with
+                  | None -> None
+                  | Some unjust -> find_good tl (Some unjust)
+                end
+            in
+            find_good ir.tip_call.results None)
   in
   match unjustified_assertion with
   | Some assertion ->

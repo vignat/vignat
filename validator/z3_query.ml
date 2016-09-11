@@ -27,7 +27,7 @@ let show_vars vars =
 let show_funs funs =
   if output_queries then begin
     Printf.printf ";funs:\n";
-    List.iter (Map.data funs) ~f:(fun f ->
+    List.iter (Map.data funs) ~f:(fun (f,_) ->
         Printf.printf "%s\n" (FuncDecl.to_string f));
   end
 
@@ -57,28 +57,42 @@ let show_result result solver =
                    (Solver.get_reason_unknown solver)
   end
 
+let make_id_from_apply fname args =
+  (fname ^ "_" ^
+   (String.concat ~sep:"_"
+      (List.map args ~f:Ir.render_tterm)))
+
 let register_symbs_z3 sttmts ctx ints =
   let var_map = ref String.Map.empty in
   let fun_map = ref String.Map.empty in
-  let add_fun fname args =
-    match String.Map.find !fun_map fname with
+  let add_var vname =
+    match String.Map.find !var_map vname with
     | Some _ -> ()
-    | None ->
+    | None -> var_map := String.Map.add !var_map ~key:vname
+          ~data:(Expr.mk_const ctx
+                   (mk_string ctx vname) ints)
+  in
+  let add_fun fname args =
+    add_var (make_id_from_apply fname args);
+    let really_add () =
       let domain = List.map args ~f:(fun _ -> ints) in
       fun_map := String.Map.add !fun_map ~key:fname
-          ~data:(mk_fresh_func_decl ctx fname domain ints)
+          ~data:((mk_fresh_func_decl ctx fname domain ints),args);
+    in
+    match String.Map.find !fun_map fname with
+    | Some (f,old_args) ->
+      if (List.length old_args) < (List.length args) then
+        really_add ()
+    | None -> really_add ()
   in
   List.iter sttmts ~f:(fun sttmt ->
       ignore (Ir.call_recursively_on_tterm (function
-      | Ir.Id x -> begin match String.Map.find !var_map x with
-          | Some _ -> ()
-          | None -> var_map := String.Map.add !var_map ~key:x
-                ~data:(Expr.mk_const ctx
-                         (mk_string ctx x) ints)
-        end;
+      | Ir.Id x -> add_var x;
         None
-      | Apply (fname,args) -> add_fun fname args; None
-      | Str_idx (arg,fname) -> add_fun fname [arg]; None
+      | Ir.Apply (fname,args) ->
+        add_fun fname args;
+        None
+      | Ir.Str_idx (arg,fname) -> add_fun fname [arg]; None
       | _ -> None) sttmt));
   (!var_map,!fun_map)
 
@@ -100,8 +114,11 @@ let tterm_to_z3 tterm ctx var_map fun_map ints =
         | Ir.And -> Boolean.mk_and ctx [lhs;rhs]
       end
     | Ir.Apply (fname,args) ->
-      let f = String.Map.find_exn fun_map fname in
-      Expr.mk_app ctx f (List.map args ~f:run_on)
+      let (f,max_args) = String.Map.find_exn fun_map fname in
+      if (List.length args) < (List.length max_args) then
+        String.Map.find_exn var_map (make_id_from_apply fname args)
+      else
+        Expr.mk_app ctx f (List.map args ~f:run_on)
   | Ir.Id x -> String.Map.find_exn var_map x
   | Ir.Struct (_,_) -> failwith ("no structures for a moment: " ^
                                  (Ir.render_tterm tterm))
@@ -125,16 +142,15 @@ let tterm_to_z3 tterm ctx var_map fun_map ints =
 
 let struct_eq_to_z3 ctx (fields : Ir.var_spec list) term funs vars ints =
   let subterms = List.map fields ~f:(fun {name;value} ->
-      let f = String.Map.find_exn funs name in
+      let (f,_) = String.Map.find_exn funs name in
       Boolean.mk_eq ctx (Expr.mk_app ctx f [term]) (tterm_to_z3 value ctx vars funs ints))
   in
   Boolean.mk_and ctx subterms
 
 let statement_to_z3 sttmt ctx vars funs ints =
-  Printf.printf "translating: %s\n" (Ir.render_tterm sttmt);
   match sttmt.Ir.v with
-  | Ir.Bop (Ir.Eq,{Ir.t=_;Ir.v=Ir.Struct (_,fields)},_)
-  | Ir.Bop (Ir.Eq,_,{Ir.t=_;Ir.v=Ir.Struct (_,fields)}) ->
+  | Ir.Bop (Ir.Eq,{Ir.t=_;Ir.v=Ir.Struct (_,_)},_)
+  | Ir.Bop (Ir.Eq,_,{Ir.t=_;Ir.v=Ir.Struct (_,_)}) ->
     failwith ("no support for structural equality: " ^ (Ir.render_tterm sttmt))
     (* struct_eq_to_z3 ctx fields (tterm_to_z3 x ctx vars funs ints) funs vars ints *)
   | Ir.Bop _ -> tterm_to_z3 sttmt ctx vars funs ints
