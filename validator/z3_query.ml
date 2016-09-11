@@ -83,11 +83,11 @@ let register_symbs_z3 sttmts ctx ints =
   (!var_map,!fun_map)
 
 let tterm_to_z3 tterm ctx var_map fun_map ints =
-  let rec run tterm = 
+  let rec run_on tterm = 
     match tterm.Ir.v with
     | Ir.Bop (op,lhs,rhs) ->
-      let lhs = run lhs in
-      let rhs = run rhs in
+      let lhs = run_on lhs in
+      let rhs = run_on rhs in
       begin match op with
         | Ir.Eq -> Boolean.mk_eq ctx lhs rhs
         | Ir.Le -> Arithmetic.mk_le ctx lhs rhs
@@ -101,22 +101,27 @@ let tterm_to_z3 tterm ctx var_map fun_map ints =
       end
     | Ir.Apply (fname,args) ->
       let f = String.Map.find_exn fun_map fname in
-      Expr.mk_app ctx f (List.map args ~f:run)
+      Expr.mk_app ctx f (List.map args ~f:run_on)
   | Ir.Id x -> String.Map.find_exn var_map x
   | Ir.Struct (_,_) -> failwith ("no structures for a moment: " ^
                                  (Ir.render_tterm tterm))
   | Ir.Int i -> Expr.mk_numeral_int ctx i ints
   | Ir.Bool b -> Expr.mk_numeral_int ctx (if b then 1 else 0) ints
-  | Ir.Not x -> Boolean.mk_not ctx (run x)
-  | Ir.Str_idx (x,fname) -> run {Ir.t=tterm.Ir.t;
+  | Ir.Not ({Ir.t=_;Ir.v=Ir.Apply _} as x) ->
+    run_on {Ir.t=Ir.Boolean;
+            Ir.v=Ir.Bop (Ir.Eq,
+                         {Ir.t=x.Ir.t;Ir.v=Ir.Int 1},
+                         x)}
+  | Ir.Not x -> Boolean.mk_not ctx (run_on x)
+  | Ir.Str_idx (x,fname) -> run_on {Ir.t=tterm.Ir.t;
                                  Ir.v=Ir.Apply (fname,[x])}
   | Ir.Deref _ -> failwith "no support for dereferences"
   | Ir.Fptr _ -> failwith "no support for fptrs"
   | Ir.Addr _ -> failwith "no spport for addrtaking"
-  | Ir.Cast (_,tt) -> run tt
+  | Ir.Cast (_,tt) -> run_on tt
   | Ir.Undef -> failwith "what should I do with undef?"
   in
-  run tterm
+  run_on tterm
 
 let struct_eq_to_z3 ctx (fields : Ir.var_spec list) term funs vars ints =
   let subterms = List.map fields ~f:(fun {name;value} ->
@@ -126,9 +131,10 @@ let struct_eq_to_z3 ctx (fields : Ir.var_spec list) term funs vars ints =
   Boolean.mk_and ctx subterms
 
 let statement_to_z3 sttmt ctx vars funs ints =
+  Printf.printf "translating: %s\n" (Ir.render_tterm sttmt);
   match sttmt.Ir.v with
-  | Ir.Bop (Ir.Eq,{t=_;v=Ir.Struct (_,fields)},x)
-  | Ir.Bop (Ir.Eq,x,{t=_;v=Ir.Struct (_,fields)}) ->
+  | Ir.Bop (Ir.Eq,{Ir.t=_;Ir.v=Ir.Struct (_,fields)},_)
+  | Ir.Bop (Ir.Eq,_,{Ir.t=_;Ir.v=Ir.Struct (_,fields)}) ->
     failwith ("no support for structural equality: " ^ (Ir.render_tterm sttmt))
     (* struct_eq_to_z3 ctx fields (tterm_to_z3 x ctx vars funs ints) funs vars ints *)
   | Ir.Bop _ -> tterm_to_z3 sttmt ctx vars funs ints

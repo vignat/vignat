@@ -484,6 +484,7 @@ let are_assignments_justified assignments assumptions =
   justified
 
 let induce_assignments_for_exec fixpoints assumptions result ret_name ret_type =
+  let assumptions = canonicalize_in_place assumptions in
   let assertion_list = (prepare_assertions result ret_name ret_type) |>
                        canonicalize fixpoints
   in
@@ -520,7 +521,12 @@ let induce_symbolic_assignments fixpoints ir executions =
           | Some _ -> ([],unjustified_assertion)
           | None -> begin match executions with
               | [] -> failwith ("The number of executions must " ^
-                                "match the number of tip call results")
+                                "no more then the number of tip call results")
+              | hd :: [] -> (executions,
+                             induce_assignments_for_exec
+                               fixpoints hd result
+                               ir.tip_call.context.ret_name
+                               ir.tip_call.context.ret_type)
               | hd :: tl -> (tl,
                              induce_assignments_for_exec
                                fixpoints hd result
