@@ -9,30 +9,31 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
   let module Spec = (val spec_mod) in
   let assumptions_fname = intermediate_pref ^ ".assumptions.vf" in
   let lino_fname = intermediate_pref ^ ".lino.int" in
-  let export_out_fname = intermediate_pref ^ ".verifast.stdout" in
+  let export_out_fname = intermediate_pref ^ ".export.stdout" in
   let verify_out_fname = intermediate_pref ^ ".verify.stdout" in
   let ir_fname = intermediate_pref ^ ".ir" in
   let intermediate_fout = intermediate_pref ^ ".c" in
+  let export_fout = intermediate_pref ^ ".exprt.c" in
   ignore (Sys.command ("rm -f " ^
                        assumptions_fname ^ " " ^
                        lino_fname ^ " " ^
                        export_out_fname ^ " " ^
                        verify_out_fname ^ " " ^
                        ir_fname ^ " " ^
-                       intermediate_fout));
+                       intermediate_fout ^ " " ^
+                       export_fout));
   let ir = Import.build_ir Spec.fun_types fin Spec.preamble Spec.boundary_fun Spec.finishing_fun in
   Out_channel.write_all ir_fname ~data:(Sexp.to_string (sexp_of_ir ir));
-  Render.render_ir ir intermediate_fout;
-  match Verifier.verify_file
-          verifast_bin intermediate_fout verify_out_fname proj_root
-          ir.export_point lino_fname
+  match Verifier.verify_ir
+          ir verifast_bin intermediate_fout verify_out_fname proj_root lino_fname
   with
   | Verifier.Valid -> printf "Valid.\n"
   | Verifier.Inconsistent -> printf "Inconsistent.\n"
-  | Verifier.Invalid _ ->
+  | Verifier.Invalid_seq -> printf "Invalid.\n"
+  | Verifier.Invalid_rez _ ->
     begin
       let vf_assumptions = Verifier.export_assumptions
-          verifast_bin intermediate_fout ir.export_point
+          ir verifast_bin export_fout
           assumptions_fname lino_fname export_out_fname
           proj_root
       in

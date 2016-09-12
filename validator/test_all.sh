@@ -78,7 +78,7 @@ validate_file() {
     CMD1="$BASE_DIR/validator.byte $FSPEC_PLUGIN $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST $SPEC_DIR"
     echo "(cd $BASE_DIR && make all) && $CMD1" > "${UNIQUE_PREFIX}.cmd"
     $CMD1 &> $VALID_RESULT
-    VERIF_RESULT="${UNIQUE_PREFIX}.verifast.stdout"
+    VERIF_RESULT="${UNIQUE_PREFIX}.verify.stdout"
     analyze_result $VALID_RESULT $VERIF_RESULT $FNAME
     show_result $FNAME $(cat $VALID_RESULT)
 }

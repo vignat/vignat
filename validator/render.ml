@@ -145,19 +145,23 @@ let render_equality_assumptions args =
          | _ -> "//@ assume(" ^ arg.name ^ " == "
                 ^ (render_tterm arg.value) ^ ");"))
 
-let render_tip_fun_call {context;results} export_point free_vars =
+let render_tip_fun_call
+    {context;results} export_point free_vars ~render_assertions =
   (render_fcall_with_lemmas context) ^
   "// The legibility of these assignments is ensured by analysis.ml\n" ^
   (render_equality_assumptions free_vars) ^ "\n" ^
   (render_export_point export_point) ^
-  (match results with
-   | result :: [] ->
-     (render_tip_post_sttmts result) ^ "\n" ^
-     (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val)
-   | res1 :: res2 :: [] ->
-     render_2tip_post_assertions res1 res2 context.ret_name
-   | [] -> failwith "There must be at least one tip call."
-   | _ -> failwith "More than two outcomes are not supported.") ^ "\n"
+  (if render_assertions then
+     (match results with
+      | result :: [] ->
+        (render_tip_post_sttmts result) ^ "\n" ^
+        (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val)
+      | res1 :: res2 :: [] ->
+        render_2tip_post_assertions res1 res2 context.ret_name
+      | [] -> failwith "There must be at least one tip call."
+      | _ -> failwith "More than two outcomes are not supported.") ^ "\n"
+   else
+     "")
 
 
 let render_vars_declarations ( vars : var_spec list ) =
@@ -195,13 +199,13 @@ let render_allocated_args args =
        ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
                        (spec.name) ^ ";")) ^ "\n"
 
-let render_final finishing =
-  if finishing then
+let render_final finishing ~catch_leaks =
+  if finishing && catch_leaks then
     "/* This sequence must terminate correctly: no need for assume(false); */\n"
   else
     "//@ assume(false);\n"
 
-let render_ir ir fout =
+let render_ir ir fout ~render_assertions =
   Out_channel.with_file fout ~f:(fun cout ->
       Out_channel.output_string cout ir.preamble;
       Out_channel.output_string cout (render_cmplexes ir.cmplxs);
@@ -215,6 +219,8 @@ let render_ir ir fout =
       Out_channel.output_string cout (render_hist_calls ir.hist_calls);
       Out_channel.output_string cout (render_tip_fun_call
                                         ir.tip_call ir.export_point
-                                        ir.free_vars);
-      Out_channel.output_string cout (render_final ir.finishing);
+                                        ir.free_vars
+                                        ~render_assertions);
+      Out_channel.output_string cout (render_final ir.finishing
+                                        ~catch_leaks:render_assertions);
       Out_channel.output_string cout "}\n")
