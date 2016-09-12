@@ -15,7 +15,7 @@ int main() {
   end = klee_range(0, CAP, "end");
 
   for (int i = 0; i < (end + CAP - begin)%CAP; ++i)
-    klee_assume(packets[(i+begin)%CAP].port != 9);
+    klee_assume(packets[(i+begin)%CAP].port != 9);// Note the semicolon
 
   {// Loop iteration begins.
     if (end != (begin - 1) || !(end == CAP - 1 && begin == 0)) {
