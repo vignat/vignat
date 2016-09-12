@@ -309,14 +309,14 @@ let get_sint_in_bounds v =
 let make_cmplx_val exp t =
   let key = Sexp.to_string exp in
   match String.Map.find !allocated_complex_vals key with
-  | Some v -> v.value
+  | Some spec -> {v=Id spec.name;t=spec.value.t}
   | None ->
     let name = complex_val_name_gen#generate in
-    let value = {v=Id name;t} in
+    let value = {v=Id key;t} in
     allocated_complex_vals :=
       String.Map.add !allocated_complex_vals ~key
         ~data:{name;value};
-    value
+    {v=Id name;t}
 
 let allocate_tmp value =
   let key = (render_tterm value) in
