@@ -13,7 +13,9 @@ type type_guess = {w:t_width confidence;
 
 type typed_var = {vname:string; t: type_guess;}
 
-let known_addresses : (tterm*int) list Int64.Map.t ref = ref Int64.Map.empty
+type address_spec = {value:tterm; callid:int; str_depth:int}
+
+let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
 let infer_signed_type w =
   if String.equal w "w32" then Sint32
@@ -455,15 +457,15 @@ let rec get_struct_val_value valu t =
     | Some v -> get_sexp_value v t
     | None -> {t;v=Undef}
 
-let update_ptee_variants nval older callid =
+let update_ptee_variants nval older =
   match nval with
-  | {t=Unknown;v=_} -> older
+  | {value={t=Unknown;v=_};_} -> older
   | _ ->
     match older with
-    | [({t=Unknown;v=_},_)] -> [(nval,callid)]
-    | _ -> (nval,callid)::older
+    | [{value={t=Unknown;v=_};_}] -> [nval]
+    | _ -> nval::older
 
-let rec add_to_known_addresses (base_value: tterm) breakdown addr callid =
+let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
   begin match base_value.t with
   | Ptr (Str (_,fields)) ->
     let fields = List.fold fields ~init:String.Map.empty
@@ -479,7 +481,7 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid =
                                v=Str_idx ({t=get_pointee base_value.t;
                                            v=Deref base_value},fname)}}
         in
-        add_to_known_addresses b_value value.break_down addr callid)
+        add_to_known_addresses b_value value.break_down addr callid (depth+1))
   | _ ->
     if (List.length breakdown) <> 0 then
       printf "%s : %s type with %d fields" (render_tterm base_value)
@@ -493,7 +495,9 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid =
     | None -> []
   in
   known_addresses := Int64.Map.add !known_addresses
-      ~key:addr ~data:(update_ptee_variants base_value prev callid)
+      ~key:addr ~data:(update_ptee_variants
+                         {value=base_value; callid; str_depth=depth}
+                         prev)
 
 let get_basic_vars ftype_of tpref =
   let get_vars known_vars (call:Trace_prefix.call_node) =
@@ -584,12 +588,12 @@ let allocate_rets ftype_of tpref =
         | Funptr _ -> failwith "TODO:support funptr retuns."
         | Apathptr ->
           let addr = Int64.of_string (Sexp.to_string value) in
-          add_to_known_addresses {t=ret_type;v=Id name} [] addr call.id;
+          add_to_known_addresses {t=ret_type;v=Id name} [] addr call.id 0;
           {name;value={t=ret_type;v=Addr {t=get_pointee ret_type;v=Undef}}}
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
           add_to_known_addresses {v=Id name;t=ret_type}
-            ptee.after.break_down addr call.id;
+            ptee.after.break_down addr call.id 0;
           {name;value={t=ret_type;v=Addr (get_struct_val_value
                                             ptee.after (get_pointee ret_type))}}
       in
@@ -614,14 +618,14 @@ let allocate_args ftype_of tpref arg_name_gen =
       match Int64.Map.find !known_addresses addr with
       | Some spec -> known_addresses :=
           Int64.Map.add !known_addresses
-            ~key:addr ~data:(List.map spec ~f:(fun (spec,id) ->
-                (update_tterm spec tterm, id)));
+            ~key:addr ~data:(List.map spec ~f:(fun spec ->
+                {spec with value=update_tterm spec.value tterm}));
         None
       | None -> let p_name = arg_name_gen#generate in
         add_to_known_addresses
           {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
           str_value.break_down
-          addr call.id;
+          addr call.id 0;
         Some {name=p_name;value=tterm}
     in
     List.filter_mapi call.args ~f:(fun i {aname=_;value;ptr;} ->
@@ -646,10 +650,10 @@ let compose_fcall_preamble ftype_of call args tmp_gen =
 
 let find_first_known_address addr =
   Option.map (Int64.Map.find !known_addresses addr)
-    ~f:(fun lst -> fst (List.hd_exn lst))
+    ~f:(fun lst -> (List.hd_exn lst).value)
 
 let find_exn_first_known_address addr =
-  fst (List.hd_exn (Int64.Map.find_exn !known_addresses addr))
+  (List.hd_exn (Int64.Map.find_exn !known_addresses addr)).value
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
@@ -703,15 +707,26 @@ let find_last_known_address_before_call addr call_id =
     ~f:(fun lst ->
         List.fold lst ~init:({v=Undef;t=Unknown},0)
           ~f:(fun (max_el,max_id)
-               (spec,id) ->
-               if id <= call_id && max_id < call_id then
-                 (spec,id)
+               spec ->
+               if spec.callid <= call_id && max_id < spec.callid then
+                 (spec.value,spec.callid)
+               else
+                 (max_el,max_id)))
+
+let find_last_known_whole_address_before_call addr call_id =
+  Option.map (Int64.Map.find !known_addresses addr)
+    ~f:(fun lst ->
+        List.fold lst ~init:({v=Undef;t=Unknown},0)
+          ~f:(fun (max_el,max_id)
+               spec ->
+               if spec.str_depth = 0 && spec.callid <= call_id && max_id < spec.callid then
+                 (spec.value,spec.callid)
                else
                  (max_el,max_id)))
 
 let take_extra_ptrs_into_account ptrs callid =
   List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
-      match find_last_known_address_before_call value callid with
+      match find_last_known_whole_address_before_call value callid with
       | None -> None
       | Some (x,_) -> match get_struct_val_value ptee.before (get_pointee x.t) with
         | {v=Undef;t=_} -> None
