@@ -25,8 +25,8 @@ iptables -t nat -A POSTROUTING -o $NAT_DEVICE_EXTERNAL -j MASQUERADE
 iptables -A FORWARD -i $NAT_DEVICE_INTERNAL -o $NAT_DEVICE_EXTERNAL -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT
 iptables -A FORWARD -i $NAT_DEVICE_INTERNAL -o $NAT_DEVICE_EXTERNAL -j ACCEPT
 
-arp -s 192.168.2.10 00:1e:67:92:2a:bc
-arp -s 192.168.3.5 00:1e:67:92:2a:bd
+arp -s $TESTER_IP_EXTERNAL $TESTER_MAC_EXTERNAL
+arp -s $TESTER_IP_INTERNAL $TESTER_MAC_INTERNAL
 
 # 4KB send buffer, 20,480 connections max at worst case
 echo 83886080  > /proc/sys/net/core/wmem_max
@@ -52,4 +52,4 @@ echo "1024 65535" > /proc/sys/net/ipv4/ip_local_port_range
 # Netdev backlog increased
 echo 100000 > /proc/sys/net/core/netdev_max_backlog
 # Interface transmit queuelen increased
-ifconfig em2 txqueuelen 10000
+ifconfig $NAT_DEVICE_EXTERNAL txqueuelen 10000
