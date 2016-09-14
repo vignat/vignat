@@ -1,7 +1,7 @@
 
 . ./config.sh
 
-. ./spdk-setup-functions.sh
+. ./dpdk-setup-functions.sh
 
 set_numa_pages
 load_igb_uio_module
