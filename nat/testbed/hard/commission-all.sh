@@ -1,15 +1,13 @@
 . ./config.sh
 
-scp config.sh $TESTER_HOST:
-scp tester-commission.sh $TESTER_HOST:
-scp tester-provision-for-nat.sh $TESTER_HOST:
-scp tester-provision-for-stub.sh $TESTER_HOST:
-ssh $CLIENT_HOST 'sh ~/client-commission.sh'
+echo "copying all the scripts to $TESTER_HOST and $SERVER_HOST"
+. ./sync-scripts.sh
 
-scp config.sh $SERVER_HOST:
-scp server-commission.sh $SERVER_HOST:
-scp server-provision-for-nat.sh $SERVER_HOST:
-scp server-provision-for-stub.sh $SERVER_HOST:
-ssh $SERVER_HOST 'sh ~/server-commission.sh'
+echo "running commission on tester"
+ssh $TESTER_HOST 'sh ~/scripts/tester-commission.sh'
 
+echo "running commission on server"
+ssh $SERVER_HOST 'sh ~/scripts/server-commission.sh'
+
+echo "runing commission on middlebox"
 . ./nat-commission.sh
