@@ -1,33 +1,33 @@
 library(plyr)
 library(ggplot2)
 
-load_missrates <- function(sources) {
-  missrates <- data.frame(V1=integer(), V2=integer(), medium=character())
+load_exp_data <- function(sources) {
+  exp_data <- data.frame(V1=integer(), V2=integer(), medium=character())
   for (s in sources) {
-    missrates_i <- read.table(paste(s[1], ".dat", sep=""))
-    missrates_i["medium"] <- s[2]
-    missrates <- rbind(missrates, missrates_i)
+    exp_data_i <- read.table(s[1])
+    exp_data_i["medium"] <- s[2]
+    exp_data <- rbind(exp_data, exp_data_i)
   }
-  data.frame(rate=1e6/missrates$V1, loss=missrates$V2, medium=missrates$medium)
+  data.frame(abscissa=exp_data$V1, ordinata=exp_data$V2, medium=exp_data$medium)
 }
 
-plot_missrates <- function(missrates, fname) {
+plot_exp_data <- function(exp_data, titles) {
   pd <- position_dodge(0.01)
-  summary=ddply(missrates, c("rate", "medium"), summarise,
-                N=length(loss), mean=mean(loss), sd=sd(loss))
-  csummary=ddply(missrates, c("medium", "rate", "loss"), nrow)
-  ggplot(summary, aes(x=rate, y=mean,
+  summary=ddply(exp_data, c("abscissa", "medium"), summarise,
+                N=length(ordinata), mean=mean(ordinata), sd=sd(ordinata))
+  csummary=ddply(exp_data, c("medium", "abscissa", "ordinata"), nrow)
+  ggplot(summary, aes(x=abscissa, y=mean,
                       colour=medium, group=medium)) +
       geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd),
                     width=.03, position=pd, colour="black") +
       geom_line(position=pd) +
       geom_point(position=pd,size=3) +
       scale_x_continuous(trans='log10') +
-      labs(title="Comparative loss/rate dependencies for [tester]-[medium]-[reflector] scenarios") +
-      xlab("Source packet rate, packets/second, log scale") +
-      ylab("Packet loss (sent pkts - received pkts)/sent pkts, %") +
+      labs(title=titles$title) +
+      xlab(titles$abscissa) +
+      ylab(titles$ordinata) +
       geom_point(data=csummary,
-                aes(x=rate, y=loss, colour=medium,
+                aes(x=abscissa, y=ordinata, colour=medium,
                     group=medium, size=V1),
                 position=pd,
                 show.legend=FALSE) +
