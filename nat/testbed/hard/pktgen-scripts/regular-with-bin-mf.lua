@@ -7,20 +7,20 @@ require "Pktgen";
 
 -- define packet sizes to test
 -- local pkt_sizes		= { 64, 128, 256, 512, 1024, 1280, 1518 };
-local pkt_sizes		= { 64, 128};
+local pkt_sizes		= { 64};--, 128};
 
-local flows_nums = {1, 20000}; --{ 1, 100, 1000, 7500, 20000, 30000 };
+local flows_nums = {1, 7500, 20000}; --{ 1, 100, 1000, 7500, 20000, 30000 };
 
 -- Time in seconds to transmit for
-local duration		= 30000;
+local duration		= 40000;
 --local confirmDuration	= 80000;
 local pauseTime		= 2000;
 
 local strtprt_int = 1000;
 
 
-local num_reg_steps = 20;
-local num_bin_steps = 7;
+local num_reg_steps = 10;
+local num_bin_steps = 5;
 
 local srcUDPPort = "1234";
 
@@ -89,9 +89,10 @@ local function runTrial(numFlows, pkt_size, rate, duration, count)
 	pktgen.set(sendport, "size", pkt_size);
 
 	pktgen.start(sendport);
-	print("Running trial " .. count .. ". % Rate: " .. rate .. " nflws: " .. numFlows .. ". Packet Size: " .. pkt_size .. ". Duration (mS):" .. duration);
+	print("R trial " .. count .. ". % rt: " .. rate .. " nflws: " .. numFlows .. ". pkts: " .. pkt_size .. ". Dur (mS):" .. duration);
 	pktgen.delay(duration);
 	pktgen.stop(sendport);
+	
 
 	pktgen.delay(pauseTime);
 
@@ -101,9 +102,9 @@ local function runTrial(numFlows, pkt_size, rate, duration, count)
 	num_rx = statRx.ipackets;
 	num_dropped = num_tx - num_rx;
 
-	print("Tx: " .. num_tx .. ". Rx: " .. num_rx .. ". Dropped: " .. num_dropped);
-	-- file:write("Tx: " .. num_tx .. ". Rx: " .. num_rx .. ". Dropped: " .. num_dropped .. "\n");
-	file:write(numFlows .. " " .. pkt_size .. " " .. rate .. " " .. num_tx .. " " .. num_rx .. " " .. duration .. "\n");
+	print("Tx: " .. num_tx .. ". Rx: " .. num_rx .. ". Drop: " .. num_dropped .. ".");
+	file:write(numFlows .. " " .. pkt_size .. " " .. rate .. " "
+	        .. num_tx .. " " .. num_rx .. " " .. duration .. "\n");
 	pktgen.delay(pauseTime);
 
 	return num_dropped;
@@ -125,9 +126,12 @@ local function runThroughputTest(numFlows, pkt_size)
 	reg100_step = (abs_max_rate - ((abs_max_rate + abs_min_rate)/2))/steps_to100;
 	reg50_step = (abs_max_rate - abs_min_rate)/num_reg_steps/3;
 	trial_rate = initialRate;
+	tot_count = 1;
+
 	for count=1, num_bin_steps, 1
 	do		
-		num_dropped = runTrial(numFlows, pkt_size, trial_rate, duration, count);
+		num_dropped = runTrial(numFlows, pkt_size, trial_rate, duration, tot_count);
+		tot_count = tot_count + 1;
 		if num_dropped == 0
 		then
 			min_rate = trial_rate;
@@ -141,12 +145,14 @@ local function runThroughputTest(numFlows, pkt_size)
 	for count=1, steps_to50, 1
 	do
 		trial_rate = reg50_step*count+abs_min_rate;
-		runTrial(numFlows, pkt_size, trial_rate, duration, count);
+		runTrial(numFlows, pkt_size, trial_rate, duration, tot_count);
+		tot_count = tot_count + 1;
 	end
 	for count=1, steps_to100, 1
 	do
 		trial_rate = reg100_step*count + (abs_min_rate+abs_max_rate)/2;
-		runTrial(numFlows, pkt_size, trial_rate, duration, count);
+		runTrial(numFlows, pkt_size, trial_rate, duration, tot_count);
+		tot_count = tot_count + 1;
 	end
 end
 
