@@ -1,7 +1,7 @@
 . ./config.sh
 
 pkill -9 nat
-echo "unbinding $MB_PCI_INTERNAL, $MB_PCI_EXTERNAL"
+echo "unbinding $MB_PCI_INTERNAL, $MB_PCI_EXTERNAL, $MB_PCI_TO_SRV"
 sudo ~/dpdk/tools/dpdk-devbind.py -b igb $MB_PCI_INTERNAL $MB_PCI_EXTERNAL $MB_PCI_TO_SRV
 
 sleep 8

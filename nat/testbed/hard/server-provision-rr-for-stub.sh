@@ -1,4 +1,4 @@
-. ./config.sh
+. ~/scripts/config.sh
 
 ifconfig $SERVER_DEVICE up
 ip addr flush dev $SERVER_DEVICE

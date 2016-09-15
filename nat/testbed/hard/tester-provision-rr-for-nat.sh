@@ -1,10 +1,10 @@
-. ./config.sh
-
-echo "sync scripts"
-. ./sync-scripts.sh
+. ~/scripts/config.sh
 
 echo "unbinding $TESTER_PCI_INTERNAL, $TESTER_PCI_EXTERNAL"
 $RTE_SDK/tools/dpdk-devbind.py -b igb $TESTER_PCI_INTERNAL $TESTER_PCI_EXTERNAL
+
+echo "waiting for that to happen"
+sleep 8
 
 echo "start ifaces, configure ip"
 ifconfig $TESTER_DEVICE_INTERNAL up
