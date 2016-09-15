@@ -1,5 +1,8 @@
 . ./config.sh
 
+echo "syncing scripts"
+. ./sync-scripts.sh
+
 echo "unbinding $TESTER_PCI_INTERNAL, $TESTER_PCI_EXTERNAL"
 $RTE_SDK/tools/dpdk-devbind.py -b igb $TESTER_PCI_INTERNAL $TESTER_PCI_EXTERNAL
 

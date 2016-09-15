@@ -1,42 +1,51 @@
 . ./config.sh
 
+mkdir -p results
+
+. ./sync-scripts.sh
+
+echo "testing STUB"
 # STUB
-bash ./provision-stub.sh
+#bash ./provision-stub.sh
 bash ./redeploy-stub.sh
 (./run-stub.sh $PWD 0<&- &>stb.log) &
 
 # Wait until the application loads up
-sleep 5
+#sleep 5
+sleep 20
 
-ssh $CLIENT_HOST "bash ~/throughput-pktsize.sh $SERVER_IP_INDIRECT 5 10"
-scp $CLIENT_HOST:result.txt ./stub-thru-pktsize.txt
+ssh $TESTER_HOST 'bash ~/scripts/run-pktgen.sh'
+scp $TESTER_HOST:pktgen/multi-flows.txt ./results/stub-rt-mf.txt
 
 sudo pkill -9 nat
 
-sleep 2
+#sleep 2
+sleep 10
 
+echo "testing VigNAT"
 # NAT
-bash ./provision-nat.sh
+#bash ./provision-nat.sh
 bash ./redeploy-nat.sh
-(./run-nat.sh $PWD 0<&- &>nat.log) &
+(./run-nat.sh $PWD 1 30000 0<&- &>nat.log) &
 
-sleep 5
+#sleep 5
+sleep 20
 
-ssh $CLIENT_HOST "bash ~/throughput-pktsize.sh $SERVER_IP_INDIRECT 5 10"
-scp $CLIENT_HOST:result.txt ./nat-thru-pktsize.txt
+ssh $TESTER_HOST 'bash ~/scripts/run-pktgen.sh'
+scp $TESTER_HOST:pktgen/multi-flows.txt ./results/vig-nat-rt-mf.txt
 
 sudo pkill -9 nat
 
-sleep 2
+#sleep 2
+sleep 10
 
+echo "testing NetFilter"
 # NetFilter
 sudo ./nf-nat.sh 0<&- &>nfn.log
 
-sleep 10
+#sleep 10
+sleep 30
 
-ssh $CLIENT_HOST "bash ~/throughput-pktsize.sh $SERVER_IP_INDIRECT 5 10"
-scp $CLIENT_HOST:result.txt ./nf-thru-pktsize.txt
+ssh $TESTER_HOST 'bash ~/scripts/run-pktgen.sh'
+scp $TESTER_HOST:pktgen/multi-flows.txt ./results/nf-nat-rt-mf.txt
 
-# Direct
-ssh $CLIENT_HOST "bash ~/throughput-pktsize.sh $SERVER_IP_DIRECT 5 10"
-scp $CLIENT_HOST:result.txt ./direct-thru-pktsize.txt
