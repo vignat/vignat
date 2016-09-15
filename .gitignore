@@ -26,3 +26,4 @@ TAGS
 .vagrant
 validator/_build
 nat/klee-*
+/nat/testbed/analysis/*

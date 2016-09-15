@@ -2,16 +2,17 @@
 
 pkill -9 nat
 echo "unbinding $MB_PCI_INTERNAL, $MB_PCI_EXTERNAL"
-sudo ~/dpdk/tools/dpdk-devbind.py -b igb $MB_PCI_INTERNAL $MB_PCI_EXTERNAL
+sudo ~/dpdk/tools/dpdk-devbind.py -b igb $MB_PCI_INTERNAL $MB_PCI_EXTERNAL $MB_PCI_TO_SRV
 
 sleep 8
 echo "configuring ip addresses"
-ifconfig $MB_DEVICE_EXTERNAL up
-ip addr flush dev $MB_DEVICE_EXTERNAL
-ip addr add $MB_IP_EXTERNAL/24 dev $MB_DEVICE_EXTERNAL
+ifconfig $MB_DEVICE_TO_SRV up
+ip addr flush dev $MB_DEVICE_TO_SRV
+ip addr add $MB_IP_TO_SRV/24 dev $MB_DEVICE_TO_SRV
 ifconfig $MB_DEVICE_INTERNAL up
 ip addr flush dev $MB_DEVICE_INTERNAL
 ip addr add $MB_IP_INTERNAL/24 dev $MB_DEVICE_INTERNAL
+ifconfig $MB_DEVICE_EXTERNAL down
 
 sysctl -w net.ipv4.ip_forward=1
 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
@@ -21,11 +22,11 @@ iptables -F FORWARD
 iptables -t nat -F POSTROUTING
 
 echo "installing forwarding rules"
-iptables -t nat -A POSTROUTING -o $MB_DEVICE_EXTERNAL -j MASQUERADE
-iptables -A FORWARD -i $MB_DEVICE_INTERNAL -o $MB_DEVICE_EXTERNAL -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT
-iptables -A FORWARD -i $MB_DEVICE_INTERNAL -o $MB_DEVICE_EXTERNAL -j ACCEPT
+iptables -t nat -A POSTROUTING -o $MB_DEVICE_TO_SRV -j MASQUERADE
+iptables -A FORWARD -i $MB_DEVICE_INTERNAL -o $MB_DEVICE_TO_SRV -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i $MB_DEVICE_INTERNAL -o $MB_DEVICE_TO_SRV -j ACCEPT
 
-arp -s $TESTER_IP_EXTERNAL $TESTER_MAC_EXTERNAL
+arp -s $SERVER_IP $SERVER_MAC
 arp -s $TESTER_IP_INTERNAL $TESTER_MAC_INTERNAL
 
 # 4KB send buffer, 20,480 connections max at worst case
@@ -52,4 +53,4 @@ echo "1024 65535" > /proc/sys/net/ipv4/ip_local_port_range
 # Netdev backlog increased
 echo 100000 > /proc/sys/net/core/netdev_max_backlog
 # Interface transmit queuelen increased
-ifconfig $MB_DEVICE_EXTERNAL txqueuelen 10000
+ifconfig $MB_DEVICE_TO_SRV txqueuelen 10000
