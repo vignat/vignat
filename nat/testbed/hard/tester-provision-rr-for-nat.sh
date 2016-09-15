@@ -16,3 +16,5 @@ ip route flush $SERVER_SUBNET
 ip route add $SERVER_SUBNET/24 via $MB_IP_INTERNAL dev $TESTER_DEVICE_INTERNAL
 ip route flush cache
 arp -s $MB_IP_INTERNAL $MB_INTERNAL_MAC
+
+sudo bash ~/scripts/relieve-connection-reuse.sh

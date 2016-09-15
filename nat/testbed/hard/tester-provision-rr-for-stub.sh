@@ -16,3 +16,5 @@ echo "configure routes"
 ip route flush $SERVER_SUBNET
 ip route flush cache
 arp -s $SERVER_IP $MB_INTERNAL_MAC
+
+sudo bash ~/scripts/relieve-connection-reuse.sh
