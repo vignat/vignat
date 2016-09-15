@@ -14,7 +14,9 @@ bash ./redeploy-stub.sh
 #sleep 5
 sleep 20
 
-ssh $TESTER_HOST 'bash ~/scripts/run-pktgen.sh'
+TEST_FILE="/home/necto/scripts/pktgen-scripts/regular-with-bin-mf.lua"
+
+ssh $TESTER_HOST "bash ~/scripts/run-pktgen.sh $TEST_FILE"
 scp $TESTER_HOST:pktgen/multi-flows.txt ./results/stub-rt-mf.txt
 
 sudo pkill -9 nat
@@ -31,7 +33,7 @@ bash ./redeploy-nat.sh
 #sleep 5
 sleep 20
 
-ssh $TESTER_HOST 'bash ~/scripts/run-pktgen.sh'
+ssh $TESTER_HOST "bash ~/scripts/run-pktgen.sh $TEST_FILE"
 scp $TESTER_HOST:pktgen/multi-flows.txt ./results/vig-nat-rt-mf.txt
 
 sudo pkill -9 nat
@@ -46,6 +48,6 @@ sudo ./nf-nat.sh 0<&- &>nfn.log
 #sleep 10
 sleep 30
 
-ssh $TESTER_HOST 'bash ~/scripts/run-pktgen.sh'
+ssh $TESTER_HOST "bash ~/scripts/run-pktgen.sh $TEST_FILE"
 scp $TESTER_HOST:pktgen/multi-flows.txt ./results/nf-nat-rt-mf.txt
 

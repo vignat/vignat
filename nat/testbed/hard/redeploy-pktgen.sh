@@ -1,4 +1,4 @@
 
-. ./config.sh
-. ./dpdk-setup-tester.sh
+. ~/scripts/config.sh
+. ~/scripts/dpdk-setup-tester.sh
 
