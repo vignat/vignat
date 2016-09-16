@@ -64,7 +64,6 @@ void array_lcc_reset(struct ArrayLcc *arr)
     klee_allow_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE));
   klee_make_symbolic(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),
                      "array_lcc_model_cell");
-  array_lcc_index_allocated = 0;
   ARRAY_LCC_EL_INIT(&array_lcc_model_cell);
   if (!array_lcc_cell_is_exposed)
     klee_forbid_access(&array_lcc_model_cell, sizeof(ARRAY_LCC_EL_TYPE),

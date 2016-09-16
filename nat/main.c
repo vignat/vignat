@@ -478,10 +478,11 @@ main_loop(__attribute__((unused)) void *dummy)
     }
 
 #ifdef KLEE_VERIFICATION
+    int x = klee_int("loop_termination");
     loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
                          &lcore_conf, lcore_id, qconf,
                          starting_time, max_flows, start_port);
-    while (klee_induce_invariants())
+    while (klee_induce_invariants() & x)
 #else //KLEE_VERIFICATION
     while (1) 
 #endif //KLEE_VERIFICATION
@@ -579,12 +580,12 @@ main_loop(__attribute__((unused)) void *dummy)
                              &lcore_conf, lcore_id, qconf,
                              current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
-    }
 #ifdef KLEE_VERIFICATION
     loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
                        &lcore_conf, lcore_id, qconf,
                        current_time(), max_flows, start_port);
 #endif//KLEE_VERIFICATION
+    }
     array_lcc_end_access(&lcore_conf);
     qconf = 0;
     return 0;
