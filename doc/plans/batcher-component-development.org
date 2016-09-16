@@ -1,0 +1,49 @@
+* Design, implement and verify a batcher.
+Batcher accepts items one by one, holds them and then passes them along to a
+receiver as a single group. The limit on the number of items is set at the
+batcher construction time.
+** Design the API
+:LOGBOOK:
+CLOCK: [2016-08-03 Mit 10:39]--[2016-08-03 Mit 10:44] =>  0:05
+CLOCK: [2016-08-03 Mit 10:25]--[2016-08-03 Mit 10:35] =>  0:10
+CLOCK: [2016-08-02 Die 21:49]--[2016-08-02 Die 21:55] =>  0:06
+CLOCK: [2016-08-02 Die 19:29]--[2016-08-02 Die 19:50] =>  0:21
+CLOCK: [2016-08-02 Die 18:43]--[2016-08-02 Die 18:54] =>  0:11
+:END:
+** Implement the API
+:LOGBOOK:
+CLOCK: [2016-08-04 Don 12:33]--[2016-08-04 Don 12:34] =>  0:01
+CLOCK: [2016-08-03 Mit 10:44]--[2016-08-03 Mit 10:55] =>  0:11
+:END:
+** Formalize the API with VeriFast contracts
+:LOGBOOK:
+CLOCK: [2016-09-16 Fre 17:08]--[2016-09-16 Fre 17:11] =>  0:03
+CLOCK: [2016-09-16 Fre 16:55]--[2016-09-16 Fre 16:59] =>  0:04
+CLOCK: [2016-08-21 Son 16:16]--[2016-08-21 Son 16:27] =>  0:11
+CLOCK: [2016-08-07 Son 11:07]--[2016-08-07 Son 11:07] =>  0:00
+CLOCK: [2016-08-06 Sam 20:32]--[2016-08-06 Sam 20:33] =>  0:01
+CLOCK: [2016-08-04 Don 12:24]--[2016-08-04 Don 12:33] =>  0:09
+CLOCK: [2016-08-03 Mit 21:17]--[2016-08-03 Mit 21:19] =>  0:02
+:END:
+** Write a symbolic model
+:LOGBOOK:
+CLOCK: [2016-08-28 Son 12:44]--[2016-08-28 Son 12:48] =>  0:04
+CLOCK: [2016-08-21 Son 16:27]--[2016-08-21 Son 16:43] =>  0:16
+CLOCK: [2016-08-06 Sam 18:44]--[2016-08-06 Sam 18:54] =>  0:10
+CLOCK: [2016-08-05 Fre 20:04]--[2016-08-05 Fre 20:04] =>  0:00
+CLOCK: [2016-08-04 Don 13:21]--[2016-08-04 Don 13:28] =>  0:07
+CLOCK: [2016-08-04 Don 13:06]--[2016-08-04 Don 13:18] =>  0:12
+CLOCK: [2016-08-04 Don 12:58]--[2016-08-04 Don 12:59] =>  0:01
+CLOCK: [2016-08-04 Don 12:35]--[2016-08-04 Don 12:49] =>  0:14
+:END:
+** Write a validator plugin
+:LOGBOOK:
+CLOCK: [2016-08-28 Son 14:02]--[2016-08-28 Son 14:05] =>  0:03
+CLOCK: [2016-08-28 Son 12:12]--[2016-08-28 Son 12:20] =>  0:08
+:END:
+** Verify the implementation
+:LOGBOOK:
+CLOCK: [2016-09-16 Fre 17:11]--[2016-09-16 Fre 17:48] =>  0:37
+CLOCK: [2016-09-16 Fre 17:08]--[2016-09-16 Fre 17:08] =>  0:00
+:END:
+

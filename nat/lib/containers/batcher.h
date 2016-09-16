@@ -24,7 +24,9 @@ struct Batcher
 /*@
   predicate batcherp(list<BATCHER_EL_TYPE> batch, struct Batcher* bat);
   predicate batcher_accp(struct Batcher* bat, int len);
-  fixpoint BATCHER_EL_TYPE* batcher_contents(struct Batcher* bat);
+  fixpoint BATCHER_EL_TYPE* batcher_contents(struct Batcher* bat) {
+    return bat->batch;
+  }
   @*/
 
 /**
@@ -33,7 +35,7 @@ struct Batcher
    @param bat_out - pointer to a preallocated memory for struct Batcher.
 */
 void batcher_init(struct Batcher *bat_out);
-//@ requires *bat_out |-> _;
+//@ requires bat_out->len |-> _ &*& pointers(bat_out->batch, BATCHER_CAPACITY, _);
 //@ ensures batcherp(nil, bat_out);
 
 /**
@@ -43,8 +45,8 @@ void batcher_init(struct Batcher *bat_out);
    @param val - the value to push into the batcher.
  */
 void batcher_push(struct Batcher *bat, BATCHER_EL_TYPE val);
-//@ requires batcherp(?b, bat);
-//@ ensures batcherp(cons(val, b), bat);
+//@ requires batcherp(?b, bat) &*& length(b) < BATCHER_CAPACITY;
+//@ ensures batcherp(append(b, cons(val, nil)), bat);
 
 /**
    Get access to all the elements collected in the batcher so far. When you
@@ -57,7 +59,7 @@ void batcher_push(struct Batcher *bat, BATCHER_EL_TYPE val);
 */
 void batcher_take_all(struct Batcher *bat,
                       BATCHER_EL_TYPE **vals_out, int *count_out);
-//@ requires batcherp(?b, bat);
+//@ requires batcherp(?b, bat) &*& pointer(vals_out, _) &*& *count_out |-> _;
 /*@ ensures batcher_accp(bat, length(b)) &*& *vals_out |-> ?vals &*&
             vals == batcher_contents(bat) &*&
             *count_out |-> length(b) &*& valsp(vals, length(b), b) &*&
