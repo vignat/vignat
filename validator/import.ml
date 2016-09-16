@@ -716,7 +716,7 @@ let find_last_known_address_before_call addr call_id =
 let find_last_known_whole_address_before_call addr call_id =
   Option.map (Int64.Map.find !known_addresses addr)
     ~f:(fun lst ->
-        List.fold lst ~init:({v=Undef;t=Unknown},0)
+        List.fold lst ~init:({v=Undef;t=Unknown},-1)
           ~f:(fun (max_el,max_id)
                spec ->
                if spec.str_depth = 0 && spec.callid <= call_id && max_id < spec.callid then
@@ -728,7 +728,8 @@ let take_extra_ptrs_into_account ptrs callid =
   List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
       match find_last_known_whole_address_before_call value callid with
       | None -> None
-      | Some (x,_) -> match get_struct_val_value ptee.before (get_pointee x.t) with
+      | Some (x,_) ->
+        match get_struct_val_value ptee.before (get_pointee x.t) with
         | {v=Undef;t=_} -> None
         | y -> Some {lhs={v=Deref x;t=y.t};rhs=y})
 
