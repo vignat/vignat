@@ -217,16 +217,13 @@ try_send_burst_and_erase(uint16_t queueid, struct Batcher *bat, uint8_t port)
 
 /* Send burst of packets on an output interface */
 static inline void
-send_burst(struct lcore_conf *qconf, uint8_t port)
+send_burst(struct lcore_conf *qconf, struct Batcher *mbufs, uint8_t port)
 {
-  struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs, port);
   uint16_t *queue_id = array_u16_begin_access(&qconf->tx_queue_id, port);
   try_send_burst_and_erase(*queue_id,
                            mbufs,
                            port);
   array_u16_end_access(&qconf->tx_queue_id);
-  array_bat_end_access(&qconf->tx_mbufs);
-  mbufs = 0;
 }
 
 /* Enqueue a single packet, and send burst if queue is filled */
@@ -236,13 +233,13 @@ send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
   struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs, port);
   batcher_push(mbufs, m);
   int is_full = batcher_full(mbufs);
-  array_bat_end_access(&qconf->tx_mbufs);
-  mbufs = 0;
 
     /* enough pkts to be sent */
   if (unlikely(is_full)) {
-    send_burst(qconf, port);
+    send_burst(qconf, mbufs, port);
   }
+  array_bat_end_access(&qconf->tx_mbufs);
+  mbufs = 0;
   return 0;
 }
 
@@ -513,11 +510,11 @@ main_loop(__attribute__((unused)) void *dummy)
               struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs,
                                                           portid);
               int is_empty = batcher_is_empty(mbufs);
-              array_bat_end_access(&qconf->tx_mbufs);
-              mbufs = 0;
               if (is_empty)
                 continue;
-              send_burst(qconf, portid);
+              send_burst(qconf, mbufs, portid);
+              array_bat_end_access(&qconf->tx_mbufs);
+              mbufs = 0;
             }
 
             prev_tsc = cur_tsc;
