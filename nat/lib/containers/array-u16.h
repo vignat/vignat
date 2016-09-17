@@ -2,7 +2,7 @@
 #define _ARRAY_U16_H_INCLUDED_
 
 #include <stdint.h>
-#include "lib/static-component-params.h"
+#include "../static-component-params.h"
 
 #define ARRAY_U16_EL_TYPE uint16_t
 #define ARRAY_U16_CAPACITY RTE_MAX_ETHPORTS
@@ -30,6 +30,12 @@ struct ArrayU16
 
   fixpoint ARRAY_U16_EL_TYPE *arrp_the_missing_cell_u16(struct ArrayU16 *arr,
                                                         int idx);
+
+  //TODO
+  lemma void init_arrp_u16(struct ArrayU16 *arr);
+  requires ushorts(arr->data, ARRAY_U16_CAPACITY, _) &*&
+           struct_ArrayU16_padding(arr);
+  ensures arrp_u16(_, arr);
   @*/
 
 #endif//_ARRAY_U16_H_INCLUDED_

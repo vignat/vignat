@@ -1,7 +1,7 @@
 #ifndef _BATCHER_H_INCLUDED_
 #define _BATCHER_H_INCLUDED_
 
-#include "lib/static-component-params.h"
+#include "../static-component-params.h"
 
 #ifndef BATCHER_EL_TYPE
 #  error "Must define the batcher element type."

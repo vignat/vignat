@@ -1,6 +1,34 @@
 #include "array-lcc.h"
 
+//@ #include "stdex.gh"
+
+/*@
+
+  predicate lcore_conf_arrp(struct lcore_conf *lcp,
+                            int len, list<lcore_confi> data) =
+            switch(data) {
+              case nil: return len == 0;
+              case cons(h,t):
+                return lcore_confp(h, lcp) &*&
+                       lcore_conf_arrp(lcp+1,len-1,t);
+            };
+
+  predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc *arr) =
+    lcore_conf_arrp(arr->data, ARRAY_LCC_CAPACITY, data);
+
+  predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr,
+                         int idx) =
+    0 <= idx &*& idx < ARRAY_LCC_CAPACITY &*&
+    length(data) == ARRAY_LCC_CAPACITY &*&
+    lcore_conf_arrp(arr->data, idx, take(idx, data)) &*&
+    lcore_conf_arrp((ARRAY_LCC_EL_TYPE*)(arr->data)+idx+1,
+                    ARRAY_LCC_CAPACITY - idx - 1, drop(idx+1,data));
+
+  @*/
+
 static void lcore_conf_condition(struct lcore_conf *cell)
+//@ requires chars((void*)cell, sizeof(struct lcore_conf), _);
+//@ ensures lcore_confp(_, cell);
 {
 #ifdef KLEE_VERIFICATION
   klee_assume(0 < cell->n_rx_queue);
@@ -9,7 +37,12 @@ static void lcore_conf_condition(struct lcore_conf *cell)
   array_u16_init(&cell->tx_queue_id);
   array_bat_init(&cell->tx_mbufs);
 #else//KLEE_VERIFICATION
-  IGNORE(cell);
+  //@ close_struct(cell);
+  cell->n_rx_queue = 0;
+  //@ init_arrp_rq(&cell->rx_queue_list);
+  //@ init_arrp_u16(&cell->tx_queue_id);
+  //@ init_arrp_bat(&cell->tx_mbufs);
+  //@ close lcore_confp(lcore_confi(0), cell);
 #endif//KLEE_VERIFICATION
 }
 
@@ -17,19 +50,19 @@ static void lcore_conf_condition(struct lcore_conf *cell)
 // In-place initialization
 void array_lcc_init(struct ArrayLcc *arr_out);
 /*@ requires chars(arr_out->data,
-  sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
+             sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
 //@ ensures arrp_lcc(_, arr_out);
 
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index);
 //@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
 /*@ ensures arrp_lcc_acc(lst, arr, index) &*&
-  result == arrp_the_missing_cell_lcc(arr, index) &*&
-  lcore_confp(nth(index, lst), result);
+            result == arrp_the_missing_cell_lcc(arr, index) &*&
+            lcore_confp(nth(index, lst), result);
   @*/
 
 void array_lcc_end_access(struct ArrayLcc *arr);
 /*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
-  lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
+             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
 //@ ensures arrp_lcc(update(idx, lc, lst), arr);
 
 #ifdef KLEE_VERIFICATION
@@ -107,27 +140,112 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 
 #else//KLEE_VERIFICATION
 
-#ifdef _NO_VERIFAST_
+/*@
+  //TODO
+  lemma void append_to_arr(ARRAY_LCC_EL_TYPE* arr, ARRAY_LCC_EL_TYPE* el);
+  requires lcore_conf_arrp(arr, ?len, ?lst) &*& lcore_confp(?v, el) &*&
+           el == (arr + len);
+  ensures lcore_conf_arrp(arr, len+1, append(lst,cons(v, nil)));
+  @*/
 
 void array_lcc_init(struct ArrayLcc *arr_out)
+/*@ requires chars(arr_out->data,
+             sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
+//@ ensures arrp_lcc(_, arr_out);
 {
   int i;
-  for (i = 0; i < ARRAY_LCC_CAPACITY; ++i) {
-    ARRAY_LCC_EL_INIT(&((*arr_out).data[i]));
+  //@ close lcore_conf_arrp(arr_out->data, 0, nil);
+  for (i = 0; i < ARRAY_LCC_CAPACITY; ++i)
+    /*@
+      invariant 0 <= i &*& i <= ARRAY_LCC_CAPACITY &*&
+                true == ((char *)0 <=
+                         (void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i)) &*&
+                true == ((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i) <=
+                         (char *)UINTPTR_MAX) &*&
+                lcore_conf_arrp(arr_out->data, i, _) &*&
+                chars((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i),
+                      sizeof(ARRAY_LCC_EL_TYPE)*
+                      (ARRAY_LCC_CAPACITY-i), _);
+      @*/
+    //@ decreases ARRAY_LCC_CAPACITY - i;
+  {
+    //@ assert i < ARRAY_LCC_CAPACITY;
+    //@ chars_limits((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i));
+    //@ assert lcore_conf_arrp(arr_out->data, i, ?xxx);
+    // TODO:
+    //@ assume(sizeof(ARRAY_LCC_EL_TYPE) <= sizeof(ARRAY_LCC_EL_TYPE)*(ARRAY_LCC_CAPACITY-i));
+    /*@ chars_split((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i),
+                    sizeof(ARRAY_LCC_EL_TYPE));
+                    @*/
+    ARRAY_LCC_EL_INIT((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
+    //@ assert lcore_confp(?xx, (ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
+    //@ append_to_arr((ARRAY_LCC_EL_TYPE*)(arr_out->data),(ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
+    //TODO:
+    /*@ assume(true == ((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i+1) <=
+                        (char *)UINTPTR_MAX));
+                        @*/
   }
+  //@ assert i == ARRAY_LCC_CAPACITY;
+  //@ close arrp_lcc(_, arr_out);
 }
+
+/*@
+  //TODO
+  lemma void extract_by_index(ARRAY_LCC_EL_TYPE* arr, int idx);
+  requires lcore_conf_arrp(arr, ?len, ?lst) &*& 0 <= idx &*& idx < len;
+  ensures lcore_conf_arrp(arr, idx, take(idx, lst)) &*&
+          lcore_confp(nth(idx, lst), arr + idx) &*&
+          lcore_conf_arrp(arr+idx+1, len - idx - 1, drop(idx+1,lst)) &*&
+          true == ((void*)0 <= arr+idx) &*&
+          true == (arr+idx <= (void*)UINTPTR_MAX);
+  @*/
+/*@
+  //TODO
+  lemma void lcnf_array_list_len(ARRAY_LCC_EL_TYPE* arr);
+  requires lcore_conf_arrp(arr, ?len, ?lst);
+  ensures lcore_conf_arrp(arr, len, lst) &*& length(lst) == len;
+@*/
+
 
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
+//@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
+/*@ ensures arrp_lcc_acc(lst, arr, index) &*&
+            result == arrp_the_missing_cell_lcc(arr, index) &*&
+            lcore_confp(nth(index, lst), result);
+  @*/
 {
-  return &((*arr).data[index]);
+  //@ open arrp_lcc(lst, arr);
+  //@ lcnf_array_list_len(arr->data);
+  //@ extract_by_index(arr->data, index);
+  //@ close arrp_lcc_acc(lst, arr, index);
+  return (ARRAY_LCC_EL_TYPE*)(arr->data) + index;
 }
+
+/*@
+  //TODO
+  lemma void glue_array(ARRAY_LCC_EL_TYPE* arr, int idx,
+                        list<lcore_confi> lst);
+  requires lcore_conf_arrp(arr, idx, take(idx, lst)) &*&
+           lcore_confp(nth(idx, lst), arr + idx) &*&
+           lcore_conf_arrp(arr+idx+1, length(lst) - idx - 1,
+                           drop(idx+1,lst)) &*&
+           0 <= idx &*& idx < length(lst);
+  ensures lcore_conf_arrp(arr, length(lst), lst);
+  @*/
 
 void array_lcc_end_access(struct ArrayLcc *arr)
+/*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
+             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
+//@ ensures arrp_lcc(update(idx, lc, lst), arr);
 {
-  (void)arr;
-  //nothing
+  //@ open arrp_lcc_acc(lst, arr, idx);
+  //@ take_update_unrelevant(idx, idx, lc, lst);
+  //@ nth_update(idx, idx, lc, lst);
+  //@ drop_update_unrelevant(idx+1, idx, lc, lst);
+  //@ glue_array(arr->data, idx, update(idx, lc, lst));
+  IGNORE(arr);
+  //@ close arrp_lcc(update(idx, lc, lst), arr);
 }
 
-#endif//_NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION

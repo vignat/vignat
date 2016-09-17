@@ -2,7 +2,7 @@
 #define _ARRAY_RQ_H_INCLUDED_
 
 #include <stdint.h>
-#include "lib/ignore.h"
+#include "../ignore.h"
 
 #define MAX_RX_QUEUE_PER_LCORE 16
 
@@ -61,12 +61,19 @@ struct ArrayRq
   fixpoint ARRAY_RQ_EL_TYPE *arrp_the_missing_cell_rq(struct ArrayRq *arr,
                                                       int idx);
 
+                                                      //TODO
   lemma void construct_rq_element(ARRAY_RQ_EL_TYPE *p);
   requires p->port_id |-> ?pid &*&
            0 <= pid &*& pid <= RTE_MAX_ETHPORTS &*&
            p->queue_id |-> _ &*&
            struct_lcore_rx_queue_padding(p);
   ensures rx_queuep(_, p);
+
+  //TODO
+  lemma void init_arrp_rq(struct ArrayRq *arr);
+  requires chars(arr->data, sizeof(ARRAY_RQ_EL_TYPE)*ARRAY_RQ_CAPACITY, _) &*&
+           struct_ArrayRq_padding(arr);
+  ensures arrp_rq(_, arr);
   @*/
 
 #endif//_ARRAY_RQ_H_INCLUDED_

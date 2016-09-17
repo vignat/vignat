@@ -2,11 +2,11 @@
 #define _ARRAY_LCC_H_INCLUDED_
 
 #include <stdint.h>
-#include "lib/ignore.h"
-#include "lib/static-component-params.h"
-#include "lib/containers/array-rq.h"
-#include "lib/containers/array-u16.h"
-#include "lib/containers/array-bat.h"
+#include "../ignore.h"
+#include "../static-component-params.h"
+#include "../containers/array-rq.h"
+#include "../containers/array-u16.h"
+#include "../containers/array-bat.h"
 
 struct lcore_conf {
   uint16_t n_rx_queue;
@@ -77,11 +77,11 @@ struct ArrayLcc
 
 /*@
   inductive lcore_confi = lcore_confi(int);
-  predicate pure_lcore_confp(lcore_confi lc, struct lcore_conf *lcp);
   predicate lcore_confp(lcore_confi lc, struct lcore_conf *lcp) =
-      pure_lcore_confp(lc, lcp) &*&
+      struct_lcore_conf_padding(lcp) &*&
       lcp->n_rx_queue |-> ?nrq &*&
-      0 < nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
+      lc == lcore_confi(nrq) &*&
+      0 <= nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
       arrp_rq(_, &lcp->rx_queue_list) &*&
       arrp_u16(_, &lcp->tx_queue_id) &*&
       arrp_bat(_, &lcp->tx_mbufs);
@@ -94,11 +94,14 @@ predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc *arr);
 predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr,
                        int idx);
 fixpoint ARRAY_LCC_EL_TYPE *arrp_the_missing_cell_lcc(struct ArrayLcc *arr,
-                                                      int idx);
+                                                      int idx) {
+  return (ARRAY_LCC_EL_TYPE*)(arr->data)+idx;
+  }
 lemma void construct_lcc_element(ARRAY_LCC_EL_TYPE *p);
 requires p->n_rx_queue |-> ?nrq &*&
-         0 < nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
-         chars((char*)(p->rx_queue_list.data), 16*sizeof(struct lcore_rx_queue), _) &*&
+         0 <= nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
+         chars((char*)(p->rx_queue_list.data),
+               16*sizeof(struct lcore_rx_queue), _) &*&
          struct_ArrayRq_padding(&p->rx_queue_list) &*&
          ushorts((unsigned short*)(p->tx_queue_id.data), 32, _) &*&
          struct_ArrayU16_padding(&p->tx_queue_id) &*&
