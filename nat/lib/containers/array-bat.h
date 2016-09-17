@@ -45,5 +45,10 @@ struct ArrayBat
   ensures arrp_bat(_, arr);
   @*/
 
+void array_bat_init(struct ArrayBat *arr_out);
+/*@ requires chars((void*)(arr_out),
+                   ARRAY_BAT_CAPACITY*sizeof(ARRAY_BAT_EL_TYPE), _) &*&
+             struct_ArrayBat_padding(arr_out); @*/
+//@ ensures arrp_bat(_, arr_out);
 
 #endif//_ARRAY_BAT_H_INCLUDED_

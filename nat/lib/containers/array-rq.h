@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../ignore.h"
+#include "../static-component-params.h"
 
 #define MAX_RX_QUEUE_PER_LCORE 16
 
@@ -46,11 +47,11 @@ struct ArrayRq
 
 /*@
   inductive rx_queuei = rx_queuei(int,int);
-  predicate rx_queuep_bare_bones(rx_queuei rq, struct lcore_rx_queue *lrq);
   predicate rx_queuep(rx_queuei rq, struct lcore_rx_queue *lrq) =
-            rx_queuep_bare_bones(rq, lrq) &*&
+            struct_lcore_rx_queue_padding(lrq) &*&
             lrq->port_id |-> ?pi &*&
-            lrq->queue_id |-> ?qi;
+            lrq->queue_id |-> ?qi &*&
+            rq == rx_queuei(pi,qi);
   predicate some_rx_queuep(struct lcore_rx_queue *lrq) = rx_queuep(_, lrq);
   @*/
 
@@ -59,9 +60,10 @@ struct ArrayRq
   predicate arrp_rq_acc(list<rx_queuei> data, struct ArrayRq *arr, int idx);
 
   fixpoint ARRAY_RQ_EL_TYPE *arrp_the_missing_cell_rq(struct ArrayRq *arr,
-                                                      int idx);
+                                                      int idx)  {
+    return (ARRAY_RQ_EL_TYPE*)(arr->data)+idx;
+  }
 
-                                                      //TODO
   lemma void construct_rq_element(ARRAY_RQ_EL_TYPE *p);
   requires p->port_id |-> ?pid &*&
            0 <= pid &*& pid <= RTE_MAX_ETHPORTS &*&
@@ -69,11 +71,13 @@ struct ArrayRq
            struct_lcore_rx_queue_padding(p);
   ensures rx_queuep(_, p);
 
-  //TODO
-  lemma void init_arrp_rq(struct ArrayRq *arr);
-  requires chars(arr->data, sizeof(ARRAY_RQ_EL_TYPE)*ARRAY_RQ_CAPACITY, _) &*&
-           struct_ArrayRq_padding(arr);
-  ensures arrp_rq(_, arr);
   @*/
+
+// In-place initialization
+void array_rq_init(struct ArrayRq *arr_out);
+/*@ requires chars((void*)(arr_out),
+                   ARRAY_RQ_CAPACITY*sizeof(ARRAY_RQ_EL_TYPE), _) &*&
+             struct_ArrayRq_padding(arr_out); @*/
+//@ ensures arrp_rq(_, arr_out);
 
 #endif//_ARRAY_RQ_H_INCLUDED_

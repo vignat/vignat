@@ -91,8 +91,7 @@ struct ArrayLcc
 /*@
 //params: lcore_confi, lcore_confp
 predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc *arr);
-predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr,
-                       int idx);
+predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr, int idx);
 fixpoint ARRAY_LCC_EL_TYPE *arrp_the_missing_cell_lcc(struct ArrayLcc *arr,
                                                       int idx) {
   return (ARRAY_LCC_EL_TYPE*)(arr->data)+idx;
@@ -100,13 +99,9 @@ fixpoint ARRAY_LCC_EL_TYPE *arrp_the_missing_cell_lcc(struct ArrayLcc *arr,
 lemma void construct_lcc_element(ARRAY_LCC_EL_TYPE *p);
 requires p->n_rx_queue |-> ?nrq &*&
          0 <= nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
-         chars((char*)(p->rx_queue_list.data),
-               16*sizeof(struct lcore_rx_queue), _) &*&
-         struct_ArrayRq_padding(&p->rx_queue_list) &*&
-         ushorts((unsigned short*)(p->tx_queue_id.data), 32, _) &*&
-         struct_ArrayU16_padding(&p->tx_queue_id) &*&
-         chars((char*)p->tx_mbufs.data, 32*sizeof(struct Batcher), _) &*&
-         struct_ArrayBat_padding(&p->tx_mbufs) &*&
+         arrp_rq(_, &p->rx_queue_list) &*&
+         arrp_u16(_, &p->tx_queue_id) &*&
+         arrp_bat(_, &p->tx_mbufs) &*&
          struct_lcore_conf_padding(p);
 ensures lcore_confp(_, p);
 

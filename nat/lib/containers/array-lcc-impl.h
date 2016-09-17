@@ -23,8 +23,7 @@
     length(data) == ARRAY_LCC_CAPACITY &*&
     lcore_conf_arrp(arr->data, ARRAY_LCC_CAPACITY, data);
 
-  predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr,
-                         int idx) =
+  predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr, int idx) =
     0 <= idx &*& idx < ARRAY_LCC_CAPACITY &*&
     true == ((char *)0 <=
              (void*)((ARRAY_LCC_EL_TYPE*)(arr->data))) &*&
@@ -35,27 +34,23 @@
     lcore_conf_arrp(arr->data, idx, take(idx, data)) &*&
     lcore_conf_arrp((ARRAY_LCC_EL_TYPE*)(arr->data)+idx+1,
                     ARRAY_LCC_CAPACITY - idx - 1, drop(idx+1,data));
-
   @*/
 
 static void lcore_conf_condition(struct lcore_conf *cell)
 //@ requires chars((void*)cell, sizeof(struct lcore_conf), _);
 //@ ensures lcore_confp(_, cell);
 {
+  //@ close_struct(cell);
 #ifdef KLEE_VERIFICATION
   klee_assume(0 < cell->n_rx_queue);
   klee_assume(cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
+#else//KLEE_VERIFICATION
+  cell->n_rx_queue = 0;
+#endif//KLEE_VERIFICATION
   array_rq_init(&cell->rx_queue_list);
   array_u16_init(&cell->tx_queue_id);
   array_bat_init(&cell->tx_mbufs);
-#else//KLEE_VERIFICATION
-  //@ close_struct(cell);
-  cell->n_rx_queue = 0;
-  //@ init_arrp_rq(&cell->rx_queue_list);
-  //@ init_arrp_u16(&cell->tx_queue_id);
-  //@ init_arrp_bat(&cell->tx_mbufs);
-  //@ close lcore_confp(lcore_confi(0), cell);
-#endif//KLEE_VERIFICATION
+  //@ construct_lcc_element(cell);
 }
 
 
@@ -178,10 +173,8 @@ void array_lcc_end_access(struct ArrayLcc *arr)
   @*/
 
 /*@
-  predicate upperbounded_ptr(void*p) =
-    true == ((p) <=
-             (char *)UINTPTR_MAX);
-             @*/
+  predicate upperbounded_ptr(void* p) = true == ((p) <= (char *)UINTPTR_MAX);
+  @*/
 
 void array_lcc_init(struct ArrayLcc *arr_out)
 /*@ requires chars(arr_out->data,
@@ -301,6 +294,20 @@ void array_lcc_end_access(struct ArrayLcc *arr)
   IGNORE(arr);
   //@ close arrp_lcc(update(idx, lc, lst), arr);
 }
+
+/*@
+  lemma void construct_lcc_element(ARRAY_LCC_EL_TYPE *p)
+  requires p->n_rx_queue |-> ?nrq &*&
+           0 <= nrq &*& nrq < MAX_RX_QUEUE_PER_LCORE &*&
+           arrp_rq(_, &p->rx_queue_list) &*&
+           arrp_u16(_, &p->tx_queue_id) &*&
+           arrp_bat(_, &p->tx_mbufs) &*&
+           struct_lcore_conf_padding(p);
+  ensures lcore_confp(_, p);
+  {
+    close lcore_confp(lcore_confi(nrq), p);
+  }
+  @*/
 
 
 #endif//KLEE_VERIFICATION

@@ -1,5 +1,5 @@
-#ifndef STDEX_H
-#define STDEX_H
+#ifndef STDEX_GH
+#define STDEX_GH
 
 #include <listex.gh>
 
@@ -716,4 +716,4 @@ requires b;
 ensures b;
 {}
 
-#endif
+#endif//STDEX_GH

@@ -29,13 +29,16 @@ struct ArrayU16
   predicate arrp_u16_acc(list<uint16_t> data, struct ArrayU16 *arr, int idx);
 
   fixpoint ARRAY_U16_EL_TYPE *arrp_the_missing_cell_u16(struct ArrayU16 *arr,
-                                                        int idx);
-
-  //TODO
-  lemma void init_arrp_u16(struct ArrayU16 *arr);
-  requires ushorts(arr->data, ARRAY_U16_CAPACITY, _) &*&
-           struct_ArrayU16_padding(arr);
-  ensures arrp_u16(_, arr);
+                                                        int idx) {
+    return (unsigned short*)(arr->data)+idx;
+  }
   @*/
+
+// In-place initialization
+void array_u16_init(struct ArrayU16 *arr_out);
+/*@ requires ushorts((void*)(arr_out),
+                     ARRAY_U16_CAPACITY, _) &*&
+             struct_ArrayU16_padding(arr_out); @*/
+//@ ensures arrp_u16(_, arr_out);
 
 #endif//_ARRAY_U16_H_INCLUDED_

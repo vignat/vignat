@@ -1,3 +1,5 @@
+#ifndef ARITH_GH
+#define ARITH_GH
 
 //Taken from https://groups.google.com/forum/#!topic/verifast/eCf5QzLtGlo
 lemma void mul_nonnegative(int x, int y)
@@ -55,3 +57,4 @@ ensures a*x == a*y;
       decreases a-i;
   {}
 }
+#endif ARITH_GH
