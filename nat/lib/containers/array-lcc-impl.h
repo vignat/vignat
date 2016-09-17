@@ -147,6 +147,8 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 
 #else//KLEE_VERIFICATION
 
+#ifdef _NO_VERIFAST_
+
 /*@ predicate ptrs_eq(ARRAY_LCC_EL_TYPE* p1, int l, ARRAY_LCC_EL_TYPE* p2) =
       p1 == p2 + l;
   @*/
@@ -309,5 +311,6 @@ void array_lcc_end_access(struct ArrayLcc *arr)
   }
   @*/
 
+#endif//_NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION

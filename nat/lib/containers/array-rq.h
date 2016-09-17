@@ -60,7 +60,7 @@ struct ArrayRq
   predicate arrp_rq_acc(list<rx_queuei> data, struct ArrayRq *arr, int idx);
 
   fixpoint ARRAY_RQ_EL_TYPE *arrp_the_missing_cell_rq(struct ArrayRq *arr,
-                                                      int idx)  {
+                                                      int idx) {
     return (ARRAY_RQ_EL_TYPE*)(arr->data)+idx;
   }
 

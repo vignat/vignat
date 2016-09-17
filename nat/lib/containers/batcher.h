@@ -35,7 +35,9 @@ struct Batcher
    @param bat_out - pointer to a preallocated memory for struct Batcher.
 */
 void batcher_init(struct Batcher *bat_out);
-//@ requires bat_out->len |-> _ &*& pointers(bat_out->batch, BATCHER_CAPACITY, _);
+/*@ requires bat_out->len |-> _ &*&
+             pointers(bat_out->batch, BATCHER_CAPACITY, _) &*&
+             struct_Batcher_padding(bat_out); @*/
 //@ ensures batcherp(nil, bat_out);
 
 /**

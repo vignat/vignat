@@ -31,18 +31,16 @@ struct ArrayBat
                          int idx);
 
   fixpoint ARRAY_BAT_EL_TYPE *arrp_the_missing_cell_bat(struct ArrayBat *arr,
-                                                        int idx);
+                                                        int idx) {
+    return (ARRAY_BAT_EL_TYPE*)(arr->data)+idx;
+  }
+
   lemma void construct_bat_element(ARRAY_BAT_EL_TYPE *p);
   requires p->len |-> ?l &*&
-           pointers((void*)&p->batch, BATCHER_CAPACITY, _) &*&
+           pointers((void*)&p->batch, ARRAY_BAT_CAPACITY, _) &*&
            struct_Batcher_padding(p);
   ensures batcherp(_, p);
 
-  //TODO
-  lemma void init_arrp_bat(struct ArrayBat *arr);
-  requires chars(arr->data, sizeof(ARRAY_BAT_EL_TYPE)*ARRAY_BAT_CAPACITY, _) &*&
-           struct_ArrayBat_padding(arr);
-  ensures arrp_bat(_, arr);
   @*/
 
 void array_bat_init(struct ArrayBat *arr_out);

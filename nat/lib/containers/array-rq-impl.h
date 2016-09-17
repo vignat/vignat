@@ -144,6 +144,9 @@ void array_rq_end_access(struct ArrayRq *arr)
 }
 
 #else//KLEE_VERIFICATION
+
+#ifdef _NO_VERIFAST_
+
 /*@ predicate ptrs_eq(ARRAY_RQ_EL_TYPE* p1, int l, ARRAY_RQ_EL_TYPE* p2) =
       p1 == p2 + l;
   @*/
@@ -299,6 +302,8 @@ void array_rq_end_access(struct ArrayRq *arr)
     close rx_queuep(rx_queuei(pid,p->queue_id), p);
   }
   @*/
+
+#endif//_NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION
 

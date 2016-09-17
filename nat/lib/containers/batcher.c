@@ -10,17 +10,21 @@
     bat->len |-> ?l &*&
     0 <= l &*& l <= BATCHER_CAPACITY &*&
     valsp(bat->batch, l, batch) &*&
+    struct_Batcher_padding(bat) &*&
     pointers((void*)((BATCHER_EL_TYPE*)(bat->batch) + l), BATCHER_CAPACITY-l, _);
 
   predicate batcher_accp(struct Batcher* bat, int len) =
     bat->len |-> len &*&
     0 <= len &*& len <= BATCHER_CAPACITY &*&
+    struct_Batcher_padding(bat) &*&
     pointers((void*)((BATCHER_EL_TYPE*)(bat->batch) + len),
                      BATCHER_CAPACITY-len, _);
   @*/
 
 void batcher_init(struct Batcher* bat_out)
-//@ requires bat_out->len |-> _ &*& pointers(bat_out->batch, BATCHER_CAPACITY, _);
+/*@ requires bat_out->len |-> _ &*&
+             pointers(bat_out->batch, BATCHER_CAPACITY, _) &*&
+             struct_Batcher_padding(bat_out); @*/
 //@ ensures batcherp(nil, bat_out);
 {
   bat_out->len = 0;

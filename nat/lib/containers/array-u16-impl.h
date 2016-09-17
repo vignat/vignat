@@ -112,6 +112,8 @@ void array_u16_end_access(struct ArrayU16 *arr)
 
 #else//KLEE_VERIFICATION
 
+#ifdef _NO_VERIFAST_
+
 /*@
   lemma void ushorts_limits(unsigned short* p)
   requires ushorts(p, ?len, ?lst) &*&
@@ -208,5 +210,7 @@ void array_u16_end_access(struct ArrayU16 *arr)
   IGNORE(arr);
   //@ close arrp_u16(update(idx, u16, lst), arr);
 }
+
+#endif// _NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION

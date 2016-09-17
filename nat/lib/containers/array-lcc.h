@@ -24,6 +24,8 @@ struct lcore_conf {
 #define ARRAY_LCC_CAPACITY RTE_MAX_LCORE
 #define ARRAY_LCC_SUFFIX _lconf
 #define ARRAY_LCC_EL_INIT lcore_conf_condition
+//TODO: add support in Klee for detailed dumping of the
+// return pointee (including pointees for pointer fields)
 #define ARRAY_LCC_EL_TRACE_BREAKDOWN {                                  \
     klee_trace_ret_ptr_field(offsetof(struct lcore_conf, n_rx_queue),   \
                              sizeof(uint16_t), "n_rx_queue");           \
