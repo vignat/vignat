@@ -1,6 +1,7 @@
 #include "array-lcc.h"
 
 //@ #include "stdex.gh"
+//@ #include "arith.gh"
 
 /*@
 
@@ -14,11 +15,22 @@
             };
 
   predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc *arr) =
+    true == ((char *)0 <=
+             (void*)((ARRAY_LCC_EL_TYPE*)(arr->data))) &*&
+    true == ((void*)((ARRAY_LCC_EL_TYPE*)(arr->data) +
+                     ARRAY_LCC_CAPACITY) <=
+             (char *)UINTPTR_MAX) &*&
+    length(data) == ARRAY_LCC_CAPACITY &*&
     lcore_conf_arrp(arr->data, ARRAY_LCC_CAPACITY, data);
 
   predicate arrp_lcc_acc(list<lcore_confi> data, struct ArrayLcc *arr,
                          int idx) =
     0 <= idx &*& idx < ARRAY_LCC_CAPACITY &*&
+    true == ((char *)0 <=
+             (void*)((ARRAY_LCC_EL_TYPE*)(arr->data))) &*&
+    true == ((void*)((ARRAY_LCC_EL_TYPE*)(arr->data) +
+                     ARRAY_LCC_CAPACITY) <=
+             (char *)UINTPTR_MAX) &*&
     length(data) == ARRAY_LCC_CAPACITY &*&
     lcore_conf_arrp(arr->data, idx, take(idx, data)) &*&
     lcore_conf_arrp((ARRAY_LCC_EL_TYPE*)(arr->data)+idx+1,
@@ -140,13 +152,36 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 
 #else//KLEE_VERIFICATION
 
-/*@
-  //TODO
-  lemma void append_to_arr(ARRAY_LCC_EL_TYPE* arr, ARRAY_LCC_EL_TYPE* el);
-  requires lcore_conf_arrp(arr, ?len, ?lst) &*& lcore_confp(?v, el) &*&
-           el == (arr + len);
-  ensures lcore_conf_arrp(arr, len+1, append(lst,cons(v, nil)));
+/*@ predicate ptrs_eq(ARRAY_LCC_EL_TYPE* p1, int l, ARRAY_LCC_EL_TYPE* p2) =
+      p1 == p2 + l;
   @*/
+
+/*@
+  lemma void append_to_arr(ARRAY_LCC_EL_TYPE* arr, ARRAY_LCC_EL_TYPE* el)
+  requires lcore_conf_arrp(arr, ?len, ?lst) &*& lcore_confp(?v, el) &*&
+           el == (arr + len) &*& len == length(lst);
+  ensures lcore_conf_arrp(arr, len+1, append(lst, cons(v, nil)));
+  {
+    close ptrs_eq(el, len, arr);
+    open lcore_conf_arrp(arr, len, lst);
+    open ptrs_eq(el, len, arr);
+    assert(el == arr + len);
+    switch(lst) {
+      case nil:
+        close lcore_conf_arrp(arr+1, 0, nil);
+        close lcore_conf_arrp(arr, 1, cons(v, nil));
+      case cons(h,t):
+        append_to_arr(arr+1, el);
+        close lcore_conf_arrp(arr, len+1, append(lst, cons(v, nil)));
+    }
+  }
+  @*/
+
+/*@
+  predicate upperbounded_ptr(void*p) =
+    true == ((p) <=
+             (char *)UINTPTR_MAX);
+             @*/
 
 void array_lcc_init(struct ArrayLcc *arr_out)
 /*@ requires chars(arr_out->data,
@@ -155,56 +190,64 @@ void array_lcc_init(struct ArrayLcc *arr_out)
 {
   int i;
   //@ close lcore_conf_arrp(arr_out->data, 0, nil);
+  //@ close upperbounded_ptr((ARRAY_LCC_EL_TYPE*)(arr_out->data) + 0);
   for (i = 0; i < ARRAY_LCC_CAPACITY; ++i)
     /*@
       invariant 0 <= i &*& i <= ARRAY_LCC_CAPACITY &*&
                 true == ((char *)0 <=
                          (void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i)) &*&
-                true == ((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i) <=
-                         (char *)UINTPTR_MAX) &*&
-                lcore_conf_arrp(arr_out->data, i, _) &*&
+                upperbounded_ptr((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i) &*&
+                lcore_conf_arrp(arr_out->data, i, ?lst) &*&
+                length(lst) == i &*&
                 chars((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i),
                       sizeof(ARRAY_LCC_EL_TYPE)*
                       (ARRAY_LCC_CAPACITY-i), _);
       @*/
     //@ decreases ARRAY_LCC_CAPACITY - i;
   {
+    //@ open upperbounded_ptr((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
     //@ assert i < ARRAY_LCC_CAPACITY;
     //@ chars_limits((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i));
     //@ assert lcore_conf_arrp(arr_out->data, i, ?xxx);
-    // TODO:
-    //@ assume(sizeof(ARRAY_LCC_EL_TYPE) <= sizeof(ARRAY_LCC_EL_TYPE)*(ARRAY_LCC_CAPACITY-i));
+
+    //@ assert 1 <= ARRAY_LCC_CAPACITY-i;
+    //@ mul_mono(1, ARRAY_LCC_CAPACITY-i, sizeof(ARRAY_LCC_EL_TYPE));
     /*@ chars_split((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i),
                     sizeof(ARRAY_LCC_EL_TYPE));
                     @*/
     ARRAY_LCC_EL_INIT((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
     //@ assert lcore_confp(?xx, (ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
-    //@ append_to_arr((ARRAY_LCC_EL_TYPE*)(arr_out->data),(ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
-    //TODO:
-    /*@ assume(true == ((void*)((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i+1) <=
-                        (char *)UINTPTR_MAX));
-                        @*/
+    /*@ append_to_arr((ARRAY_LCC_EL_TYPE*)(arr_out->data),
+                      (ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
+                      @*/
+    //@ close upperbounded_ptr((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i + 1);
   }
+  //@ open upperbounded_ptr((ARRAY_LCC_EL_TYPE*)(arr_out->data) + i);
   //@ assert i == ARRAY_LCC_CAPACITY;
-  //@ close arrp_lcc(_, arr_out);
+  //@ assert lcore_conf_arrp(arr_out->data, ARRAY_LCC_CAPACITY, ?lst);
+  //@ close arrp_lcc(lst, arr_out);
 }
 
 /*@
-  //TODO
-  lemma void extract_by_index(ARRAY_LCC_EL_TYPE* arr, int idx);
+  lemma void extract_by_index(ARRAY_LCC_EL_TYPE* arr, int idx)
   requires lcore_conf_arrp(arr, ?len, ?lst) &*& 0 <= idx &*& idx < len;
   ensures lcore_conf_arrp(arr, idx, take(idx, lst)) &*&
           lcore_confp(nth(idx, lst), arr + idx) &*&
-          lcore_conf_arrp(arr+idx+1, len - idx - 1, drop(idx+1,lst)) &*&
-          true == ((void*)0 <= arr+idx) &*&
-          true == (arr+idx <= (void*)UINTPTR_MAX);
+          lcore_conf_arrp(arr+idx+1, len - idx - 1, drop(idx+1,lst));
+  {
+    open lcore_conf_arrp(arr, len, lst);
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        if (idx == 0) {
+          close lcore_conf_arrp(arr, 0, nil);
+        } else {
+          extract_by_index(arr+1, idx-1);
+          close lcore_conf_arrp(arr, idx, take(idx, lst));
+        }
+    }
+  }
   @*/
-/*@
-  //TODO
-  lemma void lcnf_array_list_len(ARRAY_LCC_EL_TYPE* arr);
-  requires lcore_conf_arrp(arr, ?len, ?lst);
-  ensures lcore_conf_arrp(arr, len, lst) &*& length(lst) == len;
-@*/
 
 
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
@@ -215,22 +258,34 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
   @*/
 {
   //@ open arrp_lcc(lst, arr);
-  //@ lcnf_array_list_len(arr->data);
   //@ extract_by_index(arr->data, index);
-  //@ close arrp_lcc_acc(lst, arr, index);
+  //@ assert true == (index < ARRAY_LCC_CAPACITY);
+  //@ mul_mono_strict(index, ARRAY_LCC_CAPACITY, sizeof(ARRAY_LCC_EL_TYPE));
   return (ARRAY_LCC_EL_TYPE*)(arr->data) + index;
+  //@ close arrp_lcc_acc(lst, arr, index);
 }
 
 /*@
-  //TODO
   lemma void glue_array(ARRAY_LCC_EL_TYPE* arr, int idx,
-                        list<lcore_confi> lst);
+                        list<lcore_confi> lst)
   requires lcore_conf_arrp(arr, idx, take(idx, lst)) &*&
            lcore_confp(nth(idx, lst), arr + idx) &*&
            lcore_conf_arrp(arr+idx+1, length(lst) - idx - 1,
                            drop(idx+1,lst)) &*&
            0 <= idx &*& idx < length(lst);
   ensures lcore_conf_arrp(arr, length(lst), lst);
+  {
+    open lcore_conf_arrp(arr, idx, take(idx, lst));
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        if (idx == 0) {
+        } else {
+          glue_array(arr+1, idx-1, t);
+        }
+    }
+    close lcore_conf_arrp(arr, length(lst), lst);
+  }
   @*/
 
 void array_lcc_end_access(struct ArrayLcc *arr)
