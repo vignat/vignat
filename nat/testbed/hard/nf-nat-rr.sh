@@ -12,7 +12,9 @@ ip addr add $MB_IP_TO_SRV/24 dev $MB_DEVICE_TO_SRV
 ifconfig $MB_DEVICE_INTERNAL up
 ip addr flush dev $MB_DEVICE_INTERNAL
 ip addr add $MB_IP_INTERNAL/24 dev $MB_DEVICE_INTERNAL
-ifconfig $MB_DEVICE_EXTERNAL down
+ifconfig $MB_DEVICE_EXTERNAL up
+ip addr flush dev $MB_DEVICE_EXTERNAL
+ip addr add $MB_IP_EXTERNAL/24 dev $MB_DEVICE_EXTERNAL
 
 sysctl -w net.ipv4.ip_forward=1
 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
@@ -25,9 +27,12 @@ echo "installing forwarding rules"
 iptables -t nat -A POSTROUTING -o $MB_DEVICE_TO_SRV -j MASQUERADE
 iptables -A FORWARD -i $MB_DEVICE_INTERNAL -o $MB_DEVICE_TO_SRV -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT
 iptables -A FORWARD -i $MB_DEVICE_INTERNAL -o $MB_DEVICE_TO_SRV -j ACCEPT
+iptables -A FORWARD -i $MB_DEVICE_EXTERNAL -o $MB_DEVICE_TO_SRV -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i $MB_DEVICE_EXTERNAL -o $MB_DEVICE_TO_SRV -j ACCEPT
 
 arp -s $SERVER_IP $SERVER_MAC
 arp -s $TESTER_IP_INTERNAL $TESTER_MAC_INTERNAL
+arp -s $TESTER_IP_EXTERNAL $TESTER_MAC_EXTERNAL
 
 # 4KB send buffer, 20,480 connections max at worst case
 echo 83886080  > /proc/sys/net/core/wmem_max

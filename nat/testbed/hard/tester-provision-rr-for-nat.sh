@@ -1,7 +1,9 @@
 . ~/scripts/config.sh
 
-echo "unbinding $TESTER_PCI_INTERNAL, $TESTER_PCI_EXTERNAL"
-$RTE_SDK/tools/dpdk-devbind.py -b igb $TESTER_PCI_INTERNAL $TESTER_PCI_EXTERNAL
+. ~/scripts/dpdk-setup-tester-rr.sh
+
+echo "unbinding $TESTER_PCI_INTERNAL"
+$RTE_SDK/tools/dpdk-devbind.py -b igb $TESTER_PCI_INTERNAL
 
 echo "waiting for that to happen"
 sleep 8
