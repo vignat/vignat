@@ -4,6 +4,9 @@ mkdir -p latency-results
 
 . ./sync-scripts.sh
 
+if false
+then
+
 echo "testing STUB"
 # STUB
 bash ./provision-rr-stub.sh
@@ -22,19 +25,24 @@ sudo pkill -9 nat
 #sleep 2
 sleep 10
 
+fi
+
 echo "testing VigNAT"
 # NAT
 bash ./provision-rr-nat.sh
 bash ./redeploy-nat-rr.sh
-(./run-nat-rr.sh $PWD 25 30000 0<&- &>nat.log) &
+(./run-nat-rr.sh $PWD 45 61000 0<&- &>nat.log) &
 
 #sleep 5
 sleep 20
 
-ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-nat.txt"
-scp $TESTER_HOST:lat-res-nat ./latency-results/vig-nat.txt
+ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-vig-nat.txt"
+scp $TESTER_HOST:lat-res-vig-nat.txt ./latency-results/vig-nat.txt
 
 sudo pkill -9 nat
+
+if false
+then
 
 #sleep 2
 sleep 10
@@ -46,6 +54,8 @@ sudo ./nf-nat-rr.sh 0<&- &>nfn.log
 #sleep 10
 sleep 30
 
-ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-nf.txt"
-scp $TESTER_HOST:lat-res-nf ./latency-results/nf-nat.txt
+fi
+
+ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-nf-nat.txt"
+scp $TESTER_HOST:lat-res-nf-nat.txt ./latency-results/nf-nat.txt
 
