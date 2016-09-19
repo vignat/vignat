@@ -20,3 +20,4 @@ ip route flush cache
 arp -s $MB_IP_INTERNAL $MB_INTERNAL_MAC
 
 sudo bash ~/scripts/relieve-connection-reuse.sh
+echo "configured"

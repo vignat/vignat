@@ -62,6 +62,8 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
     k->protocol = f->protocol;
 }
 
+#define SWAP_BYTES(x) (((x&0xff) << 8) | ((x&0xff00) >> 8))
+
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
 int add_flow(struct flow *f, int index) {
     LOG("add_flow (f = \n");
@@ -70,6 +72,11 @@ int add_flow(struct flow *f, int index) {
     struct ext_key* new_ext_key = &f->ek;
     fill_int_key(f, new_int_key);
     fill_ext_key(f, new_ext_key);
+    
+    int nflows = dmap_size(flow_map);
+    if (nflows % 0xff == 0)
+      printf("%d flows, prts: %hu - %hu\n", nflows,
+             SWAP_BYTES(f->int_src_port), SWAP_BYTES(f->dst_port));
 
     return dmap_put(flow_map, f, index);
 }

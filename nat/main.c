@@ -164,6 +164,7 @@ struct lcore_params {
 static struct lcore_params lcore_params_array_default[] = {
     {0, 0, 0},
     {1, 0, 0},
+    {2, 0, 0},
 };
 
 static struct lcore_params * lcore_params = lcore_params_array_default;

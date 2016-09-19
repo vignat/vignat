@@ -15,4 +15,4 @@ sudo ifconfig $TESTER_DEVICE_EXTERNAL down
 bind_nics_to_igb_uio $TESTER_PCI_EXTERNAL
 
 sleep 8
-bash ~/scripts/start-pktgen-rr-serv.sh &
+bash ~/scripts/start-pktgen-rr-serv.sh
