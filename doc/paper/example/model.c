@@ -1,4 +1,4 @@
-#include <klee/klee.h>
+#include "vigor.h"
 #include "packet.h"
 #include "ring.h"
 
@@ -9,10 +9,10 @@ int main() {
     struct packet p;
     if (!ring_full())
       if (receive_packet(&p) && p.port != 9)
-        ring_push(&p);
+        ring_push_back(&p);
     if (!ring_empty() && can_send_packet()) {
-      ring_pop(&p);
-      assert(p.port != 9);
+      ring_pop_front(&p);
+      ASSERT(p.port != 9);
       send_packet(&p);
     }
   }// Loop iteration ends.

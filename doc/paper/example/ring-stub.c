@@ -1,15 +1,15 @@
-#include <klee/klee.h>
+#include "vigor.h"
 #include "ring.h"
 
-bool ring_full() { return klee_int("full"); }
+bool ring_full() { return SYMBOLIC("full"); }
 
-bool ring_empty() { return klee_int("empty"); }
+bool ring_empty() { return SYMBOLIC("empty"); }
 
-void ring_push(struct packet* p) {
-  klee_assert(p->port != 9); //Unnecessary.
+void ring_push_back(struct packet* p) {
+  ASSERT(p->port != 9); //Unnecessary.
 }
 
-void ring_pop(struct packet* p) {
-  klee_make_symbolic(p, sizeof(struct packet), "popped_packet");
-  klee_assume(p->port != 9);
+void ring_pop_front(struct packet* p) {
+  FILL_SYMBOLIC(p, sizeof(struct packet), "popped_packet");
+  ASSUME(p->port != 9);
 }
