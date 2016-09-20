@@ -41,10 +41,6 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
           dchain_high_fp(ch) <= time &*&
           dmap_cap_fp(m) == max_flows &*&
           max_flows < INT_MAX;
-
-lemma void make_chars_appear(char* ptr, int len);
-requires 0 < len;
-ensures chars(ptr, len, _);
 @*/
 
 void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
