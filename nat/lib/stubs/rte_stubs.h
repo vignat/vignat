@@ -774,10 +774,10 @@ ether_format_addr(char *buf, uint16_t size,
                     ETH_RSS_NONFRAG_IPV6_OTHER |        \
                     ETH_RSS_IPV6_EX)
 
-#define RTE_LCORE_FOREACH_SLAVE(i)                        \
-    for (i = rte_get_next_lcore(-1, 1, 0);                \
-         i<RTE_MAX_LCORE;                                 \
-         i = rte_get_next_lcore(i, 1, 0))
+#define RTE_LCORE_FOREACH_SLAVE(i)                               \
+  for (i = rte_get_closest_next_lcore(0, 1, 0);                  \
+       i<RTE_MAX_LCORE;                                          \
+       i = rte_get_closest_next_lcore(i+1, 1, 0))
 
 #define unlikely(x) (x)
 
@@ -787,9 +787,8 @@ int rte_lcore_is_enabled(unsigned lcore_id);
 unsigned rte_get_master_lcore();
 
 static inline unsigned
-rte_get_next_lcore(unsigned i, int skip_master, int wrap)
+rte_get_closest_next_lcore(unsigned i, int skip_master, int wrap)
 {
-    i++;
     if (wrap)
         i %= RTE_MAX_LCORE;
 
