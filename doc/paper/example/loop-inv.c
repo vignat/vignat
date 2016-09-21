@@ -13,9 +13,12 @@ int main() {
   begin = SYMBOLIC_RANGE(0, CAP, "begin");
   end = SYMBOLIC_RANGE(0, CAP, "end");
 
-  FOR_EVERY_RING_ELEMENT(i, begin, end, ASSUME(packets[i].port != 9));
-
+  while(INFINITE_LOOP(1))
   {// Loop iteration begins.
+    ASSUME(0 <= begin & begin < CAP &
+           0 <= end & end < CAP);
+    FOR_EVERY_RING_ELEMENT(i, begin, end, ASSUME(packets[i].port != 9));
+
     if (end != (begin - 1) || !(end == CAP - 1 && begin == 0)) {
       if (receive_packet(&packets[end]) && packets[end].port != 9)
         end = (end + 1)%CAP;
@@ -25,8 +28,10 @@ int main() {
       send_packet(&packets[begin]);
       begin = (begin + 1)%CAP;
     }
+    ASSERT(0 <= begin & begin < CAP &
+           0 <= end & end < CAP);
+    FOR_EVERY_RING_ELEMENT(i, begin, end, ASSERT(packets[i].port != 9));
   }//Loop iteration ends
 
-  FOR_EVERY_RING_ELEMENT(i, begin, end, ASSERT(packets[i].port != 9));
   return 0;
 }
