@@ -31,6 +31,9 @@ echo "[TL]perform the testing"
 ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-vig-nat-opt.txt"
 scp $TESTER_HOST:lat-res-vig-nat-opt.txt ./latency-results/vig-nat-opt.txt
 
+if false
+then
+
 sudo pkill -9 nat
 
 #sleep 2
@@ -46,3 +49,5 @@ sleep 30
 echo "[TL]perform the testing"
 ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-nf-nat.txt"
 scp $TESTER_HOST:lat-res-nf-nat.txt ./latency-results/nf-nat.txt
+
+fi

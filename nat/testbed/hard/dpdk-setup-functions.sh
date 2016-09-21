@@ -46,7 +46,7 @@ set_numa_pages()
 	  echo > .echo_tmp
 	  for d in /sys/devices/system/node/node? ; do
 		    node=$(basename $d)
-        Pages=400
+        Pages=1600
 		    echo "echo $Pages > $d/hugepages/hugepages-2048kB/nr_hugepages" >> .echo_tmp
 	  done
 	  echo "Reserving hugepages"
