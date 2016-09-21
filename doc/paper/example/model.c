@@ -5,9 +5,9 @@
 #define CAP 512
 
 int main() {
+  struct packet p;
   while(LOOP(1))
   {// Loop iteration begins.
-    struct packet p;
     if (!ring_full())
       if (receive_packet(&p) && p.port != 9)
         ring_push_back(&p);
