@@ -13,7 +13,7 @@ int main() {
   begin = SYMBOLIC_RANGE(0, CAP, "begin");
   end = SYMBOLIC_RANGE(0, CAP, "end");
 
-  while(INFINITE_LOOP(1))
+  while(LOOP(1))
   {// Loop iteration begins.
     ASSUME(0 <= begin & begin < CAP &
            0 <= end & end < CAP);

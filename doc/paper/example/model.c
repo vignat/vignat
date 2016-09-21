@@ -5,7 +5,7 @@
 #define CAP 512
 
 int main() {
-  while(INFINITE_LOOP(1))
+  while(LOOP(1))
   {// Loop iteration begins.
     struct packet p;
     if (!ring_full())

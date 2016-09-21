@@ -7,7 +7,7 @@ int main() {
   struct packet packets[CAP] = {};
   int begin = 0, end = 0;
 
-  while(1) {
+  while(LOOP(1)) {
     if (end != (begin - 1) || !(end == CAP - 1 && begin == 0)) {
       if (receive_packet(&packets[end]) && packets[end].port != 9)
         end = (end + 1)%CAP;
