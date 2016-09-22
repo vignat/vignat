@@ -9,7 +9,7 @@ require "Pktgen";
 -- local pkt_sizes		= { 64, 128, 256, 512, 1024, 1280, 1518 };
 local pkt_sizes		= { 64};--, 128};
 
-local flows_nums = {50000, 59000}; -- {40000, 50000}; --{1, 7500, 20000}; --{ 1, 100, 1000, 7500, 20000, 30000 };
+local flows_nums = {28000}; -- {50000, 59000}; -- {40000, 50000}; --{1, 7500, 20000}; --{ 1, 100, 1000, 7500, 20000, 30000 };
 
 -- Time in seconds to transmit for
 local duration		= 40000;
@@ -19,8 +19,8 @@ local pauseTime		= 2000;
 local strtprt_int = 1000;
 
 
-local num_reg_steps = 60;
-local num_bin_steps = 7;
+local num_reg_steps = 23;--20;
+local num_bin_steps = 0;--3;
 
 local srcUDPPort = "1234";
 
@@ -156,11 +156,27 @@ local function runThroughputTest(numFlows, pkt_size)
 	end
 end
 
+function heatup()
+
+	pktgen.clr();
+	pktgen.set(sendport, "rate", 100);
+	pktgen.set(sendport, "size", 64);
+
+	pktgen.start(sendport);
+	print("Heating up tables");
+	pktgen.delay(duration);
+	pktgen.delay(duration);
+	pktgen.stop(sendport);
+	statTx = pktgen.portStats(sendport, "port")[tonumber(sendport)];
+	statRx = pktgen.portStats(recvport, "port")[tonumber(recvport)];
+end
+
 function main()
 	file = io.open("multi-flows.txt", "w");
 	for _,numFlows in pairs(flows_nums)
 	do
 		setupTraffic(numFlows);
+		heatup();
 		for _,size in pairs(pkt_sizes)
 		do
 			runThroughputTest(numFlows, size);

@@ -73,10 +73,10 @@ int add_flow(struct flow *f, int index) {
     fill_int_key(f, new_int_key);
     fill_ext_key(f, new_ext_key);
     
-    int nflows = dmap_size(flow_map);
-    if (nflows % 0xff == 0)
-      printf("%d flows, prts: %hu - %hu\n", nflows,
-             SWAP_BYTES(f->int_src_port), SWAP_BYTES(f->dst_port));
+    //int nflows = dmap_size(flow_map);
+    //if (nflows % 0xff == 0)
+    //  printf("%d flows, prts: %hu - %hu\n", nflows,
+    //         SWAP_BYTES(f->int_src_port), SWAP_BYTES(f->dst_port));
 
     return dmap_put(flow_map, f, index);
 }

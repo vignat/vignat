@@ -7,6 +7,9 @@ mkdir -p latency-results
 bash ./provision-rr-nat.sh
 bash dpdk-setup-middlebox-rr.sh
 
+if false
+then
+
 # NAT
 echo "[TL]testing VigNAT"
 (./run-nat-rr.sh $PWD 10 61000 0<&- &>nat.log) &
@@ -20,6 +23,8 @@ scp $TESTER_HOST:lat-res-vig-nat.txt ./latency-results/vig-nat.txt
 
 sudo pkill -9 nat
 
+fi
+
 # NAT
 echo "[TL]testing optimized VigNAT"
 (./run-opt-nat-rr.sh $PWD 10 61000 0<&- &>nat-opt.log) &
@@ -30,9 +35,6 @@ sleep 20
 echo "[TL]perform the testing"
 ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-vig-nat-opt.txt"
 scp $TESTER_HOST:lat-res-vig-nat-opt.txt ./latency-results/vig-nat-opt.txt
-
-if false
-then
 
 sudo pkill -9 nat
 
@@ -49,5 +51,3 @@ sleep 30
 echo "[TL]perform the testing"
 ssh $TESTER_HOST "bash ~/scripts/latency-mf.sh /home/necto/lat-res-nf-nat.txt"
 scp $TESTER_HOST:lat-res-nf-nat.txt ./latency-results/nf-nat.txt
-
-fi
