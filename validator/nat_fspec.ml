@@ -201,17 +201,7 @@ let fun_types =
                                      List.nth_exn args 6 ^ ", " ^
                                      List.nth_exn args 7 ^ "); @*/");
                                 ];
-                                lemmas_after = [
-                                  (fun params ->
-                                     if !the_array_lcc_is_local then
-                                       "/*@ make_chars_appear((" ^
-                                       List.nth_exn params.args 2 ^
-                                       ")->data,\
-                                        sizeof(ARRAY_LCC_EL_TYPE)*\
-                                        ARRAY_LCC_CAPACITY);\n\
-                                        // This unproven lemma covers for the \
-                                        local struct ArrayLcc arr_lcc\n@*/"
-                                     else "")];};
+                                lemmas_after = [];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
@@ -676,6 +666,17 @@ let fun_types =
                                      "last_lcc = " ^ params.ret_name ^ ";\n");
                                   (fun params ->
                                      if params.is_tip then
+                                  "//@ introduce_arrp_rq(&((" ^
+                                  params.ret_val ^
+                                  ")->rx_queue_list));\n\
+                                   //@ introduce_arrp_u16(&((" ^
+                                  params.ret_val ^
+                                  ")->tx_queue_id));\n\
+                                   //@ introduce_arrp_bat(&((" ^
+                                  params.ret_val ^")->tx_mbufs));"
+                                     else "");
+                                  (fun params ->
+                                     if params.is_tip then
                                        "//@ construct_lcc_element(" ^ params.ret_val ^");"
                                      else "");
                                   (fun params ->
@@ -827,8 +828,22 @@ let fixpoints =
 module Iface : Fspec_api.Spec =
 struct
   let preamble = (In_channel.read_all "preamble.tmpl") ^
-                 "void to_verify()\
-                  /*@ requires true; @*/ \
+                 "\
+/*@\n\
+lemma void introduce_arrp_rq(void* ptr);\n\
+requires true;\n\
+ensures arrp_rq(_, ptr);\n\
+\n\
+lemma void introduce_arrp_u16(void* ptr);\n\
+requires true;\n\
+ensures arrp_u16(_, ptr);\n\
+\n\
+lemma void introduce_arrp_bat(void* ptr);\n\
+requires true;\n\
+ensures arrp_bat(_, ptr);\n\
+@*/\n\
+ void to_verify()\n\
+                  /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
                   struct lcore_conf *last_lcc;\n\
                   struct lcore_rx_queue *last_rq;\n"
