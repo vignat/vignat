@@ -131,8 +131,12 @@ let map_set_n_update_alist mp lst =
       String.Map.add acc ~key ~data)
 
 let is_int str =
-  try ignore (int_of_string str); true
-  with _ -> false
+  (* As a hack: handle -10 in 64bits.
+     TODO: handle more generally*)
+  if (String.equal str "18446744073709551606") then true
+  else
+    try ignore (int_of_string str); true
+    with _ -> false
 
 let guess_sign exp known_vars =
   match get_var_name_of_sexp exp with
@@ -302,11 +306,15 @@ let tmp_val_name_gen = name_gen "tmp"
 let allocated_tmp_vals = ref String.Map.empty
 
 let get_sint_in_bounds v =
-  let integer_val = Int.of_string v in
-  if Int.(integer_val > 2147483647) then
-    integer_val - 2*2147483648
+  (*Special case for 64bit -1, for now,
+    FIXME: make a more general case.*)
+  if (String.equal v "18446744073709551606") then -10
   else
-    integer_val
+    let integer_val = Int.of_string v in
+    if Int.(integer_val > 2147483647) then
+      integer_val - 2*2147483648
+    else
+      integer_val
 
 let make_cmplx_val exp t =
   let key = Sexp.to_string exp in
@@ -381,22 +389,34 @@ let rec get_sexp_value exp t =
         else if String.equal v "false" then {v=Bool false;t=Boolean}
         else {v=Id v; t}
     end
-  | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom offset; src;]
+  | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
     (*FIXME: make sure the typetransformation works.*)
     (*FIXME: pass a right type to get_sexp_value and llocate_tmp here*)
-    {v=Cast (t, allocate_tmp (get_sexp_value src Sint32));t}
+    if (String.equal w "w32") then
+      get_sexp_value src t
+    else
+      {v=Cast (t, allocate_tmp (get_sexp_value src Sint32));t}
+  | Sexp.List [Sexp.Atom f; Sexp.Atom w; arg]
+    when (String.equal f "SExt") && (String.equal w "w64") ->
+    get_sexp_value arg t (*TODO: make sure this ignorance is ok *)
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
     when (String.equal f "Add") ->
     begin (* Prefer a variable in the left position
              due to the weird VeriFast type inference rules.*)
       match lhs with
       | Sexp.Atom str when is_int str ->
-        let ival = int_of_string str in (* avoid overflow *)
-        if ival > 2147483648 then
-          {v=Bop (Sub,(get_sexp_value rhs t),{v=(Int (2*2147483648 - ival));t});t}
-        else
-          {v=Bop (Add,(get_sexp_value rhs t),{v=(Int ival);t});t}
+        (* As a hack: special hundling for 64bit -10
+           TODO: generalize*)
+        if (String.equal str "18446744073709551606") then
+          {v=Bop (Sub,(get_sexp_value rhs t),{v=(Int 10);t});t}
+          else
+            let ival = int_of_string str in (* avoid overflow *)
+            if ival > 2147483648 then
+              {v=Bop (Sub,(get_sexp_value rhs t),
+                      {v=(Int (2*2147483648 - ival));t});t}
+            else
+              {v=Bop (Add,(get_sexp_value rhs t),{v=(Int ival);t});t}
       | _ ->
         {v=Bop (Add,(get_sexp_value lhs t),(get_sexp_value rhs t));t}
     end
