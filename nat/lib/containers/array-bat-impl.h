@@ -7,12 +7,14 @@
 //@ #include "stdex.gh"
 
 /*@
+  predicate batcherpp(list<BATCHER_EL_TYPE> batch, struct Batcher* bat) =
+    batcherp(batch, bat) &*& length(batch) < BATCHER_CAPACITY;
   predicate bat_arrp(struct Batcher *bp, int len,
                      list<list<BATCHER_EL_TYPE> > bats) =
     switch(bats) {
       case nil: return len == 0;
       case cons(h,t):
-        return batcherp(h, bp) &*&
+        return batcherpp(h, bp) &*&
                bat_arrp(bp+1, len-1, t);
     };
 
@@ -46,11 +48,13 @@ ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index);
 //@ requires arrp_bat(?lst, arr) &*& 0 <= index &*& index < ARRAY_BAT_CAPACITY;
 /*@ ensures arrp_bat_acc(lst, arr, index) &*&
             result == arrp_the_missing_cell_bat(arr, index) &*&
-            batcherp(nth(index, lst), result); @*/
+            batcherp(nth(index, lst), result) &*&
+            length(nth(index, lst)) < BATCHER_CAPACITY; @*/
 
 void array_bat_end_access(struct ArrayBat *arr);
 /*@ requires arrp_bat_acc(?lst, arr, ?index) &*&
-             batcherp(?x, arrp_the_missing_cell_bat(arr, index)); @*/
+             batcherp(?x, arrp_the_missing_cell_bat(arr, index)) &*&
+             length(x) < BATCHER_CAPACITY; @*/
 //@ ensures arrp_bat(update(index, x, lst), arr);
 
 
@@ -123,7 +127,7 @@ void array_bat_end_access(struct ArrayBat *arr)
   @*/
 /*@
   lemma void append_to_arr(ARRAY_BAT_EL_TYPE* arr, ARRAY_BAT_EL_TYPE* el)
-  requires bat_arrp(arr, ?len, ?lst) &*& batcherp(?v, el) &*&
+  requires bat_arrp(arr, ?len, ?lst) &*& batcherpp(?v, el) &*&
            el == (arr + len) &*& len == length(lst);
   ensures bat_arrp(arr, len+1, append(lst, cons(v, nil)));
   {
@@ -181,6 +185,7 @@ void array_bat_init(struct ArrayBat *arr_out)
     //@ close_struct((ARRAY_BAT_EL_TYPE*)(arr_out->data) + i);
     ARRAY_BAT_EL_INIT((ARRAY_BAT_EL_TYPE*)(arr_out->data) + i);
     //@ assert batcherp(?xx, (ARRAY_BAT_EL_TYPE*)(arr_out->data) + i);
+    //@ close batcherpp(xx, (ARRAY_BAT_EL_TYPE*)(arr_out->data) + i);
     /*@ append_to_arr((ARRAY_BAT_EL_TYPE*)(arr_out->data),
                       (ARRAY_BAT_EL_TYPE*)(arr_out->data) + i);
       @*/
@@ -196,7 +201,7 @@ void array_bat_init(struct ArrayBat *arr_out)
   lemma void extract_by_index(ARRAY_BAT_EL_TYPE* arr, int idx)
   requires bat_arrp(arr, ?len, ?lst) &*& 0 <= idx &*& idx < len;
   ensures bat_arrp(arr, idx, take(idx, lst)) &*&
-          batcherp(nth(idx, lst), arr + idx) &*&
+          batcherpp(nth(idx, lst), arr + idx) &*&
           bat_arrp(arr+idx+1, len - idx - 1, drop(idx+1,lst));
   {
     open bat_arrp(arr, len, lst);
@@ -217,20 +222,22 @@ ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index)
 //@ requires arrp_bat(?lst, arr) &*& 0 <= index &*& index < ARRAY_BAT_CAPACITY;
 /*@ ensures arrp_bat_acc(lst, arr, index) &*&
             result == arrp_the_missing_cell_bat(arr, index) &*&
-            batcherp(nth(index, lst), result); @*/
+            batcherp(nth(index, lst), result) &*&
+            length(nth(index, lst)) < BATCHER_CAPACITY; @*/
 {
   //@ open arrp_bat(lst, arr);
   //@ extract_by_index(arr->data, index);
   //@ mul_mono_strict(index, ARRAY_BAT_CAPACITY, sizeof(ARRAY_BAT_EL_TYPE));
   return (ARRAY_BAT_EL_TYPE*)(arr->data) + index;
   //@ close arrp_bat_acc(lst, arr, index);
+  //@ open batcherpp(nth(index, lst), (ARRAY_BAT_EL_TYPE*)(arr->data) + index);
 }
 
 /*@
   lemma void glue_array(ARRAY_BAT_EL_TYPE* arr, int idx,
                         list<list<BATCHER_EL_TYPE> > lst)
   requires bat_arrp(arr, idx, take(idx, lst)) &*&
-           batcherp(nth(idx, lst), arr + idx) &*&
+           batcherpp(nth(idx, lst), arr + idx) &*&
            bat_arrp(arr+idx+1, length(lst) - idx - 1,
                            drop(idx+1,lst)) &*&
            0 <= idx &*& idx < length(lst);
@@ -250,13 +257,15 @@ ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index)
   @*/
 void array_bat_end_access(struct ArrayBat *arr)
 /*@ requires arrp_bat_acc(?lst, arr, ?index) &*&
-             batcherp(?x, arrp_the_missing_cell_bat(arr, index)); @*/
+             batcherp(?x, arrp_the_missing_cell_bat(arr, index)) &*&
+             length(x) < BATCHER_CAPACITY; @*/
 //@ ensures arrp_bat(update(index, x, lst), arr);
 {
   //@ open arrp_bat_acc(lst, arr, index);
   //@ take_update_unrelevant(index, index, x, lst);
   //@ nth_update(index, index, x, lst);
   //@ drop_update_unrelevant(index+1, index, x, lst);
+  //@ close batcherpp(x, arrp_the_missing_cell_bat(arr, index));
   //@ glue_array(arr->data, index, update(index, x, lst));
   IGNORE(arr);
   //@ close arrp_bat(update(index, x, lst), arr);
@@ -268,7 +277,7 @@ void array_bat_end_access(struct ArrayBat *arr)
   requires p->len |-> ?l &*&
            pointers((void*)&p->batch, ARRAY_BAT_CAPACITY, _) &*&
            struct_Batcher_padding(p);
-  ensures batcherp(_, p);
+  ensures batcherpp(_, p);
   {
     
   }
