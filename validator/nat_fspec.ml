@@ -685,20 +685,7 @@ let fun_types =
                                  (fun params ->
                                     "last_rq = " ^ params.ret_name ^ ";\n");
                                  (fun params ->
-                                    if params.is_tip then
-                                      "//@ construct_rq_element(" ^ params.ret_val ^ ");"
-                                    else "");
-                                 (fun params ->
-                                    if params.is_tip then
-                                      "//@ close some_rx_queuep(" ^ params.ret_val ^ ");"
-                                    else "");
-                                 (fun params ->
-                                    if params.is_tip then
-                                      "//@ close some_rx_queuep(" ^ params.ret_name ^ ");"
-                                    else "");
-                                 (fun params ->
-                                    if params.is_tip then "" else
-                                      "//@ open rx_queuep(_, last_rq);");
+                                    "//@ open rx_queuep(_, last_rq);");
                                ];};
      "array_rq_end_access", {ret_type = Void;
                              arg_types = [Ptr arr_rq_struct;];

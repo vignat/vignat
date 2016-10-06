@@ -111,11 +111,19 @@ let make_assignments_for_eqs equalities =
   List.map equalities ~f:(fun {lhs;rhs} ->
       {lhs=rhs;rhs=lhs})
 
+let verifast_struct_field_predicates =
+  String.Map.of_alist_exn
+    [("lcore_conf_n_rx_queue","n_rx_queue");
+     ("lcore_rx_queue_port_id","port_id");]
+
 let transform_verifast_structure_predicates spec_constraints =
   List.map spec_constraints ~f:(function
       | {t;v=Apply (fname,[arg1;arg2])}
-        when String.equal fname "lcore_conf_n_rx_queue" ->
-        {t;v=Bop (Eq,{t=arg2.t;v=Str_idx (arg1,"n_rx_queue")}, arg2)}
+        when String.Map.find verifast_struct_field_predicates fname <> None ->
+        let field_name =
+          String.Map.find_exn verifast_struct_field_predicates fname
+        in
+        {t;v=Bop (Eq,{t=arg2.t;v=Str_idx (arg1,field_name)}, arg2)}
       | x -> x)
 
 let is_execution_justified

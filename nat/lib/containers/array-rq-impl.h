@@ -294,7 +294,7 @@ void array_rq_end_access(struct ArrayRq *arr)
 /* @
   lemma void construct_rq_element(ARRAY_RQ_EL_TYPE *p)
   requires p->port_id |-> ?pid &*&
-           0 <= pid &*& pid <= RTE_MAX_ETHPORTS &*&
+           0 <= pid &*& pid < RTE_MAX_ETHPORTS &*&
            p->queue_id |-> _ &*&
            struct_lcore_rx_queue_padding(p);
   ensures rx_queuep(_, p);

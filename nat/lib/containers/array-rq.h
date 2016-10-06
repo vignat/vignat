@@ -47,9 +47,12 @@ struct ArrayRq
 
 /*@
   inductive rx_queuei = rx_queuei(int,int);
+  //VVV here was a bug in the spec: 
+  //    this line was abscent: "0 <= pi &*& pi < RTE_MAX_ETHPORTS &*&"
   predicate rx_queuep(rx_queuei rq, struct lcore_rx_queue *lrq) =
             struct_lcore_rx_queue_padding(lrq) &*&
             lrq->port_id |-> ?pi &*&
+            0 <= pi &*& pi < RTE_MAX_ETHPORTS &*&
             lrq->queue_id |-> ?qi &*&
             rq == rx_queuei(pi,qi);
   predicate some_rx_queuep(struct lcore_rx_queue *lrq) = rx_queuep(_, lrq);
@@ -66,7 +69,7 @@ struct ArrayRq
 
   lemma void construct_rq_element(ARRAY_RQ_EL_TYPE *p);
   requires p->port_id |-> ?pid &*&
-           0 <= pid &*& pid <= RTE_MAX_ETHPORTS &*&
+           0 <= pid &*& pid < RTE_MAX_ETHPORTS &*&
            p->queue_id |-> _ &*&
            struct_lcore_rx_queue_padding(p);
   ensures rx_queuep(_, p);
