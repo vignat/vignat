@@ -88,7 +88,7 @@ type tip_call = {context:fun_call_context;
 
 type ir = {
   preamble:string;
-  free_vars:var_spec String.Map.t;
+  free_vars:var_spec String.Map.t; (* TODO: var_spec -> typed_var *)
   arguments:var_spec list;
   tmps:var_spec String.Map.t;
   cmplxs:var_spec String.Map.t;

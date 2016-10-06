@@ -666,25 +666,7 @@ let fun_types =
                                      "last_lcc = " ^ params.ret_name ^ ";\n");
                                   (fun params ->
                                      if params.is_tip then
-                                  "//@ introduce_arrp_rq(&((" ^
-                                  params.ret_val ^
-                                  ")->rx_queue_list));\n\
-                                   //@ introduce_arrp_u16(&((" ^
-                                  params.ret_val ^
-                                  ")->tx_queue_id));\n\
-                                   //@ introduce_arrp_bat(&((" ^
-                                  params.ret_val ^")->tx_mbufs));"
-                                     else "");
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ construct_lcc_element(" ^ params.ret_val ^");"
-                                     else "");
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ close some_lcore_confp(" ^ params.ret_val ^");"
-                                     else ""); (fun params ->
-                                     if params.is_tip then
-                                       "//@ close some_lcore_confp(" ^ params.ret_name ^");"
+                                       "//@ open lcore_confp(_, last_lcc);"
                                      else "");
                                   (fun params ->
                                      if params.is_tip then "" else

@@ -53,6 +53,8 @@ let export_assumptions
     ir verifast src_file
     assu_file lino_fname outf proj_root =
   Render.render_ir ir src_file ~render_assertions:false;
+  (* TODO: check consistency first (as in verify_ir,
+     but that function is obsolete now)*)
   let _ = (* locate the line to dump VeriFast assumptions *)
     Sys.command ("sed -n '/" ^ ir.Ir.export_point ^ "/=' " ^
                  src_file ^ " > " ^ lino_fname)

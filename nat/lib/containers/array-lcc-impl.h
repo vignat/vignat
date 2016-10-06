@@ -42,7 +42,9 @@ static void lcore_conf_condition(struct lcore_conf *cell)
 {
   //@ close_struct(cell);
 #ifdef KLEE_VERIFICATION
-  klee_assume(0 < cell->n_rx_queue);
+  // VVV Here was a bug: "<" instead of "<=" which caused this model to
+  // loose some outputs !
+  klee_assume(0 <= cell->n_rx_queue);
   klee_assume(cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
 #else//KLEE_VERIFICATION
   cell->n_rx_queue = 0;

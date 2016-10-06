@@ -15,7 +15,7 @@ open Z3.Arithmetic.Integer
 open Z3.Arithmetic.Real
 open Z3.BitVector
 
-let output_queries = false
+let output_queries = true
 
 let show_vars vars =
   if output_queries then begin
@@ -41,6 +41,11 @@ let show_assumptions assumptions =
 let show_assignment assgn =
   if output_queries then begin
     Printf.printf ";assignment:\n (assert %s)\n" (Expr.to_string assgn);
+  end
+
+let show_negation neg =
+  if output_queries then begin
+    Printf.printf ";assertion negation: :\n (assert %s)\n" (Expr.to_string neg);
   end
 
 let show_theorem theorem =
@@ -127,7 +132,7 @@ let tterm_to_z3 tterm ctx var_map fun_map ints =
   | Ir.Not ({Ir.t=_;Ir.v=Ir.Apply _} as x) ->
     run_on {Ir.t=Ir.Boolean;
             Ir.v=Ir.Bop (Ir.Eq,
-                         {Ir.t=x.Ir.t;Ir.v=Ir.Int 1},
+                         {Ir.t=x.Ir.t;Ir.v=Ir.Int 0},
                          x)}
   | Ir.Not x -> Boolean.mk_not ctx (run_on x)
   | Ir.Str_idx (x,fname) -> run_on {Ir.t=tterm.Ir.t;
@@ -162,6 +167,28 @@ let statement_to_z3 sttmt ctx vars funs ints =
                     ctx vars funs ints
   | Ir.Bool true -> Boolean.mk_true ctx
   | _ -> failwith ("incorrect statement " ^ (Ir.render_tterm sttmt))
+
+let check_implication assumptions assertion =
+  let cfg = [("model", "true"); ("proof", "false")] in
+  let ctx = (mk_context cfg) in
+  let ints = Integer.mk_sort ctx in
+  let (vars,funs) = register_symbs_z3 (assertion::assumptions) ctx ints in
+  show_vars vars; show_funs funs;
+  let assumptions = List.map assumptions ~f:(fun ass -> statement_to_z3 ass ctx vars funs ints) in
+  let negation = statement_to_z3 {Ir.v=Ir.Not assertion;Ir.t=Ir.Boolean}
+      ctx vars funs ints
+  in
+  show_assumptions assumptions; show_negation negation;
+  let solver = Solver.mk_solver ctx None in
+  List.iter assumptions ~f:(fun ass -> Solver.add solver [ass]);
+  Solver.add solver [negation];
+  let result = (Solver.check solver []) in
+  show_result result solver;
+  match result with
+  | SATISFIABLE -> false
+  | UNSATISFIABLE -> true
+  | UNKNOWN -> false
+
 
 let is_assignment_justified assignment (assumptions : Ir.tterm list) =
   let cfg = [("model", "true"); ("proof", "false")] in

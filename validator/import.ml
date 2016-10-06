@@ -387,7 +387,9 @@ let rec get_sexp_value exp t =
       | _ ->
         if String.equal v "true" then {v=Bool true;t=Boolean}
         else if String.equal v "false" then {v=Bool false;t=Boolean}
-        else {v=Id v; t}
+        (*FIXME: deduce the true integer type for the value: *)
+        else if is_int v then {v=Int (int_of_string v);t}
+        else {v=Id v;t}
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
@@ -796,19 +798,16 @@ let split_common_assumptions a1 a2 =
   List.partition_tf as1 ~f:(fun assumption ->
       List.exists as2 ~f:(fun other -> other = assumption))
 
-let extract_tip_calls ftype_of calls rets tip_dummies =
+let extract_tip_calls ftype_of calls rets =
   let call = List.hd_exn calls in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context
       ~is_tip:true ftype_of call (Int.Map.find rets call.id) args "tip"
   in
   let get_ret_val call =
-    match Int.Map.find tip_dummies call.id with
-    | Some dummy -> {v=Addr {v=Id dummy.name;t=dummy.value.t};
-                     t=Ptr dummy.value.t}
-    | None -> match Int.Map.find rets call.id with
-      | Some ret -> ret.value
-      | None -> {t=Unknown;v=Undef;}
+    match Int.Map.find rets call.id with
+    | Some ret -> ret.value
+    | None -> {t=Unknown;v=Undef;}
   in
   let results =
     match calls with
@@ -817,34 +816,26 @@ let extract_tip_calls ftype_of calls rets tip_dummies =
       let args_post_conditions = compose_args_post_conditions tip in
       [{args_post_conditions;
         ret_val=get_ret_val tip;
-        post_statements=[(* All this statements must be about the model internal
-                            state, so we can assume them at the very beginning:
-                            in the context_assumptions. *)];}]
+        post_statements=convert_ctxt_list tip.ret_context;}]
     | tip1 :: tip2 :: [] ->
       let args_post_conditions1 = compose_args_post_conditions tip1 in
       let args_post_conditions2 = compose_args_post_conditions tip2 in
-      let (_,tip1_distinct_ctxt) =
-        split_common_assumptions tip1.ret_context tip2.ret_context
-      in
-      let (_,tip2_distinct_ctxt) =
-        split_common_assumptions tip2.ret_context tip1.ret_context
-      in
       [{args_post_conditions=args_post_conditions1;
         ret_val=get_ret_val tip1;
-        post_statements=tip1_distinct_ctxt;};
+        post_statements=convert_ctxt_list tip1.ret_context;};
        {args_post_conditions=args_post_conditions2;
         ret_val=get_ret_val tip2;
-        post_statements=tip2_distinct_ctxt;}]
+        post_statements=convert_ctxt_list tip2.ret_context;}]
     | _ -> failwith "More than two tip calls is not supported."
   in
   {context;results}
 
-let extract_calls_info ftype_of tpref rets tip_dummies =
+let extract_calls_info ftype_of tpref rets =
   let hist_funs =
     (List.map tpref.history ~f:(fun call ->
          extract_hist_call ftype_of call rets))
   in
-  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets tip_dummies in
+  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets in
   hist_funs, tip_calls
 
 let collect_context pref =
@@ -852,14 +843,11 @@ let collect_context pref =
       (convert_ctxt_list call.call_context) @
       (convert_ctxt_list call.ret_context)))) @
   (match pref.tip_calls with
-   | hd :: [] -> (convert_ctxt_list hd.call_context) @ (convert_ctxt_list hd.ret_context)
+   | hd :: [] -> (convert_ctxt_list hd.call_context)
    | hd1 :: hd2 :: [] ->
      let call_context = convert_ctxt_list hd1.call_context in
      assert (call_context = (convert_ctxt_list hd2.call_context));
-     let (common_ret_context,_) = split_common_assumptions
-         hd1.ret_context hd2.ret_context
-     in
-     call_context @ common_ret_context
+     call_context
    | [] -> failwith "There must be at least one tip call."
    | _ -> failwith "More than two tip alternative tipcalls are not supported.")
 
@@ -944,12 +932,12 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let free_vars = get_basic_vars ftype_of pref in
   let arguments = allocate_args ftype_of pref (name_gen "arg") in
   let rets = allocate_rets ftype_of pref in
-  let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in
-  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets tip_dummies in
+  (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
+  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
   let free_vars = typed_vars_to_varspec free_vars in
-  {preamble;free_vars;arguments=(arguments@(Int.Map.data tip_dummies));tmps;
+  {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing}

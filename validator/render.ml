@@ -36,8 +36,9 @@ let render_post_assumptions post_statements =
 
 let render_tip_post_sttmts {args_post_conditions;
                             ret_val=_;post_statements} =
-  (render_post_assumptions post_statements) ^ "\n" ^
-  (render_args_post_conditions ~is_assert:true args_post_conditions)
+  ""
+  (* (render_post_assumptions post_statements) ^ "\n" ^ *)
+  (* (render_args_post_conditions ~is_assert:true args_post_conditions) *)
 
 let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   match ret_name with
