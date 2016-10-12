@@ -21,9 +21,6 @@ let infer_signed_type w =
   if String.equal w "w32" then Sint32
   else if String.equal w "w8" then Sint8
   else Sunknown
-  (* TODO: this computation sometimes is not necessary,
-     so this exception may break a problem free insuction.
-     else failwith (w ^ " signed is not supported")*)
 
 let infer_unsigned_type w =
   if String.equal w "w32" then Uint32

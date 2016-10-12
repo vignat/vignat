@@ -89,7 +89,109 @@ let find_complementary_sttmts sttmts1 sttmts2 =
   | None -> Option.map (find_from_left sttmts2 sttmts1)
               ~f:(fun rez -> (rez,true))
 
-let render_2tip_post_assertions res1 res2 ret_name =
+let gen_ret_equalities ret_val ret_name ret_type =
+  match ret_name with
+  | Some ret_name -> begin
+      match ret_type, ret_val.v with
+      | Ptr (Str (_, fields)), Addr {v=Struct (_, fvals);t=_} ->
+        List.map fields ~f:(fun (name,ttype) ->
+            let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
+                String.equal vname name)
+            in
+            {lhs={v=Str_idx ({v=Deref {v=Id ret_name;t=ret_type};
+                              t=get_pointee ret_type}, name);t=ttype};
+             rhs=v.value})
+      | Sint32, Int _
+      | Sint8, Int _
+      | Uint32, Int _
+      | Uint16, Int _
+      | Uint8, Int _
+      | Sint32, Id _
+      | Sint8, Id _
+      | Uint32, Id _
+      | Uint16, Id _
+      | Uint8, Id _
+        -> [{lhs={v=Id ret_name;t=ret_type};rhs=ret_val}]
+      | Ptr (Uint16), Addr ({v=Id x;t})
+        ->
+        [{lhs={v=Deref {v=Id ret_name;t=ret_type};t};rhs={v=Id x;t};}]
+      | _ -> failwith ("unsupported return type: " ^
+                       (ttype_to_str ret_type) ^
+                       " : " ^
+                       (render_tterm ret_val))
+      end
+  | None -> []
+
+let make_assignments_for_eqs equalities =
+  List.map equalities ~f:(fun {lhs;rhs} ->
+      {lhs=rhs;rhs=lhs})
+
+let split_assignments assignments =
+  List.fold assignments ~init:([],[]) ~f:(fun (concrete,symbolic) assignment ->
+      match assignment.lhs.v with
+      | Id _ -> (concrete,assignment::symbolic)
+      | Int _ -> (assignment::concrete,symbolic)
+      | Struct (_, []) -> (* printf "skipping empty assignment: %s = %s" *)
+                          (*  (render_tterm assignment.lhs) *)
+                          (*  (render_tterm assignment.rhs); *)
+        (concrete,symbolic)
+      | _ -> failwith ("unsupported assignment: " ^
+                       (render_tterm assignment.lhs) ^
+                       " = " ^ (render_tterm assignment.rhs)))
+
+let apply_assignments assignments terms =
+  List.fold assignments ~init:terms ~f:(fun terms {lhs;rhs} ->
+    List.map terms ~f:(replace_term_in_tterm lhs.v rhs.v))
+
+let render_input_assumptions terms =
+  String.concat ~sep:"\n" (List.map terms ~f:(fun term ->
+    "//@ assume(" ^ (render_tterm term) ^ ");"))
+
+let ids_from_term term =
+  String.Set.of_list
+    (collect_nodes (function
+         | {v=Id name;t=_} -> Some name
+         | _ -> None)
+        term)
+
+let ids_from_terms terms =
+  List.fold terms ~init:String.Set.empty ~f:(fun ids term ->
+    String.Set.union ids (ids_from_term term))
+
+let ids_from_eq_conditions eq_conds =
+  List.fold eq_conds ~init:String.Set.empty ~f:(fun ids cond ->
+      String.Set.union (ids_from_term cond.lhs)
+        (String.Set.union (ids_from_term cond.rhs) ids))
+
+let split_constraints tterms symbols =
+  List.partition_tf tterms ~f:(fun tterm ->
+      Set.for_all (ids_from_term tterm) ~f:(String.Set.mem symbols))
+
+let render_output_check ret_val ret_name ret_type model_constraints hist_symbs =
+  let (input_constraints,output_constraints) =
+    split_constraints model_constraints hist_symbs
+  in
+  let ret_equalities = gen_ret_equalities ret_val ret_name ret_type
+  in
+  let args_equalities = [] in (*TODO: get these: args_post_conditions*)
+  let assignments = make_assignments_for_eqs (ret_equalities@args_equalities)
+  in
+  let (concrete_assignments,
+       symbolic_var_assignments) = split_assignments assignments
+  in
+  let upd_model_constraints =
+    apply_assignments symbolic_var_assignments output_constraints
+  in
+  (render_input_assumptions input_constraints) ^ "\n" ^
+  (String.concat ~sep:"\n"
+     (List.map concrete_assignments ~f:(fun {lhs;rhs} ->
+          "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
+          (render_tterm rhs) ^ "); @*/"))) ^ "\n" ^
+  (String.concat ~sep:"\n"
+     (List.map upd_model_constraints ~f:(fun constr ->
+          "/*@ assert(" ^ (render_tterm constr) ^ "); @*/")))
+
+let render_2tip_post_assertions res1 res2 ret_name ret_type hist_symbs =
   if term_eq res1.ret_val.v res2.ret_val.v then
     begin
       match find_complementary_sttmts
@@ -98,12 +200,12 @@ let render_2tip_post_assertions res1 res2 ret_name =
       | Some (sttmt,fst) ->
         begin
           let res1_assertions =
-            (render_tip_post_sttmts res1 ^ "\n" ^
-             render_ret_equ_sttmt ~is_assert:true ret_name res1.ret_val)
+            render_output_check
+               res1.ret_val ret_name ret_type res1.post_statements hist_symbs
           in
           let res2_assertions =
-            (render_tip_post_sttmts res2 ^ "\n" ^
-             render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val)
+            render_output_check
+               res2.ret_val ret_name ret_type res2.post_statements hist_symbs
           in
           let (pos_sttmts,neg_sttmts) =
             if fst then
@@ -125,9 +227,10 @@ let render_2tip_post_assertions res1 res2 ret_name =
       | None -> failwith "this can't be true!"
     in
     "if (" ^ rname ^ " == " ^ (render_tterm res1.ret_val) ^ ") {\n" ^
-    (render_tip_post_sttmts res1) ^ "\n} else {\n" ^
-    (render_tip_post_sttmts res2) ^ "\n" ^
-    (render_ret_equ_sttmt ~is_assert:true ret_name res2.ret_val) ^ "}\n"
+    (render_output_check
+       res1.ret_val ret_name ret_type res1.post_statements hist_symbs) ^ "\n} else {\n" ^
+    (render_output_check
+       res2.ret_val ret_name ret_type res2.post_statements hist_symbs) ^ "}\n"
 
 let render_export_point name =
   "int " ^ name ^ ";\n"
@@ -146,8 +249,11 @@ let render_equality_assumptions args =
          | _ -> "//@ assume(" ^ arg.name ^ " == "
                 ^ (render_tterm arg.value) ^ ");"))
 
+let render_1tip_post_assertions result ret_name ret_type hist_symbs =
+  render_output_check result.ret_val ret_name ret_type result.post_statements hist_symbs
+
 let render_tip_fun_call
-    {context;results} export_point free_vars ~render_assertions =
+    {context;results} export_point free_vars hist_symbols ~render_assertions =
   (render_fcall_with_lemmas context) ^
   "// The legibility of these assignments is ensured by analysis.ml\n" ^
   (render_equality_assumptions free_vars) ^ "\n" ^
@@ -155,10 +261,9 @@ let render_tip_fun_call
   (if render_assertions then
      (match results with
       | result :: [] ->
-        (render_tip_post_sttmts result) ^ "\n" ^
-        (render_ret_equ_sttmt ~is_assert:true context.ret_name result.ret_val)
+        render_1tip_post_assertions result context.ret_name context.ret_type hist_symbols
       | res1 :: res2 :: [] ->
-        render_2tip_post_assertions res1 res2 context.ret_name
+        render_2tip_post_assertions res1 res2 context.ret_name context.ret_type hist_symbols
       | [] -> failwith "There must be at least one tip call."
       | _ -> failwith "More than two outcomes are not supported.") ^ "\n"
    else
@@ -202,11 +307,22 @@ let render_allocated_args args =
 
 let render_final finishing ~catch_leaks =
   if finishing && catch_leaks then
-    "/* This sequence must terminate correctly: no need for assume(false); */\n"
+    "/* This sequence must terminate cleanly: no need for assume(false); */\n"
   else
     "//@ assume(false);\n"
 
+let get_all_symbols calls =
+  List.fold calls ~init:String.Set.empty ~f:(fun symbols call ->
+      String.Set.union (ids_from_term call.result.ret_val)
+        (String.Set.union (ids_from_eq_conditions call.result.args_post_conditions)
+           (String.Set.union (ids_from_eq_conditions call.context.extra_pre_conditions)
+              (String.Set.union (ids_from_term {v=call.context.application;t=Unknown})
+                 (match call.context.ret_name with
+                  | Some name -> (String.Set.add symbols name)
+                  | None -> symbols)))))
+
 let render_ir ir fout ~render_assertions =
+  let hist_symbols = get_all_symbols ir.hist_calls in
   Out_channel.with_file fout ~f:(fun cout ->
       Out_channel.output_string cout ir.preamble;
       Out_channel.output_string cout (render_cmplexes ir.cmplxs);
@@ -221,6 +337,7 @@ let render_ir ir fout ~render_assertions =
       Out_channel.output_string cout (render_tip_fun_call
                                         ir.tip_call ir.export_point
                                         ir.free_vars
+                                        hist_symbols
                                         ~render_assertions);
       Out_channel.output_string cout (render_final ir.finishing
                                         ~catch_leaks:render_assertions);

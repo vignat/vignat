@@ -126,6 +126,40 @@ let transform_verifast_structure_predicates spec_constraints =
         {t;v=Bop (Eq,{t=arg2.t;v=Str_idx (arg1,field_name)}, arg2)}
       | x -> x)
 
+let are_symbolic_assignments_justified
+    spec_constraints assignments model_constraints =
+  let updated_model_constraints =
+    apply_assignments assignments model_constraints
+  in
+  List.for_all updated_model_constraints
+    ~f:(fun model_constraint ->
+        lprintf "Checking constraint: %s\n" (render_tterm model_constraint);
+        Z3_query.check_implication spec_constraints model_constraint)
+
+let gen_eq_for_assignment assignment =
+  {t=Boolean;v=Bop (Eq, assignment.lhs, assignment.rhs)}
+
+let are_concrete_assignments_justified spec_constraints assignments =
+  List.for_all assignments ~f:(fun assignment ->
+      lprintf "Checking concrete assignment: %s = %s\n"
+        (render_tterm assignment.lhs)
+        (render_tterm assignment.rhs);
+      Z3_query.check_implication
+        spec_constraints (gen_eq_for_assignment assignment))
+
+let split_assignments assignments =
+  List.fold assignments ~init:([],[]) ~f:(fun (concrete,symbolic) assignment ->
+      match assignment.lhs.v with
+      | Id _ -> (concrete,assignment::symbolic)
+      | Int _ -> (assignment::concrete,symbolic)
+      | Struct (_, []) -> lprintf "skipping empty assignment: %s = %s"
+                           (render_tterm assignment.lhs)
+                           (render_tterm assignment.rhs);
+        (concrete,symbolic)
+      | _ -> failwith ("unsupported assignment: " ^
+                       (render_tterm assignment.lhs) ^
+                       " = " ^ (render_tterm assignment.rhs)))
+
 let is_execution_justified
     model_variables model_constraints
     spec_constraints model_spec_equalities =
@@ -138,17 +172,17 @@ let is_execution_justified
   lprint_list (List.map assignments ~f:(fun {lhs;rhs} ->
       (render_tterm lhs) ^ " = " ^ (render_tterm rhs)));
   let are_assignments_justified assignments =
-    let updated_model_constraints = apply_assignments assignments model_constraints
+    let (concrete_assignments,
+         symbolic_var_assignments) = split_assignments assignments
     in
-    List.for_all updated_model_constraints
-      ~f:(fun model_constraint ->
-          lprintf "Checking constraint: %s\n" (render_tterm model_constraint);
-          Z3_query.check_implication spec_constraints model_constraint)
+    (are_concrete_assignments_justified
+       spec_constraints concrete_assignments) &&
+    (are_symbolic_assignments_justified
+       spec_constraints symbolic_var_assignments model_constraints)
   in
   are_assignments_justified assignments
 
 let gen_ret_equalities ret_val ret_name ret_type =
-  (*TODO: destruct structs *)
   match ret_name with
   | Some ret_name -> begin
       match ret_type, ret_val.v with
@@ -163,7 +197,16 @@ let gen_ret_equalities ret_val ret_name ret_type =
       | Sint8, Int _
       | Uint32, Int _
       | Uint16, Int _
-      | Uint8, Int _ -> [{lhs={v=Id ret_name;t=ret_type};rhs=ret_val}]
+      | Uint8, Int _
+      | Sint32, Id _
+      | Sint8, Id _
+      | Uint32, Id _
+      | Uint16, Id _
+      | Uint8, Id _
+        -> [{lhs={v=Id ret_name;t=ret_type};rhs=ret_val}]
+      | Ptr (Uint16), Addr ({v=Id x;t})
+        ->
+        [{lhs={v=Id x;t};rhs={v=Deref {v=Id ret_name;t=ret_type};t}}]
       | _ -> failwith ("unsupported return type: " ^
                        (ttype_to_str ret_type) ^
                        " : " ^
