@@ -167,6 +167,14 @@ let split_constraints tterms symbols =
   List.partition_tf tterms ~f:(fun tterm ->
       Set.for_all (ids_from_term tterm) ~f:(String.Set.mem symbols))
 
+let render_some_assignments_as_assumptions assignments =
+  String.concat ~sep:"\n" (List.map assignments ~f:(fun {lhs;rhs} ->
+      match lhs,rhs with
+      | {v=Id _;t=_},{v=Id _;t=_} ->
+        "//@ assume(" ^ (render_tterm lhs) ^ " == " ^ (render_tterm rhs) ^ ");"
+      | _ -> "//skip this one: " ^ (render_tterm lhs) ^ " == " ^
+             (render_tterm rhs) ^ " -- too complicated"))
+
 let render_output_check ret_val ret_name ret_type model_constraints hist_symbs =
   let (input_constraints,output_constraints) =
     split_constraints model_constraints hist_symbs
@@ -183,6 +191,9 @@ let render_output_check ret_val ret_name ret_type model_constraints hist_symbs =
     apply_assignments symbolic_var_assignments output_constraints
   in
   (render_input_assumptions input_constraints) ^ "\n" ^
+  (* VV For the "if (...)" condition, which involves
+     VV the original value (non-renamed)*)
+  (render_some_assignments_as_assumptions symbolic_var_assignments) ^ "\n" ^
   (String.concat ~sep:"\n"
      (List.map concrete_assignments ~f:(fun {lhs;rhs} ->
           "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
