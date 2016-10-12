@@ -70,7 +70,9 @@ void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
                             uint32_t *time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              *lcore_id |-> _ &*&
-             *time |-> _; @*/
+             *time |-> _ &*&
+             chars(arr_lcc->data,
+                   (sizeof(ARRAY_LCC_EL_TYPE) * ARRAY_LCC_CAPACITY), _); @*/
 /*@ ensures *m |-> mp &*& *ch |-> chp &*&
             *lcore_id |-> ?lcid &*&
             *time |-> ?t &*&
