@@ -198,6 +198,14 @@ let render_concrete_assignments_as_assertions assignments =
           "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
           (render_tterm rhs) ^ "); @*/"))
 
+let expand_conjunctions terms =
+  let rec expand_tterm tterm =
+    match tterm with
+    | {v=Bop (And, t1, t2);t=_} -> (expand_tterm t1) @ (expand_tterm t2)
+    | tterm -> [tterm]
+  in
+  List.join (List.map terms ~f:expand_tterm)
+
 let render_output_check
     ret_val ret_name ret_type model_constraints
     hist_symbs args_post_conditions
@@ -207,12 +215,15 @@ let render_output_check
   in
   let ret_equalities = gen_ret_equalities ret_val ret_name ret_type
   in
-  let args_equalities = List.join (List.map args_post_conditions gen_plain_equalities) in
+  let args_equalities =
+    List.join (List.map args_post_conditions ~f:gen_plain_equalities)
+  in
   let assignments = make_assignments_for_eqs (ret_equalities@args_equalities)
   in
   let (concrete_assignments,
        symbolic_var_assignments) = split_assignments assignments
   in
+  let output_constraints = expand_conjunctions output_constraints in
   let upd_model_constraints =
     apply_assignments symbolic_var_assignments output_constraints
   in
