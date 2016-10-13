@@ -635,18 +635,7 @@ let fun_types =
      "array_bat_begin_access", {ret_type = Ptr batcher_struct;
                                 arg_types = [Ptr arr_bat_struct; Sint32;];
                                 lemmas_before = [];
-                                lemmas_after = [
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ construct_bat_element(" ^ params.ret_val ^");"
-                                     else "");
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ close some_batcherp(" ^ params.ret_val ^");"
-                                     else ""); (fun params ->
-                                     if params.is_tip then
-                                       "//@ close some_batcherp(" ^ params.ret_name ^");"
-                                     else "");];};
+                                lemmas_after = [];};
      "array_bat_end_access", {ret_type = Void;
                            arg_types = [Ptr arr_bat_struct;];
                            lemmas_before = [];

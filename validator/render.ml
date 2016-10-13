@@ -89,23 +89,20 @@ let find_complementary_sttmts sttmts1 sttmts2 =
   | None -> Option.map (find_from_left sttmts2 sttmts1)
               ~f:(fun rez -> (rez,true))
 
-let gen_plain_equalities {lhs;rhs} =
+let rec gen_plain_equalities {lhs;rhs} =
   match rhs.t, rhs.v with
-  | Ptr (Str (_, fields)), Addr {v=Struct (_, fvals);t=_} ->
-    List.map fields ~f:(fun (name,ttype) ->
-        let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
-            String.equal vname name)
-        in
-        {lhs={v=Str_idx ({v=Deref lhs;
-                          t=get_pointee lhs.t}, name);t=ttype};
-         rhs=v.value})
+  | Ptr ptee_t, Addr pointee ->
+    gen_plain_equalities {lhs={v=Deref lhs;t=ptee_t};
+                          rhs=pointee}
   | Str (_, fields), Struct (_, fvals) ->
-    List.map fields ~f:(fun (name,ttype) ->
-        let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
-            String.equal vname name)
-        in
-        {lhs={v=Str_idx (lhs, name);t=ttype};
-         rhs=v.value})
+    List.join
+      (List.map fields ~f:(fun (name,ttype) ->
+           let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
+               String.equal vname name)
+           in
+           gen_plain_equalities
+             {lhs={v=Str_idx (lhs, name);t=ttype};
+              rhs=v.value}))
   | Sint32, Int _
   | Sint8, Int _
   | Uint32, Int _
@@ -117,11 +114,8 @@ let gen_plain_equalities {lhs;rhs} =
   | Uint16, Id _
   | Uint8, Id _
   | Ptr _, Id _
-  | Ptr _, Int _
-    -> [{lhs;rhs}]
-  | Ptr (Uint16), Addr ({v=Id x;t})
-    ->
-    [{lhs={v=Deref lhs;t};rhs={v=Id x;t};}]
+  | Ptr _, Int _ -> [{lhs;rhs}]
+  | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | _ -> failwith ("unsupported output type: " ^
                    (ttype_to_str rhs.t) ^
                    " : " ^
@@ -141,6 +135,7 @@ let make_assignments_for_eqs equalities =
 let split_assignments assignments =
   List.fold assignments ~init:([],[]) ~f:(fun (concrete,symbolic) assignment ->
       match assignment.lhs.v with
+      | Cast (_,{v=Id _;t=_})
       | Id _ -> (concrete,assignment::symbolic)
       | Int _ -> (assignment::concrete,symbolic)
       | Struct (_, []) -> (* printf "skipping empty assignment: %s = %s" *)
