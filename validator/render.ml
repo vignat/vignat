@@ -89,37 +89,49 @@ let find_complementary_sttmts sttmts1 sttmts2 =
   | None -> Option.map (find_from_left sttmts2 sttmts1)
               ~f:(fun rez -> (rez,true))
 
+let gen_plain_equalities {lhs;rhs} =
+  match rhs.t, rhs.v with
+  | Ptr (Str (_, fields)), Addr {v=Struct (_, fvals);t=_} ->
+    List.map fields ~f:(fun (name,ttype) ->
+        let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
+            String.equal vname name)
+        in
+        {lhs={v=Str_idx ({v=Deref lhs;
+                          t=get_pointee lhs.t}, name);t=ttype};
+         rhs=v.value})
+  | Str (_, fields), Struct (_, fvals) ->
+    List.map fields ~f:(fun (name,ttype) ->
+        let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
+            String.equal vname name)
+        in
+        {lhs={v=Str_idx (lhs, name);t=ttype};
+         rhs=v.value})
+  | Sint32, Int _
+  | Sint8, Int _
+  | Uint32, Int _
+  | Uint16, Int _
+  | Uint8, Int _
+  | Sint32, Id _
+  | Sint8, Id _
+  | Uint32, Id _
+  | Uint16, Id _
+  | Uint8, Id _
+  | Ptr _, Id _
+  | Ptr _, Int _
+    -> [{lhs;rhs}]
+  | Ptr (Uint16), Addr ({v=Id x;t})
+    ->
+    [{lhs={v=Deref lhs;t};rhs={v=Id x;t};}]
+  | _ -> failwith ("unsupported output type: " ^
+                   (ttype_to_str rhs.t) ^
+                   " : " ^
+                   (render_tterm rhs))
+
+
 let gen_ret_equalities ret_val ret_name ret_type =
   match ret_name with
-  | Some ret_name -> begin
-      match ret_type, ret_val.v with
-      | Ptr (Str (_, fields)), Addr {v=Struct (_, fvals);t=_} ->
-        List.map fields ~f:(fun (name,ttype) ->
-            let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
-                String.equal vname name)
-            in
-            {lhs={v=Str_idx ({v=Deref {v=Id ret_name;t=ret_type};
-                              t=get_pointee ret_type}, name);t=ttype};
-             rhs=v.value})
-      | Sint32, Int _
-      | Sint8, Int _
-      | Uint32, Int _
-      | Uint16, Int _
-      | Uint8, Int _
-      | Sint32, Id _
-      | Sint8, Id _
-      | Uint32, Id _
-      | Uint16, Id _
-      | Uint8, Id _
-        -> [{lhs={v=Id ret_name;t=ret_type};rhs=ret_val}]
-      | Ptr (Uint16), Addr ({v=Id x;t})
-        ->
-        [{lhs={v=Deref {v=Id ret_name;t=ret_type};t};rhs={v=Id x;t};}]
-      | _ -> failwith ("unsupported return type: " ^
-                       (ttype_to_str ret_type) ^
-                       " : " ^
-                       (render_tterm ret_val))
-      end
+  | Some ret_name ->
+    gen_plain_equalities {lhs={v=Id ret_name;t=ret_type};rhs=ret_val}
   | None -> []
 
 let make_assignments_for_eqs equalities =
@@ -172,16 +184,30 @@ let render_some_assignments_as_assumptions assignments =
       match lhs,rhs with
       | {v=Id _;t=_},{v=Id _;t=_} ->
         "//@ assume(" ^ (render_tterm lhs) ^ " == " ^ (render_tterm rhs) ^ ");"
-      | _ -> "//skip this one: " ^ (render_tterm lhs) ^ " == " ^
+      | _ -> "//skip this assume: " ^ (render_tterm lhs) ^ " == " ^
              (render_tterm rhs) ^ " -- too complicated"))
 
-let render_output_check ret_val ret_name ret_type model_constraints hist_symbs =
+let render_concrete_assignments_as_assertions assignments =
+  String.concat ~sep:"\n"
+     (List.map assignments ~f:(fun {lhs;rhs} ->
+        match rhs.t with
+        | Ptr _ ->
+          "/*@ assert(" ^ (render_tterm rhs) ^ " == " ^
+          (render_tterm lhs) ^ "); @*/"
+        | _ ->
+          "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
+          (render_tterm rhs) ^ "); @*/"))
+
+let render_output_check
+    ret_val ret_name ret_type model_constraints
+    hist_symbs args_post_conditions
+  =
   let (input_constraints,output_constraints) =
     split_constraints model_constraints hist_symbs
   in
   let ret_equalities = gen_ret_equalities ret_val ret_name ret_type
   in
-  let args_equalities = [] in (*TODO: get these: args_post_conditions*)
+  let args_equalities = List.join (List.map args_post_conditions gen_plain_equalities) in
   let assignments = make_assignments_for_eqs (ret_equalities@args_equalities)
   in
   let (concrete_assignments,
@@ -194,15 +220,20 @@ let render_output_check ret_val ret_name ret_type model_constraints hist_symbs =
   (* VV For the "if (...)" condition, which involves
      VV the original value (non-renamed)*)
   (render_some_assignments_as_assumptions symbolic_var_assignments) ^ "\n" ^
-  (String.concat ~sep:"\n"
-     (List.map concrete_assignments ~f:(fun {lhs;rhs} ->
-          "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
-          (render_tterm rhs) ^ "); @*/"))) ^ "\n" ^
+  (render_concrete_assignments_as_assertions concrete_assignments) ^ "\n" ^
   (String.concat ~sep:"\n"
      (List.map upd_model_constraints ~f:(fun constr ->
           "/*@ assert(" ^ (render_tterm constr) ^ "); @*/")))
 
 let render_2tip_post_assertions res1 res2 ret_name ret_type hist_symbs =
+  let res1_statements =
+    render_output_check
+      res1.ret_val ret_name ret_type res1.post_statements hist_symbs res1.args_post_conditions
+  in
+  let res2_statements =
+    render_output_check
+      res2.ret_val ret_name ret_type res2.post_statements hist_symbs res2.args_post_conditions
+  in
   if term_eq res1.ret_val.v res2.ret_val.v then
     begin
       match find_complementary_sttmts
@@ -210,19 +241,11 @@ let render_2tip_post_assertions res1 res2 ret_name ret_type hist_symbs =
               res2.post_statements with
       | Some (sttmt,fst) ->
         begin
-          let res1_assertions =
-            render_output_check
-               res1.ret_val ret_name ret_type res1.post_statements hist_symbs
-          in
-          let res2_assertions =
-            render_output_check
-               res2.ret_val ret_name ret_type res2.post_statements hist_symbs
-          in
           let (pos_sttmts,neg_sttmts) =
             if fst then
-              res1_assertions,res2_assertions
+              res1_statements,res2_statements
             else
-              res2_assertions,res1_assertions
+              res2_statements,res1_statements
           in
           "if (" ^ (render_tterm sttmt) ^ ") {\n" ^
           pos_sttmts ^ "\n} else {\n" ^
@@ -238,10 +261,8 @@ let render_2tip_post_assertions res1 res2 ret_name ret_type hist_symbs =
       | None -> failwith "this can't be true!"
     in
     "if (" ^ rname ^ " == " ^ (render_tterm res1.ret_val) ^ ") {\n" ^
-    (render_output_check
-       res1.ret_val ret_name ret_type res1.post_statements hist_symbs) ^ "\n} else {\n" ^
-    (render_output_check
-       res2.ret_val ret_name ret_type res2.post_statements hist_symbs) ^ "}\n"
+    res1_statements ^ "\n} else {\n" ^
+    res2_statements ^ "}\n"
 
 let render_export_point name =
   "int " ^ name ^ ";\n"
@@ -261,7 +282,9 @@ let render_equality_assumptions args =
                 ^ (render_tterm arg.value) ^ ");"))
 
 let render_1tip_post_assertions result ret_name ret_type hist_symbs =
-  render_output_check result.ret_val ret_name ret_type result.post_statements hist_symbs
+  render_output_check
+    result.ret_val ret_name ret_type
+    result.post_statements hist_symbs result.args_post_conditions
 
 let render_tip_fun_call
     {context;results} export_point free_vars hist_symbols ~render_assertions =
