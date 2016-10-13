@@ -206,6 +206,23 @@ let expand_conjunctions terms =
   in
   List.join (List.map terms ~f:expand_tterm)
 
+let guess_support_assignments constraints symbs =
+  let (assignments,_) =
+    List.fold constraints ~init:([],symbs) ~f:(fun (assignments,symbs) tterm ->
+        match tterm.v with
+        | Bop (Eq, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
+          ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
+        | Bop (Eq, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
+          ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
+        | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
+          ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
+        | Bop (Le, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
+          ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
+        | _ -> (assignments, symbs))
+  in
+  assignments
+
+
 let render_output_check
     ret_val ret_name ret_type model_constraints
     hist_symbs args_post_conditions
@@ -220,10 +237,21 @@ let render_output_check
   in
   let assignments = make_assignments_for_eqs (ret_equalities@args_equalities)
   in
+  let output_constraints = expand_conjunctions output_constraints in
+  let output_symbs = ids_from_eq_conditions assignments in
+  let unalloc_symbs = String.Set.diff
+      (String.Set.diff
+         (ids_from_terms output_constraints)
+         output_symbs)
+      hist_symbs
+  in
+  let support_assignments =
+    guess_support_assignments output_constraints unalloc_symbs
+  in
+  let assignments = assignments@support_assignments in
   let (concrete_assignments,
        symbolic_var_assignments) = split_assignments assignments
   in
-  let output_constraints = expand_conjunctions output_constraints in
   let upd_model_constraints =
     apply_assignments symbolic_var_assignments output_constraints
   in
