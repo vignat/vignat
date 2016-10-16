@@ -104,6 +104,7 @@ let rec gen_plain_equalities {lhs;rhs} =
              {lhs={v=Str_idx (lhs, name);t=ttype};
               rhs=v.value}))
   | Sint32, Int _
+  | Sint32, Bop (Add, {v=Id _;t=_}, {v=Int _; t=_})
   | Sint8, Int _
   | Uint32, Int _
   | Uint16, Int _
@@ -138,6 +139,12 @@ let split_assignments assignments =
       | Cast (_,{v=Id _;t=_})
       | Id _ -> (concrete,assignment::symbolic)
       | Int _ -> (assignment::concrete,symbolic)
+      | Bop (Add, ({v=Id _;t=_} as symb), ({v=Int x;t=_} as delta)) ->
+        (concrete,
+         {lhs=symb;
+          rhs={v=Bop (Sub, assignment.rhs, delta);
+               t=assignment.rhs.t}}::
+         symbolic)
       | Struct (_, []) -> (* printf "skipping empty assignment: %s = %s" *)
                           (*  (render_tterm assignment.lhs) *)
                           (*  (render_tterm assignment.rhs); *)
@@ -250,6 +257,7 @@ let render_output_check
   let upd_model_constraints =
     apply_assignments symbolic_var_assignments output_constraints
   in
+  "// Output check\n" ^
   (render_input_assumptions input_constraints) ^ "\n" ^
   (* VV For the "if (...)" condition, which involves
      VV the original value (non-renamed)*)
@@ -389,8 +397,22 @@ let get_all_symbols calls =
                   | Some name -> (String.Set.add symbols name)
                   | None -> symbols)))))
 
+(* let get_some_input_assumptions {context=_;results} hist_symbs = *)
+(*   match results with *)
+(*   | result::[] -> *)
+(*     let (input_constraints,_) = *)
+(*       split_constraints result.post_statements hist_symbs *)
+(*     in *)
+(*     input_constraints *)
+(*   | res1::res2::[] -> *)
+(*     [] *)
+(*   | _ -> failwith "Unsupported number of results (> 2)." *)
+
 let render_ir ir fout ~render_assertions =
   let hist_symbols = get_all_symbols ir.hist_calls in
+  (* let tip_input_assumptions = *)
+  (*   get_some_input_assumptions ir.tip_call hist_symbols *)
+  (* in *)
   Out_channel.with_file fout ~f:(fun cout ->
       Out_channel.output_string cout ir.preamble;
       Out_channel.output_string cout (render_cmplexes ir.cmplxs);
@@ -399,6 +421,8 @@ let render_ir ir fout ~render_assertions =
       Out_channel.output_string cout (render_allocated_args ir.arguments);
       Out_channel.output_string cout (render_context_assumptions
                                         ir.context_assumptions);
+      (* Out_channel.output_string cout (render_context_assumptions *)
+      (*                                   tip_input_assumptions); *)
       Out_channel.output_string cout (render_tmps ir.tmps);
       Out_channel.output_string cout (render_assignments ir.arguments);
       Out_channel.output_string cout (render_hist_calls ir.hist_calls);

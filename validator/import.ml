@@ -660,7 +660,7 @@ let allocate_args ftype_of tpref arg_name_gen =
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call.fun_name i in
           let ptee_type = get_pointee t in
-          alloc_arg addr ptee.before (get_struct_val_value ptee.after ptee_type))
+          alloc_arg addr ptee.before (get_struct_val_value ptee.before ptee_type))
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
 
