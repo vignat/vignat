@@ -44,11 +44,11 @@ void array_u16_init(struct ArrayU16 *arr_out);
 ARRAY_U16_EL_TYPE *array_u16_begin_access(struct ArrayU16 *arr, int index);
 //@ requires arrp_u16(?lst, arr) &*& 0 <= index &*& index < ARRAY_U16_CAPACITY;
 /*@ ensures arrp_u16_acc(lst, arr, index) &*&
-  result == arrp_the_missing_cell_u16(arr, index) &*&
-  u_short_integer(result, nth(index, lst)); @*/
+            result == arrp_the_missing_cell_u16(arr, index) &*&
+            u_short_integer(result, nth(index, lst)); @*/
 void array_u16_end_access(struct ArrayU16 *arr);
 /*@ requires arrp_u16_acc(?lst, arr, ?idx) &*&
-  u_short_integer(arrp_the_missing_cell_u16(arr, idx), ?u16); @*/
+             u_short_integer(arrp_the_missing_cell_u16(arr, idx), ?u16); @*/
 //@ ensures arrp_u16(update(idx, u16, lst), arr);
 
 

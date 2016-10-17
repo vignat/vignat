@@ -112,21 +112,21 @@ ensures lcore_confp(_, p);
 // In-place initialization
 void array_lcc_init(struct ArrayLcc *arr_out);
 /*@ requires chars(arr_out->data,
-  sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
+                   sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
 /*@ ensures arrp_lcc(?lst, arr_out) &*&
-  length(lst) == ARRAY_LCC_CAPACITY; @*/
+            length(lst) == ARRAY_LCC_CAPACITY; @*/
 
 ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index);
 //@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
 /*@ ensures arrp_lcc_acc(lst, arr, index) &*&
-  result == arrp_the_missing_cell_lcc(arr, index) &*&
-  lcore_confp(nth(index, lst), result);
+            result == arrp_the_missing_cell_lcc(arr, index) &*&
+            lcore_confp(nth(index, lst), result);
   @*/
 
 void array_lcc_end_access(struct ArrayLcc *arr);
 /*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
-  lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
+             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
 /*@ ensures arrp_lcc(update(idx, lc, lst), arr) &*&
-  length(update(idx, lc, lst)) == ARRAY_LCC_CAPACITY; @*/
+            length(update(idx, lc, lst)) == ARRAY_LCC_CAPACITY; @*/
 
 #endif//_ARRAY_LCC_H_INCLUDED_

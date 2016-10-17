@@ -79,12 +79,12 @@ void array_rq_init(struct ArrayRq *arr_out);
 ARRAY_RQ_EL_TYPE *array_rq_begin_access(struct ArrayRq *arr, int index);
 //@ requires arrp_rq(?lst, arr) &*& 0 <= index &*& index < ARRAY_RQ_CAPACITY;
 /*@ ensures arrp_rq_acc(lst, arr, index) &*&
-  result == arrp_the_missing_cell_rq(arr, index) &*&
-  rx_queuep(nth(index, lst), result); @*/
+            result == arrp_the_missing_cell_rq(arr, index) &*&
+            rx_queuep(nth(index, lst), result); @*/
 
 void array_rq_end_access(struct ArrayRq *arr);
 /*@ requires arrp_rq_acc(?lst, arr, ?idx) &*&
-  rx_queuep(?rq, arrp_the_missing_cell_rq(arr, idx)); @*/
+             rx_queuep(?rq, arrp_the_missing_cell_rq(arr, idx)); @*/
 //@ ensures arrp_rq(update(idx, rq, lst), arr);
 
 #endif//_ARRAY_RQ_H_INCLUDED_
