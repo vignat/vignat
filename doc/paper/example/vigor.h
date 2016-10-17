@@ -1,5 +1,8 @@
 #ifndef _VIGOR_H_INCLUDED_
 #define _VIGOR_H_INCLUDED_
+
+#ifdef KLEE_VERIFICATION
+
 #include <klee/klee.h>
 
 #ifndef bool
@@ -24,5 +27,7 @@
 #define FILL_SYMBOLIC(addr, size, name) klee_make_symbolic(addr, size, name)
 
 #define LOOP(cond) (cond & klee_induce_invariants())
+
+#endif//KLEE_VERIFICATION
 
 #endif//_VIGOR_H_INCLUDED_

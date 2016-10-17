@@ -2,8 +2,6 @@
 #include "packet.h"
 #include "ring.h"
 
-#define CAP 512
-
 int main() {
   struct packet p;
   while(LOOP(1))

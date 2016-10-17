@@ -7,7 +7,7 @@ struct packet {
   int port;
 };
 
-static inline bool receive_packet(struct packet* dst) {
+static bool receive_packet(struct packet* dst) {
   if (SYMBOLIC("received")) {
     dst->port = SYMBOLIC("port");
     return 1;
@@ -15,12 +15,12 @@ static inline bool receive_packet(struct packet* dst) {
   return 0;
 }
 
-static inline bool can_send_packet() {
+static bool can_send_packet() {
   if (SYMBOLIC("can_send_packet")) return 1;
   return 0;
 }
 
-static inline void send_packet(struct packet* src) {
+static void send_packet(struct packet* src) {
   assert(src->port != 9);
 }
 
