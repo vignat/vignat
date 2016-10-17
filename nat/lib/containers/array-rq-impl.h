@@ -52,19 +52,8 @@ static void lcore_rx_queue_init(struct lcore_rx_queue *cell)
 #else//KLEE_VERIFICATION
   cell->port_id = 0;
 #endif//KLEE_VERIFICATION
-  //@ construct_rq_element(cell);
+  //@ close rx_queuep(rx_queuei(cell->port_id, cell->queue_id), cell);
 }
-
-ARRAY_RQ_EL_TYPE *array_rq_begin_access(struct ArrayRq *arr, int index);
-//@ requires arrp_rq(?lst, arr) &*& 0 <= index &*& index < ARRAY_RQ_CAPACITY;
-/*@ ensures arrp_rq_acc(lst, arr, index) &*&
-            result == arrp_the_missing_cell_rq(arr, index) &*&
-            rx_queuep(nth(index, lst), result); @*/
-
-void array_rq_end_access(struct ArrayRq *arr);
-/*@ requires arrp_rq_acc(?lst, arr, ?idx) &*&
-             rx_queuep(?rq, arrp_the_missing_cell_rq(arr, idx)); @*/
-//@ ensures arrp_rq(update(idx, rq, lst), arr);
 
 #ifdef KLEE_VERIFICATION
 
@@ -144,8 +133,6 @@ void array_rq_end_access(struct ArrayRq *arr)
 }
 
 #else//KLEE_VERIFICATION
-
-#ifdef _NO_VERIFAST_
 
 /*@ predicate ptrs_eq(ARRAY_RQ_EL_TYPE* p1, int l, ARRAY_RQ_EL_TYPE* p2) =
       p1 == p2 + l;
@@ -302,8 +289,6 @@ void array_rq_end_access(struct ArrayRq *arr)
     close rx_queuep(rx_queuei(pid,p->queue_id), p);
   }
   @*/
-
-#endif//_NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION
 

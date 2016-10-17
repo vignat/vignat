@@ -44,19 +44,6 @@
              ARRAY_BAT_CAPACITY - idx - 1, drop(idx+1, data));
   @*/
 
-ARRAY_BAT_EL_TYPE *array_bat_begin_access(struct ArrayBat *arr, int index);
-//@ requires arrp_bat(?lst, arr) &*& 0 <= index &*& index < ARRAY_BAT_CAPACITY;
-/*@ ensures arrp_bat_acc(lst, arr, index) &*&
-            result == arrp_the_missing_cell_bat(arr, index) &*&
-            batcherp(nth(index, lst), result) &*&
-            length(nth(index, lst)) < BATCHER_CAPACITY; @*/
-
-void array_bat_end_access(struct ArrayBat *arr);
-/*@ requires arrp_bat_acc(?lst, arr, ?index) &*&
-             batcherp(?x, arrp_the_missing_cell_bat(arr, index)) &*&
-             length(x) < BATCHER_CAPACITY; @*/
-//@ ensures arrp_bat(update(index, x, lst), arr);
-
 
 #ifdef KLEE_VERIFICATION
 
@@ -119,8 +106,6 @@ void array_bat_end_access(struct ArrayBat *arr)
 }
 
 #else//KLEE_VERIFICATION
-
-#ifdef _NO_VERIFAST_
 
 /*@ predicate ptrs_eq(ARRAY_BAT_EL_TYPE* p1, int l, ARRAY_BAT_EL_TYPE* p2) =
       p1 == p2 + l;
@@ -282,8 +267,6 @@ void array_bat_end_access(struct ArrayBat *arr)
     
   }
   @*/
-
-#endif//_NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION
 

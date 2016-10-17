@@ -55,27 +55,6 @@ static void lcore_conf_condition(struct lcore_conf *cell)
   //@ construct_lcc_element(cell);
 }
 
-
-// In-place initialization
-void array_lcc_init(struct ArrayLcc *arr_out);
-/*@ requires chars(arr_out->data,
-             sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
-/*@ ensures arrp_lcc(?lst, arr_out) &*&
-            length(lst) == ARRAY_LCC_CAPACITY; @*/
-
-ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index);
-//@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
-/*@ ensures arrp_lcc_acc(lst, arr, index) &*&
-            result == arrp_the_missing_cell_lcc(arr, index) &*&
-            lcore_confp(nth(index, lst), result);
-  @*/
-
-void array_lcc_end_access(struct ArrayLcc *arr);
-/*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
-             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
-/*@ ensures arrp_lcc(update(idx, lc, lst), arr) &*&
-            length(update(idx, lc, lst)) == ARRAY_LCC_CAPACITY; @*/
-
 #ifdef KLEE_VERIFICATION
 
 #include <klee/klee.h>
@@ -151,7 +130,6 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 
 #else//KLEE_VERIFICATION
 
-#ifdef _NO_VERIFAST_
 
 /*@ predicate ptrs_eq(ARRAY_LCC_EL_TYPE* p1, int l, ARRAY_LCC_EL_TYPE* p2) =
       p1 == p2 + l;
@@ -185,7 +163,8 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 void array_lcc_init(struct ArrayLcc *arr_out)
 /*@ requires chars(arr_out->data,
              sizeof(ARRAY_LCC_EL_TYPE)*ARRAY_LCC_CAPACITY, _);@*/
-//@ ensures arrp_lcc(_, arr_out);
+/*@ ensures arrp_lcc(?lst, arr_out) &*&
+            length(lst) == ARRAY_LCC_CAPACITY; @*/
 {
   int i;
   //@ close lcore_conf_arrp(arr_out->data, 0, nil);
@@ -290,7 +269,8 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
 void array_lcc_end_access(struct ArrayLcc *arr)
 /*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
              lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
-//@ ensures arrp_lcc(update(idx, lc, lst), arr);
+/*@ ensures arrp_lcc(update(idx, lc, lst), arr) &*&
+            length(update(idx, lc, lst)) == ARRAY_LCC_CAPACITY; @*/
 {
   //@ open arrp_lcc_acc(lst, arr, idx);
   //@ take_update_unrelevant(idx, idx, lc, lst);
@@ -315,6 +295,5 @@ void array_lcc_end_access(struct ArrayLcc *arr)
   }
   @*/
 
-#endif//_NO_VERIFAST_
 
 #endif//KLEE_VERIFICATION
