@@ -1,6 +1,7 @@
 #ifndef _MODULO_GH_INCLUDED_
 #define _MODULO_GH_INCLUDED_
 
+#include "arith.gh"
 #include "nth_prop.gh"
 
   lemma void div_mod(int g, int k, int l)
@@ -32,17 +33,6 @@
     assert(capacity > 0);
     div_rem(k%capacity + capacity, capacity);
     assert(0 <= ((k%capacity + capacity)%capacity));
-  }
-
-  lemma void mul_mono(int a, int b, int c)
-  requires a <= b &*& 0 <= c;
-  ensures a * c <= b * c;
-  {
-    for (int i = 0; i < c; i++)
-      invariant i <= c &*& a * i <= b * i;
-      decreases c - i;
-    {
-    }
   }
 
   lemma void bar(int a, int b, int q, int r)
