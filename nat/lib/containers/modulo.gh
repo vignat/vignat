@@ -47,42 +47,129 @@
     }
   }
 
+  lemma void quotidient_zero_pos(int a, int b, int q, int r)
+  requires 0 <= a &*& a < b &*& 0 <= r &*& a == q * b + r &*& r < b;
+  ensures q == 0;
+  {
+    if (q == 0) {
+    } else if (0 <= q) {
+      mul_mono(1, q, b);
+    } else {
+      mul_mono(q, -1, b);
+    }
+  }
+
+  lemma void quotidient_zero_neg(int a, int b, int q, int r)
+  requires -b < a &*& a <= 0 &*& -b < r &*& a == q * b + r &*& r <= 0;
+  ensures q == 0;
+  {
+    if (q == 0) {
+    } else if (0 <= q) {
+      mul_mono(1, q, b);
+    } else {
+      mul_mono(q, -1, b);
+    }
+  }
+
   lemma void division_round_to_zero(int a, int b)
-  requires 0 <= a &*& a < b;
+  requires -b < a &*& a < b;
   ensures a/b == 0;
   {
     div_rem(a, b);
-    bar(a, b, a / b, a % b);
+    if (0 <= a)
+      quotidient_zero_pos(a, b, a / b, a % b);
+    else
+      quotidient_zero_neg(a, b, a / b, a % b);
+  }
+
+  lemma void div_incr(int a, int b)
+  requires 0 <= a &*& 0 < b;
+  ensures true == ( (a+b)/b == a/b + 1 );
+  {
+    div_rem(a+b, b);
+    if ((a+b)/b <= a/b) {
+      div_rem(a, b);
+      mul_mono((a+b)/b, a/b, b);
+      assert true == ((a+b)/b*b <= a/b*b);
+      assert false;
+    }
+
+    assert a/b + 1 <= (a+b)/b;
+    assert 0 <= a;
+    div_rem(a, b);
+    if (a/b <= -1) {
+      mul_mono(a/b, -1, b);
+      assert(false);
+    }
+    assert 0 <= (a/b);
+    if (a/b + 1 <= (a+b)/b - 1) {
+      mul_mono(a/b + 1, (a+b)/b - 1, b);
+      assert(false);
+    }
   }
 
   lemma void loop_bijection(int k, int capacity)
   requires 0 <= k &*& k < capacity;
   ensures loop_fp(k, capacity) == k;
   {
-    div_rem(k, capacity);
-    assert(0 < capacity);
     division_round_to_zero(k, capacity);
-    //TODO: the below is really true, see in the debugger!
-    assume(k == ((k/capacity)*capacity) + (k % capacity));
-    assert(k/capacity == 0);
-    assert(k%capacity == k);
+    div_rem(k, capacity);
+    div_incr(k, capacity);
     div_rem((k + capacity), capacity);
-    // Believe me, baby. I the parser get's out of hand here,
-    // so I can not even formulate my assumptions properly
-    assume(false);
-    assert(k == ((k % capacity + capacity) % capacity));
+  }
+
+  lemma void mod_rotate(int a, int b)
+  requires 0 <= a &*& 0 < b;
+  ensures true == ((a+b)%b == a%b);
+  {
+    div_rem(a+b, b);
+    div_rem(a, b);
+    div_incr(a, b);
+    mul_subst((a+b)/b, (a/b + 1), b);
   }
 
   lemma void loop_injection(int k, int capacity)
   requires 0 <= k &*& 0 < capacity;
   ensures loop_fp(k + capacity, capacity) == loop_fp(k, capacity);
   {
-    div_rem(k, capacity);
-    div_rem((k + capacity), capacity);
-    int x = (k + capacity) % capacity;
-    // Sorry, you have to believe me again.
-    assume(false);
-    assert(x == ((k%capacity) + (capacity/capacity)));
+    mod_rotate(k, capacity);
+  }
+
+  lemma void loop_injection_minus_n(int k, int capacity, int n)
+  requires 0 <= k &*& 0 < capacity &*& 0 <= k + n*capacity &*& n < 0;
+  ensures loop_fp(k + n*capacity, capacity) == loop_fp(k, capacity);
+  {
+    int i = n;
+    for (i = n; i < 0; ++i)
+    invariant loop_fp(k + i*capacity, capacity) == loop_fp(k + n*capacity, capacity) &*&
+              0 <= k + i*capacity &*&
+              i <= 0;
+    decreases -i;
+    {
+      mod_rotate(k + i*capacity, capacity);
+      assert loop_fp(k + i*capacity, capacity) == loop_fp(k + n*capacity, capacity);
+    }
+    assume(loop_fp(k + i*capacity, capacity) == loop_fp(k + n*capacity, capacity));//workaround
+    assert loop_fp(k + i*capacity, capacity) == loop_fp(k + n*capacity, capacity);
+  }
+
+
+  lemma void loop_injection_n(int k, int capacity, int n)
+  requires 0 <= k &*& 0 < capacity &*& 0 <= k + n*capacity;
+  ensures loop_fp(k + n*capacity, capacity) == loop_fp(k, capacity);
+  {
+    if (0 <= n) {
+      for (int i = 0; i < n; ++i)
+      invariant loop_fp(k + i*capacity, capacity) == loop_fp(k, capacity) &*&
+                0 <= k + i*capacity &*&
+                i <= n;
+      decreases n-i;
+      {
+        mod_rotate(k + i*capacity, capacity);
+      }
+    } else {
+      loop_injection_minus_n(k, capacity, n);
+    }
   }
 
   lemma void loop_fixp(int k, int capacity)
@@ -93,16 +180,128 @@
     loop_bijection(loop_fp(k, capacity), capacity);
   }
 
+  predicate save_for_now(bool x) = x;
+
+  lemma void mod_bijection(int x, int y)
+  requires -y < x &*& x < y;
+  ensures x == x%y;
+  {
+    division_round_to_zero(x, y);
+    div_rem(x, y);
+  }
+
   lemma int loop_shift_inv(int x, int y, int capacity)
-  requires 0 <= x &*& x < capacity;
+  requires 0 <= x &*& x < capacity &*& 0 <= y &*& y < capacity;
   ensures 0 <= result &*& result < capacity &*&
           loop_fp(result + y, capacity) == x;
   {
-    int z = loop_fp(x - y, capacity);
-    // TODO:
-    assume(false);
-    if (z == 0) return 0;
-    else return capacity - z;
+    int z = loop_fp(y - x, capacity);
+    loop_lims(y - x, capacity);
+    if (z == 0) {
+      assert true == (((y-x)%capacity + capacity)%capacity == 0);
+      div_rem(y-x, capacity);
+      if (1 <= (y-x)%capacity) {
+        mod_rotate((y-x)%capacity, capacity);
+        assert true == (0 == ((y-x)%capacity%capacity));
+        division_round_to_zero((y-x)%capacity, capacity);
+        div_rem((y-x)%capacity, capacity);
+        assert false;
+      }
+
+      if ((y-x)%capacity <= -1) {
+        assert (-capacity < (y-x)%capacity);
+        assert true == (0 <= (y-x)%capacity + capacity);
+        division_round_to_zero((y-x)%capacity + capacity, capacity);
+        mul_subst(((y-x)%capacity + capacity)/capacity, 0, capacity);
+        assert true == (((y-x)%capacity + capacity)/capacity*capacity == 0);
+        div_rem((y-x)%capacity + capacity, capacity);
+      }
+      assert true == ((y-x)%capacity == 0);//TADA!!!
+
+      int n1 = (y-x)/capacity;
+      div_rem(y-x, capacity);
+      assert true == (y-x == n1*capacity);
+      int n = -n1;
+      assert true == (x-y == n*capacity);
+      assert true == (x == n*capacity + y);
+      division_round_to_zero(x, capacity);
+      div_rem(x, capacity);
+      assert true == (x%capacity == x);
+      assert true == (x == (n*capacity + y)%capacity);
+      assert true == (x + capacity == (n*capacity + y)%capacity + capacity);
+      mod_rotate(x, capacity);
+      assert true == ((x+capacity)%capacity == x);
+      assert true == (x == ((n*capacity + y)%capacity + capacity)%capacity);
+
+      loop_injection_n(y, capacity, n);
+      assert true == ((y - x) == (y - x)/capacity*capacity);
+      assert true == (((y%capacity) + capacity)%capacity == x);
+      assert(loop_fp(y, capacity) == x);
+      return 0;
+    } else {
+      assert(z == ((y-x)%capacity + capacity)%capacity);
+      assert(0 < z);
+      assert(z < capacity);
+      assert(0 <= (capacity - z + y));
+
+      if (0 <= y-x) {
+        div_rem(y-x, capacity);
+        assert true == (0 <= (y-x)%capacity);
+        mod_rotate((y-x)%capacity, capacity);
+        mod_bijection((y-x)%capacity, capacity);
+        assert true == ((y-x)%capacity == ((y-x)%capacity + capacity)%capacity);
+
+        if (y-x < capacity) {
+          mod_bijection((y-x), capacity);
+          assert true == ((y-x)%capacity == y-x);
+
+          mod_rotate(x, capacity);
+          mod_bijection(x, capacity);
+          assert true == (x == (capacity + x)%capacity);
+          mod_rotate((capacity + x)%capacity, capacity);
+          mod_bijection((capacity + x)%capacity, capacity);
+          assert true == (x == (((capacity + x)%capacity + capacity)%capacity));
+        } else {
+          div_rem(y-x, capacity);
+          int n = (y-x)/capacity;
+          int r = (y-x)%capacity;
+          assert true == (y-x == n*capacity + r);
+
+
+          mod_rotate(x, capacity);
+          mod_bijection(x, capacity);
+          assert true == (x == (capacity + x)%capacity);
+          mod_rotate((capacity + x)%capacity, capacity);
+          mod_bijection((capacity + x)%capacity, capacity);
+          assert true == (x == (((capacity + x)%capacity + capacity)%capacity));
+
+          if (0 <= capacity + y - r) {
+            if (capacity + y - r < capacity) {
+              mod_rotate_n(capacity + y - r, -n, capacity);
+            } else {
+              assert false;
+            }
+          } else {
+            assert false;
+          }
+
+        }
+
+      } else {
+        assert true == (y-x < 0);
+        assert true == (-capacity < y-x);
+
+        mod_bijection(y-x, capacity);
+        assert true == ((y-x)%capacity == y-x);
+        mod_bijection((y-x) + capacity, capacity);
+        mod_bijection(x, capacity);
+        mod_rotate(x, capacity);
+        assert true == (x == ((x%capacity + capacity)%capacity));
+      }
+      assert true == (((capacity - z + y)%capacity + capacity)%capacity == x);
+      return capacity - z;
+    }
+
   }
 
   fixpoint bool byLoopNthProp<t>(list<t> arr, fixpoint (t, bool) prop,
