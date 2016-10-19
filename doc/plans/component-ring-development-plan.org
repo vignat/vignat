@@ -1,0 +1,29 @@
+* Design, implement and verify a ring.
+Circular array buffer: dynamic allocation, static capacity.
+** Design the API
+   :LOGBOOK:
+   CLOCK: [2016-10-17 18:21]--[2016-10-17 18:30] =>  0:09
+   :END:
+** Implement the API
+   :LOGBOOK:
+   CLOCK: [2016-10-17 18:30]--[2016-10-17 19:00] =>  0:00
+   :END:
+** Formalize the API with VeriFast contracts
+   :LOGBOOK:
+   CLOCK: [2016-10-17 19:00]--[2016-10-17 19:30] =>  0:00
+   :END:
+** Write a symbolic model
+   :LOGBOOK:
+   CLOCK: [2016-09-17 18:00]--[2016-09-17 19:00] =>  0:00
+   :END:
+** Write a validator plugin
+** Verify the implementation
+   - Note taken on [2016-10-19 Mit 21:01] \\
+     finished ring_push_back verification
+   :LOGBOOK:
+   CLOCK: [2016-10-19 Mit 20:17]--[2016-10-19 Mit 21:01] =>  0:44
+   CLOCK: [2016-10-19 Mit 19:09]--[2016-10-19 Mit 20:01] =>  0:52
+   CLOCK: [2016-10-18 Die 10:36]--[2016-10-18 Die 11:26] =>  0:50
+   CLOCK: [2016-10-18 Die 10:26]--[2016-10-18 Die 10:27] =>  0:01
+   CLOCK: [2016-10-17 19:30]--[2016-10-17 20:50] =>  0:00
+   :END:
