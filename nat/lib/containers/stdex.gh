@@ -709,6 +709,30 @@ ensures append(a, b) != nil;
     subset_append(remove(el, xs), cons(el, nil), ys);
   }
 
+  lemma void drop_append_small<t>(int n, list<t> l1, list<t> l2)
+  requires 0 <= n &*& n <= length(l1);
+  ensures append(drop(n, l1), l2) == drop(n, append(l1, l2));
+  {
+    switch(l1) {
+      case nil: return;
+      case cons(h, t):
+        if (n == 0) return;
+        drop_append_small(n-1, t, l2);
+    }
+  }
+
+  lemma void take_append_small<t>(int n, list<t> l1, list<t> l2)
+  requires 0 <= n &*& n <= length(l1);
+  ensures take(n, l1) == take(n, append(l1, l2));
+  {
+    switch(l1) {
+      case nil: return;
+      case cons(h, t):
+        if (n == 0) return;
+        take_append_small(n-1, t, l2);
+    }
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)
