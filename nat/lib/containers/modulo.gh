@@ -113,6 +113,7 @@
   lemma void by_loop_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
                                 int shift, int capacity, nat outlen)
   requires length(arr) == capacity &*& int_of_nat(outlen) <= capacity &*&
+           0 <= shift &*& shift < capacity &*&
            true == up_to(nat_of_int(capacity),
                          (byLoopNthProp)(arr, prop, capacity, shift));
   ensures true == up_to(outlen, (nthProp)(arr, prop));

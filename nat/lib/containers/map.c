@@ -389,7 +389,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int start,
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
-             0 <= start &*& 2*start < INT_MAX &*&
+             0 <= start &*& start < capacity &*&
              [?f]is_map_keys_equality<kt>(eq, kpr); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
             pointers(keyps, capacity, kps) &*&
@@ -525,7 +525,7 @@ static
 int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
 /*@ requires hmapping<kt>(?kp, ?hsh, capacity, busybits, ?kps, ?k_hashes, ?hm) &*&
              pointers(?keyps, capacity, kps) &*&
-             0 <= start &*& 2*start < INT_MAX; @*/
+             0 <= start &*& start < capacity; @*/
 /*@ ensures hmapping<kt>(kp, hsh, capacity, busybits, kps, k_hashes, hm) &*&
             pointers(keyps, capacity, kps) &*&
             (hmap_size_fp(hm) < capacity ?
