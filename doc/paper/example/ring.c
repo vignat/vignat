@@ -35,6 +35,7 @@ struct ring {
     r->len |-> ?len &*&
     0 <= len &*& len <= CAP &*&
     len == length(packets) &*&
+    malloc_block_ring(r) &*&
     begin + len < CAP ?
       (empty_arrayp(r->array, begin) &*&
        packetsp((struct packet*)r->array + begin, len, packets) &*&
@@ -51,7 +52,15 @@ struct ring* ring_create()
 //@ requires true;
 //@ ensures result == 0 ? true : ringp(result, nil);
 {
-  return 0;
+  struct ring* ret = malloc(sizeof(struct ring));
+  if (ret == 0) return 0;
+  ret->begin = 0;
+  ret->len = 0;
+  //@ close empty_arrayp(ret->array, 0);
+  //@ close packetsp(ret->array, 0, nil);
+  //@ close empty_arrayp((struct packet*)ret->array, CAP);
+  //@ close ringp(ret, nil);
+  return ret;
 }
 
 bool ring_full(struct ring* r)
