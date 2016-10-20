@@ -1,21 +1,24 @@
 
 KLEE_INCLUDE=~/proj/klee/include/
 
+CFLAGS=-DKLEE_VERIFICATION -I ${KLEE_INCLUDE} -g
+KLEE_FLAGS=--libc=uclibc --posix-runtime --dump-call-traces --max-memory=12000 --dump-call-trace-prefixes
+
 ring-stub.bc: ring-stub.c vigor.h
-	clang ring-stub.c -emit-llvm -g -c -I ${KLEE_INCLUDE} -o ring-stub.bc
+	clang ring-stub.c -emit-llvm -c ${CFLAGS} -o ring-stub.bc
 
 ex-linv.bc: loop-inv.c packet.h vigor.h
-	clang loop-inv.c -emit-llvm -g -c -I ${KLEE_INCLUDE} -o ex-linv.bc
+	clang loop-inv.c -emit-llvm -c ${CFLAGS} -o ex-linv.bc
 
 ex-model.bc: model.c packet.h ring-stub.bc vigor.h
-	clang model.c -emit-llvm -g -c -I ${KLEE_INCLUDE} -o ex-mo.bc
+	clang model.c -emit-llvm -c ${CFLAGS} -o ex-mo.bc
 	llvm-link ex-mo.bc ring-stub.bc -o ex-model.bc
 
 verify-model: ex-model.bc
-	klee ex-model.bc
+	klee ${KLEE_FLAGS} ex-model.bc
 
 verify-loop-inv: ex-linv.bc
-	klee ex-linv.bc
+	klee ${KLEE_FLAGS} ex-linv.bc
 
 clean:
 	rm *.bc klee-* -rf
