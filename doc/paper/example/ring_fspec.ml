@@ -11,11 +11,11 @@ let fun_types =
                      arg_types = [];
                      lemmas_before = [];
                      lemmas_after = [];};
-     "ring_full", {ret_type = Bool;
+     "ring_full", {ret_type = Boolean;
                    arg_types = [Ptr ring_struct];
                    lemmas_before = [];
                    lemmas_after = [];};
-     "ring_empty", {ret_type = Bool;
+     "ring_empty", {ret_type = Boolean;
                     arg_types = [Ptr ring_struct];
                     lemmas_before = [];
                     lemmas_after = [];};
@@ -29,6 +29,14 @@ let fun_types =
                                      Ptr packet_struct];
                         lemmas_before = [];
                         lemmas_after = [];};
+     "loop_invariant_consume", {ret_type = Void;
+                                arg_types = [Ptr (Ptr ring_struct)];
+                                lemmas_before = [];
+                                lemmas_after = [];};
+     "loop_invariant_produce", {ret_type = Void;
+                                arg_types = [Ptr (Ptr ring_struct)];
+                                lemmas_before = [];
+                                lemmas_after = [];};
     ]
 
 let fixpoints = String.Map.empty

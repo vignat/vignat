@@ -1,3 +1,6 @@
+#ifndef _RING_H_INCLUDED_
+#define _RING_H_INCLUDED_
+
 #include "packet.h"
 
 #define CAP 512
@@ -28,3 +31,5 @@ void ring_push_back(struct ring* r, struct packet* p);
 void ring_pop_front(struct ring* r, struct packet* p);
 //@ requires ringp(r, ?lst) &*& lst != nil &*& pktp(p, _);
 //@ ensures ringp(r, tail(lst)) &*& pktp(p, head(lst));
+
+#endif//_RING_H_INCLUDED_

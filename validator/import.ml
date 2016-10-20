@@ -546,8 +546,10 @@ let get_basic_vars ftype_of tpref =
         end
         else get_arg_pointee_vars ptee ptee_type acc
     in
-    assert((List.length call.args) =
-           (List.length (ftype_of call.fun_name).arg_types));
+    if (List.length call.args <>
+        List.length (ftype_of call.fun_name).arg_types) then
+      failwith ("Wrong number of arguments in the plugin for function " ^
+                call.fun_name);
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
             let arg_type = get_fun_arg_type ftype_of call.fun_name i in
