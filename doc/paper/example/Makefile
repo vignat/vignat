@@ -23,5 +23,9 @@ verify-model: ex-model.bc
 verify-loop-inv: ex-linv.bc
 	klee ${KLEE_FLAGS} ex-linv.bc
 
+validate-model:
+	corebuild corebuild -I validator -no-hygiene -lib dynlink ring_fspec.cmo
+	./validator/test_all.sh ./klee-last ggg . _build/ring_fspec.cmo 2
+
 clean:
 	rm *.bc klee-* -rf
