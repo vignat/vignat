@@ -117,6 +117,8 @@ let rec gen_plain_equalities {lhs;rhs} =
   | Ptr _, Id _
   | Ptr _, Int _ -> [{lhs;rhs}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
+  | Ptr _, Zeroptr -> []
+  | Str _, Undef -> []
   | _ -> failwith ("unsupported output type: " ^
                    (ttype_to_str rhs.t) ^
                    " : " ^
@@ -294,7 +296,7 @@ let render_2tip_post_assertions res1 res2 ret_name ret_type hist_symbs =
           neg_sttmts ^ "}\n"
         end
       | None -> failwith "Tip calls non-differentiated by ret, nor \
-                          by a complementary post-conditions are \
+                          by complementary post-conditions are \
                           not supported"
     end
   else

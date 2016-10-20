@@ -607,8 +607,12 @@ let allocate_rets ftype_of tpref =
         | Funptr _ -> failwith "TODO:support funptr retuns."
         | Apathptr ->
           let addr = Int64.of_string (Sexp.to_string value) in
-          add_to_known_addresses {t=ret_type;v=Id name} [] addr call.id 0;
-          {name;value={t=ret_type;v=Addr {t=get_pointee ret_type;v=Undef}}}
+          if (addr = 0L) then
+            {name;value={t=ret_type;v=Zeroptr}}
+          else begin
+            add_to_known_addresses {t=ret_type;v=Id name} [] addr call.id 0;
+            {name;value={t=ret_type;v=Addr {t=get_pointee ret_type;v=Undef}}}
+          end
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
           add_to_known_addresses {v=Id name;t=ret_type}

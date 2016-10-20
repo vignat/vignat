@@ -34,6 +34,7 @@ type term =
   | Addr of tterm
   | Fptr of bytes
   | Cast of ttype * tterm
+  | Zeroptr
   | Undef
 and tterm = { v : term; t : ttype; }
 and var_spec = { name : bytes; value : tterm; }

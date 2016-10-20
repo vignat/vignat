@@ -36,6 +36,7 @@ type term = Bop of bop*tterm*tterm
           | Addr of tterm
           | Fptr of string
           | Cast of ttype*tterm
+          | Zeroptr
           | Undef
 and tterm = {v:term; t:ttype}
 and var_spec = {name: string; value:tterm}
@@ -152,6 +153,7 @@ let rec render_tterm (t:tterm) =
   | Fptr f -> f
   | Addr t -> "&(" ^ (render_tterm t) ^ ")"
   | Cast (t,v) -> "(" ^ ttype_to_str t ^ ")" ^ (render_tterm v)
+  | Zeroptr -> "0"(*"NULL"*)
   | Undef -> "???"
 and render_term t = render_tterm {v=t;t=Unknown} (*TODO: reformulate this coupled definition*)
 
@@ -202,6 +204,7 @@ let rec replace_term_in_term old_t new_t term =
     | Cast (ctype,tterm) ->
       Cast (ctype,replace_term_in_tterm old_t new_t tterm)
     | Undef -> Undef
+    | Zeroptr -> Zeroptr
 and replace_term_in_tterm old_t new_t tterm =
   {tterm with v=replace_term_in_term old_t new_t tterm.v}
 and replace_term_in_tterms old_t new_t tterm_list =
@@ -228,6 +231,7 @@ let rec call_recursively_on_tterm f tterm =
         | Addr tt -> Addr (call_recursively_on_tterm f tt)
         | Cast (ctype,tt) -> Cast (ctype,call_recursively_on_tterm f tt)
         | Undef -> Undef
+        | Zeroptr -> Zeroptr
       end;
      t=tterm.t} in
   match f tterm.v with
@@ -254,6 +258,7 @@ let rec collect_nodes f tterm =
     | Addr v -> collect_nodes f v
     | Cast (_,v) -> collect_nodes f v
     | Undef -> []
+    | Zeroptr -> []
 
 let rec term_contains_term super sub =
   if term_eq super sub then true else
@@ -276,6 +281,7 @@ let rec term_contains_term super sub =
     | Cast (_,tterm) ->
       tterm_contains_term tterm sub
     | Undef -> false
+    | Zeroptr -> false
 and tterm_contains_term super sub =
   term_contains_term super.v sub
 and tterms_contain_term supers sub =
@@ -297,4 +303,5 @@ let rec is_const term =
   | Addr tterm -> is_constt tterm
   | Cast (_,tterm) -> is_constt tterm
   | Undef -> true
+  | Zeroptr -> true
 and is_constt tterm = is_const tterm.v
