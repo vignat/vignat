@@ -733,6 +733,18 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void head_take<t>(int n, list<t> l)
+  requires 0 < n;
+  ensures head(l) == head(take(n, l));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (n == 1) return;
+        else head_take(n-1, t);
+    }
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)
