@@ -1,13 +1,15 @@
 #include "vigor.h"
 #include "packet.h"
 #include "ring.h"
+#include "loop-model.h"
 
 int main(int argc, char** argv) {
   struct packet p;
   struct ring *r = ring_create();
   //mistake: no check for null here!
   while(LOOP(1))
-  {// Loop iteration begins.
+  {
+    loop_iteration_begin(&r);
     if (!ring_full(r))
       if (receive_packet(&p) && p.port != 9)
         ring_push_back(r, &p);
@@ -16,6 +18,7 @@ int main(int argc, char** argv) {
       ASSERT(p.port != 9);
       send_packet(&p);
     }
-  }// Loop iteration ends.
+    loop_iteration_end(&r);
+  }
   return 0;
 }
