@@ -8,7 +8,6 @@
 struct ring;
 
 /*@
-  predicate pktp(struct packet* p, int port);
   predicate ringp(struct ring* r, list<int> packets);
   @*/
 
@@ -18,7 +17,8 @@ struct ring* ring_create();
 
 bool ring_full(struct ring* r);
 //@ requires ringp(r, ?lst);
-//@ ensures ringp(r, lst) &*& result == (length(lst) == CAP);
+/*@ ensures ringp(r, lst) &*& length(lst) <= CAP &*&
+            result == (length(lst) == CAP); @*/
 
 bool ring_empty(struct ring* r);
 //@ requires ringp(r, ?lst);
@@ -29,7 +29,8 @@ void ring_push_back(struct ring* r, struct packet* p);
 //@ ensures ringp(r, append(lst, cons(v, nil))) &*& pktp(p, v);
 
 void ring_pop_front(struct ring* r, struct packet* p);
-//@ requires ringp(r, ?lst) &*& lst != nil &*& pktp(p, _);
+/*@ requires ringp(r, ?lst) &*& lst != nil &*& p->port |-> _ &*&
+             struct_packet_padding(p); @*/
 //@ ensures ringp(r, tail(lst)) &*& pktp(p, head(lst));
 
 #endif//_RING_H_INCLUDED_

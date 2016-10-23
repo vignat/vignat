@@ -11,10 +11,6 @@ struct ring {
 
 
 /*@
-  predicate pktp(struct packet* p, int port) =
-    struct_packet_padding(p) &*&
-    p->port |-> port &*& port != 9;
-
   predicate empty_arrayp(struct packet* arr, int len) =
     true == ((char *)0 <= (void *)(arr)) &*&
     true == ((void *)(arr) <= (char *)UINTPTR_MAX) &*&
@@ -65,7 +61,8 @@ struct ring* ring_create()
 
 bool ring_full(struct ring* r)
 //@ requires ringp(r, ?lst);
-//@ ensures ringp(r, lst) &*& result == (length(lst) == CAP);
+/*@ ensures ringp(r, lst) &*& length(lst) <= CAP &*&
+            result == (length(lst) == CAP); @*/
 {
   //@ open ringp(r, lst);
   return r->len == CAP;
@@ -230,7 +227,8 @@ ensures empty_arrayp(arr, 0) &*&
 @*/
 
 void ring_pop_front(struct ring* r, struct packet* p)
-//@ requires ringp(r, ?lst) &*& lst != nil &*& pktp(p, _);
+/*@ requires ringp(r, ?lst) &*& lst != nil &*& p->port |-> _ &*&
+             struct_packet_padding(p); @*/
 //@ ensures ringp(r, tail(lst)) &*& pktp(p, head(lst));
 {
   //@ open ringp(r, lst);
@@ -245,7 +243,6 @@ void ring_pop_front(struct ring* r, struct packet* p)
   @*/
   struct packet* src_pkt = (struct packet*)r->array + r->begin;
   //@ open pktp(src_pkt, head(lst));
-  //@ open pktp(p, _);
   p->port = src_pkt->port;
   //@ open_struct(src_pkt);
   //@ int old_len = r->len;

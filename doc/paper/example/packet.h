@@ -7,6 +7,12 @@ struct packet {
   int port;
 };
 
+/*@
+  predicate pktp(struct packet* p, int port) =
+  struct_packet_padding(p) &*&
+  p->port |-> port &*& port != 9;
+@*/
+
 static bool receive_packet(struct packet* dst) {
   if (SYMBOLIC("received")) {
     dst->port = SYMBOLIC("port");

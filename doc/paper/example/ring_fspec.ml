@@ -22,13 +22,23 @@ let fun_types =
      "ring_push_back", {ret_type = Void;
                         arg_types = [Ptr ring_struct;
                                      Ptr packet_struct];
-                        lemmas_before = [];
-                        lemmas_after = [];};
+                        lemmas_before = [(fun args _ ->
+                             "//@ close pktp(" ^
+                             (List.nth_exn args 1) ^
+                             ", _);\n";)];
+                        lemmas_after = [(fun params ->
+                             "//@ open pktp(" ^
+                             (List.nth_exn params.args 1) ^
+                             ", _);\n";)];};
      "ring_pop_front", {ret_type = Void;
                         arg_types = [Ptr ring_struct;
                                      Ptr packet_struct];
                         lemmas_before = [];
-                        lemmas_after = [];};
+                        lemmas_after = [
+                          (fun params ->
+                             "//@ open pktp(" ^
+                             (List.nth_exn params.args 1) ^
+                             ", _);\n";);];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr ring_struct)];
                                 lemmas_before = [];
