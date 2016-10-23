@@ -140,6 +140,8 @@ let rec render_tterm (t:tterm) =
              (List.map fields ~f:(fun {name;value} ->
                   name ^ " = " ^ (render_tterm value)))) ^
     "}"
+  | Int 0 -> if (t.t = Boolean) then "false" else "0"
+  | Int 1 -> if (t.t = Boolean) then "true" else "1"
   | Int i -> string_of_int i
   | Bool b -> string_of_bool b
   | Not t -> "!(" ^ (render_tterm t) ^ ")"

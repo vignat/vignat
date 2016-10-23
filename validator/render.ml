@@ -121,8 +121,20 @@ let rec gen_plain_equalities {lhs;rhs} =
   | Uint16, Id _
   | Uint8, Id _
   | Boolean, Id _
+  | Boolean, Bool _
   | Ptr _, Id _
   | Ptr _, Int _ -> [{lhs;rhs}]
+  | Boolean, Int 0 ->
+    [{lhs;rhs={v=Bool false;
+               t=Boolean}}]
+  | Boolean, Int 1 ->
+    [{lhs;rhs={v=Bool true;
+               t=Boolean}}]
+  | Boolean, Int x ->
+    [{lhs;rhs={v=Not {v=Bop (Eq, {v=Int x;t=Sint32},
+                             {v=Int 0;t=Sint32});
+                      t=Boolean};
+               t=Boolean}}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | Ptr _, Zeroptr -> []
   | Str _, Undef -> []
@@ -148,6 +160,7 @@ let split_assignments assignments =
       | Cast (_,{v=Id _;t=_})
       | Id _ -> (concrete,assignment::symbolic)
       | Int _ -> (assignment::concrete,symbolic)
+      | Bool _ -> (assignment::concrete,symbolic)
       | Bop (Add, ({v=Id _;t=_} as symb), ({v=Int x;t=_} as delta)) ->
         (concrete,
          {lhs=symb;
