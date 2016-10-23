@@ -120,6 +120,7 @@ let rec gen_plain_equalities {lhs;rhs} =
   | Uint32, Id _
   | Uint16, Id _
   | Uint8, Id _
+  | Boolean, Id _
   | Ptr _, Id _
   | Ptr _, Int _ -> [{lhs;rhs}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]

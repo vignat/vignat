@@ -673,12 +673,16 @@ let allocate_args ftype_of tpref arg_name_gen =
         match Int64.Map.find !known_addresses ptee_addr with
         | Some _ -> failwith "nested ptr value dynamics too complex :/"
         | None -> let p_name = arg_name_gen#generate in
-          lprintf "allocating nested %Ld -> %s:%s\n"
-            ptr_addr p_name (ttype_to_str (Ptr ptee_t));
+          lprintf "allocating nested %Ld -> %s = &%Ld:%s\n"
+            ptr_addr p_name ptee_addr (ttype_to_str (Ptr ptee_t));
           add_to_known_addresses
             {v=Addr {v=Id p_name;t=Ptr ptee_t};t=Ptr (Ptr ptee_t)}
           []
           ptr_addr call.id 0;
+          add_to_known_addresses
+            {v=Id p_name;t=Ptr ptee_t}
+            []
+            ptee_addr call.id 0;
         Some {name=p_name;value={v=Undef;t=Ptr ptee_t}}
     in
     List.filter_mapi call.args ~f:(fun i {aname=_;value;ptr;} ->
@@ -777,15 +781,16 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
       | Curioptr ptee ->
         let key = Int64.of_string (Sexp.to_string arg.value) in
         match find_first_known_address key with
-        | Some out_arg -> begin match out_arg.t with
-            | Ptr _ -> (* Skip the two layer pointer.
-                          TODO: maye be allow special case of Zeroptr here*)
-              None
-            | _ ->
-              Some {lhs={v=simplify_term (Deref out_arg);
-                         t=get_pointee out_arg.t};
-                    rhs=(get_struct_val_value
-                           ptee.after (get_pointee out_arg.t))}
+        | Some out_arg ->
+          begin match get_struct_val_value
+              ptee.after (get_pointee out_arg.t) with
+          | {v=Int _;t=_} -> None
+            (* Skip the two layer pointer.
+               TODO: maybe be allow special case of Zeroptr here.*)
+          | value ->
+            Some {lhs={v=simplify_term (Deref out_arg);
+                       t=get_pointee out_arg.t};
+                  rhs=value}
           end
         | None -> None (* The variable is not allocated,
                           because it is a 2-layer pointer.*))
