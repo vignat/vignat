@@ -5,6 +5,8 @@ struct ring {
   int dummy;
 };
 
+bool last_full = false;
+
 struct ring preallocated;
 
 struct ring* ring_create() {
@@ -18,7 +20,8 @@ struct ring* ring_create() {
 bool ring_full(struct ring* r) {
   klee_trace_ret();
   klee_trace_param_just_ptr(r, sizeof(struct ring), "r");
-  if(SYMBOLIC("full")) {
+  last_full = SYMBOLIC("full");
+  if (last_full) {
     return true;
   } else {
     return false;
@@ -28,7 +31,7 @@ bool ring_full(struct ring* r) {
 bool ring_empty(struct ring* r) {
   klee_trace_ret();
   klee_trace_param_just_ptr(r, sizeof(struct ring), "r");
-  if (SYMBOLIC("empty")) {
+  if (!last_full && SYMBOLIC("empty")) {
     return true;
   } else {
     return false;
