@@ -3,10 +3,10 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
-let do_log = false
+let do_log = true
 
 let log str =
-  if do_log then Out_channel.with_file ~append:true "analysis.log" ~f:(fun f ->
+  if do_log then Out_channel.with_file ~append:true "import.log" ~f:(fun f ->
       Out_channel.output_string f str)
   else ()
 
@@ -664,6 +664,23 @@ let allocate_args ftype_of tpref arg_name_gen =
           addr call.id 0;
         Some {name=p_name;value=tterm}
     in
+    let alloc_dummy_nested_ptr ptr_addr ptee_addr ptee_t =
+      lprintf "looking for *%Ld\n" ptr_addr;
+      match Int64.Map.find !known_addresses ptr_addr with
+      | Some _ -> None
+      | None ->
+        lprintf "looking for *%Ld\n" ptee_addr;
+        match Int64.Map.find !known_addresses ptee_addr with
+        | Some _ -> failwith "nested ptr value dynamics too complex :/"
+        | None -> let p_name = arg_name_gen#generate in
+          lprintf "allocating nested %Ld -> %s:%s\n"
+            ptr_addr p_name (ttype_to_str (Ptr ptee_t));
+          add_to_known_addresses
+            {v=Addr {v=Id p_name;t=Ptr ptee_t};t=Ptr (Ptr ptee_t)}
+          []
+          ptr_addr call.id 0;
+        Some {name=p_name;value={v=Undef;t=Ptr ptee_t}}
+    in
     List.filter_mapi call.args ~f:(fun i {aname=_;value;ptr;} ->
         match ptr with
         | Nonptr -> None
@@ -682,9 +699,7 @@ let allocate_args ftype_of tpref arg_name_gen =
           in
           match ptee_type, ptee_ptr_val with
           | Ptr ptee_ptee_t, Some {v=(Int x);t=_} when x <> 0 ->
-            (* Skip this one, because it will be
-               assigned based on the the second-level address*)
-            None
+            alloc_dummy_nested_ptr addr (Int64.of_int x) ptee_ptee_t
           | _ -> alloc_arg addr ptee.before (get_struct_val_value ptee.before ptee_type))
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
@@ -730,8 +745,13 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
                   let key = Int64.of_int x in
                   match find_first_known_address key with
                   | Some n -> {v=Addr n; t=Ptr t}
-                  | None -> failwith ("nested pointer to unknown: " ^
-                                      (Int.to_string x))
+                  | None -> match find_first_known_address
+                                    (Int64.of_string (Sexp.to_string arg.value))
+                    with
+                    | Some n -> n
+                    | None -> failwith ("nested pointer to unknown: " ^
+                                        (Int.to_string x) ^ " -> " ^
+                                          (Sexp.to_string arg.value))
                 end
               | x -> get_allocated_arg arg a_type
             end
@@ -757,9 +777,16 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
       | Curioptr ptee ->
         let key = Int64.of_string (Sexp.to_string arg.value) in
         match find_first_known_address key with
-        | Some out_arg ->
-          Some {lhs={v=simplify_term (Deref out_arg);t=Ptr out_arg.t};
-                rhs=(get_struct_val_value ptee.after (get_pointee out_arg.t))}
+        | Some out_arg -> begin match out_arg.t with
+            | Ptr _ -> (* Skip the two layer pointer.
+                          TODO: maye be allow special case of Zeroptr here*)
+              None
+            | _ ->
+              Some {lhs={v=simplify_term (Deref out_arg);
+                         t=get_pointee out_arg.t};
+                    rhs=(get_struct_val_value
+                           ptee.after (get_pointee out_arg.t))}
+          end
         | None -> None (* The variable is not allocated,
                           because it is a 2-layer pointer.*))
 
