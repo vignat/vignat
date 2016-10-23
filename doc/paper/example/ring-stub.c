@@ -18,13 +18,21 @@ struct ring* ring_create() {
 bool ring_full(struct ring* r) {
   klee_trace_ret();
   klee_trace_param_just_ptr(r, sizeof(struct ring), "r");
-  return SYMBOLIC("full");
+  if(SYMBOLIC("full")) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool ring_empty(struct ring* r) {
   klee_trace_ret();
   klee_trace_param_just_ptr(r, sizeof(struct ring), "r");
-  return SYMBOLIC("empty");
+  if (SYMBOLIC("empty")) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 void ring_push_back(struct ring* r, struct packet* p) {

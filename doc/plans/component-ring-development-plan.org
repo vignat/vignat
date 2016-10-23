@@ -24,6 +24,7 @@ Circular array buffer: dynamic allocation, static capacity.
    :END:
 ** Write a validator plugin
    :LOGBOOK:
+   CLOCK: [2016-10-23 Son 17:25]--[2016-10-23 Son 17:36] =>  0:11
    CLOCK: [2016-10-20 Don 19:03]--[2016-10-20 Don 19:06] =>  0:03
    CLOCK: [2016-10-20 Don 14:56]--[2016-10-20 Don 15:01] =>  0:05
    CLOCK: [2016-10-20 Don 14:22]--[2016-10-20 Don 14:32] =>  0:10
