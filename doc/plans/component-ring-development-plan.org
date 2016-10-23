@@ -10,11 +10,13 @@ Circular array buffer: dynamic allocation, static capacity.
    :END:
 ** Formalize the API with VeriFast contracts
    :LOGBOOK:
+   CLOCK: [2016-10-23 Son 10:04]--[2016-10-23 Son 10:05] =>  0:01
    CLOCK: [2016-10-20 Don 13:55]--[2016-10-20 Don 14:02] =>  0:07
    CLOCK: [2016-10-17 19:00]--[2016-10-17 19:30] =>  0:00
    :END:
 ** Write a symbolic model
    :LOGBOOK:
+   CLOCK: [2016-10-20 Don 15:03]--[2016-10-20 Don 15:24] =>  0:21
    CLOCK: [2016-10-20 Don 13:43]--[2016-10-20 Don 13:54] =>  0:11
    CLOCK: [2016-10-20 Don 13:03]--[2016-10-20 Don 13:14] =>  0:11
    CLOCK: [2016-10-20 Don 11:43]--[2016-10-20 Don 11:52] =>  0:09
@@ -22,6 +24,7 @@ Circular array buffer: dynamic allocation, static capacity.
    :END:
 ** Write a validator plugin
    :LOGBOOK:
+   CLOCK: [2016-10-20 Don 19:03]--[2016-10-20 Don 19:06] =>  0:03
    CLOCK: [2016-10-20 Don 14:56]--[2016-10-20 Don 15:01] =>  0:05
    CLOCK: [2016-10-20 Don 14:22]--[2016-10-20 Don 14:32] =>  0:10
    CLOCK: [2016-10-20 Don 13:55]--[2016-10-20 Don 13:55] =>  0:00

@@ -6,7 +6,7 @@
 int main(int argc, char** argv) {
   struct packet p;
   struct ring *r = ring_create();
-  //mistake: no check for null here!
+  if (!r) return 1;
   while(LOOP(1))
   {
     loop_iteration_begin(&r);

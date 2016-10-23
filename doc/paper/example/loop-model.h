@@ -5,11 +5,11 @@
 
 void loop_invariant_consume(struct ring **r);
 //@ requires *r |-> ?rp &*& ringp(rp, _);
-//@ ensures true;
+//@ ensures *r |-> rp;
 
 void loop_invariant_produce(struct ring **r);
-//@ requires true;
-//@ ensures *r |-> ?rp &*& ringp(rp, _);
+//@ requires *r |-> ?rp;
+//@ ensures *r |-> rp &*& ringp(rp, _);
 
 void loop_iteration_begin(struct ring **r);
 void loop_iteration_end(struct ring **r);

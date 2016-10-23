@@ -3,6 +3,15 @@ open Trace_prefix
 open Ir
 open Fspec_api
 
+let do_log = false
+
+let log str =
+  if do_log then Out_channel.with_file ~append:true "analysis.log" ~f:(fun f ->
+      Out_channel.output_string f str)
+  else ()
+
+let lprintf fmt = ksprintf log fmt
+
 type 'x confidence = Sure of 'x | Tentative of 'x | Noidea
 
 type t_width = W1 | W8 | W16 | W32
@@ -503,12 +512,13 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
         add_to_known_addresses b_value value.break_down addr callid (depth+1))
   | _ ->
     if (List.length breakdown) <> 0 then
-      printf "%s : %s type with %d fields" (render_tterm base_value)
+      lprintf "%s : %s type with %d fields" (render_tterm base_value)
         (ttype_to_str base_value.t) (List.length breakdown);
     assert((List.length breakdown) = 0)
   end;
   (* The order is important here, if we do not want to replace
      the pointer to the base_value by a pointer to its field. *)
+  lprintf "allocating *%Ld = %s\n" addr (render_tterm base_value);
   let prev = match Int64.Map.find !known_addresses addr with
     | Some value -> value
     | None -> []
@@ -640,6 +650,7 @@ let allocate_rets ftype_of tpref =
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
     let alloc_arg addr str_value tterm =
+      lprintf "looking for *%Ld\n" addr;
       match Int64.Map.find !known_addresses addr with
       | Some spec -> known_addresses :=
           Int64.Map.add !known_addresses
@@ -666,7 +677,15 @@ let allocate_args ftype_of tpref arg_name_gen =
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call.fun_name i in
           let ptee_type = get_pointee t in
-          alloc_arg addr ptee.before (get_struct_val_value ptee.before ptee_type))
+          let ptee_ptr_val = Option.map ptee.before.full
+              ~f:(fun expr -> get_sexp_value expr ptee_type)
+          in
+          match ptee_type, ptee_ptr_val with
+          | Ptr ptee_ptee_t, Some {v=(Int x);t=_} when x <> 0 ->
+            (* Skip this one, because it will be
+               assigned based on the the second-level address*)
+            None
+          | _ -> alloc_arg addr ptee.before (get_struct_val_value ptee.before ptee_type))
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
 
@@ -674,10 +693,12 @@ let compose_fcall_preamble ftype_of call args tmp_gen =
   (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
 
 let find_first_known_address addr =
+  lprintf "looking for first *%Ld\n" addr;
   Option.map (Int64.Map.find !known_addresses addr)
     ~f:(fun lst -> (List.hd_exn lst).value)
 
 let find_exn_first_known_address addr =
+  lprintf "looking for first *%Ld\n" addr;
   (List.hd_exn (Int64.Map.find_exn !known_addresses addr)).value
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
@@ -697,8 +718,25 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
         | Funptr fname -> {v=Fptr fname;t=a_type}
         | Apathptr ->
           get_allocated_arg arg a_type
-        | Curioptr _ ->
-          get_allocated_arg arg a_type)
+        | Curioptr ptee ->
+          match a_type, ptee.before.full with
+          | Ptr (Ptr t), Some addr ->
+            begin (* Workaround for 2-level pointers args.*)
+              let addr = get_sexp_value addr (Ptr t) in
+              match addr with
+              | {v=Int x;t=_} -> if (x = 0) then
+                  get_allocated_arg arg a_type
+                else begin
+                  let key = Int64.of_int x in
+                  match find_first_known_address key with
+                  | Some n -> {v=Addr n; t=Ptr t}
+                  | None -> failwith ("nested pointer to unknown: " ^
+                                      (Int.to_string x))
+                end
+              | x -> get_allocated_arg arg a_type
+            end
+          | _ ->
+            get_allocated_arg arg a_type)
 
 let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
   let ret_spec = match ret_spec with
@@ -717,17 +755,19 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
       | Funptr _ -> None
       | Apathptr -> None
       | Curioptr ptee ->
-        let out_arg =
-          let key = Int64.of_string (Sexp.to_string arg.value) in
-          find_exn_first_known_address key
-        in
-        Some {lhs={v=simplify_term (Deref out_arg);t=Ptr out_arg.t};
-              rhs=(get_struct_val_value ptee.after (get_pointee out_arg.t))})
+        let key = Int64.of_string (Sexp.to_string arg.value) in
+        match find_first_known_address key with
+        | Some out_arg ->
+          Some {lhs={v=simplify_term (Deref out_arg);t=Ptr out_arg.t};
+                rhs=(get_struct_val_value ptee.after (get_pointee out_arg.t))}
+        | None -> None (* The variable is not allocated,
+                          because it is a 2-layer pointer.*))
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
 
 let find_last_known_address_before_call addr call_id =
+  lprintf "looking for last *%Ld\n" addr;
   Option.map (Int64.Map.find !known_addresses addr)
     ~f:(fun lst ->
         List.fold lst ~init:({v=Undef;t=Unknown},0)
@@ -739,6 +779,7 @@ let find_last_known_address_before_call addr call_id =
                  (max_el,max_id)))
 
 let find_last_known_whole_address_before_call addr call_id =
+  lprintf "looking for last whole *%Ld\n" addr;
   Option.map (Int64.Map.find !known_addresses addr)
     ~f:(fun lst ->
         List.fold lst ~init:({v=Undef;t=Unknown},-1)
