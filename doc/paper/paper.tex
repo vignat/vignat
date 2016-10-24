@@ -185,14 +185,84 @@ int main() {
 }
 \end{lstlisting}
 
+Suppose we had an overapproximate model:
+\begin{lstlisting}
+void ring_pop_front(struct ring* r,
+                    struct packet* p) {
+  FILL_SYMBOLIC(p, sizeof(struct packet),
+                "popped_packet");
+}
+\end{lstlisting}
+Then the \code{ASSERT} would fail.
+
 Now exhaustive SE of the code takes less than 100 millisec with our modified KLEE, regardless of the size of \code{CAP}.  The fact that the code does not crash on any path amounts to a proof of crash freedom. Or does it? The validity of the proof depends on (1)  our library implementation of \code{ring} not crashing; and (2) the symbolic model of \code{ring} accurately capturing how the \code{ring} implementation works.
 
-The Vigor library comes with a formal specification and a formal proof that the implementation satisfies that specification (we show neither of them here, due to space constraints). In other words, there is a formal spec for \code{ring} and a proof that the \code{ring} implementation satisfies the spec. This is how we enable SE to verify the high level code, while using separation logic to verify the library of components---two different verifications techniques for two different parts of the NF. Doing the library verification requires deep expertise in program verification, but our effort is amortized across all NFs that use the library. Vigor makes it possible for NF developers to verify their code without having to understand verification. Note that stating invariants for dataplane software turns out to require no verification expertise.
+The Vigor library comes with a formal specification and a formal proof that the implementation satisfies that specification. In other words, there is a formal spec for \code{ring} and a proof that the \code{ring} implementation satisfies the spec. This is how we enable SE to verify the high level code, while using separation logic to verify the library of components---two different verifications techniques for two different parts of the NF. Doing the library verification requires deep expertise in program verification, but our effort is amortized across all NFs that use the library. Vigor makes it possible for NF developers to verify their code without having to understand verification. Note that stating invariants for dataplane software turns out to require no verification expertise.
+
+Here is the example of the proven specification for the function
+\code{ring_pop_front}. We do not include the proof of this specification due to
+space constraints:
+
+\begin{lstlisting}
+void ring_pop_front(struct ring* r,
+                    struct packet* p);
+/*@ requires ringp(r, ?lst) &*&
+             lst != nil &*&
+             p->port |-> _ &*&
+             struct_packet_padding(p); @*/
+/*@ ensures ringp(r, tail(lst)) &*&
+            pktp(p, head(lst)); @*/
+\end{lstlisting}
+
+Note \code{pktp(p, head(lst));} predicate includes the \code{p->port != 9} property.
 
 Vigor must also validate that the model used for SE matches the library spec. Some symbolic models work well for some code, while others work well for other code, so the Vigor library comes with {\em multiple} simple, overapproximating models for each component, and Vigor automatically chooses combinations of models for symbolically executing the NF code. Once it finds a combination of models with which the desired property (crash freedom, no memory leaks, absence of certain security vulnerabilities) can be proven, Vigor validates that the behaviors exposed by the model during verification are consistent with the component's formal specification.  Details on how it does this appear in \S\ref{sec:design}.
- 
-{\bf Step 3: Link the NF code with the verified library} of components. The resulting executable is guaranteed to be free of crashes, subject to the assumptions listed in~\S\ref{sec:limitations}.
 
+To validate the model fit for the particular use case, SEE dumps
+all the call sequences (30 in this case) that may happen during the execution.
+Vigor checks whether the symbolic model enumerated all the possible
+outputs for each sequence.
+
+You can see the example call sequence below. It starts with
+\code{loop_invariant_produce} that marks the beginning of a loop iteration. It
+continues then with calls to \code{ring_full} \code{ring_empty}, noting that
+both return \code{false}. The seqeunce ends with a call to
+\code{ring_pop_front}, formally specified above. The last line checks that the
+value returned by model (\code{arg2.port != 9}) covers all the cases prescribed
+by the specification.
+ 
+\begin{lstlisting}
+int port_0;
+struct ring* arg1;
+struct packet arg2;
+//@ assume((9 == port_0));
+arg2.port = port_0;
+loop_invariant_produce(&(arg1));
+bool ret1 = ring_full(arg1);
+//@ assume(ret1 == false);
+bool ret2 = ring_empty(arg1);
+//@ assume(ret2 == false);
+
+ring_pop_front(arg1, &(arg2));
+//@ open pktp(&(arg2), _);
+/*@ assert((false == (9 == arg2.port))); @*/
+\end{lstlisting}
+
+Suppose we had an underapproximate model:
+\begin{lstlisting}
+void ring_pop_front(struct ring* r,
+                    struct packet* p) {
+  p->port = 0;
+}
+\end{lstlisting}
+then the last line in the call sequence check will look like:
+\begin{lstlisting}
+/*@ assert(0 == arg2.port); @*/
+\end{lstlisting}
+And the formal verification will fail, because specification admits a wider
+range of possible outputs.
+
+{\bf Step 3: Link the NF code with the verified library} of components. The resulting executable is guaranteed to be free of crashes, subject to the assumptions listed in~\S\ref{sec:limitations}.
 
 %Note, that the \code{ring_pop} model does not even check whether it is called with an empty ring or not. The example application makes sure to call pop only if the ring is not empty. Therefore the check is not necessary.
 %This model clearly overapproximates a ``ring'', e.g. \code{ring_empty} may return true even right after \code{ring_push}. This means, it may have caused false positives, but as long as it does not, no need to complicate it.

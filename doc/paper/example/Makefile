@@ -25,7 +25,7 @@ verify-loop-inv: ex-linv.bc
 
 validate-model:
 	corebuild -I validator -no-hygiene -lib dynlink ring_fspec.cmo
-	./validator/test_all.sh ./klee-last ggg . _build/ring_fspec.cmo 2
+	./validator/test_all.sh ./klee-last ggg . _build/ring_fspec.cmo
 
 clean:
 	rm *.bc klee-* -rf
