@@ -394,7 +394,7 @@ Figure~\ref{fig:validator} shows the data flow between the Validator elements.
 
 \subsection{Verified Component Library}
 
-For our Vigor library prototype, we implemented four stateful components. These are sufficient to develop the NAT middlebox of \S\ref{sec:evaluation): A hash map keeps current flows, and allows lookup by two keys corresponding to the packets coming from internal and external interfaces; the Port allocator is responsible for allocating new ports and expiring inactive entries; the Batcher allows batch processing, keeping outbound packets until the NIC is ready to send them; and the Static Array instances keep various configuration values. We are careful in how we abstract components like the Static Array, because NFs are expected to access them on hot paths, and so it is important that the data reside in the processor cache.
+For our Vigor library prototype, we implemented four stateful components. These are sufficient to develop the NAT middlebox of \S\ref{sec:evaluation}: A hash map keeps current flows, and allows lookup by two keys corresponding to the packets coming from internal and external interfaces; the Port allocator is responsible for allocating new ports and expiring inactive entries; the Batcher allows batch processing, keeping outbound packets until the NIC is ready to send them; and the Static Array instances keep various configuration values. We are careful in how we abstract components like the Static Array, because NFs are expected to access them on hot paths, and so it is important that the data reside in the processor cache.
 
 \paragraph{Hash Map}
 
