@@ -4,9 +4,16 @@
 \usepackage{listings}
 \usepackage[]{algorithm2e}
 \usepackage{changepage}
-
+\usepackage{hyperref}
 \definecolor{mygreen}{rgb}{0.1,0.5,0.1}
 \definecolor{myblue}{rgb}{0.1,0.1,0.7}
+
+\hypersetup{
+    colorlinks,
+    linkcolor={red!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
 
 \lstset{language=C,
     basicstyle=\footnotesize\ttfamily,
@@ -18,7 +25,7 @@
     otherkeywords={bool}
 }
 
-\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\code}[1]{\lstinline{#1}}
 \newcommand{\vignat}{{\sc VigNAT}\xspace}
 \newcommand{\vignata}{{\sc VigNAT$\alpha$}\xspace}
 \newcommand{\vignatb}{{\sc VigNAT$\beta$}\xspace}
@@ -85,8 +92,10 @@ We achieve both scalable verification and minimal developer effort by leveraging
 
 In this paper we present work that builds upon these insights and makes three contributions:
 \begin{itemize}
-    \item {\bf Speculative data plane verification} (SDSE), a technique for verifying stateful software NFs by fusing powerful formal verification with automatic symbolic execution. % It uses formal verification for data structures. It replaces them with simple models that encode some assumptions about the behaviour of the data structures. It then runs SE on the application code and later validates the used models. This approach postpones high-effort/low-return work and discards it when it turns out to be irrelevant.
-    \item {\bf The Vigor library of verified components} along with a tool chain that makes SDSE available to those who write software NFs in C/C++. The library consists of data structures (Hash Map, Batcher, Static Array) and a Port Allocator that are common for software NF. % The tool-chain brings together existing SE and formal verification engines to test the proposed technique.
+    \item {\bf Speculative data plane verification} (SDPV), a technique for verifying stateful software NFs by fusing powerful formal verification with automatic symbolic execution. % It uses formal verification for data structures. It replaces them with simple models that encode some assumptions about the behaviour of the data structures. It then runs SE on the application code and later validates the used models. This approach postpones high-effort/low-return work and discards it when it turns out to be irrelevant.
+    \item {\bf The Vigor library of verified components} along with a tool chain
+      that makes SDPV available to those who write software NFs in C/C++.
+      The library consists of data structures (Hash Map, Batcher, Static Array) and a Port Allocator that are common for software NF. % The tool-chain brings together existing SE and formal verification engines to test the proposed technique.
     \item {\bf The \vignat verified NAT box} that offers both high performance and is formally proven to not crash or leak memory. We estimate that it would take an NF developer about 1 week to develop and verify a NAT using Vigor.
 \end{itemize}
 
@@ -123,11 +132,13 @@ int main() {
 
 \end{lstlisting}
 
-In order to absorb bursts, the code employs a ring buffer. The interface to the network is: {\em bool receive\_packet(struct packet* dst)}, which non-blockingly reads an inbound packet and stores it at {\em dst}, returning success or failure; {\em bool can\_send\_packet()}, which checks if a new packet can be sent; and {\em void send\_packet(struct packet* src)}, which sends the packet stored at {\em src}. The application follows common practice: it consists of a main event loop, it has no other complex loops, and it uses a ring, a popular data structure in network programming.
+In order to absorb bursts, the code employs a ring buffer. The interface to the
+network is: \code{bool receive_packet(struct packet* dst)}, which
+non-blockingly reads an inbound packet and stores it at \code{dst}, returning success or failure; \code{bool can_send_packet()}, which checks if a new packet can be sent; and \code{void send_packet(struct packet* src)}, which sends the packet stored at \code{src}. The application follows common practice: it consists of a main event loop, it has no other complex loops, and it uses a ring, a popular data structure in network programming.
 
 To verify that this NF does not crash, one could use the approach in Dobrescu et al.~\cite{dobrescu2014software} and run exhaustive symbolic execution. The symbolic execution (SE) technique entails using a symbolic execution engine (SEE) to explore all paths through the code and check whether any failure conditions hold --- in our case crash conditions. The inputs to the program are marked ``symbolic,'' meaning that they subsume all possible input values, and then the SEE simulates the execution of the program while propagating the symbolic inputs along the dataflow paths into the program's variables. When facing a branch (e.g., an \code{if} or a \code{for} loop), the SEE clones the program state and takes each feasible path separately. Branches impose constraints on variable values (e.g., an \code{if} statement imposes restrictions on the values of the condition variable along the \code{else} branch); the SEE collects these constraints along each path. When evaluating a branch condition, the SEE asks an SMT constraint solver which of the branches are feasible, given the constraints collected so far on that path prefix.
 
-One could use an SEE like KLEE~\cite{cadar2008klee} to symbolically execute the code above exhaustively --- once all paths are found to be crash-free, the crash-freedom proof is complete. To perform SE, it is necessary to provide symbolic models for the three network calls. Something simple suffices, such as \code{receive\_packet} generating a new symbolic packet in \code{dst}; \code{can\_send\_packet} forking program state into two states, one for each possible return value; and \code{send\_packet} doing nothing. 
+One could use an SEE like KLEE~\cite{cadar2008klee} to symbolically execute the code above exhaustively --- once all paths are found to be crash-free, the crash-freedom proof is complete. To perform SE, it is necessary to provide symbolic models for the three network calls. Something simple suffices, such as \code{receive_packet} generating a new symbolic packet in \code{dst}; \code{can_send_packet} forking program state into two states, one for each possible return value; and \code{send_packet} doing nothing. 
 
 Alas, symbolic execution would never terminate. The reason is ``path explosion:'' there is a large (often infinite) number of paths to explore, so the SEE cannot finish.  Path explosion results from cyclomatic complexity~\cite{mccabe:cyclomatic}: every branch condition doubles the number of paths, and every loop multiplies it by a factor; in our case, three \code{if} conditions inside an infinite loop give rise to an infinite number of paths. 
 
@@ -137,7 +148,7 @@ This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 
 {\bf Step 2: Use abstract data structures.} In Vigor, we eliminate the problem of symbolic indexing by encapsulating program state into well-defined data structures and putting them into a ``library of components''. This works well for NF development, because the NF code uses a relatively small set of standard structures, such as ring buffers, hash tables, least-prefix-match tables, etc. We provide to the SEE symbolic models of these abstracted components that ``hide'' symbolic indexes and pointers from the SEE.
 
-For our example, the library provides a \code{ring} with a simple interface: {\em bool ring\_empty()} checks whether there is a packet in the ring, {\em bool ring\_full()} checks whether the ring has run out of space, {\em void ring\_push\_back(struct packet* src)} adds packet {\em src} to the ring, and {\em void ring\_pop\_front(struct packet* dst)} removes a packet from the ring and places it in {\em dst}. We then write a symbolic model for the \code{ring} and provide it to the SEE instead of the actual implementation. The NF now becomes:
+For our example, the library provides a \code{ring} with a simple interface: \code{bool ring_empty()} checks whether there is a packet in the ring, \code{bool ring_full()} checks whether the ring has run out of space, \code{void ring_push_back(struct packet* src)} adds packet \code{src} to the ring, and \code{void ring_pop_front(struct packet* dst)} removes a packet from the ring and places it in \code{dst}. We then write a symbolic model for the \code{ring} and provide it to the SEE instead of the actual implementation. The NF now becomes:
 
 % \begin{lstlisting}
 % bool ring_full() {return SYMBOLIC("full");}
@@ -183,8 +194,8 @@ Vigor must also validate that the model used for SE matches the library spec. So
 {\bf Step 3: Link the NF code with the verified library} of components. The resulting executable is guaranteed to be free of crashes, subject to the assumptions listed in~\S\ref{sec:limitations}.
 
 
-%Note, that the \code{ring\_pop} model does not even check whether it is called with an empty ring or not. The example application makes sure to call pop only if the ring is not empty. Therefore the check is not necessary.
-%This model clearly overapproximates a ``ring'', e.g. \code{ring\_empty} may return true even right after \code{ring\_push}. This means, it may have caused false positives, but as long as it does not, no need to complicate it.
+%Note, that the \code{ring_pop} model does not even check whether it is called with an empty ring or not. The example application makes sure to call pop only if the ring is not empty. Therefore the check is not necessary.
+%This model clearly overapproximates a ``ring'', e.g. \code{ring_empty} may return true even right after \code{ring_push}. This means, it may have caused false positives, but as long as it does not, no need to complicate it.
 % For the sake of the example conciseness, we hard coded the invariant ``every packet has port != 9'' and the packet structure into the ring component itself. In a real component this detail should be abstracted and supplied as a parameter.
 
 % Now a SE can analyze the code in an instant. As you can see the model does not maintain any state. It only \code{ASSERT}s that any pushed packet satisfy the invariant, and \code{ASSUME}s that every popped packet does. Last steps:
@@ -225,14 +236,14 @@ A desired property is formulated as an assert. ``No division by zero''  is state
 
 For each execution path, the Vigor SEE produces a trace of how the NF code interacted with the components it uses (we define these traces formally in \S\ref{sec:model-validation-criteria}). This is  {\em speculative} in that we don't have proof that the models are accurate abstractions of the components. The question the Validator answers is whether these traces are consistent with the formal specs of the components, i.e., could the interaction the NF code had with the model have been a legitimate interaction with an implementation of the component's specification. This is a weaker property than the model being a correct abstraction of the component, but it is sufficient for our purposes.
 
-Of course, execution paths may not always succeed during SE. While this may be indicative of a bug in the NF, it could also be simply because the model is too approximate. For example, in \S\ref{sec:solution-overview} a model of \code{ring\_empty} may be as simple as randomly returning true or false---for some NF code, this behavior could crash it, if it assumes \code{ring\_empty} to return false right after pushing an element. A different model, however, keeps a counter of how many elements are in the ring, and makes \code{ring\_empty} return true only when this counter is zero. The above NF code would not crash with this model; on the downside, the more stateful model makes SE take longer. Therefore, Vigor starts with the least-state models, and tries alternates until it either finds a model with which SE succeeds on all paths or not.
+Of course, execution paths may not always succeed during SE. While this may be indicative of a bug in the NF, it could also be simply because the model is too approximate. For example, in \S\ref{sec:solution-overview} a model of \code{ring_empty} may be as simple as randomly returning true or false---for some NF code, this behavior could crash it, if it assumes \code{ring_empty} to return false right after pushing an element. A different model, however, keeps a counter of how many elements are in the ring, and makes \code{ring_empty} return true only when this counter is zero. The above NF code would not crash with this model; on the downside, the more stateful model makes SE take longer. Therefore, Vigor starts with the least-state models, and tries alternates until it either finds a model with which SE succeeds on all paths or not.
 
 If Vigor does not find any symbolic model for which all execution paths through the NF code succeed, then it points the developers to the places where the properties fail to hold, and helps the debug.
 
 %    \item The application developer provides loop invariants for long/unbounded loops (e.g. event loop in the example). The invariants are mostly a conjunction of the corresponding invariants for the symbolic models, but they are likely to have an application specific part.
 
 
-% a number of speculative assumptions that we believe will hold for the real implementations. In the example above some of these assumptions are: ``the \code{ring\_empty} function may return either 0 or 1'', ``if the \code{ring\_pop\_front} returns success the popped packet’s port will never be equal to 9'', and ``\code{ring\_push\_back} never crashes''.
+% a number of speculative assumptions that we believe will hold for the real implementations. In the example above some of these assumptions are: ``the \code{ring_empty} function may return either 0 or 1'', ``if the \code{ring_pop_front} returns success the popped packet’s port will never be equal to 9'', and ``\code{ring_push_back} never crashes''.
 
 % ^^^ do not forget to uncomment the references together with the figure
 % \begin{figure}[h]
@@ -558,7 +569,7 @@ To zoom in on what happens around those two inflection points, we plot two throu
 %---------------
 \paragraph{Latency}
 
-To assess \vignat's latency characteristics, we use the network topology in Figure~\ref{fig:latency-setup}. We use separate ports on the tester for flow generation and latency sampling. We use again DPDK's \code{PktGen} for packet generation. We sample latency with netperf~\cite{jones1996netperf} \code{TCP\_RR}, which measures the request-response delay to \code{netserver} and computes the average over 80 seconds.
+To assess \vignat's latency characteristics, we use the network topology in Figure~\ref{fig:latency-setup}. We use separate ports on the tester for flow generation and latency sampling. We use again DPDK's \code{PktGen} for packet generation. We sample latency with netperf~\cite{jones1996netperf} \code{TCP_RR}, which measures the request-response delay to \code{netserver} and computes the average over 80 seconds.
 
 \begin{figure}[h]
     \includegraphics[width=\columnwidth]{figures/latency_setup.png}
