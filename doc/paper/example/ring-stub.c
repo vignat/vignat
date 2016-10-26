@@ -10,8 +10,9 @@ bool last_full = false;
 
 struct ring preallocated;
 
-struct ring* ring_create() {
+struct ring* ring_create(int capacity) {
   klee_trace_ret_just_ptr(sizeof(struct ring));
+  klee_trace_param_i32(capacity, "capacity");
   if (SYMBOLIC("alloc_success"))
     return &preallocated;
   else

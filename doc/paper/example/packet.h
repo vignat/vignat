@@ -15,6 +15,10 @@ struct packet {
        return struct_packet_padding(p) &*&
               p->port |-> port;
      };
+     
+  lemma void packet_layout_assumption();
+  requires true;
+  ensures sizeof(struct packet) < 1024;
 @*/
 
 static bool receive_packet(struct packet* dst) {

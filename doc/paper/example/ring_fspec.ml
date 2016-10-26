@@ -8,7 +8,7 @@ let ring_struct = Ir.Str ( "ring", [])
 let fun_types =
   String.Map.of_alist_exn
     ["ring_create", {ret_type = Ptr ring_struct;
-                     arg_types = [];
+                     arg_types = [Sint32];
                      lemmas_before = [(fun _ _ ->
                        "//@ close packet_property(port_non9);")];
                      lemmas_after = [];};
