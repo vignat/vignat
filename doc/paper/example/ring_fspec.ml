@@ -10,7 +10,7 @@ let fun_types =
     ["ring_create", {ret_type = Ptr ring_struct;
                      arg_types = [Sint32];
                      lemmas_before = [(fun _ _ ->
-                       "//@ close packet_property(port_non9);")];
+                       "//@ close packet_property(user_packet_property);")];
                      lemmas_after = [];};
      "ring_full", {ret_type = Boolean;
                    arg_types = [Ptr ring_struct];

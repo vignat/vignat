@@ -27,6 +27,7 @@
 #define FILL_SYMBOLIC(addr, size, name) klee_make_symbolic(addr, size, name)
 
 #define LOOP(cond) (cond & klee_induce_invariants())
+#define VIGOR_CHECK(cond) ASSERT(cond)
 
 #endif//KLEE_VERIFICATION
 

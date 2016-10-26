@@ -5,6 +5,11 @@
 
 #include "ring.h"
 
+/*@
+  predicate loop_invariant(struct ring* rp) =
+    ringp(rp, _, user_packet_property, RING_CAPACITY);
+  @*/
+
 void loop_invariant_consume(struct ring **r);
 //@ requires *r |-> ?rp &*& loop_invariant(rp);
 //@ ensures *r |-> rp;

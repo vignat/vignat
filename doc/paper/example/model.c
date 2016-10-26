@@ -2,6 +2,9 @@
 #include "packet.h"
 #include "ring.h"
 #include "loop-model.h"
+#include "user-params.h"
+
+#define CAP RING_CAPACITY
 
 int main(int argc, char** argv) {
   struct packet p;
@@ -15,7 +18,7 @@ int main(int argc, char** argv) {
         ring_push_back(r, &p);
     if (!ring_empty(r) && can_send_packet()) {
       ring_pop_front(r, &p);
-      ASSERT(p.port != 9);
+      VIGOR_CHECK(p.port != 9);
       send_packet(&p);
     }
     loop_iteration_end(&r);
