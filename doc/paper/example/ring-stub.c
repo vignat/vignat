@@ -1,5 +1,6 @@
 #include "vigor.h"
 #include "ring.h"
+#include "user-params.h"
 
 struct ring {
   int dummy;
@@ -44,7 +45,7 @@ void ring_push_back(struct ring* r, struct packet* p) {
   klee_trace_param_ptr(p, sizeof(struct packet), "p");
   klee_trace_param_ptr_field(p, offsetof(struct packet, port),
                              sizeof(int), "port");
-  ASSERT(p->port != 9); //Unnecessary.
+  ASSERT(packet_constraints(p)); //Unnecessary.
 }
 
 void ring_pop_front(struct ring* r, struct packet* p) {
@@ -54,5 +55,5 @@ void ring_pop_front(struct ring* r, struct packet* p) {
   klee_trace_param_ptr_field(p, offsetof(struct packet, port),
                              sizeof(int), "port");
   FILL_SYMBOLIC(p, sizeof(struct packet), "popped_packet");
-  ASSUME(p->port != 9);
+  ASSUME(packet_constraints(p));
 }

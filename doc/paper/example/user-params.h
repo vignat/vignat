@@ -9,4 +9,8 @@
   }
   @*/
 
+static bool packet_constraints(struct packet* p) {
+  return p->port != 9;
+}
+
 #endif//_USER_PARAMS_H_INCLUDED_
