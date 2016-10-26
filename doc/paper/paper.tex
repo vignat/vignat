@@ -140,7 +140,7 @@ To verify that this NF does not crash, one could use the approach in Dobrescu et
 
 One could use an SEE like KLEE~\cite{cadar2008klee} to symbolically execute the code above exhaustively --- once all paths are found to be crash-free, the crash-freedom proof is complete. To perform SE, it is necessary to provide symbolic models for the three network calls. Something simple suffices, such as \code{receive_packet} generating a new symbolic packet in \code{dst}; \code{can_send_packet} forking program state into two states, one for each possible return value; and \code{send_packet} doing nothing. 
 
-Alas, symbolic execution would never terminate. The reason is ``path explosion:'' there is a large (often infinite) number of paths to explore, so the SEE cannot finish.  Path explosion results from cyclomatic complexity~\cite{mccabe:cyclomatic}: every branch condition doubles the number of paths, and every loop multiplies it by a factor; in our case, three \code{if} conditions inside an infinite loop give rise to an infinite number of paths. 
+Alas, symbolic execution would never terminate. The reason is ``path explosion'': there is a large (often infinite) number of paths to explore, so the SEE cannot finish.  Path explosion results from cyclomatic complexity~\cite{mccabe:cyclomatic}: every branch condition doubles the number of paths, and every loop multiplies it by a factor; in our case, three \code{if} conditions inside an infinite loop give rise to an infinite number of paths. 
 
 {\bf Step 1: Add loop invariants.} Infinite (or very long) loops can be simplified using loop invariants~\cite[\S~2.1]{cormen2009introduction}. These are annotations that inform the SEE about invariant properties of the loop, such as ``no element of \code{packets} between \code{begin} and \code{end} has destination port equal to 9'', and are a good match for NF-style loops.  We added to KLEE support for havoc-ing~\cite{boogie} automatically, to take advantage of such invariants and essentially reduce the infinite loop to a single abstract iteration that can be reasoned about in one pass.
  
@@ -185,6 +185,13 @@ int main() {
 }
 \end{lstlisting}
 
+Now exhaustive SE of the code takes less than 100 millisec with our modified
+KLEE, regardless of the size of \code{CAP}.  The fact that the code does not
+crash on any path amounts to a proof of crash freedom. Or does it? The validity
+of the proof depends on (1)  our library implementation of \code{ring} not
+crashing; and (2) the symbolic model of \code{ring} accurately capturing how the
+\code{ring} implementation works ({\em Step 3}).
+
 Suppose we had an overapproximate model:
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
@@ -193,15 +200,13 @@ void ring_pop_front(struct ring* r,
                 "popped_packet");
 }
 \end{lstlisting}
-Then the \code{ASSERT} would fail.
-
-Now exhaustive SE of the code takes less than 100 millisec with our modified KLEE, regardless of the size of \code{CAP}.  The fact that the code does not crash on any path amounts to a proof of crash freedom. Or does it? The validity of the proof depends on (1)  our library implementation of \code{ring} not crashing; and (2) the symbolic model of \code{ring} accurately capturing how the \code{ring} implementation works.
+Then the \code{ASSERT} from the previous listing would fail.
 
 The Vigor library comes with a formal specification and a formal proof that the implementation satisfies that specification. In other words, there is a formal spec for \code{ring} and a proof that the \code{ring} implementation satisfies the spec. This is how we enable SE to verify the high level code, while using separation logic to verify the library of components---two different verifications techniques for two different parts of the NF. Doing the library verification requires deep expertise in program verification, but our effort is amortized across all NFs that use the library. Vigor makes it possible for NF developers to verify their code without having to understand verification. Note that stating invariants for dataplane software turns out to require no verification expertise.
 
 Here is the example of the proven specification for the function
-\code{ring_pop_front}. We do not include the proof of this specification due to
-space constraints:
+\code{ring_pop_front}. We do not include the certified implementation of this
+specification due to space constraints:
 
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
@@ -216,10 +221,11 @@ void ring_pop_front(struct ring* r,
 
 Note \code{pktp(p, head(lst));} predicate includes the \code{p->port != 9} property.
 
-Vigor must also validate that the model used for SE matches the library spec. Some symbolic models work well for some code, while others work well for other code, so the Vigor library comes with {\em multiple} simple, overapproximating models for each component, and Vigor automatically chooses combinations of models for symbolically executing the NF code. Once it finds a combination of models with which the desired property (crash freedom, no memory leaks, absence of certain security vulnerabilities) can be proven, Vigor validates that the behaviors exposed by the model during verification are consistent with the component's formal specification.  Details on how it does this appear in \S\ref{sec:design}.
+{\bf Step 3: Validate the model used for SE.}
+The model must match the library spec. Some symbolic models work well for some code, while others work well for other code, so the Vigor library comes with {\em multiple} simple, overapproximating models for each component, and Vigor automatically chooses combinations of models for symbolically executing the NF code. Once it finds a combination of models with which the desired property (crash freedom, no memory leaks, absence of certain security vulnerabilities) can be proven, Vigor validates that the behaviors exposed by the model during verification are consistent with the component's formal specification.  Details on how it does this appear in \S\ref{sec:design}.
 
 To validate the model fit for the particular use case, SEE dumps
-all the call sequences (30 in this case) that may happen during the execution.
+all the call sequences (30 in this example) that may happen during the execution.
 Vigor checks whether the symbolic model enumerated all the possible
 outputs for each sequence.
 
@@ -262,7 +268,7 @@ then the last line in the call sequence check will look like:
 And the formal verification will fail, because specification admits a wider
 range of possible outputs.
 
-{\bf Step 3: Link the NF code with the verified library} of components. The resulting executable is guaranteed to be free of crashes, subject to the assumptions listed in~\S\ref{sec:limitations}.
+{\bf Step 4: Link the NF code with the verified library} of components. The resulting executable is guaranteed to be free of crashes, subject to the assumptions listed in~\S\ref{sec:limitations}.
 
 %Note, that the \code{ring_pop} model does not even check whether it is called with an empty ring or not. The example application makes sure to call pop only if the ring is not empty. Therefore the check is not necessary.
 %This model clearly overapproximates a ``ring'', e.g. \code{ring_empty} may return true even right after \code{ring_push}. This means, it may have caused false positives, but as long as it does not, no need to complicate it.
