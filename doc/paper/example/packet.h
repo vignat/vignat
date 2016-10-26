@@ -8,9 +8,13 @@ struct packet {
 };
 
 /*@
-  predicate pktp(struct packet* p, int port) =
-  struct_packet_padding(p) &*&
-  p->port |-> port &*& port != 9;
+  inductive packet = packet(int);
+
+  predicate packetp(struct packet* p, packet pkt) =
+     switch(pkt) { case packet(port):
+       return struct_packet_padding(p) &*&
+              p->port |-> port;
+     };
 @*/
 
 static bool receive_packet(struct packet* dst) {

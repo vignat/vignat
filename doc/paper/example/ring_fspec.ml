@@ -9,7 +9,8 @@ let fun_types =
   String.Map.of_alist_exn
     ["ring_create", {ret_type = Ptr ring_struct;
                      arg_types = [];
-                     lemmas_before = [];
+                     lemmas_before = [(fun _ _ ->
+                       "//@ close packet_property(port_non9);")];
                      lemmas_after = [];};
      "ring_full", {ret_type = Boolean;
                    arg_types = [Ptr ring_struct];
@@ -23,20 +24,25 @@ let fun_types =
                         arg_types = [Ptr ring_struct;
                                      Ptr packet_struct];
                         lemmas_before = [(fun args _ ->
-                             "//@ close pktp(" ^
+                             "//@ close packetp(" ^
                              (List.nth_exn args 1) ^
-                             ", _);\n";)];
+                             ", packet((" ^ (List.nth_exn args 1) ^
+                             ")->port));\n";)];
                         lemmas_after = [(fun params ->
-                             "//@ open pktp(" ^
+                             "//@ open packetp(" ^
                              (List.nth_exn params.args 1) ^
                              ", _);\n";)];};
      "ring_pop_front", {ret_type = Void;
                         arg_types = [Ptr ring_struct;
                                      Ptr packet_struct];
-                        lemmas_before = [];
+                        lemmas_before = [(fun args _ ->
+                             "//@ close packetp(" ^
+                             (List.nth_exn args 1) ^
+                             ", packet((" ^ (List.nth_exn args 1) ^
+                             ")->port));\n";)];
                         lemmas_after = [
                           (fun params ->
-                             "//@ open pktp(" ^
+                             "//@ open packetp(" ^
                              (List.nth_exn params.args 1) ^
                              ", _);\n";);];};
      "loop_invariant_consume", {ret_type = Void;

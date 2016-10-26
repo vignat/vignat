@@ -8,29 +8,41 @@
 struct ring;
 
 /*@
-  predicate ringp(struct ring* r, list<int> packets);
+  predicate packet_property(fixpoint (packet,bool) property) = true;
+  predicate ringp(struct ring* r, list<packet> packets,
+                  fixpoint (packet,bool) property);
   @*/
 
 struct ring* ring_create();
-//@ requires true;
-//@ ensures (true == ((void*)0 == (void*)result) ? true : ringp(result, nil));
+//@ requires packet_property(?property);
+//@ ensures result == 0 ? true : ringp(result, nil, property);
 
 bool ring_full(struct ring* r);
-//@ requires ringp(r, ?lst);
-/*@ ensures ringp(r, lst) &*& length(lst) <= CAP &*&
+//@ requires ringp(r, ?lst, ?property);
+/*@ ensures ringp(r, lst, property) &*&
+            length(lst) <= CAP &*&
             result == (length(lst) == CAP); @*/
 
 bool ring_empty(struct ring* r);
-//@ requires ringp(r, ?lst);
-/*@ ensures ringp(r, lst) &*& result == (lst == nil); @*/
+//@ requires ringp(r, ?lst, ?property);
+/*@ ensures ringp(r, lst, property) &*&
+            result == (lst == nil); @*/
 
-void ring_push_back(struct ring* r, struct packet* p);
-//@ requires ringp(r, ?lst) &*& length(lst) < CAP &*& pktp(p, ?v);
-//@ ensures ringp(r, append(lst, cons(v, nil))) &*& pktp(p, v);
+void ring_push_back(struct ring* r,
+                    struct packet* p);
+/*@ requires ringp(r, ?lst, ?property) &*&
+             length(lst) < CAP &*&
+             packetp(p, ?v) &*&
+             true == property(v); @*/
+/*@ ensures ringp(r, append(lst, cons(v, nil)), property) &*&
+            packetp(p, v); @*/
 
-void ring_pop_front(struct ring* r, struct packet* p);
-/*@ requires ringp(r, ?lst) &*& lst != nil &*& p->port |-> _ &*&
-             struct_packet_padding(p); @*/
-//@ ensures ringp(r, tail(lst)) &*& pktp(p, head(lst));
+void ring_pop_front(struct ring* r,
+                    struct packet* p);
+/*@ requires ringp(r, ?lst, ?property) &*&
+             lst != nil &*& packetp(p, _); @*/
+/*@ ensures ringp(r, tail(lst), property) &*&
+            packetp(p, head(lst)) &*&
+            true == property(head(lst)); @*/
 
 #endif//_RING_H_INCLUDED_
