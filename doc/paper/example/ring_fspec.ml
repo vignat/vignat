@@ -47,12 +47,15 @@ let fun_types =
                              ", _);\n";);];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr ring_struct)];
-                                lemmas_before = [];
+                                lemmas_before = [(fun args _ ->
+                                    "//@ close loop_invariant(*" ^
+                                    (List.nth_exn args 0) ^ ");")];
                                 lemmas_after = [];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr ring_struct)];
                                 lemmas_before = [];
-                                lemmas_after = [];};
+                                lemmas_after = [
+                                  tx_l "open loop_invariant(_);"];};
     ]
 
 let fixpoints = String.Map.empty

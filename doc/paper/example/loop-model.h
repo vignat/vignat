@@ -6,12 +6,12 @@
 #include "ring.h"
 
 void loop_invariant_consume(struct ring **r);
-//@ requires *r |-> ?rp &*& ringp(rp, _, port_non9);
+//@ requires *r |-> ?rp &*& loop_invariant(rp);
 //@ ensures *r |-> rp;
 
 void loop_invariant_produce(struct ring **r);
 //@ requires *r |-> ?rp;
-//@ ensures *r |-> rp &*& ringp(rp, _, port_non9);
+//@ ensures *r |-> rp &*& loop_invariant(rp);
 
 void loop_iteration_begin(struct ring **r);
 void loop_iteration_end(struct ring **r);
