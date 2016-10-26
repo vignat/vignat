@@ -150,38 +150,40 @@ This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 
 For our example, the library provides a \code{ring} with a simple interface: \code{bool ring_empty()} checks whether there is a packet in the ring, \code{bool ring_full()} checks whether the ring has run out of space, \code{void ring_push_back(struct packet* src)} adds packet \code{src} to the ring, and \code{void ring_pop_front(struct packet* dst)} removes a packet from the ring and places it in \code{dst}. We then write a symbolic model for the \code{ring} and provide it to the SEE instead of the actual implementation. The NF now becomes:
 
-% \begin{lstlisting}
-% bool ring_full() {return SYMBOLIC("full");}
-
-% bool ring_empty() {return SYMBOLIC("empty");}
-
-% void ring_push_back(struct packet* p) {
-%   ASSERT(p->port != 9); //Extra check.
-% }
-
-% void ring_pop_front(struct packet* p) {
-%   FILL_SYMBOLIC(p, sizeof(struct packet), 
-%                 "popped_packet");
-%   ASSUME(p->port != 9);
-% }
-% \end{lstlisting}
+\begin{lstlisting}
+int main(int argc, char** argv) {
+  struct packet p;
+  struct ring *r = ring_create(CAP);
+  if (!r) return 1;
+  while(LOOP(1))
+  {
+    loop_iteration_begin(&r);
+    if (!ring_full(r))
+      if (receive_packet(&p) && p.port != 9)
+        ring_push_back(r, &p);
+    if (!ring_empty(r) && can_send_packet()) {
+      ring_pop_front(r, &p);
+      VIGOR_CHECK(p.port != 9);
+      send_packet(&p);
+    }
+    loop_iteration_end(&r);
+  }
+  return 0;
+}
+\end{lstlisting}
 
 \begin{lstlisting}
 #define CAP 512
+#define RING_CAPACITY 512
 
-int main() {
-  struct packet p;
-  while(LOOP(1)) {
-    if (!ring_full())
-      if (receive_packet(&p) && p.port != 9)
-        ring_push_back(&p);
-    if (!ring_empty() && can_send_packet()) {
-      ring_pop_front(&p);
-      ASSERT(p.port != 9);
-      send_packet(&p);
-    }
+/*@
+  fixpoint bool user_packet_property(packet p) {
+    switch(p) { case packet(port): return port != 9; }
   }
-  return 0;
+  @*/
+
+static bool packet_constraints(struct packet* p) {
+  return p->port != 9;
 }
 \end{lstlisting}
 
@@ -211,15 +213,17 @@ specification due to space constraints:
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
                     struct packet* p);
-/*@ requires ringp(r, ?lst) &*&
+/*@ requires ringp(r, ?lst,
+                   ?property, ?capacity) &*&
              lst != nil &*&
-             p->port |-> _ &*&
-             struct_packet_padding(p); @*/
-/*@ ensures ringp(r, tail(lst)) &*&
-            pktp(p, head(lst)); @*/
+             packetp(p, _); @*/
+/*@ ensures ringp(r, tail(lst),
+                  property, capacity) &*&
+            packetp(p, head(lst)) &*&
+            true == property(head(lst)); @*/
 \end{lstlisting}
 
-Note \code{pktp(p, head(lst));} predicate includes the \code{p->port != 9} property.
+Note that \code{property(head(lst));} in the post condition ensures \code{p->port != 9} property.
 
 {\bf Step 3: Validate the model used for SE.}
 The model must match the library spec. Some symbolic models work well for some code, while others work well for other code, so the Vigor library comes with {\em multiple} simple, overapproximating models for each component, and Vigor automatically chooses combinations of models for symbolically executing the NF code. Once it finds a combination of models with which the desired property (crash freedom, no memory leaks, absence of certain security vulnerabilities) can be proven, Vigor validates that the behaviors exposed by the model during verification are consistent with the component's formal specification.  Details on how it does this appear in \S\ref{sec:design}.
@@ -238,19 +242,20 @@ value returned by model (\code{arg2.port != 9}) covers all the cases prescribed
 by the specification.
  
 \begin{lstlisting}
-int port_0;
 struct ring* arg1;
 struct packet arg2;
-//@ assume((9 == port_0));
-arg2.port = port_0;
+
 loop_invariant_produce(&(arg1));
+/*@ open loop_invariant(_); @*/
 bool ret1 = ring_full(arg1);
 //@ assume(ret1 == false);
 bool ret2 = ring_empty(arg1);
 //@ assume(ret2 == false);
+//@ close packetp(&(arg2), packet((&(arg2))->port));
 
 ring_pop_front(arg1, &(arg2));
-//@ open pktp(&(arg2), _);
+//@ open packetp(&(arg2), _);
+
 /*@ assert((false == (9 == arg2.port))); @*/
 \end{lstlisting}
 

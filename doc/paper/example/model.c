@@ -4,8 +4,6 @@
 #include "loop-model.h"
 #include "user-params.h"
 
-#define CAP RING_CAPACITY
-
 int main(int argc, char** argv) {
   struct packet p;
   struct ring *r = ring_create(CAP);
