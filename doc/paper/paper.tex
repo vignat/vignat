@@ -126,7 +126,7 @@ In the rest of the paper, we give a short overview of Vigor (\S\ref{sec:solution
 \section{Solution Overview}
 \label{sec:solution-overview}
 
-This section motivates and explains at a high level what it's like to use Vigor when developing NFs. For the sake of illustration, say we wish to develop a trivial stateful NF that implements the discard protocol~\cite{rfc863}: an infinite loop receives packets from one interface, discards the ones that go to port 9 (``discard port''), and forwards the others through another interface.
+This section motivates and explains at a high level what it's like to use Vigor when developing NFs. For the sake of illustration, say we wish to develop a trivial stateful NF that implements the discard protocol~\cite{rfc863}: an infinite loop receives packets from one interface, discards the ones that target port 9 (``discard port''), and forwards the others through another interface.
 
 \begin{figure}[h!]
 \begin{lstlisting}
@@ -134,16 +134,16 @@ This section motivates and explains at a high level what it's like to use Vigor 
 
 int main() {
   struct packet packets[CAP] = {};
-  int begin = 0, end = 0;
+  int begin = 0, queue_len = 0;
 
   while(1) {
-    if (end != (begin - 1) || 
-        !(end == CAP - 1 && begin == 0)) {
-      if (receive_packet(&packets[end]) && 
+    if (queue_len < CAP) {
+      int end = (begin + queue_len)%CAP;
+      if (receive_packet(&packets[end]) &&
           packets[end].port != 9)
-        end = (end + 1)%CAP;
+        queue_len += 1;
     }
-    if (end != begin && can_send_packet()) {
+    if (0 < queue_len) {
       send_packet(&packets[begin]);
       begin = (begin + 1)%CAP;
     }

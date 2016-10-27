@@ -5,15 +5,16 @@
 
 int main() {
   struct packet packets[CAP] = {};
-  int begin = 0, end = 0;
+  int begin = 0, queue_len = 0;
 
-  while(LOOP(1)) {
-    if (end != (begin - 1) || !(end == CAP - 1 && begin == 0)) {
-      if (receive_packet(&packets[end]) && packets[end].port != 9)
-        end = (end + 1)%CAP;
+  while(1) {
+    if (queue_len < CAP) {
+      int end = (begin + queue_len)%CAP;
+      if (receive_packet(&packets[end]) &&
+          packets[end].port != 9)
+        queue_len += 1;
     }
-    if (end != begin && can_send_packet()) {
-      ASSERT(packets[begin].port != 9);
+    if (0 < queue_len) {
       send_packet(&packets[begin]);
       begin = (begin + 1)%CAP;
     }
