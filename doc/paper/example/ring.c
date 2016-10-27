@@ -31,20 +31,24 @@ struct ring {
                packetsp(arr+1, len-1, t, property);
     };
 
-  predicate ringp(struct ring* r,
-                  list<packet> packets,
-                  fixpoint (packet,bool) property,
-                  int cap) =
-    r->begin |-> ?begin &*&
-    0 <= begin &*& begin < cap &*&
-    r->len |-> ?len &*&
-    0 <= len &*& len <= cap &*&
-    len == length(packets) &*&
+  predicate ring_fieldsp(struct ring* r; struct packet* arr,
+                         int begin, int len, int cap) =
+    r->begin |-> begin &*&
     r->cap |-> cap &*&
+    r->len |-> len &*&
+    r->array |-> arr &*&
+    0 <= begin &*& begin < cap &*&
+    0 <= len &*& len <= cap &*&
     0 < cap &*& cap < CAP_LIMIT &*&
-    r->array |-> ?arr &*&
     malloc_block_chars((void*)arr, cap * sizeof(struct packet)) &*&
-    malloc_block_ring(r) &*&
+    malloc_block_ring(r);
+
+  predicate ringp(struct ring* r,
+                  fixpoint (packet,bool) property,
+                  list<packet> packets,
+                  int cap) =
+    ring_fieldsp(r, ?arr, ?begin, ?len, cap) &*&
+    len == length(packets) &*&
     begin + len < cap ?
       (empty_arrayp(arr, begin) &*&
        packetsp(arr + begin,
@@ -66,7 +70,7 @@ struct ring {
 struct ring* ring_create(int capacity)
 /*@ requires packet_property(?property) &*& 0 < capacity &*&
              capacity < CAP_LIMIT; @*/
-//@ ensures result == 0 ? true : ringp(result, nil, property, capacity);
+//@ ensures result == 0 ? true : ringp(result, property, nil, capacity);
 {
   //@ open packet_property(property);
   struct ring* ret = malloc(sizeof(struct ring));
@@ -88,30 +92,30 @@ struct ring* ring_create(int capacity)
   //@ close empty_arrayp(ret->array, 0);
   //@ close packetsp(ret->array, 0, nil, property);
   //@ close empty_arrayp((struct packet*)ret->array, capacity);
-  //@ close ringp(ret, nil, property, capacity);
+  //@ close ringp(ret, property, nil, capacity);
   return ret;
 }
 
 bool ring_full(struct ring* r)
-//@ requires ringp(r, ?lst, ?property, ?cap);
-/*@ ensures ringp(r, lst, property, cap) &*&
+//@ requires ringp(r, ?property, ?lst, ?cap);
+/*@ ensures ringp(r, property, lst, cap) &*&
             length(lst) <= cap &*&
             result == (length(lst) == cap); @*/
 {
-  //@ open ringp(r, lst, property, cap);
+  //@ open ringp(r, property, lst, cap);
   return r->len == r->cap;
-  //@ close ringp(r, lst, property, cap);
+  //@ close ringp(r, property, lst, cap);
 }
 
 bool ring_empty(struct ring* r)
-//@ requires ringp(r, ?lst, ?property, ?cap);
-/*@ ensures ringp(r, lst, property, cap) &*&
+//@ requires ringp(r, ?property, ?lst, ?cap);
+/*@ ensures ringp(r, property, lst, cap) &*&
             result == (lst == nil); @*/
 {
-  //@ open ringp(r, lst, property, cap);
+  //@ open ringp(r, property, lst, cap);
   //@ switch(lst) {case cons(h,t): case nil: }
   return r->len == 0;
-  //@ close ringp(r, lst, property, cap);
+  //@ close ringp(r, property, lst, cap);
 }
 
 /*@
@@ -160,14 +164,14 @@ bool ring_empty(struct ring* r)
 @*/
 
 void ring_push_back(struct ring* r, struct packet* p)
-/*@ requires ringp(r, ?lst, ?property, ?cap) &*&
+/*@ requires ringp(r, ?property, ?lst, ?cap) &*&
              length(lst) < cap &*&
              packetp(p, ?v) &*&
              true == property(v); @*/
-/*@ ensures ringp(r, append(lst, cons(v, nil)), property, cap) &*&
+/*@ ensures ringp(r, property, append(lst, cons(v, nil)), cap) &*&
             packetp(p, v); @*/
 {
-  //@ open ringp(r, lst, property, cap);
+  //@ open ringp(r, property, lst, cap);
   int end = r->begin + r->len;
   if ( r->cap <= end ) {
     end = end - r->cap;
@@ -215,7 +219,7 @@ void ring_push_back(struct ring* r, struct packet* p)
       take_append_small(cap - r->begin, lst, cons(v, nil));
     }
     @*/
-  //@ close ringp(r, append(lst, cons(v, nil)), property, cap);
+  //@ close ringp(r, property, append(lst, cons(v, nil)), cap);
 }
 
 /*@
@@ -263,14 +267,20 @@ ensures empty_arrayp(arr, 0) &*&
 }
 @*/
 
+/* @ lemma void extract_first(struct ring* r)
+    requires ringp(r, ?prop, ?lst, ?cap) &*&
+             lst != nil;
+    ensures 
+  @*/
+
 void ring_pop_front(struct ring* r, struct packet* p)
-/*@ requires ringp(r, ?lst, ?property, ?cap) &*&
+/*@ requires ringp(r, ?property, ?lst, ?cap) &*&
              lst != nil &*& packetp(p, _); @*/
-/*@ ensures ringp(r, tail(lst), property, cap) &*&
+/*@ ensures ringp(r, property, tail(lst), cap) &*&
             packetp(p, head(lst)) &*&
             true == property(head(lst)); @*/
 {
-  //@ open ringp(r, lst, property, cap);
+  //@ open ringp(r, property, lst, cap);
   /*@ if (r->begin + r->len < cap) {
     open packetsp((struct packet*)r->array + r->begin, ?len, lst, property);
   } else {
@@ -314,5 +324,5 @@ void ring_pop_front(struct ring* r, struct packet* p)
   }
   //@ length_tail(lst);
   //@ close packetp(p, head(lst));
-  //@ close ringp(r, tail(lst), property, cap);
+  //@ close ringp(r, property, tail(lst), cap);
 }
