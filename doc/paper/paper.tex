@@ -22,7 +22,10 @@
     commentstyle=\color{gray}\ttfamily,
     keepspaces=true,
     tabsize=2,
-    otherkeywords={bool}
+    otherkeywords={bool},
+    numbers=left,
+    numbersep=1pt,
+    numberstyle=\tiny\color{gray}
 }
 
 \newcommand{\code}[1]{\lstinline{#1}}
@@ -64,7 +67,23 @@
 
 
 \subsection*{Abstract}
-The objective of this work is to enable developers to productively write software-based data plane network functions that simultaneously meet the highest standards of reliability, security, and performance. We present a verification approach for formally proving properties of stateful network functions, in a way that is practical both in terms of developer effort and the performance of the resulting data plane software. Unlike alternative approaches that require drastic changes in the way network functions are developed, our approach allows the use of C/C++ together with popular frameworks like DPDK. To the best of our knowledge, our work is the first to both be practical and formally verify stateful network functions. We introduce a new ``speculative'' form of symbolic execution, which achieves scalability to real-world network functions by leveraging insights related to the structure and cyclomatic complexity of data plane software. This technique dovetails with a new library of verified components that are commonly used in network functions. We illustrate our approach by developing a middlebox that is verified to never crash, to not leak memory, be free of several classes of security vulnerabilities, and whose performance is on par with other NATs. %\footnote{Disclaimer: we use acronym NAT in this paper to refer to a more narrow kind - Dynamic Source NAPT (network address-port translation~\cite{rfc3022}).}. 
+The objective of this work is to enable developers to productively write
+software-based data plane network functions that simultaneously meet the highest
+standards of reliability, security, and performance. We present a verification
+approach for formally proving properties of stateful network functions, in a way
+that is practical both in terms of developer effort and the performance of the
+resulting data plane software. Unlike alternative approaches that require
+drastic changes in the way network functions are developed, our approach allows
+the use of C/C++ together with popular frameworks like DPDK. To the best of our
+knowledge, our work is the first to both be practical and formally verify
+stateful network functions. We introduce a new ``speculative'' form of symbolic
+execution, which achieves scalability to real-world network functions by
+leveraging insights related to the structure and cyclomatic complexity of data
+plane software. This technique dovetails with a new library of verified
+components that are commonly used in network functions. We illustrate our
+approach by developing a NAT box that is verified to never crash, to not leak
+memory, be free of several classes of security vulnerabilities, and whose
+performance is on par with other NATs. %\footnote{Disclaimer: we use acronym NAT in this paper to refer to a more narrow kind - Dynamic Source NAPT (network address-port translation~\cite{rfc3022}).}. 
 We view this as an important milestone on the road to complete verification of all software-based network functions.
 
 \section{Introduction}
@@ -86,7 +105,8 @@ Practical verification of stateful software NFs is a difficult research problem.
 We achieve both scalable verification and minimal developer effort by leveraging two insights into the verification of data plane software:
 \begin{itemize}
     \item {\bf Canonical data structures}: Unlike general-purpose software, data plane software employs a small number of commonly used network data structures (hash table, least-prefix-match, rings, etc.) and components. These lend themselves naturally to being abstracted into a library. They can be formally verified a priori, and their proofs then automatically leveraged for proving properties of the code that uses them.
-    \item {\bf Hybrid verification}: While typically one picks a verification technique and applies it throughout, any {\em one} technique works well for {\em some} of the code and not for other. However, data plane software offers us the opportunity to advantageously employ symbolic execution for high-level code (which is mostly stateless and has short execution paths) and verification based on separation logic to the library of components/data structures (which is highly stateful).
+    \item {\bf Hybrid verification}: While typically one picks a verification
+      technique and applies it throughout, no {\em single} technique works well for {\em all} of the code. However, data plane software offers us the opportunity to advantageously employ symbolic execution for high-level code (which is mostly stateless and has short execution paths) and verification based on separation logic to the library of components/data structures (which is highly stateful).
      
 \end{itemize}
 
@@ -108,6 +128,7 @@ In the rest of the paper, we give a short overview of Vigor (\S\ref{sec:solution
 
 This section motivates and explains at a high level what it's like to use Vigor when developing NFs. For the sake of illustration, say we wish to develop a trivial stateful NF that implements the discard protocol~\cite{rfc863}: an infinite loop receives packets from one interface, discards the ones that go to port 9 (``discard port''), and forwards the others through another interface.
 
+\begin{figure}[h!]
 \begin{lstlisting}
 #define CAP 512
 
@@ -129,8 +150,10 @@ int main() {
   }
   return 0;
 }
-
 \end{lstlisting}
+  \caption{Original implementation of the Drop protocol}
+  \label{lst:orig}
+\end{figure}
 
 In order to absorb bursts, the code employs a ring buffer. The interface to the
 network is: \code{bool receive_packet(struct packet* dst)}, which
@@ -142,7 +165,7 @@ One could use an SEE like KLEE~\cite{cadar2008klee} to symbolically execute the 
 
 Alas, symbolic execution would never terminate. The reason is ``path explosion'': there is a large (often infinite) number of paths to explore, so the SEE cannot finish.  Path explosion results from cyclomatic complexity~\cite{mccabe:cyclomatic}: every branch condition doubles the number of paths, and every loop multiplies it by a factor; in our case, three \code{if} conditions inside an infinite loop give rise to an infinite number of paths. 
 
-{\bf Step 1: Add loop invariants.} Infinite (or very long) loops can be simplified using loop invariants~\cite[\S~2.1]{cormen2009introduction}. These are annotations that inform the SEE about invariant properties of the loop, such as ``no element of \code{packets} between \code{begin} and \code{end} has destination port equal to 9'', and are a good match for NF-style loops.  We added to KLEE support for havoc-ing~\cite{boogie} automatically, to take advantage of such invariants and essentially reduce the infinite loop to a single abstract iteration that can be reasoned about in one pass.
+{\bf Step 1: Add loop invariants.} Infinite (or very long) loops can be simplified using loop invariants~\cite[\S~2.1]{cormen2009introduction}. These are annotations that inform the SEE about invariant properties of the loop, such as ``no element of \code{packets} between \code{begin} and \code{end} has destination port equal to 9'', and are a good match for NF-style loops.  We added to KLEE support for havoc-ing~\cite{barnett2005boogie} automatically, to take advantage of such invariants and essentially reduce the infinite loop to a single abstract iteration that can be reasoned about in one pass.
  
 This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10 sec to exhaustively SE the code; for \code{CAP=30} it takes 15 min, for \code{CAP=60} it takes 3 hours, and so on. It takes long due to another classic SE challenge, ``symbolic indexing''~\cite{sen2005cute,godefroid2008automated,boonstoppel2008rwset}: when indexing an array with a symbolic variable (or when dereferencing a symbolic pointer), the constraints on program state become extremely complex, because the symbolic pointer or index could be referencing many different possible locations. The complexity of the constraints chokes the SMT solver, and the SEE grinds to a halt. In general, SE doesn't work for code with symbolic pointers or offsets. Alas, stateful C code almost always has some of these.
 
@@ -150,6 +173,7 @@ This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 
 For our example, the library provides a \code{ring} with a simple interface: \code{bool ring_empty()} checks whether there is a packet in the ring, \code{bool ring_full()} checks whether the ring has run out of space, \code{void ring_push_back(struct packet* src)} adds packet \code{src} to the ring, and \code{void ring_pop_front(struct packet* dst)} removes a packet from the ring and places it in \code{dst}. We then write a symbolic model for the \code{ring} and provide it to the SEE instead of the actual implementation. The NF now becomes:
 
+\begin{figure}[h!]
 \begin{lstlisting}
 int main(int argc, char** argv) {
   struct packet p;
@@ -171,10 +195,17 @@ int main(int argc, char** argv) {
   return 0;
 }
 \end{lstlisting}
+  \caption{Vigor implementation of Drop protocol.}
+  \label{lst:vigor}
+\end{figure}
 
+For the symbolic execution and future validation, we need also to customize the
+general-purpose packet ring with the following definitions:
+
+\begin{figure}
 \begin{lstlisting}
 #define CAP 512
-#define RING_CAPACITY 512
+#define RING_CAPACITY CAP
 
 /*@
   fixpoint bool user_packet_property(packet p) {
@@ -186,6 +217,9 @@ static bool packet_constraints(struct packet* p) {
   return p->port != 9;
 }
 \end{lstlisting}
+  \caption{Custom definitions capturing the desired property.}
+  \label{lst:customizations}
+\end{figure}
 
 Now exhaustive SE of the code takes less than 100 millisec with our modified
 KLEE, regardless of the size of \code{CAP}.  The fact that the code does not
@@ -195,6 +229,7 @@ crashing; and (2) the symbolic model of \code{ring} accurately capturing how the
 \code{ring} implementation works ({\em Step 3}).
 
 Suppose we had an overapproximate model:
+\begin{figure}[h!]
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
                     struct packet* p) {
@@ -202,6 +237,9 @@ void ring_pop_front(struct ring* r,
                 "popped_packet");
 }
 \end{lstlisting}
+  \caption{An extract from an overapproximate ring model.}
+  \label{lst:overapproximate}
+\end{figure}
 Then the \code{ASSERT} from the previous listing would fail.
 
 The Vigor library comes with a formal specification and a formal proof that the implementation satisfies that specification. In other words, there is a formal spec for \code{ring} and a proof that the \code{ring} implementation satisfies the spec. This is how we enable SE to verify the high level code, while using separation logic to verify the library of components---two different verifications techniques for two different parts of the NF. Doing the library verification requires deep expertise in program verification, but our effort is amortized across all NFs that use the library. Vigor makes it possible for NF developers to verify their code without having to understand verification. Note that stating invariants for dataplane software turns out to require no verification expertise.
@@ -210,6 +248,7 @@ Here is the example of the proven specification for the function
 \code{ring_pop_front}. We do not include the certified implementation of this
 specification due to space constraints:
 
+\begin{figure}[h!]
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
                     struct packet* p);
@@ -222,6 +261,9 @@ void ring_pop_front(struct ring* r,
             packetp(p, head(lst)) &*&
             true == property(head(lst)); @*/
 \end{lstlisting}
+  \caption{A formal contract for the ring\_pop\_front function.}
+  \label{lst:contract}
+\end{figure}
 
 Note that \code{property(head(lst));} in the post condition ensures \code{p->port != 9} property.
 
@@ -241,6 +283,7 @@ both return \code{false}. The seqeunce ends with a call to
 value returned by model (\code{arg2.port != 9}) covers all the cases prescribed
 by the specification.
  
+\begin{figure}[h!]
 \begin{lstlisting}
 struct ring* arg1;
 struct packet arg2;
@@ -258,14 +301,21 @@ ring_pop_front(arg1, &(arg2));
 
 /*@ assert((false == (9 == arg2.port))); @*/
 \end{lstlisting}
+  \caption{A call sequence, produced by SEE.}
+  \label{lst:call-sequence}
+\end{figure}
 
 Suppose we had an underapproximate model:
+\begin{figure}[h!]
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
                     struct packet* p) {
   p->port = 0;
 }
 \end{lstlisting}
+  \caption{An underapproximate model fragment.}
+  \label{lst:underapproximate}
+\end{figure}
 then the last line in the call sequence check will look like:
 \begin{lstlisting}
 /*@ assert(0 == arg2.port); @*/
