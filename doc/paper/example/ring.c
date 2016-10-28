@@ -65,6 +65,33 @@ struct ring {
        packetsp(arr + begin, cap - begin,
                 take(cap - begin, packets),
                 property));
+
+  predicate accessed_ringp(struct ring* r,
+                           fixpoint (packet,bool) property,
+                           list<packet> packets,
+                           struct packet* arr,
+                           int begin,
+                           int len,
+                           int cap) =
+    len == length(packets) &*&
+    0 < len &*&
+    begin + len < cap ?
+      (empty_arrayp(arr, begin) &*&
+       packetsp(arr + begin + 1,
+                len - 1, tail(packets),
+                property) &*&
+       empty_arrayp(arr + begin + len,
+                    cap - len - begin)) :
+      (packetsp(arr,
+                begin + len - cap,
+                drop(cap - begin, packets),
+                property) &*&
+       empty_arrayp(arr +
+                    (begin + len - cap),
+                    cap - len) &*&
+       packetsp(arr + begin + 1, cap - begin - 1,
+                tail(take(cap - begin, packets)),
+                property));
   @*/
 
 struct ring* ring_create(int capacity)
@@ -267,11 +294,76 @@ ensures empty_arrayp(arr, 0) &*&
 }
 @*/
 
-/* @ lemma void extract_first(struct ring* r)
+/*@ lemma void extract_first(struct ring* r)
     requires ringp(r, ?prop, ?lst, ?cap) &*&
              lst != nil;
-    ensures 
+    ensures ring_fieldsp(r, ?arr, ?begin, ?len, cap) &*&
+            accessed_ringp(r, prop, lst, arr, begin, len, cap) &*&
+            packetp(arr+begin, head(lst)) &*&
+            true == ((char *)0 <= (void *)(arr + begin)) &*&
+            true == ((void *)(arr + begin) <= (void*)UINTPTR_MAX) &*&
+            true == prop(head(lst)) &*&
+            0 < len;
+    {
+      open ringp(r, prop, lst, cap);
+      if (r->begin + r->len < cap) {
+        open packetsp((struct packet*)r->array + r->begin, ?len, lst, prop);
+      } else {
+        open packetsp((struct packet*)r->array + r->begin,
+                      cap - r->begin, take(cap - r->begin, lst),
+                      prop);
+        assert 0 < cap - r->begin;
+        head_take(cap - r->begin, lst);
+      }
+      close accessed_ringp(r, prop, lst, r->array, r->begin, r->len, cap);
+    }
   @*/
+  
+/*@
+  lemma void stitch_with_empty_overflow(struct ring* r)
+  requires accessed_ringp(r, ?prop, ?lst, ?arr, ?begin, ?len, ?cap) &*&
+           packetp(arr + begin, _) &*&
+           len <= cap &*&
+           begin < cap &*&
+           cap <= begin + 1 &*&
+           ring_fieldsp(r, arr, 0, len-1, cap);
+  ensures ringp(r, prop, tail(lst), cap);
+  {
+    open accessed_ringp(r, prop, _, _, _, _, _);
+    assert cap <= begin + len;
+    open packetp(arr + begin, _);
+    open_struct(arr + begin);
+    append_empty_place(arr + begin + len - cap, cap - len);
+    mul_subst(begin + len - cap, len - 1, sizeof(struct packet));
+    repartition_begin_overflow(r->array, r->len, r->cap);
+    drop_n_plus_one(0, lst);
+    length_tail(lst);
+    close ringp(r, prop, tail(lst), cap);
+  }
+@*/
+/*@
+  lemma void stitch_with_empty(struct ring* r)
+  requires accessed_ringp(r, ?prop, ?lst, ?arr, ?begin, ?len, ?cap) &*&
+           packetp(arr + begin, _) &*&
+           len <= cap &*&
+           begin < cap &*&
+           begin + 1 < cap &*&
+           ring_fieldsp(r, arr, begin+1, len-1, cap);
+  ensures ringp(r, prop, tail(lst), cap);
+  {
+    open accessed_ringp(r, prop, _, _, _, _, _);
+    open packetp(arr + begin, _);
+    open_struct(arr + begin);
+    if (begin + len < cap) {
+      append_empty_place(r->array, begin);
+    } else {
+      append_empty_place(r->array + begin + len - cap, cap - len);
+      drop_n_plus_one(0, lst);
+    }
+    length_tail(lst);
+    close ringp(r, prop, tail(lst), cap);
+  }
+@*/
 
 void ring_pop_front(struct ring* r, struct packet* p)
 /*@ requires ringp(r, ?property, ?lst, ?cap) &*&
@@ -280,49 +372,19 @@ void ring_pop_front(struct ring* r, struct packet* p)
             packetp(p, head(lst)) &*&
             true == property(head(lst)); @*/
 {
-  //@ open ringp(r, property, lst, cap);
-  /*@ if (r->begin + r->len < cap) {
-    open packetsp((struct packet*)r->array + r->begin, ?len, lst, property);
-  } else {
-    open packetsp((struct packet*)r->array + r->begin,
-                  cap - r->begin, take(cap - r->begin, lst),
-                  property);
-    assert 0 < cap - r->begin;
-    head_take(cap - r->begin, lst);
-  }
-  @*/
+  //@ extract_first(r);
   struct packet* src_pkt = (struct packet*)r->array + r->begin;
-  //@ open packetp(src_pkt, head(lst));
-  //@ open packetp(p, _);
+  // @ open packetp(src_pkt, head(lst));
+  // @ open packetp(p, _);
   p->port = src_pkt->port;
-  //@ open_struct(src_pkt);
-  //@ int old_len = r->len;
-  //@ int old_begin = r->begin;
+  // @ close packetp(src_pkt, head(lst));
+  // @ close packetp(p, head(lst));
   r->len = r->len - 1;
   r->begin = r->begin + 1;
   if (r->cap <= r->begin) {
     r->begin = 0;
-    //@ assert r->begin + r->len < cap;
-    //@ assert cap <= old_begin + old_len;
-    /*@ append_empty_place((struct packet*)r->array +
-                                           old_begin + old_len - cap,
-                           cap - old_len);
-    @*/
-    //@ mul_subst(old_begin + old_len - cap, old_len - 1, sizeof(struct packet));
-    //@ repartition_begin_overflow(r->array, r->len, r->cap);
-    //@ drop_n_plus_one(0, lst);
+    //@ stitch_with_empty_overflow(r);
   } else {
-    /*@ if (old_begin + old_len < cap) {
-          append_empty_place(r->array, old_begin);
-        } else {
-          append_empty_place((struct packet*)r->array +
-                             old_begin + old_len - cap,
-                             cap - old_len);
-          drop_n_plus_one(0, lst);
-        }
-    @*/
+    //@ stitch_with_empty(r);
   }
-  //@ length_tail(lst);
-  //@ close packetp(p, head(lst));
-  //@ close ringp(r, property, tail(lst), cap);
 }

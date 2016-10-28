@@ -10,11 +10,10 @@ struct packet {
 /*@
   inductive packet = packet(int);
 
-  predicate packetp(struct packet* p, packet pkt) =
-     switch(pkt) { case packet(port):
-       return struct_packet_padding(p) &*&
-              p->port |-> port;
-     };
+  predicate packetp(struct packet* p; packet pkt) =
+     struct_packet_padding(p) &*&
+     p->port |-> ?port &*&
+     pkt == packet(port);
      
   lemma void packet_layout_assumption();
   requires true;
