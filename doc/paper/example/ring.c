@@ -366,19 +366,15 @@ ensures empty_arrayp(arr, 0) &*&
 @*/
 
 void ring_pop_front(struct ring* r, struct packet* p)
-/*@ requires ringp(r, ?property, ?lst, ?cap) &*&
+/*@ requires ringp(r, ?user_property, ?lst, ?cap) &*&
              lst != nil &*& packetp(p, _); @*/
-/*@ ensures ringp(r, property, tail(lst), cap) &*&
+/*@ ensures ringp(r, user_property, tail(lst), cap) &*&
             packetp(p, head(lst)) &*&
-            true == property(head(lst)); @*/
+            true == user_property(head(lst)); @*/
 {
   //@ extract_first(r);
   struct packet* src_pkt = (struct packet*)r->array + r->begin;
-  // @ open packetp(src_pkt, head(lst));
-  // @ open packetp(p, _);
   p->port = src_pkt->port;
-  // @ close packetp(src_pkt, head(lst));
-  // @ close packetp(p, head(lst));
   r->len = r->len - 1;
   r->begin = r->begin + 1;
   if (r->cap <= r->begin) {

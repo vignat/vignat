@@ -7,7 +7,7 @@
 #define RING_CAPACITY 512
 
 /*@
-  fixpoint bool user_packet_property(packet p) {
+  fixpoint bool user_property(packet p) {
     switch(p) { case packet(port): return port != 9; }
   }
   @*/
