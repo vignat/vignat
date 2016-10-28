@@ -83,7 +83,10 @@ plane software. This technique dovetails with a new library of verified
 components that are commonly used in network functions. We illustrate our
 approach by developing a NAT box that is verified to never crash, to not leak
 memory, be free of several classes of security vulnerabilities, and whose
-performance is on par with other NATs. %\footnote{Disclaimer: we use acronym NAT in this paper to refer to a more narrow kind - Dynamic Source NAPT (network address-port translation~\cite{rfc3022}).}. 
+performance is on par with other NATs.
+% \footnote{Disclaimer: we use acronym NAT in this paper to refer to a more
+% narrow kind - Dynamic Source NAPT (network address-port
+% translation~\cite{rfc3022}).}.
 We view this as an important milestone on the road to complete verification of all software-based network functions.
 
 \section{Introduction}
@@ -253,7 +256,7 @@ conditions hold --- in our case crash conditions. The inputs to the program are
 marked ``symbolic,'' meaning that they subsume all possible input values, and
 then the SEE simulates the execution of the program while propagating the
 symbolic inputs along the dataflow paths into the program's variables. When
-facing a branch (e.g., an \code{if} or a \code{for} loop), the SEE clones the
+facing a branch (e.g., an \code{if} or a \code{while} loop), the SEE clones the
 program state and takes each feasible path separately. Branches impose
 constraints on variable values (e.g., an \code{if} statement imposes
 restrictions on the values of the condition variable along the \code{else}
@@ -280,15 +283,15 @@ loop gives rise to an infinite number of paths.
 simplified using loop invariants~\cite[\S~2.1]{cormen2009introduction}. These
 are annotations that inform the SEE about invariant properties of the loop, such
 as ``no element of \code{packets} between \code{begin} and \code{begin +
-  queue_len} has destination port equal to 9'', and are a good match for
-NF-style loops.  We added to KLEE support for havoc-ing~\cite{barnett2005boogie}
-automatically, to take advantage of such invariants and essentially reduce the
-infinite loop to a single abstract iteration that can be reasoned about in one
-pass.
+  queue_len} has \code{port == 9}'', and are a good match for NF-style loops. We
+added to KLEE support for havoc-ing~\cite{barnett2005boogie} automatically
+(replace all modified variables with unconstrained symbols), to take advantage
+of such invariants and essentially reduce the infinite loop to a single abstract
+iteration that allows reasoning in one pass.
  
 This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 sec to exhaustively SE the code; for \code{CAP=30} it takes 15 min, for
-\code{CAP=60} it takes 3 hours, and so on. It takes long due to another classic
+\code{CAP=60} it takes 3 hours, and so on. It takes so long due to another classic
 SE challenge, ``symbolic
 indexing''~\cite{sen2005cute,godefroid2008automated,boonstoppel2008rwset}: when
 indexing an array with a symbolic variable (or when dereferencing a symbolic
@@ -306,11 +309,11 @@ structures, such as ring buffers, hash tables, least-prefix-match tables, etc.
 We provide to the SEE symbolic models of these abstracted components that
 ``hide'' symbolic indexes and pointers from the SEE.
 
-For our example, the library provides a \code{ring} with a simple interface:
-\code{bool ring_empty()} checks whether there is a packet in the ring,
-\code{bool ring_full()} checks whether the ring has run out of space, \code{void
-  ring_push_back(struct packet* src)} adds packet \code{src} to the ring, and
-\code{void ring_pop_front(struct packet* dst)} removes a packet from the ring
+For our example, the library provides a packet ring with a simple interface:
+\code{bool ring_empty(ring*)} checks whether there is a packet in the ring,
+\code{bool ring_full(ring*)} checks whether the ring has run out of space, \code{void
+  ring_push_back(ring*, packet* src)} adds packet \code{src} to the ring, and
+\code{void ring_pop_front(ring*, packet* dst)} removes a packet from the ring
 and places it in \code{dst}. We then write a symbolic model for the \code{ring}
 and provide it to the SEE instead of the actual implementation. The NF now
 becomes:
@@ -342,7 +345,7 @@ int main(int argc, char** argv) {
 \end{figure}
 
 For the symbolic execution and future validation, we need also to customize the
-general-purpose packet ring with the following definitions:
+general-purpose packet ring library with the following definitions:
 
 \begin{figure}
 \begin{lstlisting}
@@ -350,18 +353,26 @@ general-purpose packet ring with the following definitions:
 #define RING_CAPACITY CAP
 
 /*@
-  fixpoint bool user_packet_property(packet p) {
-    switch(p) { case packet(port): return port != 9; }
+  fixpoint bool
+  user_property(packet p) {
+    switch(p) { case packet(port):
+                  return port != 9; }
   }
   @*/
 
-static bool packet_constraints(struct packet* p) {
+static bool
+packet_constraints(struct packet* p) {
   return p->port != 9;
 }
 \end{lstlisting}
   \caption{Custom definitions capturing the desired property.}
   \label{lst:customizations}
 \end{figure}
+
+Currently, we have to duplicate the packet condition in two languages (formal
+logic, and C) due to the limitations of our prototype. This is the
+application-specific part of the loop invariant given before, that we plug-in in
+order for Vigor to be able to verify the app.
 
 Now exhaustive SE of the code takes less than 100 millisec with our modified
 KLEE, regardless of the size of \code{CAP}.  The fact that the code does not
@@ -377,12 +388,13 @@ void ring_pop_front(struct ring* r,
                     struct packet* p) {
   FILL_SYMBOLIC(p, sizeof(struct packet),
                 "popped_packet");
+  // No constraints on the packet port here.
 }
 \end{lstlisting}
   \caption{An extract from an overapproximate ring model.}
   \label{lst:overapproximate}
 \end{figure}
-Then the \code{ASSERT} from the previous listing would fail.
+Then the \code{VIGOR_CHECK} from the previous listing would fail.
 
 The Vigor library comes with a formal specification and a formal proof that the
 implementation satisfies that specification. In other words, there is a formal
@@ -397,27 +409,59 @@ that stating invariants for dataplane software turns out to require no
 verification expertise.
 
 Here is the example of the proven specification for the function
-\code{ring_pop_front}. We do not include the certified implementation of this
-specification due to space constraints:
+\code{ring_pop_front}:
 
 \begin{figure}[h!]
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
-                    struct packet* p);
-/*@ requires ringp(r, ?lst,
-                   ?property, ?capacity) &*&
-             lst != nil &*&
-             packetp(p, _); @*/
-/*@ ensures ringp(r, tail(lst),
-                  property, capacity) &*&
+                    struct packet* p)
+/*@ requires ringp(r, ?user_property,
+                   ?lst, ?cap) &*&
+             lst != nil &*& packetp(p, _); @*/
+/*@ ensures ringp(r, user_property,
+                  tail(lst), cap) &*&
             packetp(p, head(lst)) &*&
-            true == property(head(lst)); @*/
+            true == user_property(head(lst)); @*/
+{
+  //@ extract_first(r);
+  struct packet* src_pkt = r->array + r->begin;
+  p->port = src_pkt->port;
+  r->len = r->len - 1;
+  r->begin = r->begin + 1;
+  if (r->cap <= r->begin) {
+    r->begin = 0;
+    //@ stitch_with_empty_overflow(r);
+  } else {
+    //@ stitch_with_empty(r);
+  }
+}
 \end{lstlisting}
-  \caption{A formal contract for the ring\_pop\_front function.}
+  \caption{A formal contract and verified implementation of the \code{ring_pop_front} function.}
   \label{lst:contract}
 \end{figure}
 
-Note that \code{property(head(lst));} in the post condition ensures
+This C code is intermingled with the correctness proof annotations that help the
+formal verification engine (VeriFast) with small steps to transform the initial
+state, given in \code{requires} to the final state, specified in \code{ensures}.
+After proving the correctness of this transformation, the formal verification
+engine will use \code{requires/ensures} formulas as pre- and post- conditions
+for \code{ring_pop_front} contract. The trigraph \code{&*&} separates different
+statements that hold together. For example
+
+\begin{lstlisting}
+ringp(r, user_property, tail(lst), cap) &*&
+packetp(p, head(lst)) &*&
+true == user_property(head(lst))};
+\end{lstlisting}
+means:
+\begin{itemize}
+\item \code{r} points to a healthy ring of capacity \code{cap}, that contains
+  \code{tail(lst)} packets, that satisfy the \code{user_property}.
+\item \code{p} points to a packet \code{head(lst)}.
+\item \code{head(lst)} satisfies the \code{user_property}.
+\end{itemize}
+
+Note that \code{user_property(head(lst));} in the post condition ensures
 \code{p->port != 9} property.
 
 {\bf Step 3: Validate the model used for SE.} The model must match the library
@@ -431,15 +475,15 @@ validates that the behaviors exposed by the model during verification are
 consistent with the component's formal specification. Details on how it does
 this appear in \S\ref{sec:design}.
 
-To validate the model fit for the particular use case, SEE dumps
-all the call sequences (30 in this example) that may happen during the execution.
-Vigor checks whether the symbolic model enumerated all the possible
-outputs for each sequence.
+To validate the model fit for the particular use case, SEE dumps all the call
+sequences (30 in this example) extracted from the execution paths. Vigor
+checks whether the symbolic model has enumerated all the possible outputs for
+each call sequence.
 
 You can see the example call sequence below. It starts with
 \code{loop_invariant_produce} that marks the beginning of a loop iteration. It
-continues then with calls to \code{ring_full} \code{ring_empty}, noting that
-both return \code{false}. The seqeunce ends with a call to
+continues then with calls to \code{ring_full} \code{ring_empty}, noting (with
+\code{assume}) that both return \code{false}. The seqeunce ends with a call to
 \code{ring_pop_front}, formally specified above. The last line checks that the
 value returned by model (\code{arg2.port != 9}) covers all the cases prescribed
 by the specification.
@@ -455,7 +499,8 @@ bool ret1 = ring_full(arg1);
 //@ assume(ret1 == false);
 bool ret2 = ring_empty(arg1);
 //@ assume(ret2 == false);
-//@ close packetp(&(arg2), packet((&(arg2))->port));
+/*@ close packetp(&(arg2),
+                  packet((&(arg2))->port)); @*/
 
 ring_pop_front(arg1, &(arg2));
 //@ open packetp(&(arg2), _);
@@ -466,7 +511,10 @@ ring_pop_front(arg1, &(arg2));
   \label{lst:call-sequence}
 \end{figure}
 
-Suppose we had an underapproximate model:
+Formal verification engine then checks this sequence using the contracts
+like in the Figure~\ref{lst:contract}, and ensures the abscence of misuse. It then checks
+that the model output covers all the possible outputs specified in the contract
+for the tip function (see~\S\ref{sec:model-validation-criteria}).
 \begin{figure}[h!]
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
@@ -477,12 +525,14 @@ void ring_pop_front(struct ring* r,
   \caption{An underapproximate model fragment.}
   \label{lst:underapproximate}
 \end{figure}
-then the last line in the call sequence check will look like:
+
+Suppose we had an underapproximate model: Figure~\ref{lst:underapproximate}.
+Then the last line in the call sequence check will look like:
 \begin{lstlisting}
 /*@ assert(0 == arg2.port); @*/
 \end{lstlisting}
-And the formal verification will fail, because specification admits a wider
-range of possible outputs.
+And the formal verification will fail, because the contract
+(Figure~\ref{lst:contract}) specifies a wider range of possible outputs.
 
 {\bf Step 4: Link the NF code with the verified library} of components. The
 resulting executable is guaranteed to be free of crashes, subject to the
