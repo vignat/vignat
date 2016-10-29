@@ -1,5 +1,6 @@
 \documentclass[letterpaper,twocolumn,10pt]{article}
 \usepackage{usenix,epsfig}
+\usepackage{amsmath}
 \usepackage{xcolor}
 \usepackage{listings}
 \usepackage[]{algorithm2e}
@@ -759,7 +760,7 @@ memory safety (writing to unallocated memory, writing to the wrong memory
 object, use-after-free, double-free, etc.) and related to integer operations
 (e.g., integer overflow).
 
-When symbolically executing a code path, the SEE checks whether any asserts fail.
+When symbolically executing a code path, the SEE checks whether any assert fail.
 
 To check for memory leaks (or leaked resources in general) is a bit more
 complicated, because that is a global property. Vigor therefore must keep track
@@ -784,44 +785,47 @@ To validate a model behavior under certain circumstances means to ensure the
 behavior agrees with the specification, or is more relaxed (i.e., admits more
 behaviors than the spec). Suppose that, for the input \(I\) to the prefix of an
 execution trace (a ``run''), the specification produces the output $O_s$, and
-the model produces the case output \(O_m\). Then the model is valid iff for all
-call sequences performed during the exhaustive SE, \(O_m\) contains \(O_s\).
+the model produces the output \(O_m\). Then the model is valid iff for all call
+sequences performed during the exhaustive SE, \(O_m\) contains \(O_s\).
 
 More formally:
 \begin{enumerate}
-\item \(C\): A call sequence, or a run (\(C=Ci+Co\)) consists of a run input and
-  run output. It summarizes a particular interaction scenario with the model. It
-  consists of the calls to component API functions (with function names,
-  arguments and return values), and leaves out all other details like other
-  calls or unrelated path conditions.
-\item \(Ci\): The run input (\(Ci = <Fi,Fo>i=0..n-1 + Fin\)) is a set of:
-  function names, function inputs(\(Fi\)) for all the functions in the sequence
-  and function outputs(\(Fo\)) for all but the last call.
-\item \(Co\): The run output (\(Co = Fon\)) is the output of the last API
-  function call in the sequence.
-\item \(Fi\): The function input (\(Fi = fun\_name + args +
+\item \(F^i\): The function input (\(F^i = fun\_name + args +
   arg\_pointee\_vals\_before + constraints\)) consists of the function arguments
   (possibly symbolic), and constraints bounding these arguments (specifically,
   the transitive closure of all the constraints involving the symbols mentioned
   in the formulas for the arguments). For a pointer argument (which must point
-  to a concrete address --- practical limitation), the pointee must be
+  to a concrete address --- a practical limitation), the pointee must be
   considered according to the \S\ref{sec:handling-pointers}. We use the
   numerical value of the pointer to detect aliasing between the variables, and
   then throw it away, since we forbid pointer comparison anyway.
-\item \(Fo\): The function output (\(Fo = ret\_val + pointee\_vals\_after +
+\item \(F^o\): The function output (\(F^o = ret\_val + pointee\_vals\_after +
   constraints\)) is its return value and the pointee values for the output
   pointer arguments, as well as the constraints for all the symbols involved
-  (transitive closure, same as above).
+  (transitive closure, same as for \(F^i\)).
+\item \(I\): The run input (\(I = <F^i,F^o>_{i=0..n-1} + F^i_n\)) is a set of:
+  function names, function inputs(\(F^i\)) for all the functions in the sequence
+  and function outputs(\(F^o\)) for all but the last call.
+\item \(O\): The run output (\(O = F^o_n\)) is the output of the last API
+  function call in the sequence.
+\item \(C\): A call sequence(= run), (\(C=I+O\)) consists of a run input and
+  run output. It summarizes a particular interaction scenario with the model. It
+  consists of the calls to component API functions (with function names,
+  arguments and return values), and leaves out all other details like other
+  calls or unrelated path conditions.
 \end{enumerate}
 
 Let us represent the formal specification and the symbolic model total states by
 large sets. A total state consists of variables V, bound by logical formulas F.
 So, the specification and model total states are:
 \[
-\{V_s : F_s(V_s)\} and \{V_m : F_m(V_m)\}
+  \begin{aligned}
+  &\mathrm{total~specification~state} = \{V_s : F_s(V_s)\}\\
+  &\mathrm{total~model~state} = \{V_m : F_m(V_m)\}
+  \end{aligned}
 \]
 The output is then simply a projection of the corresponding state. The
-projection (P) gives the output variables (return value and output pointers of
+projection (\(P\)) gives the output variables (return value and output pointers of
 the tip call):
 \[
 OV_s = P_s(V_s): OV_m = P_m(V_m).
@@ -837,8 +841,10 @@ OV_s = P_s(V_s): OV_m = P_m(V_m).
 
 With the introduced definitions, the following formulas define the outputs:
 \[
-O_s = \{P_s(V_s): \forall V_s F_s(V_s)\} \\
-O_m = \{P_m(V_m) : \forall V_m F_m(V_m)\}
+  \begin{aligned}
+    &O_s = \{P_s(V_s): \forall V_s F_s(V_s)\} \\
+    &O_m = \{P_m(V_m) : \forall V_m F_m(V_m)\}
+  \end{aligned}
 \]
 Then, the model exhibits all the specified behaviours (and may be some more) iff
 \(O_s \in O_m\), or:
@@ -848,12 +854,13 @@ Then, the model exhibits all the specified behaviours (and may be some more) iff
 This formula in general is too difficult for the existing SMT solvers because of
 the quantifier. However, due to similarities in the model and the specification
 it is easy to find appropriate values for \(V_m\) --- they happen to be some
-values from Vs. Let us call this assignment \(A\). \(A\) by construction
+values from \(Vs\). Let us call this assignment \(A\). \(A\) by construction
 satisfies the equality \(P_s(V_s)=P_m(A(V_s))\). So the condition becomes:
 \[
 \forall V_s : F_s(V_s) \rightarrow F_m(A(V_s))
 \]
---- a typical validity query, which we pass  to an SMT solver.
+--- which we formulate as an assertion and let the formal verification engine
+decide its validity.
 
 This validation criteria guarantees that the formally verified implementation
 will never do anything that the model did not explore during verification. So
