@@ -1,0 +1,21 @@
+* Optimize map by adding a chain-counter into each cell.
+The chain-counter stores the number of bucket-lists going through it, so we do
+not have to traverse the whole array searching for an element. This optimization
+should also be compatible with the one Martin is implementing.
+** optimize single map (actual implementation)
+   :LOGBOOK:
+   CLOCK: [2016-11-01 Die 11:38]--[2016-11-01 Die 11:44] =>  0:06
+   CLOCK: [2016-10-31 Mon 12:17]--[2016-10-31 Mon 12:32] =>  0:15
+   :END:
+*** Adjust single map contracts to allow a faster implementation.
+    :LOGBOOK:
+    CLOCK: [2016-11-01 Die 11:44]--[2016-11-01 Die 11:46] =>  0:02
+    CLOCK: [2016-11-01 Die 11:24]--[2016-11-01 Die 11:38] =>  0:14
+    :END:
+** adjust the double map (add additional array)
+   :LOGBOOK:
+   CLOCK: [2016-11-01 Die 11:46]--[2016-11-01 Die 11:54] =>  0:08
+   :END:
+** certify the single map optimization
+*** design the abstract logical model
+** certify the double map modifications

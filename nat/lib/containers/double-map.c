@@ -16,6 +16,7 @@ struct DoubleMap {
   int *bbs_a;
   void **kps_a;
   int *khs_a;
+  int *chns_a;
   int *inds_a;
   map_keys_equality *eq_a;
   map_key_hash *hsh_a;
@@ -23,6 +24,7 @@ struct DoubleMap {
   int *bbs_b;
   void **kps_b;
   int *khs_b;
+  int *chns_b;
   int *inds_b;
   map_keys_equality *eq_b;
   map_key_hash *hsh_b;
@@ -348,6 +350,17 @@ int dmap_allocate/*@ <K1,K2,V> @*/
     return 0;
   }
   (*map_out)->khs_a = khs_a_alloc;
+  int* chns_a_alloc = malloc(sizeof(int)*capacity);
+  if (chns_a_alloc == NULL) {
+    free(khs_a_alloc);
+    free(kps_a_alloc);
+    free(bbs_a_alloc);
+    free(vals_alloc);
+    free(map_alloc);
+    *map_out = old_map_val;
+    return 0;
+  }
+  (*map_out)->chns_a = chns_a_alloc;
   int* inds_a_alloc = malloc(sizeof(int)*capacity);
   if (inds_a_alloc == NULL) {
     free(khs_a_alloc);
@@ -362,6 +375,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   int* bbs_b_alloc = malloc(sizeof(int)*capacity);
   if (bbs_b_alloc == NULL) {
     free(inds_a_alloc);
+    free(chns_a_alloc);
     free(khs_a_alloc);
     free(kps_a_alloc);
     free(bbs_a_alloc);
@@ -375,6 +389,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   if (kps_b_alloc == NULL) {
     free(bbs_b_alloc);
     free(inds_a_alloc);
+    free(chns_a_alloc);
     free(khs_a_alloc);
     free(kps_a_alloc);
     free(bbs_a_alloc);
@@ -389,6 +404,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
     free(kps_b_alloc);
     free(bbs_b_alloc);
     free(inds_a_alloc);
+    free(chns_a_alloc);
     free(khs_a_alloc);
     free(kps_a_alloc);
     free(bbs_a_alloc);
@@ -400,10 +416,12 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   (*map_out)->khs_b = khs_b_alloc;
   int* inds_b_alloc = malloc(sizeof(int)*capacity);
   if (inds_b_alloc == NULL) {
+    free(inds_b_alloc);
     free(khs_b_alloc);
     free(kps_b_alloc);
     free(bbs_b_alloc);
     free(inds_a_alloc);
+    free(chns_a_alloc);
     free(khs_a_alloc);
     free(kps_a_alloc);
     free(bbs_a_alloc);
@@ -429,13 +447,15 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   //@ close map_key_hash(hsh1);
   //@ close map_record_property(recp1);
   map_initialize((*map_out)->bbs_a, (*map_out)->eq_a,
-                 (*map_out)->kps_a, (*map_out)->khs_a, (*map_out)->inds_a,
+                 (*map_out)->kps_a, (*map_out)->khs_a, (*map_out)->chns_a,
+                 (*map_out)->inds_a,
                  (*map_out)->capacity);
   //@ close map_key_type(def_k2);
   //@ close map_key_hash(hsh2);
   //@ close map_record_property(recp2);
   map_initialize((*map_out)->bbs_b, (*map_out)->eq_b,
-                 (*map_out)->kps_b, (*map_out)->khs_b, (*map_out)->inds_b,
+                 (*map_out)->kps_b, (*map_out)->khs_b, (*map_out)->chns_b,
+                 (*map_out)->inds_b,
                  (*map_out)->capacity);
 
   (*map_out)->n_vals = 0;
@@ -498,7 +518,8 @@ int dmap_get_a/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   //@ close [x]hide_map_key_hash(map->hsh_b, kp2, hsh2);
   int hash = hsh_a(key);
   //@ open [x]hide_map_key_hash(map->hsh_b, kp2, hsh2);
-  int rez = map_get(map->bbs_a, map->kps_a, map->khs_a, map->inds_a, key,
+  int rez = map_get(map->bbs_a, map->kps_a, map->khs_a, map->chns_a,
+                    map->inds_a, key,
                     map->eq_a, hash, index,
                     map->capacity);
   /*@ close dmappingp(m, kp1, kp2, hsh1, hsh2,
@@ -537,7 +558,8 @@ int dmap_get_b/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* key, int* index)
   //@ int* vals1 = map->inds_a;
   //@ assert mapping(?m1, ?addrs1, kp1, rp1, hsh1, ?cap, bbs1, kps1, khs1, vals1);
   //@ close hide_mapping(m1, addrs1, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
-  return map_get(map->bbs_b, map->kps_b, map->khs_b, map->inds_b, key,
+  return map_get(map->bbs_b, map->kps_b, map->khs_b, map->chns_b,
+                 map->inds_b, key,
                  map->eq_b, hash, index,
                  map->capacity);
   //@ open hide_mapping(_, _, _, _, _, _, _, _, _, _);
@@ -1120,7 +1142,7 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
   //@ insync_has_not_nonfull(vals, m1, m2, vk1, vk2, cap, index);
   //@ assert map_size_fp(m1) < dmap_cap_fp(m);
 
-  map_put(map->bbs_a, map->kps_a, map->khs_a,
+  map_put(map->bbs_a, map->kps_a, map->khs_a, map->chns_a,
           map->inds_a, key_a,
           hash1,
           index, map->capacity);
@@ -1137,7 +1159,7 @@ int dmap_put/*@ <K1,K2,V> @*/(struct DoubleMap* map, void* value, int index)
                          map_put_fp(addrs1, vk1(v), key_a),
                          kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
     @*/
-  map_put(map->bbs_b, map->kps_b, map->khs_b,
+  map_put(map->bbs_b, map->kps_b, map->khs_b, map->chns_b,
           map->inds_b, key_b,
           hash2,
           index, map->capacity);
@@ -1613,7 +1635,7 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
   int hash1 = hsh_a(key_a);
 
   //@ insync_has(vals, m1, m2, vk1, vk2, index, cap);
-  map_erase(map->bbs_a, map->kps_a, map->khs_a, key_a,
+  map_erase(map->bbs_a, map->kps_a, map->khs_a, map->chns_a, key_a,
             map->eq_a, hash1,
             map->capacity, &out_key_a);
   //@ assert [?x1]is_map_key_hash(hsh_a, kp1, hsh1);
@@ -1628,7 +1650,7 @@ int dmap_erase/*@ <K1,K2,V> @*/(struct DoubleMap* map, int index)
                          map_erase_fp(addrs1, vk1(v)),
                          kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
     @*/
-  map_erase(map->bbs_b, map->kps_b, map->khs_b, key_b,
+  map_erase(map->bbs_b, map->kps_b, map->khs_b, map->chns_b, key_b,
             map->eq_b, hash2,
             map->capacity, &out_key_b);
   //@ open hide_mapping(_, _, kp1, rp1, hsh1, cap, bbs1, kps1, khs1, vals1);
