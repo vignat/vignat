@@ -12,6 +12,65 @@
 //@ #include "nth_prop.gh"
 //@ #include "modulo.gh"
 
+/*@
+  inductive bucket<kt> = bucket(list<pair<kt, nat> >);
+  list<bucket<kt> > - the map.
+
+  fixpoint list<nat> get_expected_cells<kt>(bucket<kt> b) {
+    switch(b) {
+      case nil: return nil;
+      case cons(h,t):
+        return cons(snd(h), get_expected_cells(t));
+    }
+  }
+
+  fixpoint list<nat> advance_exp_cells(list<nat> exp_cells) {
+    switch(exp_cells) {
+      case nil: return nil;
+      case cons(h,t):
+        return switch(h) {
+          case zero: return advance_exp_cells(t);
+          case succ(n): return cons(n, advance_exp_cells(t));
+        };
+    }
+  }
+
+  fixpoint list<pair<kt,nat> > advance_bucket<kt>(list<pair<kt,nat> > b) {
+      return switch(b) {
+        case nil: return nil;
+        case cons(h,t):
+          switch(snd(h)) {
+            case zero: return advance_bucket ...
+          }
+      };
+  }
+
+  fixpoint bool buckets_ok<kt>(list<nat> expected_cells,
+                               list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil: return true;
+      case cons(bkh,bkt):
+        return distinct(append(expected_cells, get_expected_cells(bkh))) &&
+               buckets_ok(advance_exp_cells(append(expected_cells,
+                                                   get_expected_cells(bkh))),
+                          bkt);
+    }
+  }
+
+  predicate chs_buckets_insync<kt>(list<nat> exp_cells, list<option<kt> > keys, list<int> chs, list<bucket<kt> > buckets) =
+    switch(buckets) {
+      case nil: return keys == nil &*& chs == nil;
+      case cons(bkh,bkt):
+        return match(chs) {
+          case nil: return false; //must never happen
+          case cons(chh,cht):
+            chh == length(exp_cells) &&
+        };
+    };
+
+    
+  @*/
+
 static
 int loop(int k, int capacity)
 //@ requires 0 < capacity &*& 2*capacity < INT_MAX;
@@ -27,7 +86,7 @@ int loop(int k, int capacity)
 }
 
 /*@
-  inductive hmap<kt> = hmap(list<option<kt> >, list<int>);
+  inductive hmap<kt> = hmap(list<option<kt> >, list<int>, list<int>);
 
   predicate hmapping<kt>(predicate (void*; kt) keyp,
                          fixpoint (kt, int) hash,
@@ -468,14 +527,13 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
              0 <= start &*& start < capacity &*&
-             [?f]is_map_keys_equality<kt>(eq, kpr); @*/
+             [?f]is_map_keys_equality<kt>(eq, kpr) &*&
+             true == hmap_exists_key_fp(hm, k); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
             pointers(keyps, capacity, kps) &*&
             [kfr]kpr(keyp, k) &*&
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
-            (hmap_exists_key_fp(hm, k) ?
-            (result == hmap_find_key_fp(hm, k)) :
-             (result == -1)); @*/
+            result == hmap_find_key_fp(hm, k); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);

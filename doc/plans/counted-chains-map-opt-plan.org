@@ -4,11 +4,13 @@ not have to traverse the whole array searching for an element. This optimization
 should also be compatible with the one Martin is implementing.
 ** optimize single map (actual implementation)
    :LOGBOOK:
+   CLOCK: [2016-11-01 Die 13:06]--[2016-11-01 Die 13:07] =>  0:01
    CLOCK: [2016-11-01 Die 11:38]--[2016-11-01 Die 11:44] =>  0:06
    CLOCK: [2016-10-31 Mon 12:17]--[2016-10-31 Mon 12:32] =>  0:15
    :END:
 *** Adjust single map contracts to allow a faster implementation.
     :LOGBOOK:
+    CLOCK: [2016-11-01 Die 13:06]--[2016-11-01 Die 13:06] =>  0:00
     CLOCK: [2016-11-01 Die 11:44]--[2016-11-01 Die 11:46] =>  0:02
     CLOCK: [2016-11-01 Die 11:24]--[2016-11-01 Die 11:38] =>  0:14
     :END:
@@ -18,4 +20,11 @@ should also be compatible with the one Martin is implementing.
    :END:
 ** certify the single map optimization
 *** design the abstract logical model
+    :LOGBOOK:
+    CLOCK: [2016-11-01 Die 15:41]--[2016-11-01 Die 15:56] =>  0:15
+    CLOCK: [2016-11-01 Die 15:14]--[2016-11-01 Die 15:38] =>  0:24
+    CLOCK: [2016-11-01 Die 15:07]--[2016-11-01 Die 15:09] =>  0:02
+    CLOCK: [2016-11-01 Die 13:23]--[2016-11-01 Die 13:35] =>  0:12
+    CLOCK: [2016-11-01 Die 13:07]--[2016-11-01 Die 13:08] =>  0:01
+    :END:
 ** certify the double map modifications
