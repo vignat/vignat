@@ -14,61 +14,85 @@
 
 /*@
   inductive bucket<kt> = bucket(list<pair<kt, nat> >);
-  list<bucket<kt> > - the map.
+  //list<bucket<kt> > - the map.
 
-  fixpoint list<nat> get_expected_cells<kt>(bucket<kt> b) {
-    switch(b) {
+  fixpoint list<pair<kt, nat> > advance_acc<kt>(list<pair<kt, nat> > acc) {
+    switch(acc) {
       case nil: return nil;
       case cons(h,t):
-        return cons(snd(h), get_expected_cells(t));
-    }
-  }
-
-  fixpoint list<nat> advance_exp_cells(list<nat> exp_cells) {
-    switch(exp_cells) {
-      case nil: return nil;
-      case cons(h,t):
-        return switch(h) {
-          case zero: return advance_exp_cells(t);
-          case succ(n): return cons(n, advance_exp_cells(t));
+        return switch(snd(h)) {
+          case zero: return t;
+          case succ(n): return cons(pair(fst(h), n), t);
         };
     }
   }
 
-  fixpoint list<pair<kt,nat> > advance_bucket<kt>(list<pair<kt,nat> > b) {
-      return switch(b) {
-        case nil: return nil;
-        case cons(h,t):
-          switch(snd(h)) {
-            case zero: return advance_bucket ...
-          }
-      };
+  fixpoint list<nat> get_just_tails<kt>(list<pair<kt, nat> > acc) {
+    return map(acc, snd);
   }
 
-  fixpoint bool buckets_ok<kt>(list<nat> expected_cells,
+  fixpoint option<kt> get_current_key<kt>(list<pair<kt, nat> > acc) {
+    switch(acc) {
+      case nil: return none;
+      case cons(h,t):
+        return switch(h) { case pair(key,distance):
+          return switch(distance) {
+            case zero: return some(key);
+            case succ(n): return get_current_key(t);
+          };
+        };
+    }
+  }
+
+  fixpoint list<pair<kt, nat> > acc_at_next_bucket<kt>(list<pair<kt, nat> > acc, bucket next_bucket) {
+    switch(next_bucket) { case bucket(tails): return append(advance_acc(acc), tails);}
+  }
+
+  fixpoint list<pair<kt, nat> > get_wraparound<kt>(list<pair<kt, nat> > accumulated, list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil: return accumulated;
+      case cons(h,t):
+        return get_wraparound(acc_at_next_bucket(accumulated, h), t);
+    }
+  }
+
+  fixpoint bool buckets_ok<kt>(list<pair<kt, nat> > acc,
                                list<bucket<kt> > buckets) {
     switch(buckets) {
       case nil: return true;
       case cons(bkh,bkt):
-        return distinct(append(expected_cells, get_expected_cells(bkh))) &&
-               buckets_ok(advance_exp_cells(append(expected_cells,
-                                                   get_expected_cells(bkh))),
-                          bkt);
+        return distinct(get_just_tails(acc_at_next_bucket(acc, bkh))) &&
+               buckets_ok(acc_at_next_bucket(acc, bkh), bkt);
     }
   }
 
-  predicate chs_buckets_insync<kt>(list<nat> exp_cells, list<option<kt> > keys, list<int> chs, list<bucket<kt> > buckets) =
-    switch(buckets) {
-      case nil: return keys == nil &*& chs == nil;
-      case cons(bkh,bkt):
-        return match(chs) {
-          case nil: return false; //must never happen
-          case cons(chh,cht):
-            chh == length(exp_cells) &&
-        };
-    };
 
-    
+  fixpoint bool chs_buckets_insync_rec<kt>(list<option<kt> > keys,
+                                           list<int> chs,
+                                           list<bucket<kt> > buckets,
+                                           list<pair<kt, nat> > acc_tails) {
+    switch(buckets) {
+      case nil: return keys == nil && chs == nil;
+      case cons(bh,bt):
+        return switch(keys) {
+          case nil: return false;
+          case cons(kh,kt):
+            return switch(chs) {
+              case nil: return false;
+              case cons(chh,cht):
+                return get_current_key(acc_at_next_bucket
+                                       (acc_tails, bh)) == kh &&
+                       chh == length(acc_at_next_bucket(acc_tails, bh)) &&
+                       chs_buckets_insync_rec(kt, cht, bt,
+                                              acc_at_next_bucket(acc_tails, bh));
+            };
+        };
+    }
+  }
+
+  fixpoint bool chs_buckets_insync<kt>(list<option<kt> > keys, list<int> chs, list<bucket<kt> > buckets) {
+    return chs_buckets_insync_rec(keys, chs, buckets, get_wraparound(nil, buckets));
+  }
   @*/
 
 static

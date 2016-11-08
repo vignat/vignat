@@ -21,6 +21,15 @@ should also be compatible with the one Martin is implementing.
 ** certify the single map optimization
 *** design the abstract logical model
     :LOGBOOK:
+    CLOCK: [2016-11-08 Die 15:52]
+    CLOCK: [2016-11-08 Die 15:42]--[2016-11-08 Die 15:47] =>  0:05
+    CLOCK: [2016-11-08 Die 15:23]--[2016-11-08 Die 15:33] =>  0:10
+    CLOCK: [2016-11-08 Die 12:40]--[2016-11-08 Die 12:45] =>  0:05
+    CLOCK: [2016-11-08 Die 12:37]--[2016-11-08 Die 12:38] =>  0:01
+    CLOCK: [2016-11-08 Die 12:22]--[2016-11-08 Die 12:36] =>  0:14
+    CLOCK: [2016-11-08 Die 11:37]--[2016-11-08 Die 11:43] =>  0:06
+    CLOCK: [2016-11-08 Die 10:51]--[2016-11-08 Die 10:53] =>  0:02
+    CLOCK: [2016-11-08 Die 10:05]--[2016-11-08 Die 10:11] =>  0:06
     CLOCK: [2016-11-01 Die 15:41]--[2016-11-01 Die 15:56] =>  0:15
     CLOCK: [2016-11-01 Die 15:14]--[2016-11-01 Die 15:38] =>  0:24
     CLOCK: [2016-11-01 Die 15:07]--[2016-11-01 Die 15:09] =>  0:02
