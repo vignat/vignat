@@ -19,9 +19,14 @@ should also be compatible with the one Martin is implementing.
    CLOCK: [2016-11-01 Die 11:46]--[2016-11-01 Die 11:54] =>  0:08
    :END:
 ** certify the single map optimization
+   :LOGBOOK:
+   CLOCK: [2016-11-10 Don 10:09]
+   :END:
 *** design the abstract logical model
     :LOGBOOK:
-    CLOCK: [2016-11-08 Die 15:52]
+    CLOCK: [2016-11-08 Die 18:53]--[2016-11-08 Die 18:53] =>  0:00
+    CLOCK: [2016-11-08 Die 18:37]--[2016-11-08 Die 18:52] =>  0:15
+    CLOCK: [2016-11-08 Die 15:52]--[2016-11-08 Die 16:01] =>  0:09
     CLOCK: [2016-11-08 Die 15:42]--[2016-11-08 Die 15:47] =>  0:05
     CLOCK: [2016-11-08 Die 15:23]--[2016-11-08 Die 15:33] =>  0:10
     CLOCK: [2016-11-08 Die 12:40]--[2016-11-08 Die 12:45] =>  0:05

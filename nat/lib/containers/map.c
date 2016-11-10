@@ -20,15 +20,17 @@
     switch(acc) {
       case nil: return nil;
       case cons(h,t):
-        return switch(snd(h)) {
-          case zero: return t;
-          case succ(n): return cons(pair(fst(h), n), t);
+        return switch(h) { case pair(key,distance):
+            return switch(distance) {
+            case zero: return t;
+            case succ(n): return cons(pair(fst(h), n), t);
+          };
         };
     }
   }
 
   fixpoint list<nat> get_just_tails<kt>(list<pair<kt, nat> > acc) {
-    return map(acc, snd);
+    return map(snd, acc);
   }
 
   fixpoint option<kt> get_current_key<kt>(list<pair<kt, nat> > acc) {
@@ -44,7 +46,7 @@
     }
   }
 
-  fixpoint list<pair<kt, nat> > acc_at_next_bucket<kt>(list<pair<kt, nat> > acc, bucket next_bucket) {
+  fixpoint list<pair<kt, nat> > acc_at_next_bucket<kt>(list<pair<kt, nat> > acc, bucket<kt> next_bucket) {
     switch(next_bucket) { case bucket(tails): return append(advance_acc(acc), tails);}
   }
 
@@ -56,14 +58,18 @@
     }
   }
 
-  fixpoint bool buckets_ok<kt>(list<pair<kt, nat> > acc,
-                               list<bucket<kt> > buckets) {
+  fixpoint bool buckets_ok_rec<kt>(list<pair<kt, nat> > acc,
+                                   list<bucket<kt> > buckets) {
     switch(buckets) {
       case nil: return true;
       case cons(bkh,bkt):
         return distinct(get_just_tails(acc_at_next_bucket(acc, bkh))) &&
-               buckets_ok(acc_at_next_bucket(acc, bkh), bkt);
+               buckets_ok_rec(acc_at_next_bucket(acc, bkh), bkt);
     }
+  }
+
+  fixpoint bool buckets_ok<kt>(list<bucket<kt> > buckets) {
+    return buckets_ok_rec(get_wraparound(nil, buckets), buckets);
   }
 
 
@@ -110,7 +116,7 @@ int loop(int k, int capacity)
 }
 
 /*@
-  inductive hmap<kt> = hmap(list<option<kt> >, list<int>, list<int>);
+  inductive hmap<kt> = hmap(list<option<kt> >, list<int>);
 
   predicate hmapping<kt>(predicate (void*; kt) keyp,
                          fixpoint (kt, int) hash,
@@ -207,6 +213,17 @@ int loop(int k, int capacity)
             true == hash_list(ks, khs, hash) &*&
             m == hmap(ks, khs);
 @*/
+
+/*@
+  predicate chmp<kt>(int* chns, int capacity,
+                     hmap<kt> m, list<bucket<kt> > buckets) =
+    ints(chns, capacity, ?chains) &*&
+    true == buckets_ok(buckets) &*&
+    switch(m) {case hmap(ks, khs):
+      return true == chs_buckets_insync(ks, chains, buckets);
+    };
+
+  @*/
 /*@
   lemma void pred_mapping_same_len<t>(list<int> bbs, list<option<t> > ks)
   requires pred_mapping(?pts, bbs, ?pred, ks);
@@ -468,17 +485,19 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                          void* keyp, map_keys_equality* eq, int key_hash,
                          int capacity)
 /*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, ?kps, k_hashes, ?hm) &*&
+             chmp<kt>(chns, capacity, hm, ?buckets) &*&
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
              0 <= start &*& start < capacity &*&
              [?f]is_map_keys_equality<kt>(eq, kpr); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
+            chmp<kt>(chns, capacity, hm, buckets) &*&
             pointers(keyps, capacity, kps) &*&
             [kfr]kpr(keyp, k) &*&
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
             (hmap_exists_key_fp(hm, k) ?
-            (result == hmap_find_key_fp(hm, k)) :
+             (result == hmap_find_key_fp(hm, k)) :
              (result == -1)); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
@@ -901,9 +920,11 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                         int* busybits,
                         void** keyps,
                         int* k_hashes,
+                        int* chns,
                         int* values) =
      pointers(keyps, capacity, ?kps) &*&
      hmapping<kt>(keyp, hash, capacity, busybits, kps, k_hashes, ?hm) &*&
+     chmp<kt>(chns, capacity, hm, ?buckets) &*&
      ints(values, capacity, ?val_arr) &*&
      true == rec_props(recp, m) &*&
      key_vals<kt,int>(hmap_ks_fp(hm), val_arr, m) &*&
@@ -951,11 +972,12 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
              pointers(keyps, capacity, ?kplist) &*&
              ints(vals, capacity, ?vallist) &*&
              ints(khs, capacity, ?khlist) &*&
+             ints(chns, capacity, ?chnlist) &*&
              0 < capacity &*& 2*capacity < INT_MAX; @*/
 /*@ ensures mapping<kt>(empty_map_fp(), empty_map_fp(),
                         keyp, recp, hash,
                         capacity, busybits, keyps,
-                        khs, vals) &*&
+                        khs, chns, vals) &*&
             [fr]is_map_keys_equality<kt>(eq, keyp); @*/
 {
   IGNORE(eq);
@@ -996,7 +1018,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   //@ produce_empty_key_vals<kt,int>(vallist);
   //@ produce_empty_key_vals<kt,void*>(kplist);
   /*@ close mapping(empty_map_fp(), empty_map_fp(), keyp, recp,
-                    hash, capacity, busybits, keyps, khs, vals);
+                    hash, capacity, busybits, keyps, khs, chns, vals);
     @*/
 }
 
@@ -1315,13 +1337,13 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                         void* keyp, map_keys_equality* eq, int hash, int* value,
                         int capacity)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
-                         keyps, k_hashes, values) &*&
+                         keyps, k_hashes, chns, values) &*&
              kp(keyp, ?k) &*&
              [?fr]is_map_keys_equality(eq, kp) &*&
              hsh(k) == hash &*&
              *value |-> ?v; @*/
 /*@ ensures mapping<kt>(m, addrs, kp, recp, hsh, capacity, busybits,
-                        keyps, k_hashes, values) &*&
+                        keyps, k_hashes, chns, values) &*&
             kp(keyp, k) &*&
             [fr]is_map_keys_equality(eq, kp) &*&
             (map_has_fp(m, k) ?
@@ -1332,7 +1354,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              (result == 0 &*&
               *value |-> v)); @*/
 {
-  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
   int start = loop(hash, capacity);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
@@ -1341,7 +1363,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ hmap_exists_iff_map_has(hm, m, k);
   if (-1 == index)
   {
-    //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+    //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
     return 0;
   }
   //@ hmapping_ks_capacity(hm, capacity);
@@ -1350,7 +1372,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   *value = values[index];
   //@ hmap_find_returns_the_key(hm, val_arr, m, k);
   //@ map_extract_recp(m, k, recp);
-  //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   return 1;
 }
 
@@ -1547,7 +1569,7 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                          void* keyp, int hash, int value,
                          int capacity)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
-                         keyps, k_hashes, values) &*&
+                         keyps, k_hashes, chns, values) &*&
              [0.5]kp(keyp, ?k) &*& true == recp(k, value) &*&
              hsh(k) == hash &*&
              false == map_has_fp(m, k) &*&
@@ -1558,9 +1580,9 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                         kp, recp,
                         hsh,
                         capacity, busybits,
-                        keyps, k_hashes, values); @*/
+                        keyps, k_hashes, chns, values); @*/
 {
-  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
   int start = loop(hash, capacity);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
@@ -1586,7 +1608,7 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ coherent_put_preserves_key_vals(hmap_ks_fp(hm), vals, m, index, k, value);
   //@ coherent_put_preserves_key_vals(hmap_ks_fp(hm), kps, addrs, index, k, keyp);
   /*@ close mapping(map_put_fp(m, k, value), map_put_fp(addrs, k, keyp),
-                    kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+                    kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
     @*/
 }
 
@@ -1838,7 +1860,7 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
                           map_keys_equality* eq, int hash, int capacity,
                           void** keyp_out)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
-                         keyps, k_hashes, ?values) &*&
+                         keyps, k_hashes, chns, ?values) &*&
              [0.5]kp(keyp, ?k) &*&
              [?fr]is_map_keys_equality<kt>(eq, kp) &*&
              hsh(k) == hash &*&
@@ -1851,9 +1873,9 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
                [0.5]kp(nko, k) &*&
                mapping<kt>(map_erase_fp(m, k), map_erase_fp(addrs, k),
                            kp, recp, hsh,
-                           capacity, busybits, keyps, k_hashes, values); @*/
+                           capacity, busybits, keyps, k_hashes, chns, values); @*/
 {
-  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
   int start = loop(hash, capacity);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
@@ -1875,7 +1897,7 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
   //@ hmap_rem_map_erase_coherent(hm, m, index, k);
   //@ hmap_rem_map_erase_coherent(hm, addrs, index, k);
   /*@ close mapping(map_erase_fp(m, k), map_erase_fp(addrs, k),
-                    kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+                    kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
     @*/
 }
 
@@ -1919,12 +1941,12 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
 
 int map_size/*@ <kt> @*/(int* busybits, int capacity)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
-                         ?keyps, ?k_hashes, ?values); @*/
+                         ?keyps, ?k_hashes, ?chns, ?values); @*/
 /*@ ensures mapping<kt>(m, addrs, kp, recp, hsh, capacity, busybits,
-                        keyps, k_hashes, values) &*&
+                        keyps, k_hashes, chns, values) &*&
             result == map_size_fp(m);@*/
 {
-  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
   //@ assert ints(busybits, capacity, ?bbs);
   //@ assert pointers(keyps, capacity, kps);
@@ -1957,21 +1979,21 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
   //@ assert(s == hmap_size_fp(hm));
   //@ hmap_map_size(hm, m);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
-  //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, values);
+  //@ close mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   return s;
 }
 
 /*@
   lemma void map_get_keeps_recp<kt>(list<pair<kt,int> > m, kt k)
   requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
-                   ?cap, ?bbs, ?kps, ?khs, ?vals) &*&
+                   ?cap, ?bbs, ?kps, ?khs, ?chns, ?vals) &*&
            true == map_has_fp(m, k);
   ensures true == rp(k, map_get_fp(m, k)) &*&
           mapping(m, addrs, kp, rp, hsh,
-                  cap, bbs, kps, khs, vals);
+                  cap, bbs, kps, khs, chns, vals);
   {
-    open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, chns, vals);
     map_extract_recp(m, k, rp);
-    close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, chns, vals);
   }
   @*/
