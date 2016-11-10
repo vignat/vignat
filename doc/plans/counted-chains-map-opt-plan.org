@@ -20,7 +20,10 @@ should also be compatible with the one Martin is implementing.
    :END:
 ** certify the single map optimization
    :LOGBOOK:
-   CLOCK: [2016-11-10 Don 10:09]
+   CLOCK: [2016-11-10 Don 13:52]--[2016-11-10 Don 14:35] =>  0:43
+   CLOCK: [2016-11-10 Don 11:59]--[2016-11-10 Don 12:07] =>  0:08
+   CLOCK: [2016-11-10 Don 11:52]--[2016-11-10 Don 11:57] =>  0:05
+   CLOCK: [2016-11-10 Don 10:09]--[2016-11-10 Don 10:30] =>  0:21
    :END:
 *** design the abstract logical model
     :LOGBOOK:
