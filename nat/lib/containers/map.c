@@ -166,6 +166,27 @@
   }
   @*/
 
+/*@
+  fixpoint bool has_given_hash_fp<kt>(fixpoint (kt, int) hash,
+                                      int pos, int capacity,
+                                      pair<kt, nat> chain) {
+    return pos == loop_fp(hash(fst(chain)), capacity);
+  }
+
+  fixpoint bool key_chains_start_on_hash_fp<kt>(list<bucket<kt> > buckets,
+                                                int pos, int capacity,
+                                                fixpoint (kt, int) hash) {
+    switch(buckets) {
+      case nil: return true;
+      case cons(h,t):
+        return switch(h) { case bucket(chains):
+            return forall(chains, (has_given_hash_fp)(hash, pos, capacity)) &&
+                   key_chains_start_on_hash_fp(t, pos + 1, capacity, hash);
+          };
+    }
+  }
+  @*/
+
 static
 int loop(int k, int capacity)
 //@ requires 0 < capacity &*& 2*capacity < INT_MAX;
@@ -281,10 +302,12 @@ int loop(int k, int capacity)
 
 /*@
   predicate chmp<kt>(int* chns, int capacity,
-                     hmap<kt> m, list<bucket<kt> > buckets) =
+                     hmap<kt> m, list<bucket<kt> > buckets,
+                     fixpoint (kt, int) hash) =
     ints(chns, capacity, ?chains) &*&
     true == buckets_ok(buckets) &*&
-    true == chs_buckets_insync_fp(hmap_ks_fp(m), chains, buckets);
+    true == chs_buckets_insync_fp(hmap_ks_fp(m), chains, buckets) &*&
+    true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash);
 
   @*/
 /*@
@@ -567,21 +590,20 @@ int loop(int k, int capacity)
   }
   @*/
 
-
 static
 int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                          int start,
                          void* keyp, map_keys_equality* eq, int key_hash,
                          int capacity)
 /*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, ?kps, k_hashes, ?hm) &*&
-             chmp<kt>(chns, capacity, hm, ?buckets) &*&
+             chmp<kt>(chns, capacity, hm, ?buckets, hsh) &*&
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
              0 <= start &*& start < capacity &*&
              [?f]is_map_keys_equality<kt>(eq, kpr); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
-            chmp<kt>(chns, capacity, hm, buckets) &*&
+            chmp<kt>(chns, capacity, hm, buckets, hsh) &*&
             pointers(keyps, capacity, kps) &*&
             [kfr]kpr(keyp, k) &*&
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
@@ -590,7 +612,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              (result == -1)); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
-  //@ open chmp(chns, capacity, hm, buckets);
+  //@ open chmp(chns, capacity, hm, buckets, hsh);
   //@ assert ints(chns, capacity, ?chnlist);
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
@@ -628,7 +650,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         /*@ recover_pred_mapping(kps, bbs, ks, index); @*/
         //@ hmap_find_this_key(hm, index, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
-        //@ close chmp(chns, capacity, hm, buckets);
+        //@ close chmp(chns, capacity, hm, buckets, hsh);
         return index;
       }
       //@ recover_pred_mapping(kps, bbs, ks, index);
@@ -641,7 +663,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         //@ assert nil == get_crossing_chains_fp(buckets, index);
         //@ assert false == hmap_exists_key_fp(hm, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
-        //@ close chmp(chns, capacity, hm, buckets);
+        //@ close chmp(chns, capacity, hm, buckets, hsh);
         return -1;
       }
       //@ assert(length(ks) == capacity);
@@ -656,7 +678,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ pred_mapping_same_len(bbs, ks);
   //@ by_loop_for_all(ks, (not_my_key)(k), start, capacity, nat_of_int(capacity));
   //@ no_key_found(ks, k);
-  //@ close chmp(chns, capacity, hm, buckets);
+  //@ close chmp(chns, capacity, hm, buckets, hsh);
   //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
   return -1;
 }
@@ -1028,7 +1050,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                         int* values) =
      pointers(keyps, capacity, ?kps) &*&
      hmapping<kt>(keyp, hash, capacity, busybits, kps, k_hashes, ?hm) &*&
-     chmp<kt>(chns, capacity, hm, ?buckets) &*&
+     chmp<kt>(chns, capacity, hm, ?buckets, hash) &*&
      ints(values, capacity, ?val_arr) &*&
      true == rec_props(recp, m) &*&
      key_vals<kt,int>(hmap_ks_fp(hm), val_arr, m) &*&
