@@ -33,14 +33,14 @@
     return map(snd, acc);
   }
 
-  fixpoint option<kt> get_current_key<kt>(list<pair<kt, nat> > acc) {
+  fixpoint option<kt> get_current_key_fp<kt>(list<pair<kt, nat> > acc) {
     switch(acc) {
       case nil: return none;
       case cons(h,t):
         return switch(h) { case pair(key,distance):
           return switch(distance) {
             case zero: return some(key);
-            case succ(n): return get_current_key(t);
+            case succ(n): return get_current_key_fp(t);
           };
         };
     }
@@ -72,33 +72,47 @@
     return buckets_ok_rec(get_wraparound(nil, buckets), buckets);
   }
 
-
-  fixpoint bool chs_buckets_insync_rec_fp<kt>(list<option<kt> > keys,
-                                              list<int> chs,
-                                              list<bucket<kt> > buckets,
-                                              list<pair<kt, nat> > acc_tails) {
+  fixpoint list<int> buckets_get_chns_rec_fp<kt>(list<pair<kt, nat> > acc,
+                                                 list<bucket<kt> > buckets) {
     switch(buckets) {
-      case nil: return keys == nil && chs == nil;
+      case nil: return nil;
       case cons(bh,bt):
-        return switch(keys) {
-          case nil: return false;
-          case cons(kh,kt):
-            return switch(chs) {
-              case nil: return false;
-              case cons(chh,cht):
-                return get_current_key(acc_at_next_bucket
-                                       (acc_tails, bh)) == kh &&
-                       chh == length(acc_at_next_bucket(acc_tails, bh)) &&
-                       chs_buckets_insync_rec_fp(kt, cht, bt,
-                                                 acc_at_next_bucket(acc_tails, bh));
-            };
-        };
+        return cons(length(acc_at_next_bucket(acc, bh)),
+                    buckets_get_chns_rec_fp(acc_at_next_bucket(acc, bh),
+                                            bt));
     }
   }
 
-  fixpoint bool chs_buckets_insync_fp<kt>(list<option<kt> > keys, list<int> chs, list<bucket<kt> > buckets) {
-    return chs_buckets_insync_rec_fp(keys, chs, buckets, get_wraparound(nil, buckets));
+  fixpoint list<int> buckets_get_chns_fp<kt>(list<bucket<kt> > buckets) {
+    return buckets_get_chns_rec_fp(get_wraparound(nil, buckets), buckets);
   }
+
+  fixpoint list<option<kt> > buckets_get_keys_rec_fp<kt>(list<pair<kt, nat> > acc,
+                                                         list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil: return nil;
+      case cons(bh,bt):
+        return cons(get_current_key_fp(acc_at_next_bucket(acc, bh)),
+                    buckets_get_keys_rec_fp(acc_at_next_bucket(acc, bh), bt));
+    }
+  }
+
+  fixpoint list<option<kt> > buckets_get_keys_fp<kt>(list<bucket<kt> > buckets) {
+    return buckets_get_keys_rec_fp(get_wraparound(nil, buckets), buckets);
+  }
+
+  fixpoint int get_optional_hash_fp<kt>(fixpoint (kt,int) hash, option<kt> k) {
+    switch(k) {
+      case none: return 0;
+      case some(key): return hash(key);
+    }
+  }
+
+  fixpoint list<int> get_keys_hashes_fp<kt>(list<option<kt> > keys,
+                                            fixpoint (kt,int) hash) {
+    return map((get_optional_hash_fp)(hash), keys);
+  }
+
   @*/
 
 /*@
@@ -122,47 +136,33 @@
 
 /*@
   lemma void no_crossing_chains_rec<kt>(list<pair<kt, nat> > acc,
-                                        list<option<kt> > keys,
-                                        list<int> chs,
                                         list<bucket<kt> > buckets,
                                         int index)
   requires 0 <= index &*& index < length(buckets) &*&
-           nth(index, chs) == 0 &*&
-           true == chs_buckets_insync_rec_fp(keys, chs, buckets, acc);
+           nth(index, buckets_get_chns_rec_fp(acc, buckets)) == 0;
   ensures nil == get_crossing_chains_rec_fp(acc, buckets, index);
   {
     switch(buckets) {
       case nil: return;
       case cons(bh,bt):
-        switch(keys) {
-          case nil:
-          case cons(keyh,keyt):
-        }
-        switch(chs) {
-          case nil:
-          case cons(chh,cht):
-        }
         if (0 == index) {
           assert get_crossing_chains_rec_fp(acc, buckets, index) ==
                  acc_at_next_bucket(acc, bh);
 
           length_0_nil(acc_at_next_bucket(acc, bh));
         } else {
-          no_crossing_chains_rec(acc_at_next_bucket(acc, bh), tail(keys), tail(chs), bt, index - 1);
+          no_crossing_chains_rec(acc_at_next_bucket(acc, bh), bt, index - 1);
         }
     }
   }
 
-  lemma void no_crossing_chains_here<kt>(list<option<kt> > keys,
-                                         list<int> chs,
-                                         list<bucket<kt> > buckets,
+  lemma void no_crossing_chains_here<kt>(list<bucket<kt> > buckets,
                                          int index)
   requires 0 <= index &*& index < length(buckets) &*&
-           nth(index, chs) == 0 &*&
-           true == chs_buckets_insync_fp(keys, chs, buckets);
+           nth(index, buckets_get_chns_fp(buckets)) == 0;
   ensures nil == get_crossing_chains_fp(buckets, index);
   {
-    no_crossing_chains_rec(get_wraparound(nil, buckets), keys, chs, buckets, index);
+    no_crossing_chains_rec(get_wraparound(nil, buckets), buckets, index);
   }
   @*/
 
@@ -254,6 +254,14 @@ int loop(int k, int capacity)
   @*/
 
 /*@
+  fixpoint hmap<kt> buckets_get_hmap_fp<kt>(list<bucket<kt> > buckets,
+                                            fixpoint (kt,int) hash) {
+    return hmap(buckets_get_keys_fp(buckets),
+                get_keys_hashes_fp(buckets_get_keys_fp(buckets), hash));
+  }
+  @*/
+
+/*@
 
   predicate pred_mapping<t>(list<void*> pts, list<int> bbs,
                             predicate (void*; t) pred;
@@ -301,12 +309,12 @@ int loop(int k, int capacity)
 @*/
 
 /*@
-  predicate chmp<kt>(int* chns, int capacity,
-                     hmap<kt> m, list<bucket<kt> > buckets,
-                     fixpoint (kt, int) hash) =
-    ints(chns, capacity, ?chains) &*&
+  predicate buckets_hmap_insync<kt>(int* chns, int capacity,
+                                    hmap<kt> m, list<bucket<kt> > buckets,
+                                    fixpoint (kt, int) hash) =
+    ints(chns, capacity, buckets_get_chns_fp(buckets)) &*&
     true == buckets_ok(buckets) &*&
-    true == chs_buckets_insync_fp(hmap_ks_fp(m), chains, buckets) &*&
+    m == buckets_get_hmap_fp(buckets, hash) &*&
     true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash);
 
   @*/
@@ -565,28 +573,25 @@ int loop(int k, int capacity)
 @*/
 
 /*@
-  lemma void buckets_insync_same_len_rec<kt>(list<pair<kt, nat> > acc,
-                                             list<option<kt> > keys, list<int> chns,
+  lemma void buckets_keys_chns_same_len_rec<kt>(list<pair<kt, nat> > acc,
                                              list<bucket<kt> > buckets)
-  requires true == chs_buckets_insync_rec_fp(keys, chns, buckets, acc);
-  ensures length(keys) == length(buckets) &*& length(chns) == length(buckets);
+  requires true;
+  ensures length(buckets_get_keys_rec_fp(acc, buckets)) == length(buckets) &*&
+          length(buckets_get_chns_rec_fp(acc, buckets)) == length(buckets);
   {
     switch(buckets) {
       case nil: return;
       case cons(h,t):
-        switch(keys) { case nil: case cons(keyh,keyt): }
-        switch(chns) { case nil: case cons(chh,cht): }
-        buckets_insync_same_len_rec(acc_at_next_bucket(acc, h),
-                                    tail(keys), tail(chns), t);
+        buckets_keys_chns_same_len_rec(acc_at_next_bucket(acc, h), t);
     }
   }
 
-  lemma void buckets_insync_same_len<kt>(list<option<kt> > keys, list<int> chns,
-                                         list<bucket<kt> > buckets)
-  requires true == chs_buckets_insync_fp(keys, chns, buckets);
-  ensures length(keys) == length(buckets) &*& length(chns) == length(buckets);
+  lemma void buckets_keys_chns_same_len<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures length(buckets_get_keys_fp(buckets)) == length(buckets) &*&
+          length(buckets_get_chns_fp(buckets)) == length(buckets);
   {
-    buckets_insync_same_len_rec(get_wraparound(nil, buckets), keys, chns, buckets);
+    buckets_keys_chns_same_len_rec(get_wraparound(nil, buckets), buckets);
   }
   @*/
 
@@ -596,14 +601,14 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                          void* keyp, map_keys_equality* eq, int key_hash,
                          int capacity)
 /*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, ?kps, k_hashes, ?hm) &*&
-             chmp<kt>(chns, capacity, hm, ?buckets, hsh) &*&
+             buckets_hmap_insync(chns, capacity, hm, ?buckets, hsh) &*&
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
              0 <= start &*& start < capacity &*&
              [?f]is_map_keys_equality<kt>(eq, kpr); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
-            chmp<kt>(chns, capacity, hm, buckets, hsh) &*&
+            buckets_hmap_insync(chns, capacity, hm, buckets, hsh) &*&
             pointers(keyps, capacity, kps) &*&
             [kfr]kpr(keyp, k) &*&
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
@@ -612,7 +617,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              (result == -1)); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
-  //@ open chmp(chns, capacity, hm, buckets, hsh);
+  //@ open buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
   //@ assert ints(chns, capacity, ?chnlist);
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
@@ -650,20 +655,20 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         /*@ recover_pred_mapping(kps, bbs, ks, index); @*/
         //@ hmap_find_this_key(hm, index, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
-        //@ close chmp(chns, capacity, hm, buckets, hsh);
+        //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
         return index;
       }
       //@ recover_pred_mapping(kps, bbs, ks, index);
     } else {
       if (chn == 0) {
         //@ assert length(chnlist) == capacity;
-        //@ buckets_insync_same_len(ks, chnlist, buckets);
+        //@ buckets_keys_chns_same_len(buckets);
         //@ assert length(buckets) == capacity;
-        //@ no_crossing_chains_here(ks, chnlist, buckets, index);
+        //@ no_crossing_chains_here(buckets, index);
         //@ assert nil == get_crossing_chains_fp(buckets, index);
         //@ assert false == hmap_exists_key_fp(hm, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
-        //@ close chmp(chns, capacity, hm, buckets, hsh);
+        //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
         return -1;
       }
       //@ assert(length(ks) == capacity);
@@ -678,7 +683,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ pred_mapping_same_len(bbs, ks);
   //@ by_loop_for_all(ks, (not_my_key)(k), start, capacity, nat_of_int(capacity));
   //@ no_key_found(ks, k);
-  //@ close chmp(chns, capacity, hm, buckets, hsh);
+  //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
   //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
   return -1;
 }
@@ -1050,7 +1055,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                         int* values) =
      pointers(keyps, capacity, ?kps) &*&
      hmapping<kt>(keyp, hash, capacity, busybits, kps, k_hashes, ?hm) &*&
-     chmp<kt>(chns, capacity, hm, ?buckets, hash) &*&
+     buckets_hmap_insync<kt>(chns, capacity, hm, ?buckets, hash) &*&
      ints(values, capacity, ?val_arr) &*&
      true == rec_props(recp, m) &*&
      key_vals<kt,int>(hmap_ks_fp(hm), val_arr, m) &*&
