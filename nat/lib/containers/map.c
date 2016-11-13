@@ -58,12 +58,17 @@
     }
   }
 
+  fixpoint bool upper_limit<kt>(int lim, pair<kt,nat> x) {
+    return int_of_nat(snd(x)) < lim;
+  }
+
   fixpoint bool buckets_ok_rec<kt>(list<pair<kt, nat> > acc,
                                    list<bucket<kt> > buckets) {
     switch(buckets) {
       case nil: return true;
       case cons(bkh,bkt):
         return distinct(get_just_tails(acc_at_next_bucket(acc, bkh))) &&
+               forall(acc, (upper_limit)(length(buckets))) &&
                buckets_ok_rec(acc_at_next_bucket(acc, bkh), bkt);
     }
   }
@@ -131,6 +136,14 @@
 
   fixpoint list<pair<kt, nat> > get_crossing_chains_fp<kt>(list<bucket<kt> > buckets, int index) {
     return get_crossing_chains_rec_fp(get_wraparound(nil, buckets), buckets, index);
+  }
+  @*/
+
+/*@
+  fixpoint bool bucket_has_key_fp<kt>(kt k, bucket<kt> b) {
+    switch(b) { case bucket(chains):
+      return mem(k, map(fst, chains));
+    }
   }
   @*/
 
@@ -318,6 +331,215 @@ int loop(int k, int capacity)
     true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash);
 
   @*/
+
+/*@
+  lemma void hash_for_given_key<kt>(list<pair<kt, nat> > chains,
+                                    fixpoint (kt,int) hash,
+                                    int shift, int capacity,
+                                    kt k)
+  requires true == mem(k, map(fst, chains)) &*&
+           true == forall(chains, (has_given_hash_fp)(hash, shift, capacity));
+  ensures true == (loop_fp(hash(k), capacity) == shift);
+  {
+    switch(chains) {
+      case nil:
+      case cons(h,t):
+        if (fst(h) == k) {
+        } else {
+          hash_for_given_key(t, hash, shift, capacity, k);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void overshoot_bucket<kt>(list<bucket<kt> > buckets, int shift, int capacity,
+                                  fixpoint (kt,int) hash,
+                                  kt k)
+  requires true == key_chains_start_on_hash_fp(buckets, shift, capacity, hash) &*&
+           loop_fp(hash(k), capacity) < shift &*& shift <= capacity &*&
+           capacity - shift == length(buckets);
+  ensures false == exists(buckets, (bucket_has_key_fp)(k));
+  {
+    switch(buckets) {
+      case nil: return;
+      case cons(bh,bt):
+        switch(bh) { case bucket(chains):
+          if (bucket_has_key_fp(k, bh)) {
+              assert true == mem(k, map(fst, chains));
+              assert true == forall(chains, (has_given_hash_fp)(hash, shift, capacity));
+              hash_for_given_key(chains, hash, shift, capacity, k);
+              assert true == (loop_fp(hash(k), capacity) == shift);
+          }
+          overshoot_bucket(bt, shift + 1, capacity, hash, k);
+        }
+    }
+  }
+  @*/
+
+/* @
+  lemma void the_key_is_deeper<kt>(kt k, list<pair<kt, nat> > acc, bucket<kt> bh, list<bucket<kt> > bt)
+  requires true == mem(some(k), buckets_get_keys_rec_fp(acc, cons(bh,bt))) &*&
+           get_current_key_fp(acc) != some(k);
+  ensures true == mem(some(k), buckets_get_keys_rec_fp(acc_at_next_bucket(acc, bh), bt));
+  {
+    assert true == (buckets_get_keys_rec_fp(acc, cons(bh,bt)) == cons(get_current_key_fp(acc_at_next_bucket(acc, bh)), buckets_get_keys_rec_fp(acc_at_next_bucket(acc, bh), bt)));
+  }
+  @*/
+
+/*@
+  lemma void next_bucket_still_no_key<kt>(list<pair<kt, nat> > acc, bucket<kt> bh, kt k)
+  requires false == mem(k, map(fst, acc)) &*&
+           false == bucket_has_key_fp(k, bh);
+  ensures false == mem(k, map(fst, acc_at_next_bucket(acc, bh)));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void no_key_certainly_not_here<kt>(list<pair<kt, nat> > acc, kt k)
+  requires false == mem(k, map(fst, acc));
+  ensures get_current_key_fp(acc) != some(k);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void some_bucket_contains_key_rec<kt>(list<pair<kt, nat> > acc, list<bucket<kt> > buckets, kt k)
+  requires true == mem(some(k), buckets_get_keys_rec_fp(acc, buckets)) &*&
+           false == mem(k, map(fst, acc));
+  ensures true == exists(buckets, (bucket_has_key_fp)(k));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        if (bucket_has_key_fp(k, h)) {
+        } else {
+          next_bucket_still_no_key(acc, h, k);
+          assert false == mem(k, map(fst, acc_at_next_bucket(acc, h)));
+          no_key_certainly_not_here(acc_at_next_bucket(acc, h), k);
+          assert get_current_key_fp(acc_at_next_bucket(acc, h)) != some(k);
+          some_bucket_contains_key_rec(acc_at_next_bucket(acc, h), t, k);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void in_this_bucket_then_in_the_map<kt>(list<pair<kt, nat> > acc, list<bucket<kt> > buckets, int n, kt k)
+  requires true == buckets_ok_rec(acc, buckets) &*& 0 <= n &*& n < length(buckets) &*&
+           true == bucket_has_key_fp(k, nth(n, buckets));
+  ensures true == mem(some(k), buckets_get_keys_rec_fp(acc, buckets));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void wrong_hash_no_key<kt>(kt k, bucket<kt> bh, list<bucket<kt> > bt,
+                                   int shift, int capacity,
+                                   fixpoint (kt,int) hash)
+  requires true == key_chains_start_on_hash_fp(cons(bh,bt), shift, capacity, hash) &*&
+           shift != loop_fp(hash(k), capacity);
+  ensures false == bucket_has_key_fp(k, bh);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void key_is_contained_in_the_bucket_rec<kt>(list<bucket<kt> > buckets,
+                                                    list<pair<kt, nat> > acc,
+                                                    int shift, int capacity,
+                                                    fixpoint (kt,int) hash,
+                                                    kt k)
+  requires true == key_chains_start_on_hash_fp(buckets, shift, capacity, hash) &*&
+           true == buckets_ok_rec(acc, buckets) &*&
+           false == mem(k, map(fst, acc)) &*&
+           0 <= shift &*& shift <= loop_fp(hash(k), capacity) &*&
+           0 < capacity &*&
+           capacity - shift == length(buckets) &*&
+           buckets != nil;
+  ensures loop_fp(hash(k), capacity) - shift < length(buckets) &*&
+          mem(some(k), buckets_get_keys_rec_fp(acc, buckets)) ==
+          bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift, buckets));
+  {
+    switch(buckets) {
+      case nil: return;
+      case cons(bh,bt):
+        loop_lims(hash(k), capacity);
+        assert true == ((loop_fp(hash(k), capacity) - shift) <= length(buckets));
+        if (loop_fp(hash(k), capacity) == shift) {
+          if (mem(some(k), buckets_get_keys_rec_fp(acc, buckets))) {
+            some_bucket_contains_key_rec(acc, buckets, k);
+            switch(bh) { case bucket(chains): }
+            overshoot_bucket(bt, shift+1, capacity, hash, k);
+            if (bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift, buckets))) {
+              
+            } else {
+              assert false;
+            }
+          } else {
+            if (bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift, buckets))) {
+              in_this_bucket_then_in_the_map(acc, buckets, loop_fp(hash(k), capacity) - shift, k);
+              assert false;
+            } else {
+
+            }
+          }
+        } else {
+          assert true == (shift < loop_fp(hash(k), capacity));
+          assert true == (shift + 1 < capacity);
+          assert true == (1 < length(buckets));
+          assert true == (0 < length(bt));
+          switch(bt) {
+            case nil:
+            case cons(h,t):
+          }
+          switch(bh) { case bucket(chains): };
+          wrong_hash_no_key(k, bh, bt, shift, capacity, hash);
+          next_bucket_still_no_key(acc, bh, k);
+          key_is_contained_in_the_bucket_rec(bt, acc_at_next_bucket(acc, bh),
+                                             shift + 1, capacity,
+                                             hash, k);
+          no_key_certainly_not_here(acc_at_next_bucket(acc, bh), k);
+          //assume(some(k) != get_current_key_fp(acc_at_next_bucket(acc, bh)));
+          assert some(k) != get_current_key_fp(acc_at_next_bucket(acc, bh));
+          assert true == (mem(some(k), buckets_get_keys_rec_fp(acc, buckets)) ==
+                          mem(some(k), buckets_get_keys_rec_fp(acc_at_next_bucket(acc, bh), bt)));
+          assert true == (bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift, buckets)) ==
+                          bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift - 1, bt)));
+        }
+    }
+  }
+
+  @*/
+/*@
+
+  lemma void key_is_contained_in_the_bucket<kt>(list<bucket<kt> > buckets, int capacity,
+                                                fixpoint (kt,int) hash,
+                                                kt k)
+  requires true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash) &*&
+           0 < capacity &*&
+           true == buckets_ok(buckets) &*&
+           length(buckets) == capacity;
+  ensures hmap_exists_key_fp(buckets_get_hmap_fp(buckets, hash), k) ==
+          bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity), buckets));
+  {
+    assert hmap_exists_key_fp(buckets_get_hmap_fp(buckets, hash), k) ==
+           mem(some(k), buckets_get_keys_fp(buckets));
+    loop_lims(hash(k), capacity);
+    if (mem(k, map(fst, get_wraparound(nil, buckets)))) {
+      assume(false);//TODO
+    } else {
+      key_is_contained_in_the_bucket_rec(buckets, get_wraparound(nil, buckets),
+                                         0, capacity, hash, k);
+    }
+  }
+  @*/
+
 /*@
   lemma void pred_mapping_same_len<t>(list<int> bbs, list<option<t> > ks)
   requires pred_mapping(?pts, bbs, ?pred, ks);
@@ -595,9 +817,80 @@ int loop(int k, int capacity)
   }
   @*/
 
+/*@
+  lemma void next_cell_keeps_keys<kt>(list<pair<kt, nat> > acc, bucket<kt> b, kt k)
+  requires true == mem(k, map(fst, acc)) &*&
+           get_current_key_fp(acc) != some(k);
+  ensures true == mem(k, map(fst, acc_at_next_bucket(acc, b)));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void next_i_cells_keep_keys<kt>(list<bucket<kt> > buckets,
+                                        int i,
+                                        kt k,
+                                        list<pair<kt, nat> > acc)
+  requires true == up_to(nat_of_int(i),
+                         (nthProp)(buckets_get_keys_rec_fp(acc, buckets),
+                                   (not_my_key)(k))) &*&
+           true == mem(k, map(fst, acc));
+  ensures true == mem(k, map(fst, get_crossing_chains_rec_fp(acc, buckets, i)));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void crossing_chains_keep_key<kt>(list<bucket<kt> > buckets,
+                                          int i,
+                                          int start,
+                                          int capacity,
+                                          kt k)
+  requires true == up_to(nat_of_int(i),
+                         (byLoopNthProp)(buckets_get_keys_fp(buckets),
+                                         (not_my_key)(k),
+                                         capacity,
+                                         start)) &*&
+           true == bucket_has_key_fp(k, nth(start, buckets));
+  ensures true == mem(k, map(fst, get_crossing_chains_fp(buckets, loop_fp(start + i, capacity))));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void chains_depleted_no_hope<kt>(list<bucket<kt> > buckets,
+                                         int i,
+                                         kt k,
+                                         int capacity,
+                                         fixpoint (kt,int) hash)
+  requires true == up_to(nat_of_int(i),
+                         (byLoopNthProp)(buckets_get_keys_fp(buckets),
+                                         (not_my_key)(k),
+                                         capacity,
+                                         loop_fp(hash(k), capacity))) &*&
+           true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash) &*&
+           true == buckets_ok(buckets) &*&
+           0 < capacity &*&
+           capacity == length(buckets) &*&
+           nth(loop_fp(loop_fp(hash(k), capacity) + i, capacity), buckets_get_chns_fp(buckets)) == 0;
+  ensures false == bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity), buckets));
+  {
+    if (bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity), buckets))) {
+      crossing_chains_keep_key(buckets, i, loop_fp(hash(k), capacity), capacity, k);
+      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, loop_fp(loop_fp(hash(k), capacity) + i, capacity))));
+      loop_lims(loop_fp(hash(k), capacity) + i, capacity);
+      no_crossing_chains_here(buckets, loop_fp(loop_fp(hash(k), capacity) + i, capacity));
+
+      assert get_crossing_chains_fp(buckets, loop_fp(loop_fp(hash(k), capacity) + i, capacity)) == nil;
+    }
+  }
+  @*/
+
 static
 int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
-                         int start,
                          void* keyp, map_keys_equality* eq, int key_hash,
                          int capacity)
 /*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, ?kps, k_hashes, ?hm) &*&
@@ -605,7 +898,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
-             0 <= start &*& start < capacity &*&
              [?f]is_map_keys_equality<kt>(eq, kpr); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
             buckets_hmap_insync(chns, capacity, hm, buckets, hsh) &*&
@@ -621,6 +913,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ assert ints(chns, capacity, ?chnlist);
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
+  int start = loop(key_hash, capacity);
   int i = 0;
   for (; i < capacity; ++i)
     /*@ invariant pred_mapping(kps, bbs, kpr, ks) &*&
@@ -633,6 +926,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                   [kfr]kpr(keyp, k) &*&
                   hsh(k) == key_hash &*&
                   true == hash_list(ks, khs, hsh) &*&
+                  start == loop_fp(hsh(k), capacity) &*&
+                  ks == buckets_get_keys_fp(buckets) &*&
                   true == up_to(nat_of_int(i),
                                 (byLoopNthProp)(ks, (not_my_key)(k),
                                                 capacity, start));
@@ -666,6 +961,10 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         //@ assert length(buckets) == capacity;
         //@ no_crossing_chains_here(buckets, index);
         //@ assert nil == get_crossing_chains_fp(buckets, index);
+        //@ key_is_contained_in_the_bucket(buckets, capacity, hsh, k);
+        //@ assert true == up_to(nat_of_int(i), (byLoopNthProp)(ks, (not_my_key)(k), capacity, start));
+        //@ assert true == up_to(nat_of_int(i), (byLoopNthProp)(ks, (not_my_key)(k), capacity, loop_fp(hsh(k), capacity)));
+        //@ chains_depleted_no_hope(buckets, i, k, capacity, hsh);
         //@ assert false == hmap_exists_key_fp(hm, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
         //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
@@ -1487,9 +1786,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 {
   //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
-  int start = loop(hash, capacity);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
-  int index = find_key(busybits, keyps, k_hashes, chns, start,
+  int index = find_key(busybits, keyps, k_hashes, chns,
                        keyp, eq, hash, capacity);
   //@ hmap_exists_iff_map_has(hm, m, k);
   if (-1 == index)
