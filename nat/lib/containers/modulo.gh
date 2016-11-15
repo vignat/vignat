@@ -323,8 +323,8 @@
         by_loop_for_all(arr, prop, shift, capacity, len);
         int orig = loop_shift_inv(int_of_nat(len), shift, capacity);
         up_to_covers_x(nat_of_int(capacity),
-                      (byLoopNthProp)(arr, prop, capacity, shift),
-                      orig);
+                       (byLoopNthProp)(arr, prop, capacity, shift),
+                       orig);
         assert(true == byLoopNthProp(arr, prop, capacity, shift, orig));
         assert(true == nthProp(arr, prop, int_of_nat(len)));
     }

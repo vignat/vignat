@@ -586,6 +586,28 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void subset_append2<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, ys);
+  ensures true == subset(xs, append(ys, zs));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        subset_append2(t, ys, zs);
+    }
+  }
+
+  lemma void subset_append3<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, zs);
+  ensures true == subset(xs, append(ys, zs));
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        subset_append3(t, ys, zs);
+    }
+  }
+
   lemma void remove_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
   requires true == subset(xs, ys) &*& true == mem(el, remove(el, ys));
   ensures true == subset(xs, remove(el, ys));
@@ -707,6 +729,18 @@ ensures append(a, b) != nil;
   {
     subset_remove(xs, ys, el);
     subset_append(remove(el, xs), cons(el, nil), ys);
+  }
+
+  lemma void subset_forall<t>(list<t> xs, list<t> ys, fixpoint (t,bool) prop)
+  requires true == subset(xs, ys) &*& true == forall(ys, prop);
+  ensures true == forall(xs, prop);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        forall_mem(h, ys, prop);
+        subset_forall(t, ys, prop);
+    }
   }
 
   lemma void drop_append_small<t>(int n, list<t> l1, list<t> l2)
