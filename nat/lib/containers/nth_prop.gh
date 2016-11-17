@@ -36,7 +36,7 @@
 
   lemma void shift_for_all<t>(list<t> arr, fixpoint (t, bool) prop,
                               int shift, int inlen, nat outlen)
-  requires length(arr) == inlen &*& 0 <= shift &*&
+  requires 0 <= shift &*&
            shift + int_of_nat(outlen) <= inlen &*&
            true == up_to(nat_of_int(inlen), (nthProp)(arr, prop));
   ensures true == up_to(outlen, (shiftNthProp)(arr, prop, shift));
@@ -53,7 +53,7 @@
   lemma void shift_for_append<t>(list<t> l1, list<t> l2,
                                  fixpoint (t, bool) prop,
                                  nat outlen)
-  requires true == up_to(nat_of_int(length(l2)),
+  requires true == up_to(outlen,
                          (shiftNthProp)(append(l1,l2), prop, length(l1))) &*&
            int_of_nat(outlen) <= length(l2);
   ensures true == up_to(outlen, (nthProp)(l2, prop));
@@ -62,7 +62,7 @@
       case zero: return;
       case succ(len):
         shift_for_append(l1, l2, prop, len);
-        up_to_covers_x(nat_of_int(length(l2)),
+        up_to_covers_x(outlen,
                        (shiftNthProp)(append(l1,l2), prop, length(l1)),
                        int_of_nat(len));
         nth_append_r(l1, l2, int_of_nat(len));

@@ -77,7 +77,7 @@
   }
 
   fixpoint bool buckets_ok<kt>(list<bucket<kt> > buckets) {
-    return buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
+    return buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets) - 1);
   }
 
   fixpoint list<int> buckets_get_chns_rec_fp<kt>(list<pair<kt, nat> > acc,
@@ -124,7 +124,9 @@
   @*/
 
 /*@
-  lemma void buckets_ok_acc_bounded_rec<kt>(list<pair<kt, nat> > acc, list<bucket<kt> > buckets, int bound)
+  lemma void buckets_ok_acc_bounded_rec<kt>(list<pair<kt, nat> > acc,
+                                            list<bucket<kt> > buckets,
+                                            int bound)
   requires true == buckets_ok_rec(acc, buckets, bound);
   ensures true == forall(get_wraparound(acc, buckets), (upper_limit)(bound));
   {
@@ -211,32 +213,20 @@
 
   lemma void buckets_ok_acc_bounded<kt>(list<bucket<kt> > buckets)
   requires true == buckets_ok(buckets);
-  ensures true == forall(get_wraparound(nil, buckets), (upper_limit)(length(buckets)));
+  ensures true == forall(get_wraparound(nil, buckets), (upper_limit)(length(buckets) - 1));
   {
-    buckets_ok_acc_bounded_rec(get_wraparound(nil, buckets), buckets, length(buckets));
+    buckets_ok_acc_bounded_rec(get_wraparound(nil, buckets), buckets, length(buckets) - 1);
     holds_for_subset_wraparound(get_wraparound(nil, buckets), nil,
-                                buckets, (upper_limit)(length(buckets)));
+                                buckets, (upper_limit)(length(buckets) - 1));
   }
   @*/
-
-/*@
-  lemma void buckets_ok_get_wraparound_idemp<kt>(list<bucket<kt> > buckets)
-  requires true == buckets_ok(buckets);
-  ensures get_wraparound(nil, buckets) ==
-          get_wraparound(get_wraparound(nil, buckets), buckets);
-  {
-    buckets_ok_acc_bounded(buckets);
-    //any bounded by length(buckets) acc wont make a difference.
-  }
-  @*/
-
 /*@
   fixpoint list<pair<kt, nat> > get_crossing_chains_rec_fp<kt>
        (list<pair<kt, nat> > acc,
         list<bucket<kt> > buckets,
         int index) {
     switch(buckets) {
-      case nil: return acc; //index must be 0 here
+      case nil: return advance_acc(acc); //index must be 0 here
       case cons(h,t):
         return (index == 0) ?
           (acc_at_next_bucket(acc, h)) :
@@ -251,21 +241,135 @@
 
 /*@
   lemma void wraparound_is_last_crossing_chains<kt>(list<pair<kt, nat> > acc, list<bucket<kt> > buckets)
-  requires true;
+  requires buckets != nil;
   ensures get_wraparound(acc, buckets) == get_crossing_chains_rec_fp(acc, buckets, length(buckets) - 1);
   {
     switch(buckets) {
       case nil: return;
       case cons(h,t):
-        wraparound_is_last_crossing_chains(acc_at_next_bucket(acc, h), t);
-        assert get_wraparound(acc, buckets) == get_wraparound(acc_at_next_bucket(acc, h), t);
-        switch(t) {
-          case nil:
-          case cons(th,tt):
+        if (t == nil) {
+        } else {
+          wraparound_is_last_crossing_chains(acc_at_next_bucket(acc, h), t);
+          assert get_wraparound(acc, buckets) == get_wraparound(acc_at_next_bucket(acc, h), t);
+          switch(t) {
+            case nil:
+            case cons(th,tt):
+          }
+          assert get_crossing_chains_rec_fp(acc, buckets, length(buckets) - 1) ==
+                get_crossing_chains_rec_fp(acc_at_next_bucket(acc, h), t, length(t) - 1);
         }
-        assert get_crossing_chains_rec_fp(acc, buckets, length(buckets) - 1) ==
-               get_crossing_chains_rec_fp(acc_at_next_bucket(acc, h), t, length(t) - 1);
     }
+  }
+  @*/
+
+
+/*@
+  lemma void advance_acc_append_commute<kt>(list<pair<kt, nat> > acc1,
+                                            list<pair<kt, nat> > acc2)
+  requires true;
+  ensures advance_acc(append(acc1, acc2)) ==
+          append(advance_acc(acc1), advance_acc(acc2));
+  {
+    switch(acc1) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+        }
+        advance_acc_append_commute(t, acc2);
+    }
+  }
+
+  lemma void append_at_next_commute<kt>(list<pair<kt, nat> > shrt,
+                                        list<pair<kt, nat> > acc,
+                                        bucket<kt> b)
+  requires true;
+  ensures acc_at_next_bucket(append(shrt, acc), b) ==
+          append(advance_acc(shrt), acc_at_next_bucket(acc, b));
+  {
+    switch(b) { case bucket(chains):
+      advance_acc_append_commute(shrt, acc);
+      append_assoc(advance_acc(shrt), advance_acc(acc), chains);
+    }
+  }
+
+  lemma void advance_acc_lower_limit<kt>(list<pair<kt, nat> > shrt,
+                                         int uplim)
+  requires true == forall(shrt, (upper_limit)(uplim));
+  ensures true == forall(advance_acc(shrt), (upper_limit)(uplim - 1));
+  {
+    switch(shrt) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+        }
+        advance_acc_lower_limit(t, uplim);
+    }
+  }
+
+  lemma void upper_limit_nonpos_no_tail<kt>(list<pair<kt, nat> > shrt,
+                                            int uplim)
+  requires uplim <= 0 &*&
+           true == forall(shrt, (upper_limit)(uplim));
+  ensures shrt == nil;
+  {
+    switch(shrt) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+        }
+    }
+  }
+
+  lemma void short_chains_dont_matter<kt>(list<pair<kt, nat> > shrt,
+                                          list<pair<kt, nat> > acc,
+                                          list<bucket<kt> > buckets,
+                                          int uplim, int index)
+  requires true == forall(shrt, (upper_limit)(uplim)) &*&
+           uplim <= index &*&
+           index < length(buckets);
+  ensures get_crossing_chains_rec_fp(append(shrt, acc), buckets, index) ==
+          get_crossing_chains_rec_fp(acc, buckets, index);
+  {
+    switch(buckets) {
+      case nil:
+        upper_limit_nonpos_no_tail(shrt, uplim);
+      case cons(h,t):
+        if (index == 0) {
+          upper_limit_nonpos_no_tail(shrt, uplim);
+        } else {
+          append_at_next_commute(shrt, acc, h);
+          advance_acc_lower_limit(shrt, uplim);
+          short_chains_dont_matter(advance_acc(shrt),
+                                   acc_at_next_bucket(acc, h),
+                                   t, uplim - 1, index - 1);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void buckets_ok_get_wraparound_idemp<kt>(list<bucket<kt> > buckets)
+  requires true == buckets_ok(buckets) &*& buckets != nil;
+  ensures get_wraparound(nil, buckets) ==
+          get_wraparound(get_wraparound(nil, buckets), buckets);
+  {
+    buckets_ok_acc_bounded(buckets);
+    short_chains_dont_matter(get_wraparound(nil, buckets), nil,
+                             buckets, length(buckets) - 1, length(buckets) - 1);
+    wraparound_is_last_crossing_chains(nil, buckets);
+    wraparound_is_last_crossing_chains(get_wraparound(nil, buckets), buckets);
   }
   @*/
 
@@ -590,7 +694,7 @@ int loop(int k, int capacity)
                                                     fixpoint (kt,int) hash,
                                                     kt k)
   requires true == key_chains_start_on_hash_fp(buckets, shift, capacity, hash) &*&
-           true == buckets_ok_rec(acc, buckets, capacity) &*&
+           true == buckets_ok_rec(acc, buckets, capacity - 1) &*&
            false == mem(k, map(fst, acc)) &*&
            0 <= shift &*& shift <= loop_fp(hash(k), capacity) &*&
            0 < capacity &*&
@@ -611,13 +715,14 @@ int loop(int k, int capacity)
             switch(bh) { case bucket(chains): }
             overshoot_bucket(bt, shift+1, capacity, hash, k);
             if (bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift, buckets))) {
-              
             } else {
               assert false;
             }
           } else {
             if (bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity) - shift, buckets))) {
-              in_this_bucket_then_in_the_map(acc, buckets, loop_fp(hash(k), capacity) - shift, k);
+              in_this_bucket_then_in_the_map(acc, buckets,
+                                             loop_fp(hash(k), capacity) - shift,
+                                             k, capacity - 1);
               assert false;
             } else {
 
@@ -904,15 +1009,17 @@ int loop(int k, int capacity)
 
 /*@
 
-  lemma void up_to_nth_uncons<kt>(kt hd, list<kt> tl, fixpoint (kt, bool) prop)
-  requires true == up_to(succ(nat_of_int(length(tl))),
-                         (nthProp)(cons(hd,tl), prop));
-  ensures true == up_to(nat_of_int(length(tl)), (nthProp)(tl, prop)) &*&
+  lemma void up_to_nth_uncons<kt>(kt hd, list<kt> tl,
+                                  nat n, fixpoint (kt, bool) prop)
+  requires true == up_to(succ(n),
+                         (nthProp)(cons(hd,tl), prop)) &*&
+           int_of_nat(n) <= length(tl);
+  ensures true == up_to(n, (nthProp)(tl, prop)) &*&
           true == prop(hd);
   {
-    shift_for_all(cons(hd,tl), prop, 1, length(tl)+1, nat_of_int(length(tl)));
-    shift_for_append(cons(hd,nil), tl, prop, nat_of_int(length(tl)));
-    up_to_covers_x(nat_of_int(length(tl)+1), (nthProp)(cons(hd,tl), prop), 0);
+    shift_for_all(cons(hd,tl), prop, 1, int_of_nat(succ(n)), n);
+    shift_for_append(cons(hd,nil), tl, prop, n);
+    up_to_covers_x(succ(n), (nthProp)(cons(hd,tl), prop), 0);
   }
 
   lemma void no_key_found<kt>(list<option<kt> > ks, kt k)
@@ -922,7 +1029,7 @@ int loop(int k, int capacity)
     switch(ks){
       case nil: return;
       case cons(h,t):
-        up_to_nth_uncons(h, t, (not_my_key)(k));
+        up_to_nth_uncons(h, t, nat_of_int(length(t)), (not_my_key)(k));
         no_key_found(t, k);
     }
   }
@@ -952,12 +1059,60 @@ int loop(int k, int capacity)
   @*/
 
 /*@
+  lemma void nozero_no_current_key<kt>(list<pair<kt, nat> > acc)
+  requires false == mem(zero, get_just_tails(acc));
+  ensures get_current_key_fp(acc) == none;
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(k,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              nozero_no_current_key(t);
+          }
+        }
+    }
+  }
+
+  lemma void advance_acc_preserves_key<kt>(list<pair<kt, nat> > acc, kt key)
+  requires true == distinct(get_just_tails(acc)) &*& get_current_key_fp(acc) != some(key);
+  ensures mem(key, map(fst, acc)) == mem(key, map(fst, advance_acc(acc)));
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(k,dst):
+          switch(dst) {
+            case zero:
+              nozero_no_current_key(t);
+              assert get_current_key_fp(t) == none;
+              if (k == key) {
+              } else {
+                advance_acc_preserves_key(t, key);
+              }
+            case succ(n):
+              assert get_current_key_fp(t) == get_current_key_fp(acc);
+              if (k == key) {
+              } else {
+                advance_acc_preserves_key(t, key);
+              }
+          }
+        }
+    }
+  }
+
   lemma void next_cell_keeps_keys<kt>(list<pair<kt, nat> > acc, bucket<kt> b, kt k)
   requires true == mem(k, map(fst, acc)) &*&
-           get_current_key_fp(acc) != some(k);
+           get_current_key_fp(acc) != some(k) &*&
+           true == distinct(get_just_tails(acc));
   ensures true == mem(k, map(fst, acc_at_next_bucket(acc, b)));
   {
-    assume(false);//TODO
+    switch(b) { case bucket(chains):
+      advance_acc_preserves_key(acc, k);
+      map_append(fst, advance_acc(acc), chains);
+    }
   }
   @*/
 
@@ -969,11 +1124,27 @@ int loop(int k, int capacity)
   requires true == up_to(i,
                          (nthProp)(buckets_get_keys_rec_fp(acc, buckets),
                                    (not_my_key)(k))) &*&
-           true == mem(k, map(fst, acc));
+           true == mem(k, map(fst, advance_acc(acc))) &*&
+           int_of_nat(i) <= length(buckets);
   ensures true == mem(k, map(fst, get_crossing_chains_rec_fp(acc, buckets,
                                                              int_of_nat(i))));
   {
-    assume(false);//TODO
+    switch(buckets) {
+      case nil:
+      case cons(bh,bt):
+        switch(i) {
+          case zero:
+            switch(bh) { case bucket(chains):
+              map_append(fst, advance_acc(acc), chains);
+            }
+          case succ(n):
+            buckets_keys_chns_same_len_rec(acc, buckets);
+            assert buckets_get_keys_rec_fp(acc, buckets) == cons(?bgkh, ?bgkt);
+            up_to_nth_uncons(bgkh, bgkt, n, (not_my_key)(k));
+            next_cell_keeps_keys(advance_acc(acc), bh, k);
+            next_i_cells_keep_keys(bt, n, k, acc_at_next_bucket(acc, bh));
+        }
+    }
   }
   @*/
 
@@ -1118,6 +1289,7 @@ int loop(int k, int capacity)
            0 <= start &*&
            start < length(buckets) &*&
            buckets != nil &*&
+           true == buckets_ok(buckets) &*&
            length(buckets) == capacity &*&
            true == up_to(nat_of_int(i),
                          (byLoopNthProp)(buckets_get_keys_fp(buckets),
@@ -1132,18 +1304,25 @@ int loop(int k, int capacity)
       break_down_up_to_by_loop(buckets_get_keys_fp(buckets), i, start, capacity, (not_my_key)(k));
       //assume( true == mem(k, map(fst, get_wraparound(nil, buckets))));
       crossing_chains_keep_key_inbound(buckets, nat_of_int(capacity - start - 1), start, capacity, k);
-      wraparound_is_last_crossing_chains(nil, buckets);
+      wraparound_is_last_crossing_chains(get_wraparound(nil, buckets), buckets);
+      assert get_wraparound(get_wraparound(nil, buckets), buckets) == get_crossing_chains_fp(buckets, length(buckets) - 1);
       loop_bijection(capacity - 1, capacity);
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
                                                             loop_fp(start + int_of_nat(nat_of_int(capacity - start - 1)),
                                                                     capacity))));
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
-      loop_fp(capacity - 1,
-      capacity))));
+                                                            loop_fp(capacity - 1,
+                                                                    capacity))));
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity -1)));
+      buckets_ok_get_wraparound_idemp(buckets);
+
       assert get_wraparound(nil, buckets) == get_wraparound(get_wraparound(nil, buckets), buckets);
+      assert get_wraparound(nil, buckets) == get_crossing_chains_fp(buckets, capacity - 1);
+      assert true == mem(k, map(fst, get_wraparound(get_wraparound(nil, buckets), buckets)));
+
       assert true == mem(k, map(fst, get_wraparound(nil, buckets)));
       next_i_cells_keep_keys(buckets, nat_of_int(start + i - capacity + 1), k, get_wraparound(nil, buckets));
+      assert loop_fp(start + i, capacity) == (start + i - capacity + 1);
     } else {
       crossing_chains_keep_key_inbound(buckets, nat_of_int(i), start, capacity, k);
     }
