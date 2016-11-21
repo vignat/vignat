@@ -238,7 +238,8 @@ int main() {
   return 0;
 }
 \end{lstlisting}
-  \caption{Original implementation of the Drop protocol}
+  \caption{Original implementation of the Drop protocol. Contains an infinite
+    loop and a latent ring implementation}
   \label{lst:orig}
 \end{figure}
 
@@ -264,8 +265,8 @@ the library provides a packet ring with a simple interface: \code{bool
   ring_push_back(ring*, packet* src)} adds packet \code{src} to the ring, and
 \code{void ring_pop_front(ring*, packet* dst)} removes a packet from the ring
 and places it in \code{dst}. Fig.\ref{lst:vigor} shows the resulting NF code.
-\code{VIGOR_CHECK} adds additional property that we would like to verify ---
-that we do not forward packets with port 9.
+\code{VIGOR_CHECK} (line NN) adds additional property that we would like to
+verify --- that we do not forward packets with port 9.
 
 \begin{figure}[h!]
 \begin{lstlisting}
@@ -289,7 +290,9 @@ int main(int argc, char** argv) {
   return 0;
 }
 \end{lstlisting}
-  \caption{Vigor implementation of Drop protocol.}
+  \caption{Vigor implementation of Drop protocol. \code{LOOP} labels the
+    infinite loop head and we explicitly use a ring from the Vigor library.
+    \code{VIGOR_CHECK} at the line NN adds a semantic property to be verified.}
   \label{lst:vigor}
 \end{figure}
 
@@ -318,15 +321,16 @@ packet_constraints(struct packet* p) {
   return p->port != 9;
 }
 \end{lstlisting}
-  \caption{Custom definitions capturing the desired property.}
+  \caption{Custom definitions capturing the desired property. They capture the
+    essential property of every packet in the ring.}
   \label{lst:customizations}
 \end{figure}
 
 Currently, we have to duplicate the packet condition in two languages (formal
-logic, and C) due to the limitations of our prototype.
+logic -lines NN, and C - NN) due to the limitations of our prototype.
 
-{\bf Step 4: Run Vigor checker.} Vigor will find the appropriate symbolic model,
-check that the application does not crash in any execution scenario. It will
+{\bf Step 4: Run Vigor checker.} Vigor will find the appropriate symbolic model
+and check that the application does not crash in any execution scenario. It will
 then make sure that the chosen model is faithful to the formally proven
 implementation of the component.
 
@@ -372,10 +376,13 @@ loop gives rise to an infinite number of paths.
 
 Vigor transforms infinite loops using loop
 invariants~\cite[\S~2.1]{cormen2009introduction}. We added to KLEE support for
-automatic havoc-ing~\cite{barnett2005boogie} (replace all variables changed in
-the loop with unconstrained symbols). The step 1 enables Vigor to reduce each
-problematic loop to a single generalized iteration that allows reasoning in one
-pass.
+automatic havoc-ing~\cite{barnett2005boogie}. Havoc-ing simply replaces all the
+variables that may change in the loop by unconstrained symbols at the beginning
+of the iteration. In our example that would be the variables \code{begin} and
+\code{queue_len} and the contents of \code{packets[0..CAP]}, but not the value
+of the \code{packets} pointer because it never changes. The step 1 enables
+Vigor to reduce each problematic loop to a single generalized iteration that
+allows reasoning in one pass.
 
 This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 sec to exhaustively SE the code; for \code{CAP=30} it takes 15 min, for
@@ -389,6 +396,11 @@ symbolic pointer or index could be referencing many different possible
 locations. The complexity of the constraints chokes the SMT solver, and the SEE
 grinds to a halt. In general, SE doesn't work for code with symbolic pointers or
 offsets. Alas, stateful C code almost always has some of these.
+
+In this example the symbolic indexing comes from the ring array. Once we
+replaced the infinite loop with a single iteration we have to assume (remember
+havoc-ing) the \code{begin} and \code{begin + queue_len} indexes may point
+anywhere in the array.
 
 In Vigor, we circumvent the problem of symbolic indexing by encapsulating program
 state into well-defined data structures and putting them into a ``library of
@@ -446,7 +458,11 @@ void ring_pop_front(struct ring* r,
   }
 }
 \end{lstlisting}
-  \caption{A formal contract and verified implementation of the \code{ring_pop_front} function.}
+  \caption{A formal contract and verified implementation of the
+    \code{ring_pop_front} function. The comments starting with \code{@} symbol
+    are formal annotations that hold the function contract (\code{requires} -
+    precondition, \code{ensures} - postcondition) and lemmas that help the proof
+    checker to verify the state transformations in the code.}
   \label{lst:contract}
 \end{figure}
 
@@ -483,7 +499,8 @@ void ring_pop_front(struct ring* r,
   ASSUME(packet_constraints(p));
 }
 \end{lstlisting}
-  \caption{A symbolic model for \code{ring_pop_front}.}
+  \caption{A symbolic model for \code{ring_pop_front}. It fills symbolically the
+    a packet and adds a constraint to it.}
   \label{lst:symbolic-model}
 \end{figure}
 
@@ -508,7 +525,7 @@ each call sequence.
 
 You can see one of the generated call sequences on Fig.~\ref{lst:call-sequence}.
 It starts with \code{loop_invariant_produce} that marks the beginning of a loop
-iteration. It continues then with calls to \code{ring_full} \code{ring_empty},
+iteration. It continues then with calls to \code{ring_full} and \code{ring_empty},
 noting (with \code{assume}) that both return \code{false}. The seqeunce ends
 with a call to \code{ring_pop_front}. The last line detects underapproximation
 of the model output.
@@ -532,7 +549,8 @@ ring_pop_front(arg1, &(arg2));
 
 /*@ assert(arg2.port != 9); @*/
 \end{lstlisting}
-  \caption{A call sequence, produced by SEE.}
+  \caption{A call sequence, produced by SEE. Vigor adds formal annotations to
+    constrain the execution space.}
   \label{lst:call-sequence}
 \end{figure}
 
@@ -558,7 +576,8 @@ void ring_pop_front(struct ring* r,
   // No constraints on the packet port here.
 }
 \end{lstlisting}
-  \caption{An overapproximate ring model fragment.}
+  \caption{An overapproximate ring model fragment. It does not add the
+    constraint necessary for the code to verify.}
   \label{lst:overapproximate}
 \end{figure}
 
@@ -569,7 +588,9 @@ void ring_pop_front(struct ring* r,
   p->port = 0;
 }
 \end{lstlisting}
-  \caption{An underapproximate ring model fragment.}
+  \caption{An underapproximate ring model fragment. Instead of returning a
+    constrained symbolic packet, it simply returns some particular packet, which
+    clearly can not capture what the real ring would return on its place.}
   \label{lst:underapproximate}
 \end{figure}
 
