@@ -17,16 +17,18 @@
 }
 
 \lstset{language=C,
-    basicstyle=\footnotesize\ttfamily,
-    keywordstyle=\color{myblue}\ttfamily,
-    stringstyle=\color{mygreen}\ttfamily,
-    commentstyle=\color{gray}\ttfamily,
-    keepspaces=true,
-    tabsize=2,
-    otherkeywords={bool},
-    numbers=left,
-    numbersep=1pt,
-    numberstyle=\tiny\color{gray}
+  escapechar=^,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\color{myblue}\ttfamily,
+  stringstyle=\color{mygreen}\ttfamily,
+  commentstyle=\color{gray}\ttfamily,
+  keepspaces=true,
+  columns=flexible,
+  tabsize=2,
+  otherkeywords={bool},
+  numbers=left,
+  numbersep=1pt,
+  numberstyle=\tiny\color{gray}
 }
 
 \newcommand{\code}[1]{\lstinline{#1}}
@@ -214,48 +216,89 @@ when developing NFs. For the sake of illustration, say we wish to develop a
 trivial stateful NF that implements the discard protocol~\cite{rfc863}: an
 infinite loop receives packets from one interface, discards the ones that target
 port 9 (``discard port''), and forwards the others through another interface.
+A possible implementation is on the Fig.~\ref{lst:orig}.
 
 \begin{figure}[h!]
 \begin{lstlisting}
 #define CAP 512
 
 int main() {
-  struct packet packets[CAP] = {};
-  int begin = 0, queue_len = 0;
+  struct packet packets[CAP] = {}; ^\label{line:pkt-def}^
+  int begin = 0, queue_len = 0; ^\label{line:iter-def}^
 
-  while(1) {
+  while(1) {^\label{line:loop-begin}^
     if (queue_len < CAP) {
       int end = (begin + queue_len)%CAP;
-      if (receive_packet(&packets[end]) &&
+      if (receive_packet(&packets[end]) && ^\label{line:recv-pkt}^
           packets[end].port != 9)
         queue_len += 1;
     }
-    if (0 < queue_len) {
-      send_packet(&packets[begin]);
+    if (0 < queue_len && can_send_packet()) { ^\label{line:can-send}^
+      send_packet(&packets[begin]); ^\label{line:send-pkt}^
       begin = (begin + 1)%CAP;
     }
-  }
+  }^\label{line:loop-end}^
   return 0;
 }
 \end{lstlisting}
   \caption{Original implementation of the Drop protocol. Contains an infinite
-    loop and a latent ring implementation}
+    loop (l.\ref{line:loop-begin}-\ref{line:loop-end}) and a latent ring
+    implementation (declared on l.\ref{line:pkt-def},\ref{line:iter-def})}
   \label{lst:orig}
 \end{figure}
 
-In order to absorb bursts, the code employs a ring buffer. The interface to the
-network is: \code{bool receive_packet(struct packet* dst)}, which non-blockingly
-reads an inbound packet and stores it at \code{dst}, returning success or
-failure; \code{bool can_send_packet()}, which checks if a new packet can be
-sent; and \code{void send_packet(struct packet* src)}, which sends the packet
-stored at \code{src}. The application follows a common practice: it consists of a
-main event loop, it has no other complex loops, and it uses a ring, a popular
-data structure in network programming.
+In order to absorb bursts, the code employs a ring buffer. The application
+interacts with the network using the following 3 functions:
+\code{receive_packet}(l.\ref{line:recv-pkt}), which non-blockingly reads an
+inbound packet and stores it at \code{packets[end]}, returning success or
+failure; \code{can_send_packet}(l.\ref{line:can-send}), which checks if a new
+packet can be sent; and \code{send_packet}(l.\ref{line:send-pkt}), which sends
+the packet stored at \code{packets[begin]}. The application follows a common
+practice: it consists of a main event loop, it has no other complex loops, and
+it uses a ring, a popular data structure in network programming.
+
+The ring keeps the state of our NF and makes many existing verification
+approaches impractical.
+
+Fig.~\ref{lst:vigor} shows the actual code that we are going to verify. The
+first two steps show how we get there. \code{VIGOR_CHECK}
+(l.~\ref{line:vigcheck}) adds additional property that we would like to verify
+--- that we do not forward packets with port 9.
+
+\begin{figure}[h!]
+\begin{lstlisting}
+int main(int argc, char** argv) {
+  struct packet p;
+  struct ring *r = ring_create(CAP);^\label{line:mk-ring}^
+  if (!r) return 1;
+  while(LOOP(1))^\label{line:loop-hd}^
+  {
+    loop_iteration_begin(&r);
+    if (!ring_full(r))
+      if (receive_packet(&p) && p.port != 9)
+        ring_push_back(r, &p);
+    if (!ring_empty(r) && can_send_packet()) {
+      ring_pop_front(r, &p);
+      VIGOR_CHECK(p.port != 9);^\label{line:vigcheck}^
+      send_packet(&p);
+    }
+    loop_iteration_end(&r);
+  }
+  return 0;
+}
+\end{lstlisting}
+  \caption{Vigor implementation of Drop protocol.
+    \code{LOOP}(l.\ref{line:loop-hd}) labels the infinite loop head and we
+    explicitly use a ring(l.\ref{line:mk-ring}) from the Vigor library. \code{VIGOR_CHECK} at the
+    line \ref{line:vigcheck} adds a semantic property to be verified.}
+  \label{lst:vigor}
+\end{figure}
 
 {\bf Step 1: Label infinite loops.} Our approach requires special handling of
 infinite loops in the application code. A developer puts a label \code{LOOP}
-into the condition in order to designate the potentially infinite loop. For a
-typical NF there should be only a handful or them (1 in our example).
+(l.\label{line:loophd}) into the condition in order to designate the
+potentially infinite loop. For a typical NF there should be only a handful or
+them (1 in our example).
 
 {\bf Step 2: Use library components. } A developer replaces every array with a
 component from Vigor library that performs the same function. For our example,
@@ -264,37 +307,8 @@ the library provides a packet ring with a simple interface: \code{bool
   ring_full(ring*)} checks whether the ring has run out of space, \code{void
   ring_push_back(ring*, packet* src)} adds packet \code{src} to the ring, and
 \code{void ring_pop_front(ring*, packet* dst)} removes a packet from the ring
-and places it in \code{dst}. Fig.\ref{lst:vigor} shows the resulting NF code.
-\code{VIGOR_CHECK} (line NN) adds additional property that we would like to
-verify --- that we do not forward packets with port 9.
+and places it in \code{dst}.
 
-\begin{figure}[h!]
-\begin{lstlisting}
-int main(int argc, char** argv) {
-  struct packet p;
-  struct ring *r = ring_create(CAP);
-  if (!r) return 1;
-  while(LOOP(1))
-  {
-    loop_iteration_begin(&r);
-    if (!ring_full(r))
-      if (receive_packet(&p) && p.port != 9)
-        ring_push_back(r, &p);
-    if (!ring_empty(r) && can_send_packet()) {
-      ring_pop_front(r, &p);
-      VIGOR_CHECK(p.port != 9);
-      send_packet(&p);
-    }
-    loop_iteration_end(&r);
-  }
-  return 0;
-}
-\end{lstlisting}
-  \caption{Vigor implementation of Drop protocol. \code{LOOP} labels the
-    infinite loop head and we explicitly use a ring from the Vigor library.
-    \code{VIGOR_CHECK} at the line NN adds a semantic property to be verified.}
-  \label{lst:vigor}
-\end{figure}
 
 {\bf Step 3: Provide invariants.} Besides usual parameters, like capacity or
 element size, most Vigor components also require simple logical invariants of
@@ -308,31 +322,34 @@ Fig.~\ref{lst:customizations}.
 #define CAP 512
 #define RING_CAPACITY CAP
 
-/*@
+/*@^\label{line:vf-user-prop-from}^
   fixpoint bool
   user_property(packet p) {
     switch(p) { case packet(port):
                   return port != 9; }
   }
-  @*/
+  @*/^\label{line:vf-user-prop-to}^
 
-static bool
+static bool^\label{line:c-user-prop-from}^
 packet_constraints(struct packet* p) {
   return p->port != 9;
-}
+}^\label{line:c-user-prop-to}^
 \end{lstlisting}
   \caption{Custom definitions capturing the desired property. They capture the
-    essential property of every packet in the ring.}
+    essence of every packet in the ring. Currently, we have to duplicate the
+    packet condition in two languages (formal logic --
+    ll\ref{line:vf-user-prop-from}-\ref{line:vf-user-prop-to}, and C --
+    ll\ref{line:c-user-prop-from}-\ref{line:c-user-prop-to}) due to the
+    limitations of our prototype.}
   \label{lst:customizations}
 \end{figure}
 
-Currently, we have to duplicate the packet condition in two languages (formal
-logic -lines NN, and C - NN) due to the limitations of our prototype.
 
 {\bf Step 4: Run Vigor checker.} Vigor will find the appropriate symbolic model
 and check that the application does not crash in any execution scenario. It will
 then make sure that the chosen model is faithful to the formally proven
-implementation of the component.
+implementation of the component. \S\ref{sec:under-the-hood} provides more
+details on how it is done.
 
 {\bf Step 5: Link the NF code with the verified library} of components. The
 resulting executable is guaranteed to be free of crashes, and hold the
@@ -340,7 +357,7 @@ properties formulated in \code{VIGOR_CHECK}, subject to the assumptions listed
 in~\S\ref{sec:limitations}.
 
 \subsection{Under the hood}
-
+\label{sec:under-the-hood}
 
 To verify that this NF does not crash, one could use the approach of Dobrescu et
 al.~\cite{dobrescu2014software} and run exhaustive symbolic execution. The
@@ -437,32 +454,36 @@ Here is an example of the proven specification for the function
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
                     struct packet* p)
-/*@ requires ringp(r, ?user_property,
+/*@ requires ringp(r, ?user_property,^\label{line:precondition-from}^
                    ?lst, ?cap) &*&
-             lst != nil &*& packetp(p, _); @*/
-/*@ ensures ringp(r, user_property,
+             lst != nil &*& packetp(p, _); @*/^\label{line:precondition-to}^
+/*@ ensures ringp(r, user_property,^\label{line:postcondition-from}^
                   tail(lst), cap) &*&
             packetp(p, head(lst)) &*&
-            true == user_property(head(lst)); @*/
+            true == user_property(head(lst)); @*/^\label{line:postcondition-to}^
 {
-  //@ extract_first(r);
+  //@ extract_first(r); ^\label{line:lemma1}^
   struct packet* src_pkt = r->array + r->begin;
   p->port = src_pkt->port;
   r->len = r->len - 1;
   r->begin = r->begin + 1;
   if (r->cap <= r->begin) {
     r->begin = 0;
-    //@ stitch_with_empty_overflow(r);
+    //@ stitch_with_empty_overflow(r);^\label{line:lemma2}^
   } else {
-    //@ stitch_with_empty(r);
+    //@ stitch_with_empty(r);^\label{line:lemma3}^
   }
 }
 \end{lstlisting}
   \caption{A formal contract and verified implementation of the
     \code{ring_pop_front} function. The comments starting with \code{@} symbol
-    are formal annotations that hold the function contract (\code{requires} -
-    precondition, \code{ensures} - postcondition) and lemmas that help the proof
-    checker to verify the state transformations in the code.}
+    are formal annotations that hold the function contract
+    (\code{requires}(ll.\ref{line:precondition-from}-\ref{line:precondition-to})
+    - precondition,
+    \code{ensures}(ll.\ref{line:postcondition-from}-\ref{line:postcondition-to})
+    - postcondition) and
+    lemmas(ll.\ref{line:lemma1},\ref{line:lemma2},\ref{line:lemma3}) that help
+    the proof checker to verify the state transformations in the code.}
   \label{lst:contract}
 \end{figure}
 
@@ -515,7 +536,7 @@ this appear in \S\ref{sec:design}.
 
 A model of \code{ring_pop_front} used for this example is shown on
 Fig.~\ref{lst:symbolic-model}. This model is simple enough to enable
-exhaustive SE, but preserves the vital propertiy --- \code{packet_constraints}
+exhaustive SE, but preserves the vital property --- \code{packet_constraints}
 (Fig.\ref{lst:customizations}).
 
 To validate the model fit for the particular use case, SEE dumps all the call
@@ -562,7 +583,9 @@ This happens in the last line on the listing. The assert contains the
 path-constraint generated by the symbolic model. In this case the contract
 (Fig.\ref{lst:contract}) guarantees that the popped packet satisfies
 \code{user_property} that entails \code{arg2.port != 9}, hence the trace is
-ligitimate. (see~\S\ref{sec:model-validation-criteria}).
+legitimate. (see~\S\ref{sec:model-validation-criteria}).
+
+\subsection{Misfit symptoms}
 
 Consider potential model mismatches. Suppose we had an overapproximate model ---
 Fig.~\ref{lst:overapproximate}. Then the \code{VIGOR_CHECK}
