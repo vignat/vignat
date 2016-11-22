@@ -1192,6 +1192,19 @@ int loop(int k, int capacity)
   @*/
 
 /*@
+  lemma void upToByLoopNthPropShiftN<t>(nat i, int shift, list<t> l,
+                                        fixpoint (t,bool) prop,
+                                        int capacity, int start)
+  requires int_of_nat(i) + shift < capacity &*&
+           0 <= shift &*& shift <= start &*&
+           true == up_to(i, (byLoopNthProp)(l, prop, capacity, start));
+  ensures true == up_to(i, (byLoopNthProp)(drop(shift, l), prop, capacity, start - shift));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
   lemma void upToNthPropShift1<t>(nat n, t hd, list<t> tl, fixpoint (t,bool) prop)
   requires true;
   ensures up_to(succ(n), (nthProp)(cons(hd, tl), prop)) ==
@@ -1303,7 +1316,7 @@ int loop(int k, int capacity)
            true == up_to(nat_of_int(i),
                          (byLoopNthProp)(lst, prop, capacity, start));
   ensures true == up_to(nat_of_int(capacity - start),
-                        (nthProp)(lst, prop, capacity, start)) &*&
+                        (byLoopNthProp)(lst, prop, capacity, start)) &*&
           true == up_to(nat_of_int(start + i - capacity),
                         (nthProp)(lst, prop));
   {
@@ -1339,32 +1352,28 @@ int loop(int k, int capacity)
       crossing_chains_keep_key_inbound(buckets, nat_of_int(capacity - start), start, capacity, k);
       wraparound_is_last_crossing_chains(get_wraparound(nil, buckets), buckets);
       assert get_wraparound(get_wraparound(nil, buckets), buckets) == get_crossing_chains_fp(buckets, length(buckets));
-      loop_bijection(capacity - 1, capacity);
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
-                                                            loop_fp(start + int_of_nat(nat_of_int(capacity - start)),
-                                                                    capacity))));
-      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
-                                                            loop_fp(capacity - 1,
-                                                                    capacity))));
-      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity -1)));
+                                                            start + int_of_nat(nat_of_int(capacity - start)))));
+      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)));
       buckets_ok_get_wraparound_idemp(buckets);
 
       assert get_wraparound(nil, buckets) == get_wraparound(get_wraparound(nil, buckets), buckets);
       assert get_wraparound(nil, buckets) == get_crossing_chains_fp(buckets, capacity);
-      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity - 1)));
 
-      assume(get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k)); //TODO
-      assert get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k);
-      assume(mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)))); //TODO
+      //assume(get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k)); //TODO
+      //assert get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k);
+      //assume(mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)))); //TODO
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)));
       assert true == mem(k, map(fst, get_wraparound(get_wraparound(nil, buckets), buckets)));
 
       assert true == mem(k, map(fst, get_wraparound(nil, buckets)));
       next_i_cells_keep_keys(buckets, nat_of_int(start + i - capacity), k, get_wraparound(nil, buckets), capacity);
+      loop_injection(start + i - capacity, capacity);
+      loop_bijection(start + i - capacity, capacity);
       assert loop_fp(start + i, capacity) == (start + i - capacity);
     } else {
       crossing_chains_keep_key_inbound(buckets, nat_of_int(i), start, capacity, k);
-      loop_bijection(start + int_of_nat(i), capacity);
+      loop_bijection(start + i, capacity);
     }
   }
   @*/
@@ -1384,7 +1393,7 @@ int loop(int k, int capacity)
                                          start)) &*&
            true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash) &*&
            true == buckets_ok(buckets) &*&
-           0 <= i &*&
+           0 <= i &*& i < capacity &*&
            0 <= start &*&
            start < capacity &*&
            capacity == length(buckets) &*&
