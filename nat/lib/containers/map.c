@@ -22,8 +22,8 @@
       case cons(h,t):
         return switch(h) { case pair(key,distance):
             return switch(distance) {
-            case zero: return advance_acc(t);
-            case succ(n): return cons(pair(fst(h), n), advance_acc(t));
+              case zero: return advance_acc(t);
+              case succ(n): return cons(pair(fst(h), n), advance_acc(t));
           };
         };
     }
@@ -1594,10 +1594,73 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+/*@
+  fixpoint list<int> add_partial_chain_rec_fp<kt>(list<int> chain_cnts,
+                                                  int start,
+                                                  int len) {
+    switch(chain_cnts) {
+      case nil:
+        return nil;
+      case cons(h,t):
+        return (start == 0)                                         ?
+                ((len == 0) ? cons(h-1, t) :
+                  cons(h-1, add_partial_chain_rec_fp(t, 0, len-1))) :
+                cons(h,add_partial_chain_rec_fp(t, start-1, len));
+    }
+  }
+
+  fixpoint list<int> add_partial_chain_fp(int start,
+                                          int len,
+                                          list<int> chain_cnts) {
+    return (length(chain_cnts) < len + start)      ?
+      add_partial_chain_rec_fp
+        (add_partial_chain_rec_fp
+           (chain_cnts, start, len),
+         0,
+         len + start - length(chain_cnts)) :
+      add_partial_chain_rec_fp(chain_cnts, start, len);
+  }
+
+  fixpoint nat chain_with_key_fp<kt>(list<pair<kt,nat> > chains, kt k) {
+    switch(chains) {
+      case nil: return zero;
+      case cons(h,t):
+        return switch(h) { case pair(key,len):
+          return (key == k) ? len :
+                    chain_with_key_fp(t, k);
+        };
+    }
+  }
+
+  fixpoint nat bucket_get_chain_fp<kt>(bucket<kt> b, kt k) {
+    switch(b) { case bucket(chains):
+      return chain_with_key_fp(chains, k);
+    }
+  }
+
+  fixpoint int buckets_get_chain_fp<kt>(list<bucket<kt> > buckets,
+                                        kt k,
+                                        int start) {
+    return int_of_nat(bucket_get_chain_fp(nth(start, buckets), k));
+  }
+  @*/
+
+/*@
+  lemma void buckets_remove_add_one_chain<kt>(list<bucket<kt> > buckets,
+                                              int start, kt k)
+  requires true == bucket_has_key_fp(k, nth(start, buckets));
+  ensures buckets_get_chns_fp(buckets) ==
+          add_partial_chain_fp
+            (start, buckets_get_chain_fp(buckets, k, start),
+             buckets_get_chns_fp(buckets_remove_key_fp(buckets,
+                                                       k)));
+  {
+    assume(false);//TODO
+  }
+  @*/
 static
 int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                                       int* k_hashes, int* chns,
-                                      int start,
                                       void* keyp, map_keys_equality* eq,
                                       int key_hash,
                                       int capacity,
@@ -1607,7 +1670,6 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
-             0 <= start &*& start < capacity &*&
              [?f]is_map_keys_equality<kt>(eq, kpr) &*&
              true == hmap_exists_key_fp(hm, k)
              &*& *keyp_out |-> _; @*/
@@ -1628,6 +1690,13 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
   int i = 0;
+  int start = loop(key_hash, capacity);
+  //@ buckets_keys_chns_same_len(buckets);
+  //@ assert true == hmap_exists_key_fp(hm, k);
+  //@ assert true == hmap_exists_key_fp(buckets_get_hmap_fp(buckets, hsh), k);
+  //@ assert start == loop_fp(hsh(k), capacity);
+  //@ key_is_contained_in_the_bucket(buckets, capacity, hsh, k);
+  //@ buckets_remove_add_one_chain(buckets, start, k);
   for (; i < capacity; ++i)
     /*@ invariant pred_mapping(kps, bbs, kpr, ks) &*&
                   ints(busybits, capacity, bbs) &*&
@@ -1640,6 +1709,11 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                   hsh(k) == key_hash &*&
                   true == hash_list(ks, khs, hsh) &*&
                   *keyp_out |-> _ &*&
+                  chnlist ==
+                    add_partial_chain_fp
+                      (start + i, buckets_get_chain_fp(buckets, k, start) - i,
+                       buckets_get_chns_fp(buckets_remove_key_fp(buckets,
+                                                                 k))) &*&
                   true == up_to(nat_of_int(i),
                                 (byLoopNthProp)(ks, (not_my_key)(k),
                                                 capacity, start));
@@ -1669,16 +1743,22 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
         /*@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes,
                                hmap_rem_key_fp(hm, hmap_find_key_fp(hm, k)));
           @*/
+        /*@ close buckets_hmap_insync(chns, capacity,
+                                      hmap_rem_key_fp(hm,
+                                                      hmap_find_key_fp(hm, k)),
+                                      buckets_remove_key_fp(buckets, k),
+                                      hsh);
+          @*/
         return index;
       }
       //@ recover_pred_mapping(kps, bbs, ks, index);
     } else {
-      //@ assert 0 < chn;
-      chns[index] = chn - 1;
       //@ assert(length(ks) == capacity);
       //@ if (bb != 0) no_hash_no_key(ks, khs, k, index, hsh);
       //@ if (bb == 0) no_bb_no_key(ks, bbs, index);
     }
+    //@ assert 0 < chn;
+    chns[index] = chn - 1;
     //@ assert(nth(index, ks) != some(k));
     //@ assert(true == not_my_key(k, nth(index, ks)));
     //@ assert(true == not_my_key(k, nth(loop_fp(i+start,capacity), ks)));
@@ -2876,9 +2956,8 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
 {
   //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
-  int start = loop(hash, capacity);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
-  find_key_remove_chain(busybits, keyps, k_hashes, chns, start,
+  find_key_remove_chain(busybits, keyps, k_hashes, chns,
                         keyp, eq, hash, capacity, keyp_out);
   //@ hmap_exists_iff_map_has(hm, m, k);
   //@ hmapping_ks_capacity(hm, capacity);
