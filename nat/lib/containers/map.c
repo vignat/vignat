@@ -1603,7 +1603,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         return nil;
       case cons(h,t):
         return (start == 0)                                         ?
-                ((len == 0) ? cons(h-1, t) :
+                ((len == 0) ? cons(h, t) :
                   cons(h-1, add_partial_chain_rec_fp(t, 0, len-1))) :
                 cons(h,add_partial_chain_rec_fp(t, start-1, len));
     }
@@ -1998,27 +1998,99 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
     switch(ks) {
       case nil: return;
       case cons(h,t):
-        up_to_nth_uncons(h, t, cell_busy);
+        up_to_nth_uncons(h, t, nat_of_int(length(t)), cell_busy);
         full_size(t);
     }
+  }
+  @*/
+
+/*@
+  predicate buckets_hmap_insync_Xchain<kt>(int* chns, int capacity,
+                                           hmap<kt> m,
+                                           list<bucket<kt> > buckets,
+                                           fixpoint (kt,int) hash,
+                                           int start, int fin) =
+    ints(chns, capacity,
+         add_partial_chain_fp(start,
+                              (fin < start) ? capacity + fin - start :
+                                              fin - start,
+                              buckets_get_chns_fp(buckets))) &*&
+    true == buckets_ok(buckets) &*&
+    m == buckets_get_hmap_fp(buckets, hash) &*&
+    true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash);
+  @*/
+
+/*@
+  lemma void start_Xchain<kt>(int* chns, int capacity, hmap<kt> hm,
+                              list<bucket<kt> > buckets,
+                              fixpoint (kt,int) hsh,
+                              int start)
+  requires buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
+  ensures buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
+                                     start, start);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void buckets_ok_chn_bound<kt>(list<bucket<kt> > buckets,
+                                      int i)
+  requires true == buckets_ok(buckets) &*& 0 <= i &*& i < length(buckets);
+  ensures length(buckets_get_chns_fp(buckets)) == length(buckets) &*&
+          0 <= nth(i, buckets_get_chns_fp(buckets)) &*&
+          nth(i, buckets_get_chns_fp(buckets)) <= length(buckets);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void outside_part_chn_no_effect(list<int> chns, int start, int fin,
+                                        int capacity)
+  requires true;
+  ensures nth(fin, chns) ==
+          nth(fin, add_partial_chain_fp(start, (fin < start) ?
+                                                 capacity + fin - start :
+                                                 fin - start,
+                                        chns));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void Xchain_add_one(list<int> chns, list<int> orig_chns, int start,
+                            int len, int capacity)
+  requires chns == add_partial_chain_fp(start, len, orig_chns);
+  ensures update(loop_fp(start + len, capacity),
+                 nth(loop_fp(start + len, capacity), chns) + 1,
+                 chns) ==
+          add_partial_chain_fp(start, len+1, orig_chns);
+  {
+    assume(false);//TODO
   }
   @*/
 
 static
 int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
 /*@ requires hmapping<kt>(?kp, ?hsh, capacity, busybits, ?kps, ?k_hashes, ?hm) &*&
+             buckets_hmap_insync(chns, capacity, hm, ?buckets, hsh) &*&
              pointers(?keyps, capacity, kps) &*&
-             0 <= start &*& start < capacity; @*/
+             0 <= start &*& start < capacity &*&
+             hmap_size_fp(hm) < capacity; @*/
 /*@ ensures hmapping<kt>(kp, hsh, capacity, busybits, kps, k_hashes, hm) &*&
+            buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
+                                       start, result) &*&
             pointers(keyps, capacity, kps) &*&
-            (hmap_size_fp(hm) < capacity ?
-             (true == hmap_empty_cell_fp(hm, result) &*&
-              0 <= result &*& result < capacity) :
-             result == -1) ; @*/
+            true == hmap_empty_cell_fp(hm, result) &*&
+            0 <= result &*& result < capacity; @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
   //@ assert pred_mapping(kps, ?bbs, kp, ?ks);
   //@ assert hm == hmap(ks, ?khs);
+  //@ start_Xchain(chns, capacity, hm, buckets, hsh, start);
+  //@ loop_bijection(start, capacity);
   int i = 0;
   for (; i < capacity; ++i)
     /*@ invariant pred_mapping(kps, bbs, kp, ks) &*&
@@ -2028,22 +2100,74 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                   0 <= i &*& i <= capacity &*&
                   true == up_to(nat_of_int(i),
                                 (byLoopNthProp)(ks, cell_busy,
-                                                capacity, start));
+                                                capacity, start)) &*&
+                  buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
+                                             start, loop_fp(start + i, capacity));
       @*/
     //@ decreases capacity - i;
   {
     //@ pred_mapping_same_len(bbs, ks);
     int index = loop(start + i, capacity);
+    /*@ open buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
+                                        start, index);
+      @*/
+    //@ assert ints(chns, capacity, ?chnlist);
     int bb = busybits[index];
     if (0 == bb) {
       //@ zero_bbs_is_for_empty(bbs, ks, index);
       //@ close hmapping<kt>(kp, hsh, capacity, busybits, kps, k_hashes, hm);
+      /*@ close buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
+                                           start, index);
+        @*/
       return index;
     }
-    chns[index]++;
+    int chn = chns[index];
+    
+    //@ buckets_keys_chns_same_len(buckets);
+    //@ buckets_ok_chn_bound(buckets, index);
+    /*@ outside_part_chn_no_effect(buckets_get_chns_fp(buckets), start,
+                                   index, capacity);
+      @*/
+    //@ assert chn <= capacity;
+    //@ assert capacity < INT_MAX;
+    chns[index] = chn + 1;
     //@ bb_nonzero_cell_busy(bbs, ks, index);
     //@ assert(true == cell_busy(nth(loop_fp(i+start,capacity), ks)));
     //@ assert(nat_of_int(i+1) == succ(nat_of_int(i)));
+    /*@ Xchain_add_one(chnlist, buckets_get_chns_fp(buckets), start,
+                       index < start ? capacity + index - start : index - start,
+                       capacity);
+      @*/
+    /*@
+      if (index < start) {
+        if (index + 1 == capacity) {
+          assert true == (start + i + i == capacity);
+          assert true == (loop_fp(start + i + 1, capacity) == 0);
+          assert true == (loop_fp(start + i + 1, capacity) < start);
+        } else {
+          inc_modulo_loop(start + i, capacity);
+          loop_bijection(index + 1, capacity);
+          assert true == (index + 1 == loop_fp(start + i + 1, capacity));
+          assert true == (index + 1 < capacity);
+          assert true == (start + i + 1 < capacity);
+          loop_bijection(start + i + 1, capacity);
+          assert false == (loop_fp(start + i + 1, capacity) < start);
+          assert true == (capacity + index - start + 1 == (loop_fp(((start + i) + 1), capacity) < start ?
+                                                            ((capacity + loop_fp(((start + i) + 1), capacity)) - start) :
+                                                            (loop_fp(((start + i) + 1), capacity) - start)));
+        }
+        assert true == (index == loop_fp(start + i, capacity));
+        assert true == (capacity + index - start + 1 == capacity + loop_fp(start + i + 1, capacity) - start);
+      } else {
+        inc_modulo_loop(start + i, capacity);
+        assert true == (index - start + 1 == loop_fp(start + i + 1, capacity) - start);
+      } 
+      @*/
+    //@ inc_modulo_loop(start + i, capacity);
+    /*@
+        close buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
+                                         start, loop_fp(start+i+1, capacity));
+      @*/
   }
   //@ pred_mapping_same_len(bbs, ks);
   //@ by_loop_for_all(ks, cell_busy, start, capacity, nat_of_int(capacity));
