@@ -2166,7 +2166,6 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
         }
       }
       @*/
-    //@ inc_modulo_loop(start + i, capacity);
     /*@
         close buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
                                          start, loop_fp(start+i+1, capacity));
@@ -2386,6 +2385,30 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
 
   @*/
 
+/*@
+  fixpoint list<bucket<kt> > empty_buckets_fp<kt>(nat len) {
+    switch(len) {
+      case zero: return nil;
+      case succ(n):
+        return cons(bucket(nil), empty_buckets_fp<kt>(n));
+    }
+  }
+  @*/
+
+/*@
+  lemma void empty_buckets_hmap_insync<kt>(int* chns, int capacity,
+                                           list<int> khlist,
+                                           fixpoint (kt,int) hash)
+  requires ints(chns, capacity, zero_list_fp(nat_of_int(capacity)));
+  ensures buckets_hmap_insync<kt>(chns, capacity,
+                                  empty_hmap_fp(capacity, khlist),
+                                  empty_buckets_fp<kt>(nat_of_int(capacity)),
+                                  hash);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                 void** keyps, int* khs, int* chns,
                                 int* vals, int capacity)
@@ -2419,17 +2442,22 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                   pointers(keyps, capacity, kplist) &*&
                   ints(vals, capacity, vallist) &*&
                   ints(khs, capacity, khlist) &*&
+                  ints(chns, i, zero_list_fp(nat_of_int(i))) &*&
+                  ints(chns + i, capacity - i, drop(i, chnlist)) &*&
                   0 < capacity &*& 2*capacity < INT_MAX &*&
                   0 <= i &*& i <= capacity;
       @*/
     //@ decreases capacity - i;
   {
     //@ move_int(busybits, i, capacity);
+    //@ move_int(chns, i, capacity);
     //@ extend_zero_list(nat_of_int(i), head(drop(i,bbs)));
+    //@ extend_zero_list(nat_of_int(i), head(drop(i, chnlist)));
     busybits[i] = 0;
     chns[i] = 0;
     //@ assert(succ(nat_of_int(i)) == nat_of_int(i+1));
     //@ tail_drop(bbs, i);
+    //@ tail_drop(chnlist, i);
   }
   //@ assert(i == capacity);
   //@ assert(drop(i,bbs) == nil);
@@ -2441,6 +2469,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   //@ close hmapping<kt>(keyp, hash, capacity, busybits, kps, khs, empty_hmap_fp<kt>(capacity, khlist));
   //@ produce_empty_key_vals<kt,int>(vallist);
   //@ produce_empty_key_vals<kt,void*>(kplist);
+  //@ empty_buckets_hmap_insync(chns, capacity, khlist, hash);
   /*@ close mapping(empty_map_fp(), empty_map_fp(), keyp, recp,
                     hash, capacity, busybits, keyps, khs, chns, vals);
     @*/
@@ -3009,9 +3038,9 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
   int start = loop(hash, capacity);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
+  //@ hmap_map_size(hm, m);
   int index = find_empty(busybits, chns, start, capacity);
 
-  //@ hmap_map_size(hm, m);
 
   //@ open hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
   //@ assert pred_mapping(kps, ?bbs, kp, ?ks);
