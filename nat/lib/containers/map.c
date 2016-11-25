@@ -2139,29 +2139,32 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                        capacity);
       @*/
     /*@
+      if (i + 1 == capacity) {
+        by_loop_for_all(ks, cell_busy, start, capacity, nat_of_int(capacity));
+        full_size(ks);
+        assert(false);
+      }
+      @*/
+    /*@
       if (index < start) {
-        if (index + 1 == capacity) {
-          assert true == (start + i + i == capacity);
-          assert true == (loop_fp(start + i + 1, capacity) == 0);
-          assert true == (loop_fp(start + i + 1, capacity) < start);
-        } else {
-          inc_modulo_loop(start + i, capacity);
-          loop_bijection(index + 1, capacity);
-          assert true == (index + 1 == loop_fp(start + i + 1, capacity));
-          assert true == (index + 1 < capacity);
-          assert true == (start + i + 1 < capacity);
-          loop_bijection(start + i + 1, capacity);
-          assert false == (loop_fp(start + i + 1, capacity) < start);
-          assert true == (capacity + index - start + 1 == (loop_fp(((start + i) + 1), capacity) < start ?
-                                                            ((capacity + loop_fp(((start + i) + 1), capacity)) - start) :
-                                                            (loop_fp(((start + i) + 1), capacity) - start)));
-        }
-        assert true == (index == loop_fp(start + i, capacity));
-        assert true == (capacity + index - start + 1 == capacity + loop_fp(start + i + 1, capacity) - start);
+        if (start + i < capacity) loop_bijection(start + i, capacity);
+        loop_injection_n(start + i + 1 - capacity, capacity, 1);
+        loop_bijection(start + i + 1 - capacity, capacity);
+        loop_injection_n(start + i - capacity, capacity, 1);
+        loop_bijection(start + i - capacity, capacity);
       } else {
-        inc_modulo_loop(start + i, capacity);
-        assert true == (index - start + 1 == loop_fp(start + i + 1, capacity) - start);
-      } 
+        if (capacity <= start + i) {
+          loop_injection_n(start + i - capacity, capacity, 1);
+          loop_bijection(start + i - capacity, capacity);
+        }
+        loop_bijection(start + i, capacity);
+        if (start + i + 1 == capacity) {
+          loop_injection_n(start + i + 1 - capacity, capacity, 1);
+          loop_bijection(start + i + 1 - capacity, capacity);
+        } else {
+          loop_bijection(start + i + 1, capacity);
+        }
+      }
       @*/
     //@ inc_modulo_loop(start + i, capacity);
     /*@
