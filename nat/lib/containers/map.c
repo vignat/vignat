@@ -96,6 +96,28 @@
     }
   }
 
+  fixpoint bucket<kt> bucket_put_key_fp<kt>(bucket<kt> b,
+                                            kt k, int dist) {
+    switch(b) { case bucket(chains):
+      return bucket(cons(pair(k, nat_of_int(dist)), chains));
+    }
+  }
+
+  fixpoint list<bucket<kt> >
+  buckets_put_key_fp<kt>(list<bucket<kt> > buckets, kt k,
+                         int start, int fin, int capacity) {
+    switch(buckets) {
+      case nil: return nil;
+      case cons(h,t):
+        return (start == 0) ?
+          cons(bucket_put_key_fp(h, k, (fin < start ?
+                                        capacity + fin - start :
+                                        fin - start)),
+               t) :
+          cons(h, buckets_put_key_fp(t, k, start - 1, fin - 1, capacity));
+    }
+  }
+
   fixpoint bool buckets_ok<kt>(list<bucket<kt> > buckets) {
     return buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
   }
@@ -3016,6 +3038,25 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+/*@
+  lemma void buckets_hmap_put_key_insync<kt>(int* chns, int capacity,
+                                             hmap<kt> hm,
+                                             fixpoint (kt,int) hsh,
+                                             int start,
+                                             int fin,
+                                             kt k)
+  requires buckets_hmap_insync_Xchain(chns, capacity, hm, ?buckets,
+                                      hsh, start, fin);
+  ensures buckets_hmap_insync(chns, capacity,
+                              hmap_put_key_fp(hm, fin, k, hsh(k)),
+                              buckets_put_key_fp(buckets, k, start,
+                                                 fin, capacity),
+                              hsh);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
 void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                          int* values,
                          void* keyp, int hash, int value,
@@ -3059,6 +3100,10 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     @*/
   //@ coherent_put_preserves_key_vals(hmap_ks_fp(hm), vals, m, index, k, value);
   //@ coherent_put_preserves_key_vals(hmap_ks_fp(hm), kps, addrs, index, k, keyp);
+  /*@ buckets_hmap_put_key_insync(chns, capacity,
+                                  hm, hsh,
+                                  start, index, k);
+    @*/
   /*@ close mapping(map_put_fp(m, k, value), map_put_fp(addrs, k, keyp),
                     kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
     @*/
