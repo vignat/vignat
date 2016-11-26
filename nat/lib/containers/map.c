@@ -728,7 +728,7 @@ int loop(int k, int capacity)
            false == bucket_has_key_fp(k, bh);
   ensures false == mem(k, map(fst, acc_at_this_bucket(acc, bh)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -737,7 +737,7 @@ int loop(int k, int capacity)
   requires false == mem(k, map(fst, acc));
   ensures false == mem(k, map(fst, advance_acc(acc)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -746,7 +746,7 @@ int loop(int k, int capacity)
   requires false == mem(k, map(fst, acc));
   ensures get_current_key_fp(acc) != some(k);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -780,7 +780,7 @@ int loop(int k, int capacity)
            true == bucket_has_key_fp(k, nth(n, buckets));
   ensures true == mem(some(k), buckets_get_keys_rec_fp(acc, buckets));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -792,7 +792,7 @@ int loop(int k, int capacity)
            shift != loop_fp(hash(k), capacity);
   ensures false == bucket_has_key_fp(k, bh);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -880,7 +880,7 @@ int loop(int k, int capacity)
            mem(some(k), buckets_get_keys_fp(buckets));
     loop_lims(hash(k), capacity);
     if (mem(k, map(fst, get_wraparound(nil, buckets)))) {
-      assume(false);//TODO
+      assume(false);//TODO 20m
     } else {
       key_is_contained_in_the_bucket_rec(buckets, get_wraparound(nil, buckets),
                                          0, capacity, hash, k);
@@ -1267,7 +1267,7 @@ int loop(int k, int capacity)
   requires int_of_nat(n) <= capacity;
   ensures up_to(n, (byLoopNthProp)(lst, prop, capacity, 0)) == up_to(n, (nthProp)(lst, prop));
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -1279,7 +1279,7 @@ int loop(int k, int capacity)
            int_of_nat(n) + start <= capacity;
   ensures true == up_to(n, (byLoopNthProp)(tl, prop, capacity, start - 1));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1292,7 +1292,7 @@ int loop(int k, int capacity)
            true == up_to(i, (byLoopNthProp)(l, prop, capacity, start));
   ensures true == up_to(i, (byLoopNthProp)(drop(shift, l), prop, capacity, start - shift));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1302,7 +1302,7 @@ int loop(int k, int capacity)
   ensures up_to(succ(n), (nthProp)(cons(hd, tl), prop)) ==
           prop(hd) && up_to(n, (nthProp)(tl, prop));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1311,7 +1311,7 @@ int loop(int k, int capacity)
   requires true == bucket_has_key_fp(k, b);
   ensures true == mem(k, map(fst, acc_at_this_bucket(acc, b)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1412,7 +1412,7 @@ int loop(int k, int capacity)
           true == up_to(nat_of_int(start + i - capacity),
                         (nthProp)(lst, prop));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1440,7 +1440,7 @@ int loop(int k, int capacity)
     if (capacity <= start + i) {
       buckets_keys_chns_same_len(buckets);
       break_down_up_to_by_loop(buckets_get_keys_fp(buckets), i, start, capacity, (not_my_key)(k));
-      //assume( true == mem(k, map(fst, get_wraparound(nil, buckets))));
+      //assume( true == mem(k, map(fst, get_wraparound(nil, buckets))));//TODO 20m
       crossing_chains_keep_key_inbound(buckets, nat_of_int(capacity - start), start, capacity, k);
       wraparound_is_last_crossing_chains(get_wraparound(nil, buckets), buckets);
       assert get_wraparound(get_wraparound(nil, buckets), buckets) == get_crossing_chains_fp(buckets, length(buckets));
@@ -1452,9 +1452,9 @@ int loop(int k, int capacity)
       assert get_wraparound(nil, buckets) == get_wraparound(get_wraparound(nil, buckets), buckets);
       assert get_wraparound(nil, buckets) == get_crossing_chains_fp(buckets, capacity);
 
-      //assume(get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k)); //TODO
+      //assume(get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k)); //TODO 10m
       //assert get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k);
-      //assume(mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)))); //TODO
+      //assume(mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)))); //TODO 5m
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)));
       assert true == mem(k, map(fst, get_wraparound(get_wraparound(nil, buckets), buckets)));
 
@@ -1612,7 +1612,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures pred_mapping(kps, update(index, 0, bbs), keyp, update(index, none, ks)) &*&
           [0.5]keyp(nth(index, kps), k);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1677,7 +1677,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              buckets_get_chns_fp(buckets_remove_key_fp(buckets,
                                                        k)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1686,7 +1686,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true;
   ensures 0 < nth(i, add_partial_chain_fp(i, len, chn_cnts));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1702,7 +1702,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           add_partial_chain_fp(loop_fp(index + 1, capacity),
                                len - 1, src_chns);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1711,7 +1711,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true;
   ensures length(chns) == length(add_partial_chain_fp(start, len, chns));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1720,7 +1720,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true;
   ensures length(buckets_remove_key_fp(buckets, k)) == length(buckets);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1729,7 +1729,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires 0 <= a;
   ensures loop_fp(loop_fp(a, capacity) + 1, capacity) == loop_fp(a + 1, capacity);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1746,7 +1746,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              buckets_get_chns_fp(buckets_remove_key_fp(buckets,
                                                        k)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1755,7 +1755,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true == buckets_ok(buckets);
   ensures true == buckets_ok(buckets_remove_key_fp(buckets, k));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -1767,7 +1767,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures hmap_rem_key_fp(hm, hmap_find_key_fp(hm, k)) ==
           buckets_get_hmap_fp(buckets_remove_key_fp(buckets, k), hsh);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -1780,7 +1780,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures true == key_chains_start_on_hash_fp
                     (buckets_remove_key_fp(buckets, k), 0, capacity, hash);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -2052,7 +2052,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   ensures buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
                                      start, start);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -2064,7 +2064,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
           0 <= nth(i, buckets_get_chns_fp(buckets)) &*&
           nth(i, buckets_get_chns_fp(buckets)) <= length(buckets);
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -2078,7 +2078,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                                                  fin - start,
                                         chns));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -2091,7 +2091,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                  chns) ==
           add_partial_chain_fp(start, len+1, orig_chns);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -2428,7 +2428,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                                   empty_buckets_fp<kt>(nat_of_int(capacity)),
                                   hash);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -3054,7 +3054,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                  fin, capacity),
                               hsh);
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
