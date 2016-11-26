@@ -1610,7 +1610,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            0 <= index &*& index < length(bbs) &*&
            nth(index, ks) == some(?k);
   ensures pred_mapping(kps, update(index, 0, bbs), keyp, update(index, none, ks)) &*&
-          keyp(nth(index, kps), k);
+          [0.5]keyp(nth(index, kps), k);
   {
     assume(false);//TODO
   }
@@ -1810,7 +1810,8 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
             result == hmap_find_key_fp(hm, k) &*&
             *keyp_out |-> ?ptr &*&
-            kpr(ptr, k); @*/
+            ptr == nth(result, kps) &*&
+            [0.5]kpr(ptr, k); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
   //@ open buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
@@ -3322,23 +3323,24 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
   //@ open mapping(m, addrs, kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
   //@ open hmapping(kp, hsh, capacity, busybits, ?kps, k_hashes, ?hm);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
+  //@ hmap_exists_iff_map_has(hm, m, k);
   find_key_remove_chain(busybits, keyps, k_hashes, chns,
                         keyp, eq, hash, capacity, keyp_out);
   //@ hmap_exists_iff_map_has(hm, m, k);
-  //@ hmapping_ks_capacity(hm, capacity);
-  //@ assert(index < capacity);
-  //@ open hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
-  //@ assert(pred_mapping(kps, ?bbs, kp, ?ks));
-  //@ assert(ints(k_hashes, capacity, ?khs));
+  // @ hmapping_ks_capacity(hm, capacity);
+  // @ assert(index < capacity);
+  // @ open hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
+  // @ assert(pred_mapping(kps, ?bbs, kp, ?ks));
+  // @ assert(ints(k_hashes, capacity, ?khs));
   //@ hmap_find_returns_the_key(hm, kps, addrs, k);
-  //@ mem_nth_index_of(some(k), ks);
-  //@ hmap_rem_preserves_pred_mapping(kps, bbs, kp, ks, index);
-  //@ hmap_rem_preserves_no_dups(ks, index);
-  //@ hmap_rem_preserves_hash_list(ks, khs, hsh, index);
-  //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hmap_rem_key_fp(hm, index));
+  //@ mem_nth_index_of(some(k), hmap_ks_fp(hm));
+  // @ hmap_rem_preserves_pred_mapping(kps, bbs, kp, ks, index);
+  // @ hmap_rem_preserves_no_dups(ks, index);
+  // @ hmap_rem_preserves_hash_list(ks, khs, hsh, index);
+  // @ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hmap_rem_key_fp(hm, index));
   //@ map_erase_preserves_rec_props(m, recp, k);
-  //@ hmap_rem_map_erase_coherent(hm, m, index, k);
-  //@ hmap_rem_map_erase_coherent(hm, addrs, index, k);
+  //@ hmap_rem_map_erase_coherent(hm, m, hmap_find_key_fp(hm,k), k);
+  //@ hmap_rem_map_erase_coherent(hm, addrs, hmap_find_key_fp(hm,k), k);
   /*@ close mapping(map_erase_fp(m, k), map_erase_fp(addrs, k),
                     kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
     @*/
