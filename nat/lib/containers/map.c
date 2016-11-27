@@ -728,8 +728,10 @@ int loop(int k, int capacity)
            false == bucket_has_key_fp(k, bh);
   ensures false == mem(k, map(fst, acc_at_this_bucket(acc, bh)));
   {
-    assume(false);//TODO 5m
-  }
+    switch(bh) { case bucket(chains):
+      map_append(fst, acc, chains);
+    }
+  } //took 5m
   @*/
 
 /*@
@@ -737,8 +739,18 @@ int loop(int k, int capacity)
   requires false == mem(k, map(fst, acc));
   ensures false == mem(k, map(fst, advance_acc(acc)));
   {
-    assume(false);//TODO 5m
-  }
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+        }
+        advance_acc_still_no_key(t, k);
+    }
+  }//took 4m
   @*/
 
 /*@
@@ -746,8 +758,18 @@ int loop(int k, int capacity)
   requires false == mem(k, map(fst, acc));
   ensures get_current_key_fp(acc) != some(k);
   {
-    assume(false);//TODO 5m
-  }
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              no_key_certainly_not_here(t, k);
+          }
+        }
+    }
+  }//took 5m
   @*/
 
 /*@
