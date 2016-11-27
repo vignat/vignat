@@ -1492,43 +1492,47 @@ int loop(int k, int capacity)
   requires int_of_nat(n) <= capacity;
   ensures up_to(n, (byLoopNthProp)(lst, prop, capacity, 0)) == up_to(n, (nthProp)(lst, prop));
   {
-    assume(false);//TODO 20m
-  }
+    switch(n) {
+      case zero:
+      case succ(nn):
+        loop_bijection(int_of_nat(nn), capacity);
+        byLoopNthPropEqNthPropUpTo(nn, lst, prop, capacity);
+    }
+  }//took 3m
   @*/
 
 /*@
   lemma void upToByLoopNthPropShift1<t>(nat n, t hd, list<t> tl,
                                         fixpoint (t,bool) prop,
                                         int capacity, int start)
-  requires true == up_to(n, (byLoopNthProp)(cons(hd,tl), prop, capacity, start)) &*&
-           int_of_nat(n) + start <= capacity;
+  requires true == up_to(n, (byLoopNthProp)(cons(hd,tl), prop,
+                                            capacity, start)) &*&
+           int_of_nat(n) + start <= capacity &*&
+           0 < start;
   ensures true == up_to(n, (byLoopNthProp)(tl, prop, capacity, start - 1));
   {
-    assume(false);//TODO 10m
-  }
-  @*/
-
-/*@
-  lemma void upToByLoopNthPropShiftN<t>(nat i, int shift, list<t> l,
-                                        fixpoint (t,bool) prop,
-                                        int capacity, int start)
-  requires int_of_nat(i) + shift < capacity &*&
-           0 <= shift &*& shift <= start &*&
-           true == up_to(i, (byLoopNthProp)(l, prop, capacity, start));
-  ensures true == up_to(i, (byLoopNthProp)(drop(shift, l), prop, capacity, start - shift));
-  {
-    assume(false);//TODO 10m
-  }
+    switch(n) {
+      case zero:
+      case succ(m):
+        loop_bijection(start + int_of_nat(m), capacity);
+        loop_bijection(start + int_of_nat(m) - 1, capacity);
+        upToByLoopNthPropShift1(m, hd, tl, prop, capacity, start);
+    }
+  } //took 10m
   @*/
 
 /*@
   lemma void upToNthPropShift1<t>(nat n, t hd, list<t> tl, fixpoint (t,bool) prop)
   requires true;
   ensures up_to(succ(n), (nthProp)(cons(hd, tl), prop)) ==
-          prop(hd) && up_to(n, (nthProp)(tl, prop));
+          (prop(hd) && up_to(n, (nthProp)(tl, prop)));
   {
-    assume(false);//TODO 5m
-  }
+    switch(n) {
+      case zero:
+      case succ(m):
+        upToNthPropShift1(m, hd, tl, prop);
+    }
+  }//took 2m
   @*/
 
 /*@
@@ -1536,8 +1540,10 @@ int loop(int k, int capacity)
   requires true == bucket_has_key_fp(k, b);
   ensures true == mem(k, map(fst, acc_at_this_bucket(acc, b)));
   {
-    assume(false);//TODO 5m
-  }
+    switch(b) { case bucket(chains):
+      map_append(fst, acc, chains);
+    }
+  }//took 2m
   @*/
 
 /*@
@@ -1625,11 +1631,49 @@ int loop(int k, int capacity)
   @*/
 
 /*@
-  lemma void break_down_up_to_by_loop<t>(list<t> lst, int i, int start, int capacity,
+  lemma void
+  break_down_up_to_by_loop_rec<t>(nat i, list<t> lst,
+                                  int start, int capacity,
+                                  fixpoint (t,bool) prop)
+  requires true == up_to(i, (byLoopNthProp)(lst, prop, capacity, start)) &*&
+           0 <= start &*& start < capacity &*&
+           capacity <= length(lst) &*&
+           capacity <= start + int_of_nat(i) &*&
+           int_of_nat(i) <= capacity;
+  ensures true == up_to(nat_of_int(capacity - start),
+                        (byLoopNthProp)(lst, prop, capacity, start)) &*&
+          true == up_to(nat_of_int(int_of_nat(i) + start - capacity),
+                        (nthProp)(lst, prop));
+  {
+    switch(i) {
+      case zero:
+      case succ(n):
+        assert true == (byLoopNthProp(lst, prop, capacity, start, int_of_nat(n)));
+        assert true == nthProp(lst, prop, loop_fp(start + int_of_nat(n),
+                                                  capacity));
+        if (capacity <= start + int_of_nat(n)) {
+          assert true == (start + int_of_nat(n) - capacity < capacity);
+          loop_injection_n(start + int_of_nat(n) - capacity, capacity, 1);
+          loop_bijection(start + int_of_nat(n) - capacity, capacity);
+          break_down_up_to_by_loop_rec(n, lst, start, capacity, prop);
+          assert nat_of_int(int_of_nat(succ(n)) + start - capacity) ==
+                 succ(nat_of_int(int_of_nat(n) + start - capacity));
+        } else {
+          assert capacity == start + int_of_nat(n) + 1;
+          assert nat_of_int(capacity - start) == i;
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void break_down_up_to_by_loop<t>(list<t> lst, int i,
+                                         int start, int capacity,
                                          fixpoint (t,bool) prop)
   requires capacity <= length(lst) &*&
            0 <= start &*& start < capacity &*&
            capacity <= start + i &*&
+           i <= capacity &*&
            true == up_to(nat_of_int(i),
                          (byLoopNthProp)(lst, prop, capacity, start));
   ensures true == up_to(nat_of_int(capacity - start),
@@ -1637,8 +1681,8 @@ int loop(int k, int capacity)
           true == up_to(nat_of_int(start + i - capacity),
                         (nthProp)(lst, prop));
   {
-    assume(false);//TODO 10m
-  }
+    break_down_up_to_by_loop_rec(nat_of_int(i), lst, start, capacity, prop);
+  } //took 22m
   @*/
 
 /*@
@@ -1647,7 +1691,7 @@ int loop(int k, int capacity)
                                           int start,
                                           int capacity,
                                           kt k)
-  requires 0 <= i &*&
+  requires 0 <= i &*& i <= capacity &*&
            0 <= start &*&
            start < length(buckets) &*&
            start + i - capacity + 1 <= capacity &*&
