@@ -569,11 +569,15 @@ int loop(int k, int capacity)
   predicate pred_mapping<t>(list<void*> pts, list<int> bbs,
                             predicate (void*; t) pred;
                             list<option<t> > ks) =
-            bbs == nil ? (ks == nil &*& pts == nil) :
-              (pred_mapping(tail(pts), tail(bbs), pred, ?kst) &*&
-               pts != nil &*&
-               (head(bbs) == 0 ? ks == cons(none, kst) :
-                 ([0.5]pred(head(pts), ?ksh) &*& ks == cons(some(ksh), kst))));
+    switch(bbs) {
+      case nil:
+        return ks == nil &*& pts == nil;
+      case cons(h,t):
+        return pts == cons(?pth,?ptt) &*&
+          pred_mapping(ptt, t, pred, ?kt) &*&
+          (h == 0 ? ks == cons(none, kt) :
+             ([0.5]pred(pth, ?kh) &*& ks == cons(some(kh), kt)));
+    };
 
   fixpoint bool no_dups<t>(list<option<t> > l) {
     switch(l) {
@@ -1164,6 +1168,8 @@ int loop(int k, int capacity)
                   case none: return default_value<kt>();
                 }
               } else {
+                close pred_mapping(cons(kph, kps_b), cons(bbh,bbs_b),
+                                   pred, cons(kh, ks_b));
                 append_reverse_take_cons(n,kph,kpt,kps_b);
                 append_reverse_take_cons(n,bbh,bbt,bbs_b);
                 append_reverse_take_cons(n,kh,kt,ks_b);
@@ -1200,6 +1206,8 @@ int loop(int k, int capacity)
         append_reverse_tail_cons_head(kps1, kps2);
         append_reverse_tail_cons_head(bbs1, bbs2);
         append_reverse_tail_cons_head(ks1, ks2);
+        close pred_mapping(cons(head(kps1), kps2), cons(bbh, bbs2),
+                           pred, cons(head(ks1), ks2));
         reconstruct_pred_mapping(tail(kps1), bbt, tail(ks1),
                                  cons(head(kps1), kps2),
                                  cons(bbh, bbs2),
@@ -1708,32 +1716,45 @@ int loop(int k, int capacity)
   {
     if (capacity <= start + i) {
       buckets_keys_chns_same_len(buckets);
-      break_down_up_to_by_loop(buckets_get_keys_fp(buckets), i, start, capacity, (not_my_key)(k));
-      //assume( true == mem(k, map(fst, get_wraparound(nil, buckets))));//TODO 20m
-      crossing_chains_keep_key_inbound(buckets, nat_of_int(capacity - start), start, capacity, k);
-      wraparound_is_last_crossing_chains(get_wraparound(nil, buckets), buckets);
-      assert get_wraparound(get_wraparound(nil, buckets), buckets) == get_crossing_chains_fp(buckets, length(buckets));
-      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
-                                                            start + int_of_nat(nat_of_int(capacity - start)))));
-      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)));
+      break_down_up_to_by_loop(buckets_get_keys_fp(buckets),
+                               i, start, capacity, (not_my_key)(k));
+      crossing_chains_keep_key_inbound(buckets,
+                                       nat_of_int(capacity - start),
+                                       start, capacity, k);
+      wraparound_is_last_crossing_chains
+        (get_wraparound(nil, buckets), buckets);
+      assert get_wraparound(get_wraparound(nil, buckets), buckets) ==
+             get_crossing_chains_fp(buckets, length(buckets));
+      assert true == mem(k, map(fst,
+                                get_crossing_chains_fp
+                                  (buckets,
+                                    start +
+                                      int_of_nat(nat_of_int(capacity -
+                                                            start)))));
+      assert true == mem(k, map(fst, get_crossing_chains_fp
+                                       (buckets, capacity)));
       buckets_ok_get_wraparound_idemp(buckets);
 
-      assert get_wraparound(nil, buckets) == get_wraparound(get_wraparound(nil, buckets), buckets);
-      assert get_wraparound(nil, buckets) == get_crossing_chains_fp(buckets, capacity);
+      assert get_wraparound(nil, buckets) ==
+             get_wraparound(get_wraparound(nil, buckets), buckets);
+      assert get_wraparound(nil, buckets) ==
+             get_crossing_chains_fp(buckets, capacity);
 
-      //assume(get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k)); //TODO 10m
-      //assert get_current_key_fp(get_crossing_chains_fp(buckets, capacity - 1)) != some(k);
-      //assume(mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)))); //TODO 5m
-      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets, capacity)));
-      assert true == mem(k, map(fst, get_wraparound(get_wraparound(nil, buckets), buckets)));
+      assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
+                                                            capacity)));
+      assert true == mem(k, map(fst, get_wraparound
+                                       (get_wraparound(nil, buckets),
+                                        buckets)));
 
       assert true == mem(k, map(fst, get_wraparound(nil, buckets)));
-      next_i_cells_keep_keys(buckets, nat_of_int(start + i - capacity), k, get_wraparound(nil, buckets), capacity);
+      next_i_cells_keep_keys(buckets, nat_of_int(start + i - capacity),
+                             k, get_wraparound(nil, buckets), capacity);
       loop_injection(start + i - capacity, capacity);
       loop_bijection(start + i - capacity, capacity);
       assert loop_fp(start + i, capacity) == (start + i - capacity);
     } else {
-      crossing_chains_keep_key_inbound(buckets, nat_of_int(i), start, capacity, k);
+      crossing_chains_keep_key_inbound(buckets, nat_of_int(i),
+                                       start, capacity, k);
       loop_bijection(start + i, capacity);
     }
   }
@@ -1881,8 +1902,16 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures pred_mapping(kps, update(index, 0, bbs), keyp, update(index, none, ks)) &*&
           [0.5]keyp(nth(index, kps), k);
   {
-    assume(false);//TODO 5m
-  }
+    open pred_mapping(kps, bbs, keyp, ks);
+    switch(bbs) {
+      case nil:
+      case cons(h,t):
+        if (index != 0) {
+          pred_mapping_drop_key(tail(kps), t, tail(ks), index - 1);
+        }
+    }
+    close pred_mapping(kps, update(index, 0, bbs), keyp, update(index, none, ks));
+  }//took 5m
   @*/
 
 /*@
