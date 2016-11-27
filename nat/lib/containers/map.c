@@ -808,7 +808,7 @@ int loop(int k, int capacity)
            true == bucket_has_key_fp(k, nth(n, buckets));
   ensures true == mem(some(k), buckets_get_keys_rec_fp(acc, buckets));
   {
-    assume(false);//TODO
+    assume(false);//TODO 30m
   }//debugged VeriFast:Redux for 30m, not done yet
   @*/
 
@@ -1924,7 +1924,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       case cons(h,t):
         return (start == 0)                                         ?
                 ((len == 0) ? cons(h, t) :
-                  cons(h-1, add_partial_chain_rec_fp(t, 0, len-1))) :
+                  cons(h+1, add_partial_chain_rec_fp(t, 0, len-1))) :
                 cons(h,add_partial_chain_rec_fp(t, start-1, len));
     }
   }
@@ -1968,14 +1968,15 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void buckets_remove_add_one_chain<kt>(list<bucket<kt> > buckets,
                                               int start, kt k)
-  requires true == bucket_has_key_fp(k, nth(start, buckets));
+  requires 0 <= start &*& start < length(buckets) &*&
+           true == bucket_has_key_fp(k, nth(start, buckets));
   ensures buckets_get_chns_fp(buckets) ==
           add_partial_chain_fp
             (start, buckets_get_chain_fp(buckets, k, start),
              buckets_get_chns_fp(buckets_remove_key_fp(buckets,
                                                        k)));
   {
-    assume(false);//TODO 10m
+    assume(false);//TODO 30m
   }
   @*/
 
@@ -1984,7 +1985,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true;
   ensures 0 < nth(i, add_partial_chain_fp(i, len, chn_cnts));
   {
-    assume(false);//TODO 5m
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -2044,7 +2045,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              buckets_get_chns_fp(buckets_remove_key_fp(buckets,
                                                        k)));
   {
-    assume(false);//TODO 10m
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -2065,7 +2066,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures hmap_rem_key_fp(hm, hmap_find_key_fp(hm, k)) ==
           buckets_get_hmap_fp(buckets_remove_key_fp(buckets, k), hsh);
   {
-    assume(false);//TODO 10m
+    assume(false);//TODO 50m
   }
   @*/
 
@@ -2362,7 +2363,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
           0 <= nth(i, buckets_get_chns_fp(buckets)) &*&
           nth(i, buckets_get_chns_fp(buckets)) <= length(buckets);
   {
-    assume(false);//TODO 20m
+    assume(false);//TODO 30m
   }
   @*/
 
@@ -3352,7 +3353,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                  fin, capacity),
                               hsh);
   {
-    assume(false);//TODO 20m
+    assume(false);//TODO 30m
   }
   @*/
 
