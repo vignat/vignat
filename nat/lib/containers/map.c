@@ -122,6 +122,8 @@
     return buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
   }
 
+  fixpoint bool nonneg(int x) { return 0 <= x; }
+
   fixpoint list<int> buckets_get_chns_rec_fp<kt>(list<pair<kt, nat> > acc,
                                                  list<bucket<kt> > buckets) {
     switch(buckets) {
@@ -1915,9 +1917,9 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  fixpoint list<int> add_partial_chain_rec_fp<kt>(list<int> chain_cnts,
-                                                  int start,
-                                                  int len) {
+  fixpoint list<int> add_partial_chain_rec_fp(list<int> chain_cnts,
+                                              int start,
+                                              int len) {
     switch(chain_cnts) {
       case nil:
         return nil;
@@ -1965,6 +1967,11 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+/* @
+  lemma void
+  requries true == no_dups(buckets_get_keys_fp(buckets))
+  @*/
+
 /*@
   lemma void buckets_remove_add_one_chain<kt>(list<bucket<kt> > buckets,
                                               int start, kt k)
@@ -1977,16 +1984,156 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                        k)));
   {
     assume(false);//TODO 30m
+  }//took 11m and counting
+  @*/
+
+/*@
+  lemma void buckets_get_chns_rec_nonneg<kt>(list<pair<kt, nat> > acc,
+                                             list<bucket<kt> > buckets)
+  requires true;
+  ensures true == forall(buckets_get_chns_rec_fp(acc, buckets), nonneg);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        buckets_get_chns_rec_nonneg(advance_acc(acc_at_this_bucket(acc, h)), t);
+    }
+  }
+
+  lemma void buckets_get_chns_nonneg<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures true == forall(buckets_get_chns_fp(buckets), nonneg);
+  {
+    buckets_get_chns_rec_nonneg(get_wraparound(nil, buckets), buckets);
   }
   @*/
 
 /*@
-  lemma void add_part_chn_gt0(int i, int len, list<int> chn_cnts)
+  lemma void add_part_chn_rec_still_nonneg(int start, int len,
+                                           list<int> chn_cnts)
+  requires true == forall(chn_cnts, nonneg);
+  ensures true == forall(add_partial_chain_rec_fp(chn_cnts,
+                                                  start, len),
+                         nonneg);
+  {
+    switch(chn_cnts) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          if (len != 0) add_part_chn_rec_still_nonneg(0, len - 1, t);
+        } else {
+          add_part_chn_rec_still_nonneg(start - 1, len, t);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void add_partial_chain_rec_nonneg(int start, int len, list<int> chn_cnts)
+  requires true == forall(chn_cnts, nonneg);
+  ensures true == forall(add_partial_chain_rec_fp(chn_cnts, start, len), nonneg);
+  {
+    switch(chn_cnts) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          if (len != 0) {
+            add_partial_chain_rec_nonneg(0, len - 1, t);
+          }
+        } else {
+          add_partial_chain_rec_nonneg(start - 1, len, t);
+        }
+    }
+  }
+
+  lemma void add_partial_chain_nonneg(int i, int len, list<int> chn_cnts)
+  requires true == forall(chn_cnts, nonneg);
+  ensures true == forall(add_partial_chain_fp(i, len, chn_cnts), nonneg);
+  {
+    if (length(chn_cnts) < len + i) {
+      add_partial_chain_rec_nonneg(i, len, chn_cnts);
+      add_partial_chain_rec_nonneg(0, len + i - length(chn_cnts),
+                                   add_partial_chain_rec_fp(chn_cnts, i, len));
+    } else {
+      add_partial_chain_rec_nonneg(i, len, chn_cnts);
+    }
+  }
+  @*/
+
+/*@
+  lemma void add_part_chn_rec_same_len(int start, int len, list<int> chn_cnts)
   requires true;
+  ensures length(chn_cnts) == length(add_partial_chain_rec_fp(chn_cnts,
+                                                              start, len));
+  {
+    switch(chn_cnts) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          if (len != 0)
+            add_part_chn_rec_same_len(0, len-1, t);
+        } else {
+          add_part_chn_rec_same_len(start - 1, len, t);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void add_part_chn_gt0_rec(int i, int len, list<int> chn_cnts)
+  requires len != 0 &*& 0 <= i &*& i < length(chn_cnts) &*&
+           true == forall(chn_cnts, nonneg);
+  ensures 0 < nth(i, add_partial_chain_rec_fp(chn_cnts, i, len));
+  {
+    switch(chn_cnts) {
+      case nil:
+      case cons(h,t):
+        if (i == 0) {
+        } else {
+          add_part_chn_gt0_rec(i-1, len, t);
+        }
+    }
+  }
+
+  lemma void add_part_chn_still_gt0_rec(int i, int start, int len,
+                                        list<int> chn_cnts)
+  requires 0 <= i &*& i < length(chn_cnts) &*&
+           0 <= start &*& start <= i &*&
+           0 < nth(i, chn_cnts) &*&
+           true == forall(chn_cnts, nonneg);
+  ensures 0 < nth(i, add_partial_chain_rec_fp(chn_cnts, start, len));
+  {
+    switch(chn_cnts) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          if (len != 0) {
+            if (i != 0)
+              add_part_chn_still_gt0_rec(i - 1, 0, len - 1, t);
+          }
+        } else {
+          note(0 < start);
+          add_part_chn_still_gt0_rec(i - 1, start - 1, len, t);
+        }
+    }
+  }
+
+  lemma void add_part_chn_gt0(int i, int len, list<int> chn_cnts)
+  requires 0 <= i &*& i < length(chn_cnts) &*&
+           0 < len &*&
+           true == forall(chn_cnts, nonneg);
   ensures 0 < nth(i, add_partial_chain_fp(i, len, chn_cnts));
   {
-    assume(false);//TODO 10m
-  }
+    if (length(chn_cnts) < len + i) {
+      add_part_chn_gt0_rec(i, len, chn_cnts);
+      add_part_chn_rec_same_len(i, len, chn_cnts);
+      add_part_chn_rec_still_nonneg(i, len, chn_cnts);
+      add_part_chn_still_gt0_rec(i, 0, len + i - length(chn_cnts),
+                                 add_partial_chain_rec_fp(chn_cnts, i, len));
+    } else {
+      add_part_chn_gt0_rec(i, len, chn_cnts);
+    }
+  }//took 80m
   @*/
 
 /*@
@@ -2020,6 +2167,19 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures length(buckets_remove_key_fp(buckets, k)) == length(buckets);
   {
     assume(false);//TODO 5m
+  }
+  @*/
+
+/*@
+  lemma void buckets_get_chain_longer<kt>(list<bucket<kt> > buckets,
+                                          int start, int i, kt k,
+                                          int capacity)
+  requires nth(loop_fp(start + i, capacity),
+               buckets_get_keys_fp(buckets)) != some(k) &*&
+           true == bucket_has_key_fp(k, nth(start, buckets));
+  ensures buckets_get_chain_fp(buckets, k, start) != i;
+  {
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -2139,6 +2299,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                   true == hash_list(ks, khs, hsh) &*&
                   *keyp_out |-> _ &*&
                   hm == buckets_get_hmap_fp(buckets, hsh) &*&
+                  i <= buckets_get_chain_fp(buckets, k, start) &*&
                   chnlist ==
                     add_partial_chain_fp
                       (loop_fp(start + i, capacity),
@@ -2195,6 +2356,12 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
       //@ if (bb != 0) no_hash_no_key(ks, khs, k, index, hsh);
       //@ if (bb == 0) no_bb_no_key(ks, bbs, index);
     }
+    //@ buckets_remove_key_same_len(buckets, k);
+    //@ buckets_keys_chns_same_len(buckets_remove_key_fp(buckets, k));
+    //@ assert nth(index, ks) != some(k);
+    //@ buckets_get_chain_longer(buckets, start, i, k, capacity);
+    //@ assert buckets_get_chain_fp(buckets, k, start) != i;
+    //@ buckets_get_chns_nonneg(buckets_remove_key_fp(buckets, k));
     /*@ add_part_chn_gt0(index, buckets_get_chain_fp(buckets, k, start) - i,
                          buckets_get_chns_fp
                            (buckets_remove_key_fp(buckets, k))); @*/
