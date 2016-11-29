@@ -2626,11 +2626,37 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void inc_modulo_loop(int a, int capacity)
-  requires 0 <= a;
-  ensures loop_fp(loop_fp(a, capacity) + 1, capacity) == loop_fp(a + 1, capacity);
+  requires 0 <= a &*& 0 < capacity;
+  ensures loop_fp(loop_fp(a, capacity) + 1, capacity) ==
+          loop_fp(a + 1, capacity);
   {
-    assume(false);//TODO 10m
-  }
+    int quotient = a / capacity;
+    div_rem(a, capacity);
+    int b = a - quotient * capacity;
+    assert 0 <= b;
+    assert b < capacity;
+    loop_injection_n(b, capacity, quotient);
+    assert loop_fp(a, capacity) == loop_fp(b, capacity);
+    loop_bijection(b, capacity);
+    assert loop_fp(b, capacity) == b;
+    if (b + 1 < capacity) {
+      assert b + 1 == a + 1 - quotient*capacity;
+      loop_injection_n(b + 1, capacity, quotient);
+      assert loop_fp(a + 1, capacity) == loop_fp(b + 1, capacity);
+    } else {
+      assert !(b + 1 < capacity);
+      assert capacity <= b + 1;
+      assert b < capacity;
+      note(b < capacity);
+      note(capacity <= b + 1);
+      assert b + 1 == capacity;
+      assert loop_fp(a, capacity) + 1 == capacity;
+      assert a + 1 == capacity + quotient*capacity;
+      loop_injection_n(b + 1, capacity, quotient);
+      assert loop_fp(a + 1, capacity) == loop_fp(capacity, capacity);
+      assert loop_fp(a+1, capacity) == 0;
+    }
+  }//took 20m, and counting
   @*/
 
 /*@
