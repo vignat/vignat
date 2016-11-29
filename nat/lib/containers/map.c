@@ -2138,17 +2138,187 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void
+  remove_one_cell_from_part_ch_rec(list<int> chns, int index,
+                                   int len, list<int> src_chns)
+  requires chns == add_partial_chain_rec_fp(src_chns,
+                                            index,
+                                            len) &*&
+           0 <= index &*& index + 1 < length(src_chns) &*&
+           0 < len;
+  ensures update(index, nth(index, chns) - 1, chns) ==
+          add_partial_chain_rec_fp(src_chns, index + 1, len - 1);
+  {
+    switch(src_chns) {
+      case nil:
+      case cons(h,t):
+        if (index == 0) {
+        } else {
+          assert chns == cons(h, ?rest);
+          assert rest == add_partial_chain_rec_fp(t, index - 1, len);
+          remove_one_cell_from_part_ch_rec(rest, index - 1, len, t);
+        }
+    }
+  }
+
+  @*/
+
+/*@
+  lemma void
+  add_part_chn_rec_preserves_decrement(list<int> chns, list<int> src_chns,
+                                       int start, int len, int index)
+  requires chns == add_partial_chain_rec_fp(src_chns, start, len) &*&
+           0 <= index &*& index < length(src_chns);
+  ensures update(index, nth(index, chns) - 1, chns) ==
+          add_partial_chain_rec_fp(update(index,
+                                          nth(index, src_chns) - 1,
+                                          src_chns),
+                                   start, len);
+  {
+    switch(src_chns) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          if (len != 0) {
+            if (index != 0) {
+              assert chns == cons(h+1,?rest);
+              add_part_chn_rec_preserves_decrement(rest, t, 0,
+                                                   len - 1, index - 1);
+            }
+          }
+        } else {
+          assert chns == cons(h,?rest);
+          if (index != 0)
+            add_part_chn_rec_preserves_decrement(rest, t, start - 1,
+                                                 len, index - 1);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dec_cancels_inc(list<int> lst, int index)
+  requires 0 <= index &*& index < length(lst);
+  ensures update(index, nth(index, update(index, nth(index, lst) + 1, lst)) - 1,
+                 update(index, nth(index, lst) + 1, lst)) == lst;
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        if (index != 0) dec_cancels_inc(t, index - 1);
+    }
+  }
+  @*/
+
+/*@
+  lemma void add_part_chn_rec_inc_last(list<int> chns, int len)
+  requires 0 < len &*& 0 < length(chns);
+  ensures add_partial_chain_rec_fp(chns, length(chns) - 1, len) ==
+          update(length(chns) - 1, nth(length(chns) - 1, chns) + 1, chns);
+  {
+    switch(chns) {
+      case nil:
+      case cons(h,t):
+        if (length(chns) == 1) {
+          length_0_nil(t);
+        } else {
+          add_part_chn_rec_inc_last(t, len);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void add_part_chn_rec_zero_len(list<int> chns, int start)
+  requires true;
+  ensures add_partial_chain_rec_fp(chns, start, 0) == chns;
+  {
+    switch(chns) {
+      case nil:
+      case cons(h,t):
+        if (start != 0) add_part_chn_rec_zero_len(t, start - 1);
+    }
+  }
+  @*/
+
+/*@
+  lemma void
   remove_one_cell_from_partial_chain(list<int> chns, int index,
                                      int len, list<int> src_chns,
                                      int capacity)
-  requires chns == add_partial_chain_fp(loop_fp(index, capacity),
+  requires chns == add_partial_chain_fp(index,
                                         len, src_chns) &*&
-           length(src_chns) == capacity;
+           length(src_chns) == capacity &*&
+           0 <= index &*& index < capacity &*&
+           0 < len &*& len <= capacity;
   ensures update(index, nth(index, chns) - 1, chns) ==
           add_partial_chain_fp(loop_fp(index + 1, capacity),
                                len - 1, src_chns);
   {
-    assume(false);//TODO 10m
+    if (index == capacity - 1) {
+      loop_injection_n(index + 1 - capacity, capacity, 1);
+      loop_bijection(index + 1 - capacity, capacity);
+      assert loop_fp(index + 1, capacity) == 0;
+      add_part_chn_rec_inc_last(src_chns, len);
+      if (capacity < index + len) {
+        list<int> interim = update(index, nth(index, src_chns) + 1, src_chns);
+        dec_cancels_inc(src_chns, index);
+        assert update(index, nth(index, interim) - 1, interim) == src_chns;
+        assert add_partial_chain_rec_fp(src_chns, index, len) ==
+               update(index, nth(index, src_chns) + 1, src_chns);
+        add_part_chn_rec_same_len(index, len, src_chns);
+        add_part_chn_rec_preserves_decrement
+           (chns, update(index, nth(index, src_chns) + 1, src_chns),
+            0, len + index - length(src_chns), index);
+        assert chns == add_partial_chain_rec_fp(interim, 0, len + index - length(src_chns));
+        assert update(index, nth(index, chns) - 1, chns) ==
+               add_partial_chain_rec_fp(update(index, nth(index, interim) - 1, interim),
+                                        0, len + index - length(src_chns));
+        assert update(index, nth(index, chns) - 1, chns) ==
+               add_partial_chain_rec_fp(src_chns,
+                                        0, len + index - length(src_chns));
+        assert loop_fp(index + 1, capacity) == 0;
+        assert len + index - length(src_chns) == len - 1;
+        assert len - 1 < capacity;
+        assert add_partial_chain_rec_fp(src_chns, 0, len + index - length(src_chns)) ==
+               add_partial_chain_fp(loop_fp(index + 1, capacity), len - 1, src_chns);
+      } else {
+        assert len == 1;
+        dec_cancels_inc(src_chns, index);
+        add_part_chn_rec_zero_len(src_chns, loop_fp(index + 1, capacity));
+      }
+    } else {
+      loop_bijection(index + 1, capacity);
+      assert loop_fp(index + 1, capacity) == index + 1;
+      if (capacity < index + len) {
+        list<int> chns0 = add_partial_chain_rec_fp(src_chns, index, len);
+        remove_one_cell_from_part_ch_rec(chns0, index, len, src_chns);
+        assert chns == add_partial_chain_rec_fp(chns0, 0,
+                                                len + index - length(src_chns));
+        add_part_chn_rec_same_len(index, len, src_chns);
+        add_part_chn_rec_preserves_decrement(chns, chns0,
+                                             0,
+                                             len + index - length(src_chns),
+                                             index);
+        assert update(index, nth(index, chns) - 1, chns) ==
+               add_partial_chain_rec_fp(update(index,
+                                               nth(index, chns0) - 1, chns0),
+                                        0,
+                                        len + index - length(src_chns));
+      } else {
+        remove_one_cell_from_part_ch_rec(chns, index, len, src_chns);
+      }
+    }
+  }//took 145m
+  @*/
+
+/*@
+  lemma void buckets_ok_get_chain_bounded<kt>(list<bucket<kt> > buckets,
+                                              kt k, int start)
+  requires true == buckets_ok(buckets) &*&
+           0 <= start &*& start < length(buckets);
+  ensures buckets_get_chain_fp(buckets, k, start) < length(buckets);
+  {
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -2383,6 +2553,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
            buckets_get_chns_fp(buckets_remove_key_fp(buckets, k)));
       @*/
     //@ loop_fixp(start + i, capacity);
+    //@ buckets_ok_get_chain_bounded(buckets, k, start);
     /*@ remove_one_cell_from_partial_chain
           (chnlist, loop_fp(start + i, capacity),
            buckets_get_chain_fp(buckets, k, start) - i,
