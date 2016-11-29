@@ -1967,11 +1967,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
-/* @
-  lemma void
-  requries true == no_dups(buckets_get_keys_fp(buckets))
-  @*/
-
 /*@
   lemma void buckets_remove_add_one_chain<kt>(list<bucket<kt> > buckets,
                                               int start, kt k)
@@ -2312,14 +2307,60 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  lemma void chain_with_key_bounded<kt>(list<pair<kt,nat> > chains,
+                                        kt k, int bound)
+  requires true == forall(chains, (upper_limit)(bound)) &*&
+           0 < bound;
+  ensures int_of_nat(chain_with_key_fp(chains, k)) < bound;
+  {
+    switch(chains) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,len):
+          if (key != k) {
+            chain_with_key_bounded(t, k, bound);
+          }
+        }
+    }
+  }
+
+  lemma void buckets_ok_rec_get_chain_bounded<kt>(list<pair<kt, nat> > acc,
+                                                  list<bucket<kt> > buckets,
+                                                  int bound,
+                                                  kt k, int start)
+  requires true == buckets_ok_rec(acc, buckets, bound) &*&
+           0 <= start &*& start < length(buckets) &*&
+           0 < bound;
+  ensures buckets_get_chain_fp(buckets, k, start) < bound;
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          switch(h) { case bucket(chains):
+            forall_append(acc, chains, (upper_limit)(bound));
+            assert true == forall(chains, (upper_limit)(bound));
+            chain_with_key_bounded(chains, k, bound);
+          }
+        } else {
+          buckets_ok_rec_get_chain_bounded
+            (advance_acc(acc_at_this_bucket(acc, h)),
+             t, bound, k, start - 1);
+        }
+    }
+  }
+  @*/
+/*@
   lemma void buckets_ok_get_chain_bounded<kt>(list<bucket<kt> > buckets,
                                               kt k, int start)
   requires true == buckets_ok(buckets) &*&
            0 <= start &*& start < length(buckets);
-  ensures buckets_get_chain_fp(buckets, k, start) < length(buckets);
+  ensures buckets_get_chain_fp(buckets, k, start) < length(buckets) &*&
+          0 <= buckets_get_chain_fp(buckets, k, start);
   {
-    assume(false);//TODO 20m
-  }
+    buckets_ok_rec_get_chain_bounded(get_wraparound(nil, buckets),
+                                     buckets, length(buckets), k, start);
+  }//took 25m
   @*/
 
 /*@
