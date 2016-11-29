@@ -264,7 +264,7 @@ existing verification approaches impractical.
 Fig.~\ref{lst:vigor} shows the annotated code, ready for the verification with
 Vigor. It is the result of applying the first two steps shown below.
 \code{VIGOR_CHECK} (l.\ref{line:vigcheck}) adds additional property that we
-would like to verify --- that we do not forward packets with port 9.
+would like to verify: ``we do not forward packets destined to port 9''.
 
 \begin{figure}[h!]
 \begin{lstlisting}
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 \end{lstlisting}
-  \caption{Vigor implementation of Drop protocol.
+  \caption{Annotated code of Drop buffer.
     \code{LOOP} (l.\ref{line:loop-hd}) labels the infinite loop head and we
     explicitly use a ring (l.\ref{line:mk-ring}) from the Vigor library. \code{VIGOR_CHECK} at the
     line \ref{line:vigcheck} adds a semantic property to be verified.}
@@ -301,18 +301,18 @@ infinite loops in the application code. A developer puts a label \code{LOOP}
 potentially infinite loop. For a typical NF there should be only a handful or
 them (1 in our example).
 
-{\bf Step 2: Use library components. } A developer replaces every array with a
-component from Vigor library that performs the same function. For our example,
-the library provides a packet ring with a simple interface: \code{bool
-  ring_empty(ring*)} checks whether there is a packet in the ring, \code{bool
-  ring_full(ring*)} checks whether the ring has run out of space, \code{void
-  ring_push_back(ring*, packet* src)} adds packet \code{src} to the ring, and
-\code{void ring_pop_front(ring*, packet* dst)} removes a packet from the ring
-and places it in \code{dst}.
+{\bf Step 2: Use library components. } A developer replaces state chunks (e.g.
+most of the arrays) with components from the Vigor library that perform the
+same function. For our example, the library provides a packet ring with a simple
+interface: \code{bool ring_empty(ring*)} checks whether there is a packet in the
+ring, \code{bool ring_full(ring*)} checks whether the ring has run out of space,
+\code{void ring_push_back(ring*, packet* src)} adds packet \code{src} to the
+ring, and \code{void ring_pop_front(ring*, packet* dst)} removes a packet from
+the ring and places it in \code{dst}.
 
 
 {\bf Step 3: Provide invariants.} Besides usual parameters, like capacity or
-element size, most Vigor components also require simple logical invariants of
+element size, most Vigor components also require simple logical invariants about
 their elements to enable the reasoning about the application code. For our
 example, the essential property of the ring is, that it contains only packets
 with a port different from 9. A developer communicates that as shown in
@@ -393,14 +393,15 @@ of paths, and every loop multiplies it by a factor; in our case, the infinite
 loop gives rise to an infinite number of paths.
 
 Vigor transforms infinite loops using loop
-invariants~\cite[\S~2.1]{cormen2009introduction}. We added to KLEE support for
-automatic havoc-ing~\cite{barnett2005boogie}. Havoc-ing simply replaces all the
-variables that may change in the loop by unconstrained symbols at the beginning
-of the iteration. In our example that would be the variables \code{begin} and
-\code{queue_len} and the contents of \code{packets[0..CAP]}, but not the value
-of the \code{packets} pointer because it never changes. The step 1 enables
-Vigor to reduce each problematic loop to a single generalized iteration that
-allows reasoning in one pass.
+invariants~\cite[\S~2.1]{cormen2009introduction} that allow to model all the
+iterations of a loop in a single one. To support this kind of generalization, we
+added automatic havoc-ing~\cite{barnett2005boogie} to KLEE. Havoc-ing simply
+replaces all the variables that may change in the loop by unconstrained symbols
+at the beginning of the iteration. In our example that would be the variables
+\code{begin} and \code{queue_len} and the contents of \code{packets[0..CAP]},
+but not the value of the \code{packets} pointer because it never changes. The
+step 1 enables Vigor to reduce each problematic loop to a single generalized
+iteration that allows reasoning in one pass.
 
 This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 sec to exhaustively SE the code; for \code{CAP=30} it takes 15 min, for
@@ -420,7 +421,7 @@ point anywhere in the array.
 
 In Vigor, we circumvent the problem of symbolic indexing by encapsulating
 program state into well-defined data structures and putting them into a
-``library of components'' (e.g. the ring in the step 2). This works well for NF
+``library of components'' (e.g. the ring in step 2). This works well for NF
 development, because the NF code uses a relatively small set of standard
 structures, such as ring buffers, hash tables, least-prefix-match tables, etc.
 We provide to the SEE symbolic models of these abstracted components that
@@ -518,8 +519,8 @@ void ring_pop_front(struct ring* r,
   ASSUME(packet_constraints(p));^\label{line:assume}^
 }
 \end{lstlisting}
-  \caption{A symbolic model for \code{ring_pop_front}. It fills symbolically the
-    a packet and adds a constraint to it.}
+  \caption{A symbolic model for \code{ring_pop_front}. It fills symbolically a
+    packet and adds a constraint to it.}
   \label{lst:symbolic-model}
 \end{figure}
 
@@ -543,8 +544,7 @@ checks whether the symbolic model has enumerated all the possible outputs for
 each call sequence.
 
 You can see one of the generated call sequences on Fig.~\ref{lst:call-sequence}.
-It starts with \code{loop_invariant_produce} that is inserted automatically at
-the beginning of a loop iteration. It continues then with calls to
+It starts with \code{loop_invariant_produce} and continues then with calls to
 \code{ring_full} and \code{ring_empty}, noting (with \code{assume}) that both
 return \code{false}. They both return false in this particular trace, in other
 traces they returned other values, but to define the context for the last
@@ -575,17 +575,19 @@ ring_pop_front(arg1, &(arg2));^\label{line:tip-call}^
 /*@ assert(arg2.port != 9); @*/^\label{line:assert}^
 \end{lstlisting}
   \caption{A call sequence, produced by SEE. Vigor adds formal annotations to
-    constrain the execution space. Unexplained
-    lines(\ref{line:unexplained1},\ref{line:unexplained2},\ref{line:unexplained3},\ref{line:unexplained4})
-    are the automatically inserted helper steps to guide the proof checker.}
+    constrain the execution space. The \code{loop_invariant_produce} call is
+    inserted automatically at the beginning of a loop iteration. Lines
+    \ref{line:unexplained1},\ref{line:unexplained2},\ref{line:unexplained3},\ref{line:unexplained4}
+    account for the automatically inserted helper steps to guide the proof
+    checker.}
   \label{lst:call-sequence}
 \end{figure}
 
-Formal verification engine checks this sequence using the contracts like in the
-Fig.~\ref{lst:contract}, and ensures the abscence of misuse e.g. call for
-\code{ring_pop} on a possibly empty ring. It then checks that the model output
-covers all the possible outputs specified in the contract for the tip function.
-This happens in the last line on the listing. The assert contains the
+The formal verification engine checks this sequence using contracts like the one
+shown in the Fig.~\ref{lst:contract}, and ensures the abscence of misuse e.g.
+call for \code{ring_pop} on a possibly empty ring. It then checks that the model
+output covers all the possible outputs specified in the contract for the last
+function. This happens in the last line on the listing. The assert contains the
 path-constraint generated by the symbolic model. In this case the contract
 (Fig.\ref{lst:contract}) guarantees that the popped packet satisfies
 \code{user_property} that entails \code{arg2.port != 9}, hence the trace is
@@ -620,7 +622,7 @@ Formal verification serves two purposes:
   Fig.~\ref{lst:call-sequence} l.\ref{line:assert}.
 \end{itemize}
 
-\subsection{Model inconsystency symptoms}
+\subsection{Detecting model inconsistencies}
 
 The component developer produces a number of model that capture the component
 semantics in more or less details for different usecases. For a particular use
