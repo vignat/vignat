@@ -234,9 +234,7 @@
                          acc_at_this_bucket(acc2, b));
   {
     switch(b) { case bucket(chains):
-      subset_append2(acc1, acc2, chains);
-      subset_append3(chains, acc2, chains);
-      subset_append(acc1, chains, acc_at_this_bucket(acc2, b));
+      append_both_subset(acc1, chains, acc2);
     }
   }
 
@@ -2734,69 +2732,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void filter_subset<t>(fixpoint (t,bool) f, list<t> l)
-  requires true;
-  ensures true == subset(filter(f, l), l);
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        filter_subset(f, t);
-        if (f(h)) {
-          assert remove(h, (filter(f, l))) == filter(f, t);
-          subset_unremove(filter(f,l), t, h);
-        } else {
-          add_extra_preserves_subset(filter(f,l), t, h);
-        }
-    }
-  }
-
-  lemma void append_both_subset<t>(list<t> xs, list<t> ys, list<t> zs)
-  requires true == subset(xs, zs);
-  ensures true == subset(append(xs, ys), append(zs, ys)) &*&
-          true == subset(append(xs, ys), append(ys, zs)) &*&
-          true == subset(append(ys, xs), append(zs, ys)) &*&
-          true == subset(append(ys, xs), append(ys, zs));
-  {
-    subset_append2(xs, zs, ys);
-    subset_append3(xs, ys, zs);
-    subset_refl(ys);
-    subset_append3(ys, zs, ys);
-    subset_append2(ys, ys, zs);
-    subset_append(xs, ys, append(zs, ys));
-    subset_append(xs, ys, append(ys, zs));
-    subset_append(ys, xs, append(zs, ys));
-    subset_append(ys, xs, append(ys, zs));
-  }
-
-  lemma void nonmem_map_filter<t1,t2>(fixpoint (t1,t2) f1,
-                                      fixpoint (t1,bool) f2,
-                                      list<t1> l,
-                                      t1 el)
-  requires false == mem(f1(el), map(f1, l));
-  ensures false == mem(f1(el), map(f1, filter(f2, l)));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        nonmem_map_filter(f1, f2, t, el);
-    }
-  }
-
-  lemma void distinct_map_filter<t1,t2>(fixpoint (t1,t2) f1,
-                                        fixpoint (t1,bool) f2,
-                                        list<t1> l)
-  requires true == distinct(map(f1, l));
-  ensures true == distinct(map(f1, filter(f2, l)));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        nonmem_map_filter(f1, f2, t, h);
-        distinct_map_filter(f1, f2, t);
-    }
-  }
-
   lemma void nonmem_map_append_filter<t1,t2>(fixpoint (t1,t2) f1,
                                              fixpoint (t1,bool) f2,
                                              list<t1> l,
@@ -2875,6 +2810,73 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  lemma void subset_map<t1,t2>(list<t1> l1, list<t1> l2, fixpoint (t1,t2) f)
+  requires true == subset(l1, l2);
+  ensures true == subset(map(f, l1), map(f, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        mem_map(h, l2, f);
+        subset_map(t, l2, f);
+    }
+  }
+  @*/
+
+/*@
+  lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
+  requires true == distinct(append(l1,l2));
+  ensures true == distinct(l1) &*& true == distinct(l2);
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        mem_append(h, t, l2);
+        distinct_unappend(t, l2);
+    }
+  }
+  @*/
+
+/*@
+  lemma void double_mem_append_nondistinct<t>(list<t> l1, list<t> l2, t x)
+  requires true == mem(x, l1) &*& true == mem(x, l2);
+  ensures false == distinct(append(l1, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        if (h == x) {
+          mem_append(x, t, l2);
+        } else {
+          double_mem_append_nondistinct(t, l2, x);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void subset_append_distinct<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, ys) &*&
+           true == distinct(xs) &*&
+           true == distinct(append(ys, zs));
+  ensures true == distinct(append(xs, zs));
+  {
+    switch(xs) {
+      case nil:
+        distinct_unappend(ys, zs);
+      case cons(h,t):
+        mem_append(h, t, zs);
+        if (mem(h, zs)) {
+          assert true == mem(h, ys);
+          double_mem_append_nondistinct(ys, zs, h);
+          assert false == distinct(append(ys, zs));
+        }
+        subset_append_distinct(t, ys, zs);
+    }
+  }
+  @*/
+
+/*@
   lemma void acc_subset_buckets_still_ok_rec<kt>(list<pair<kt, nat> > acc1,
                                                  list<pair<kt, nat> > acc2,
                                                  list<bucket<kt> > buckets,
@@ -2884,7 +2886,40 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == buckets_ok_rec(acc2, buckets, bound);
   ensures true == buckets_ok_rec(acc1, buckets, bound);
   {
-    assume(false);//TODO 60m
+    switch(buckets) {
+      case nil:
+        assert true == distinct(get_just_tails(acc1));
+        subset_forall(acc1, acc2, (upper_limit)(bound));
+      case cons(h,t):
+        acc_at_this_bucket_subset(acc1, acc2, h);
+        assert true == subset(acc_at_this_bucket(acc1, h),
+                              acc_at_this_bucket(acc2, h));
+        advance_acc_subset(acc_at_this_bucket(acc1, h),
+                           acc_at_this_bucket(acc2, h));
+        assert true == subset(advance_acc(acc_at_this_bucket(acc1, h)),
+                              advance_acc(acc_at_this_bucket(acc2, h)));
+        switch(h) { case bucket(chains):
+          map_append(snd, acc2, chains);
+          assert true == distinct(append(get_just_tails(acc2),
+                                         get_just_tails(chains)));
+          subset_map(acc1, acc2, snd);
+          subset_append_distinct(get_just_tails(acc1),
+                                 get_just_tails(acc2),
+                                 get_just_tails(chains));
+          map_append(snd, acc1, chains);
+          assert true == distinct(get_just_tails(append(acc1, chains)));
+        }
+        assert true == distinct(get_just_tails(acc_at_this_bucket(acc2, h)));
+        assert true == distinct(get_just_tails(acc_at_this_bucket(acc1, h)));
+        subset_forall(acc_at_this_bucket(acc1, h),
+                      acc_at_this_bucket(acc2, h), (upper_limit)(bound));
+        advance_acc_still_distinct(acc_at_this_bucket(acc1, h));
+        acc_subset_buckets_still_ok_rec
+          (advance_acc(acc_at_this_bucket(acc1, h)),
+           advance_acc(acc_at_this_bucket(acc2, h)),
+           t, k, bound);
+
+    }
   }
   @*/
 
@@ -3086,7 +3121,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     acc_remove_key_buckets_still_ok_rec(get_wraparound(nil, buckets),
                                         buckets_remove_key_fp(buckets, k),
                                         k, length(buckets));
-  } //took 30m+120m and counting
+  } //took 225m
   @*/
 
 /*@

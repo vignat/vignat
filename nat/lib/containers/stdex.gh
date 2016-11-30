@@ -779,6 +779,69 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void filter_subset<t>(fixpoint (t,bool) f, list<t> l)
+  requires true;
+  ensures true == subset(filter(f, l), l);
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        filter_subset(f, t);
+        if (f(h)) {
+          assert remove(h, (filter(f, l))) == filter(f, t);
+          subset_unremove(filter(f,l), t, h);
+        } else {
+          add_extra_preserves_subset(filter(f,l), t, h);
+        }
+    }
+  }
+
+  lemma void append_both_subset<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, zs);
+  ensures true == subset(append(xs, ys), append(zs, ys)) &*&
+          true == subset(append(xs, ys), append(ys, zs)) &*&
+          true == subset(append(ys, xs), append(zs, ys)) &*&
+          true == subset(append(ys, xs), append(ys, zs));
+  {
+    subset_append2(xs, zs, ys);
+    subset_append3(xs, ys, zs);
+    subset_refl(ys);
+    subset_append3(ys, zs, ys);
+    subset_append2(ys, ys, zs);
+    subset_append(xs, ys, append(zs, ys));
+    subset_append(xs, ys, append(ys, zs));
+    subset_append(ys, xs, append(zs, ys));
+    subset_append(ys, xs, append(ys, zs));
+  }
+
+  lemma void nonmem_map_filter<t1,t2>(fixpoint (t1,t2) f1,
+                                      fixpoint (t1,bool) f2,
+                                      list<t1> l,
+                                      t1 el)
+  requires false == mem(f1(el), map(f1, l));
+  ensures false == mem(f1(el), map(f1, filter(f2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        nonmem_map_filter(f1, f2, t, el);
+    }
+  }
+
+  lemma void distinct_map_filter<t1,t2>(fixpoint (t1,t2) f1,
+                                        fixpoint (t1,bool) f2,
+                                        list<t1> l)
+  requires true == distinct(map(f1, l));
+  ensures true == distinct(map(f1, filter(f2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        nonmem_map_filter(f1, f2, t, h);
+        distinct_map_filter(f1, f2, t);
+    }
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)
