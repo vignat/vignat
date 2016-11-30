@@ -2810,73 +2810,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void subset_map<t1,t2>(list<t1> l1, list<t1> l2, fixpoint (t1,t2) f)
-  requires true == subset(l1, l2);
-  ensures true == subset(map(f, l1), map(f, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        mem_map(h, l2, f);
-        subset_map(t, l2, f);
-    }
-  }
-  @*/
-
-/*@
-  lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
-  requires true == distinct(append(l1,l2));
-  ensures true == distinct(l1) &*& true == distinct(l2);
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        mem_append(h, t, l2);
-        distinct_unappend(t, l2);
-    }
-  }
-  @*/
-
-/*@
-  lemma void double_mem_append_nondistinct<t>(list<t> l1, list<t> l2, t x)
-  requires true == mem(x, l1) &*& true == mem(x, l2);
-  ensures false == distinct(append(l1, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        if (h == x) {
-          mem_append(x, t, l2);
-        } else {
-          double_mem_append_nondistinct(t, l2, x);
-        }
-    }
-  }
-  @*/
-
-/*@
-  lemma void subset_append_distinct<t>(list<t> xs, list<t> ys, list<t> zs)
-  requires true == subset(xs, ys) &*&
-           true == distinct(xs) &*&
-           true == distinct(append(ys, zs));
-  ensures true == distinct(append(xs, zs));
-  {
-    switch(xs) {
-      case nil:
-        distinct_unappend(ys, zs);
-      case cons(h,t):
-        mem_append(h, t, zs);
-        if (mem(h, zs)) {
-          assert true == mem(h, ys);
-          double_mem_append_nondistinct(ys, zs, h);
-          assert false == distinct(append(ys, zs));
-        }
-        subset_append_distinct(t, ys, zs);
-    }
-  }
-  @*/
-
-/*@
   lemma void acc_subset_buckets_still_ok_rec<kt>(list<pair<kt, nat> > acc1,
                                                  list<pair<kt, nat> > acc2,
                                                  list<bucket<kt> > buckets,
@@ -2965,41 +2898,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void filter_forall<t>(fixpoint (t,bool) f, list<t> l)
-  requires true;
-  ensures true == (l == filter(f, l)) == forall(l, f);
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        filter_forall(f, t);
-        if (f(h)) {
-        } else {
-          assert false == forall(l, f);
-          assert filter(f,l) == filter(f,t);
-          filter_no_increase_len(f, t);
-          assert length(filter(f, l)) < length(l);
-          assert l != filter(f,l);
-        }
-    }
-  }
-  @*/
-
-/*@
-  lemma void filter_append_idemp<t>(list<t> l1, list<t> l2,
-                                    fixpoint (t,bool) f)
-  requires true;
-  ensures filter(f, append(l1, l2)) == append(filter(f, l1), filter(f, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        filter_append_idemp(t, l2, f);
-    }
-  }
-  @*/
-
-/*@
   lemma void filter_acc_at_this_b_idemp<kt>(list<pair<kt, nat> > acc,
                                             list<pair<kt, nat> > chns,
                                             fixpoint (pair<kt, nat>, bool) f)
@@ -3053,20 +2951,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           filter_acc_at_this_b_idemp(acc, chains, (not_this_key_pair_fp)(k));
           remkey_advance_acc_idemp(acc_at_this_bucket(acc, h), k);
         }
-    }
-  }
-  @*/
-/*@
-  lemma void forall_filter<t>(fixpoint (t,bool) f1,
-                              fixpoint (t,bool) f2,
-                              list<t> l)
-  requires true == forall(l, f1);
-  ensures true == forall(filter(f2, l), f1);
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        forall_filter(f1, f2, t);
     }
   }
   @*/
