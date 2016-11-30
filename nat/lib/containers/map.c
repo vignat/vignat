@@ -2884,7 +2884,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == buckets_ok_rec(acc2, buckets, bound);
   ensures true == buckets_ok_rec(acc1, buckets, bound);
   {
-    assume(false);//TODO 30m
+    assume(false);//TODO 60m
   }
   @*/
 
@@ -3021,16 +3021,51 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     }
   }
   @*/
+/*@
+  lemma void forall_filter<t>(fixpoint (t,bool) f1,
+                              fixpoint (t,bool) f2,
+                              list<t> l)
+  requires true == forall(l, f1);
+  ensures true == forall(filter(f2, l), f1);
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        forall_filter(f1, f2, t);
+    }
+  }
+  @*/
+
+/*@
+  lemma void buckets_ok_rec_wraparound_distinct<kt>(list<pair<kt, nat> > acc,
+                                                    list<bucket<kt> > buckets,
+                                                    int bound)
+  requires true == buckets_ok_rec(acc, buckets, bound);
+  ensures true == distinct(get_just_tails(get_wraparound(acc, buckets)));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        buckets_ok_rec_wraparound_distinct
+          (advance_acc(acc_at_this_bucket(acc, h)),
+           t, bound);
+    }
+  }
+  @*/
 
 /*@
   lemma void acc_remove_key_buckets_still_ok_rec<kt>(list<pair<kt, nat> > acc,
                                                      list<bucket<kt> > buckets,
                                                      kt k, int bound)
-  requires true == buckets_ok_rec(acc, buckets, bound);
+  requires true == buckets_ok_rec(acc, buckets, bound) &*&
+           true == distinct(get_just_tails(acc));
   ensures true == buckets_ok_rec(filter((not_this_key_pair_fp)(k), acc),
                                  buckets, bound);
   {
-    assume(false);//TODO 10m
+    filter_subset((not_this_key_pair_fp)(k), acc);
+    distinct_map_filter(snd, (not_this_key_pair_fp)(k), acc);
+    acc_subset_buckets_still_ok_rec(filter((not_this_key_pair_fp)(k), acc),
+                                    acc, buckets, k, bound);
   }
   @*/
 /*@
@@ -3038,10 +3073,16 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true == buckets_ok(buckets);
   ensures true == buckets_ok(buckets_remove_key_fp(buckets, k));
   {
+    if (buckets == nil) {
+      return;
+    }
     buckets_remove_key_same_len(buckets, k);
     buckets_remove_key_still_ok_rec(get_wraparound(nil, buckets), buckets,
                                     k, length(buckets));
     get_wraparound_removed_key(nil, buckets, k);
+    buckets_ok_rec_wraparound_distinct(get_wraparound(nil, buckets),
+                                       buckets, length(buckets));
+    buckets_ok_get_wraparound_idemp(buckets);
     acc_remove_key_buckets_still_ok_rec(get_wraparound(nil, buckets),
                                         buckets_remove_key_fp(buckets, k),
                                         k, length(buckets));
