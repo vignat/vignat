@@ -3022,6 +3022,27 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void
+  buckets_remove_key_chains_still_start_on_hash_rec<kt>
+    (list<bucket<kt> > buckets, int capacity, kt k,
+     fixpoint (kt,int) hash, int start)
+  requires true == key_chains_start_on_hash_fp(buckets, start, capacity, hash);
+  ensures true == key_chains_start_on_hash_fp
+                    (buckets_remove_key_fp(buckets, k), start, capacity, hash);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          forall_filter((has_given_hash_fp)(hash, start, capacity),
+                        (not_this_key_pair_fp)(k),
+                        chains);
+          buckets_remove_key_chains_still_start_on_hash_rec
+            (t, capacity, k, hash, start+1);
+        }
+    }
+  }
+
+  lemma void
   buckets_remove_key_chains_still_start_on_hash<kt>
     (list<bucket<kt> > buckets, int capacity, kt k,
      fixpoint (kt,int) hash)
@@ -3029,8 +3050,9 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures true == key_chains_start_on_hash_fp
                     (buckets_remove_key_fp(buckets, k), 0, capacity, hash);
   {
-    assume(false);//TODO 5m
-  }
+    buckets_remove_key_chains_still_start_on_hash_rec
+      (buckets, capacity, k, hash, 0);
+  } //took 10m
   @*/
 
 static
