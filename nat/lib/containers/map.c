@@ -163,12 +163,6 @@
       case some(key): return hash(key);
     }
   }
-
-  fixpoint list<int> get_keys_hashes_fp<kt>(list<option<kt> > keys,
-                                            fixpoint (kt,int) hash) {
-    return map((get_optional_hash_fp)(hash), keys);
-  }
-
   @*/
 
 /*@
@@ -557,14 +551,6 @@ int loop(int k, int capacity)
   @*/
 
 /*@
-  fixpoint hmap<kt> buckets_get_hmap_fp<kt>(list<bucket<kt> > buckets,
-                                            fixpoint (kt,int) hash) {
-    return hmap(buckets_get_keys_fp(buckets),
-                get_keys_hashes_fp(buckets_get_keys_fp(buckets), hash));
-  }
-  @*/
-
-/*@
 
   predicate pred_mapping<t>(list<void*> pts, list<int> bbs,
                             predicate (void*; t) pred;
@@ -617,13 +603,13 @@ int loop(int k, int capacity)
 
 /*@
   predicate buckets_hmap_insync<kt>(int* chns, int capacity,
-                                    hmap<kt> m, list<bucket<kt> > buckets,
-                                    fixpoint (kt, int) hash) =
+                                    list<bucket<kt> > buckets,
+                                    fixpoint (kt,int) hash;
+                                    list<option<kt> > ks) =
     ints(chns, capacity, buckets_get_chns_fp(buckets)) &*&
     true == buckets_ok(buckets) &*&
-    m == buckets_get_hmap_fp(buckets, hash) &*&
-    true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash);
-
+    true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash) &*&
+    ks == buckets_get_keys_fp(buckets);
   @*/
 
 /*@
@@ -1097,11 +1083,9 @@ int loop(int k, int capacity)
            0 < capacity &*&
            true == buckets_ok(buckets) &*&
            length(buckets) == capacity;
-  ensures hmap_exists_key_fp(buckets_get_hmap_fp(buckets, hash), k) ==
+  ensures mem(some(k), buckets_get_keys_fp(buckets)) ==
           bucket_has_key_fp(k, nth(loop_fp(hash(k), capacity), buckets));
   {
-    assert hmap_exists_key_fp(buckets_get_hmap_fp(buckets, hash), k) ==
-           mem(some(k), buckets_get_keys_fp(buckets));
     loop_lims(hash(k), capacity);
     if (mem(k, map(fst, get_wraparound(nil, buckets)))) {
       key_in_wraparound_then_key_in_a_bucket(buckets, k, nil);
@@ -1798,13 +1782,15 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                          void* keyp, map_keys_equality* eq, int key_hash,
                          int capacity)
 /*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, ?kps, k_hashes, ?hm) &*&
-             buckets_hmap_insync(chns, capacity, hm, ?buckets, hsh) &*&
+             buckets_hmap_insync(chns, capacity, ?buckets, hsh,
+                                 hmap_ks_fp(hm)) &*&
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
              [?f]is_map_keys_equality<kt>(eq, kpr); @*/
 /*@ ensures hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm) &*&
-            buckets_hmap_insync(chns, capacity, hm, buckets, hsh) &*&
+            buckets_hmap_insync(chns, capacity, buckets, hsh,
+                                hmap_ks_fp(hm)) &*&
             pointers(keyps, capacity, kps) &*&
             [kfr]kpr(keyp, k) &*&
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
@@ -1813,7 +1799,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              (result == -1)); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
-  //@ open buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
+  //@ open buckets_hmap_insync(chns, capacity, buckets, hsh, hmap_ks_fp(hm));
   //@ assert ints(chns, capacity, ?chnlist);
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
@@ -1855,7 +1841,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         /*@ recover_pred_mapping(kps, bbs, ks, index); @*/
         //@ hmap_find_this_key(hm, index, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
-        //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
+        //@ close buckets_hmap_insync(chns, capacity, buckets, hsh, ks);
         return index;
       }
       //@ recover_pred_mapping(kps, bbs, ks, index);
@@ -1873,7 +1859,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         //@ chains_depleted_no_hope(buckets, i, loop_fp(hsh(k), capacity), k, capacity, hsh);
         //@ assert false == hmap_exists_key_fp(hm, k);
         //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
-        //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
+        //@ close buckets_hmap_insync(chns, capacity, buckets, hsh, ks);
         return -1;
       }
       //@ assert(length(ks) == capacity);
@@ -1888,7 +1874,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ pred_mapping_same_len(bbs, ks);
   //@ by_loop_for_all(ks, (not_my_key)(k), start, capacity, nat_of_int(capacity));
   //@ no_key_found(ks, k);
-  //@ close buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
+  //@ close buckets_hmap_insync(chns, capacity, buckets, hsh, ks);
   //@ close hmapping<kt>(kpr, hsh, capacity, busybits, kps, k_hashes, hm);
   return -1;
 }
@@ -3009,14 +2995,15 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void buckets_hmap_rm_key<kt>(list<bucket<kt> > buckets,
-                                     hmap<kt> hm,
-                                     fixpoint (kt,int) hsh, kt k)
-  requires buckets_get_hmap_fp(buckets, hsh) == hm;
-  ensures hmap_rem_key_fp(hm, hmap_find_key_fp(hm, k)) ==
-          buckets_get_hmap_fp(buckets_remove_key_fp(buckets, k), hsh);
+  lemma void buckets_rm_key_get_keys<kt>(list<bucket<kt> > buckets,
+                                         kt k)
+  requires true == mem(some(k), buckets_get_keys_fp(buckets)) &*&
+           true == no_dups(buckets_get_keys_fp(buckets));
+  ensures buckets_get_keys_fp(buckets_remove_key_fp(buckets, k)) ==
+          update(index_of(some(k), buckets_get_keys_fp(buckets)),
+                 none, buckets_get_keys_fp(buckets));
   {
-    assume(false);//TODO 50m
+    assume(false);//TODO
   }
   @*/
 
@@ -3063,7 +3050,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                                       int capacity,
                                       void** keyp_out)
 /*@ requires hmapping<kt>(?kpr, ?hsh, capacity, busybits, ?kps, k_hashes, ?hm) &*&
-             buckets_hmap_insync(chns, capacity, hm, ?buckets, hsh) &*&
+             buckets_hmap_insync(chns, capacity, ?buckets, hsh, hmap_ks_fp(hm)) &*&
              pointers(keyps, capacity, kps) &*&
              [?kfr]kpr(keyp, ?k) &*&
              hsh(k) == key_hash &*&
@@ -3074,8 +3061,9 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                          busybits, kps, k_hashes,
                          hmap_rem_key_fp(hm, hmap_find_key_fp(hm, k))) &*&
             buckets_hmap_insync(chns, capacity,
-                                hmap_rem_key_fp(hm, hmap_find_key_fp(hm, k)),
-                                buckets_remove_key_fp(buckets, k), hsh) &*&
+                                buckets_remove_key_fp(buckets, k), hsh,
+                                hmap_ks_fp(hmap_rem_key_fp
+                                             (hm, hmap_find_key_fp(hm, k)))) &*&
             pointers(keyps, capacity, kps) &*&
             [kfr]kpr(keyp, k) &*&
             [f]is_map_keys_equality<kt>(eq, kpr) &*&
@@ -3085,7 +3073,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
             [0.5]kpr(ptr, k); @*/
 {
   //@ open hmapping(_, _, _, _, _, _, hm);
-  //@ open buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
+  //@ open buckets_hmap_insync(chns, capacity, buckets, hsh, hmap_ks_fp(hm));
   //@ assert ints(chns, capacity, ?chnlist);
   //@ assert pred_mapping(kps, ?bbs, kpr, ?ks);
   //@ assert hm == hmap(ks, ?khs);
@@ -3093,7 +3081,6 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   int start = loop(key_hash, capacity);
   //@ buckets_keys_chns_same_len(buckets);
   //@ assert true == hmap_exists_key_fp(hm, k);
-  //@ assert true == hmap_exists_key_fp(buckets_get_hmap_fp(buckets, hsh), k);
   //@ assert start == loop_fp(hsh(k), capacity);
   //@ key_is_contained_in_the_bucket(buckets, capacity, hsh, k);
   //@ buckets_remove_add_one_chain(buckets, start, k);
@@ -3110,7 +3097,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                   hsh(k) == key_hash &*&
                   true == hash_list(ks, khs, hsh) &*&
                   *keyp_out |-> _ &*&
-                  hm == buckets_get_hmap_fp(buckets, hsh) &*&
+                  ks == buckets_get_keys_fp(buckets) &*&
                   i <= buckets_get_chain_fp(buckets, k, start) &*&
                   chnlist ==
                     add_partial_chain_fp
@@ -3150,15 +3137,14 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
         //@ assert nth(index, hmap_ks_fp(hm)) == some(k);
         //@ chns_after_partial_chain_ended(buckets, k, start, i, capacity);
         //@ buckets_remove_key_still_ok(buckets, k);
-        //@ buckets_hmap_rm_key(buckets, hm, hsh, k);
+        //@ buckets_rm_key_get_keys(buckets, k);
         /*@ buckets_remove_key_chains_still_start_on_hash
               (buckets, capacity, k, hsh);
           @*/
         /*@ close buckets_hmap_insync(chns, capacity,
-                                      hmap_rem_key_fp(hm,
-                                                      hmap_find_key_fp(hm, k)),
                                       buckets_remove_key_fp(buckets, k),
-                                      hsh);
+                                      hsh,
+                                      update(index_of(some(k), ks), none, ks));
           @*/
         return index;
       }
@@ -3307,29 +3293,30 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   @*/
 
 /*@
-  predicate buckets_hmap_insync_Xchain<kt>(int* chns, int capacity,
-                                           hmap<kt> m,
-                                           list<bucket<kt> > buckets,
-                                           fixpoint (kt,int) hash,
-                                           int start, int fin) =
+  predicate buckets_ks_insync_Xchain<kt>(int* chns, int capacity,
+                                         list<bucket<kt> > buckets,
+                                         fixpoint (kt,int) hash,
+                                         int start, int fin;
+                                         list<option<kt> > ks) =
     ints(chns, capacity,
          add_partial_chain_fp(start,
                               (fin < start) ? capacity + fin - start :
                                               fin - start,
                               buckets_get_chns_fp(buckets))) &*&
     true == buckets_ok(buckets) &*&
-    m == buckets_get_hmap_fp(buckets, hash) &*&
-    true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash);
+    true == key_chains_start_on_hash_fp(buckets, 0, capacity, hash) &*&
+    ks == buckets_get_keys_fp(buckets);
   @*/
 
 /*@
-  lemma void start_Xchain<kt>(int* chns, int capacity, hmap<kt> hm,
+  lemma void start_Xchain<kt>(int* chns, int capacity,
                               list<bucket<kt> > buckets,
+                              list<option<kt> > ks,
                               fixpoint (kt,int) hsh,
                               int start)
-  requires buckets_hmap_insync(chns, capacity, hm, buckets, hsh);
-  ensures buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
-                                     start, start);
+  requires buckets_hmap_insync(chns, capacity, buckets, hsh, ks);
+  ensures buckets_ks_insync_Xchain(chns, capacity, buckets, hsh,
+                                   start, start, ks);
   {
     assume(false);//TODO 5m
   }
@@ -3377,13 +3364,13 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
 static
 int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
 /*@ requires hmapping<kt>(?kp, ?hsh, capacity, busybits, ?kps, ?k_hashes, ?hm) &*&
-             buckets_hmap_insync(chns, capacity, hm, ?buckets, hsh) &*&
+             buckets_hmap_insync(chns, capacity, ?buckets, hsh, hmap_ks_fp(hm)) &*&
              pointers(?keyps, capacity, kps) &*&
              0 <= start &*& start < capacity &*&
              hmap_size_fp(hm) < capacity; @*/
 /*@ ensures hmapping<kt>(kp, hsh, capacity, busybits, kps, k_hashes, hm) &*&
-            buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
-                                       start, result) &*&
+            buckets_ks_insync_Xchain(chns, capacity, buckets, hsh,
+                                     start, result, hmap_ks_fp(hm)) &*&
             pointers(keyps, capacity, kps) &*&
             true == hmap_empty_cell_fp(hm, result) &*&
             0 <= result &*& result < capacity; @*/
@@ -3391,7 +3378,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
   //@ open hmapping(_, _, _, _, _, _, hm);
   //@ assert pred_mapping(kps, ?bbs, kp, ?ks);
   //@ assert hm == hmap(ks, ?khs);
-  //@ start_Xchain(chns, capacity, hm, buckets, hsh, start);
+  //@ start_Xchain(chns, capacity, buckets, ks, hsh, start);
   //@ loop_bijection(start, capacity);
   int i = 0;
   for (; i < capacity; ++i)
@@ -3403,23 +3390,24 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                   true == up_to(nat_of_int(i),
                                 (byLoopNthProp)(ks, cell_busy,
                                                 capacity, start)) &*&
-                  buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
-                                             start, loop_fp(start + i, capacity));
+                  buckets_ks_insync_Xchain(chns, capacity, buckets, hsh,
+                                           start, loop_fp(start + i, capacity),
+                                           ks);
       @*/
     //@ decreases capacity - i;
   {
     //@ pred_mapping_same_len(bbs, ks);
     int index = loop(start + i, capacity);
-    /*@ open buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
-                                        start, index);
+    /*@ open buckets_ks_insync_Xchain(chns, capacity, buckets, hsh,
+                                      start, index, ks);
       @*/
     //@ assert ints(chns, capacity, ?chnlist);
     int bb = busybits[index];
     if (0 == bb) {
       //@ zero_bbs_is_for_empty(bbs, ks, index);
       //@ close hmapping<kt>(kp, hsh, capacity, busybits, kps, k_hashes, hm);
-      /*@ close buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
-                                           start, index);
+      /*@ close buckets_ks_insync_Xchain(chns, capacity, buckets, hsh,
+                                         start, index, ks);
         @*/
       return index;
     }
@@ -3469,8 +3457,9 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
       }
       @*/
     /*@
-        close buckets_hmap_insync_Xchain(chns, capacity, hm, buckets, hsh,
-                                         start, loop_fp(start+i+1, capacity));
+        close buckets_ks_insync_Xchain(chns, capacity, buckets, hsh,
+                                       start, loop_fp(start+i+1, capacity),
+                                       ks);
       @*/
   }
   //@ pred_mapping_same_len(bbs, ks);
@@ -3649,7 +3638,8 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                         int* values) =
      pointers(keyps, capacity, ?kps) &*&
      hmapping<kt>(keyp, hash, capacity, busybits, kps, k_hashes, ?hm) &*&
-     buckets_hmap_insync<kt>(chns, capacity, hm, ?buckets, hash) &*&
+     buckets_hmap_insync<kt>(chns, capacity, ?buckets, hash, ?ks) &*&
+     ks == hmap_ks_fp(hm) &*&
      ints(values, capacity, ?val_arr) &*&
      true == rec_props(recp, m) &*&
      key_vals<kt,int>(hmap_ks_fp(hm), val_arr, m) &*&
@@ -3703,9 +3693,9 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
                                            fixpoint (kt,int) hash)
   requires ints(chns, capacity, zero_list_fp(nat_of_int(capacity)));
   ensures buckets_hmap_insync<kt>(chns, capacity,
-                                  empty_hmap_fp(capacity, khlist),
                                   empty_buckets_fp<kt>(nat_of_int(capacity)),
-                                  hash);
+                                  hash,
+                                  none_list_fp<kt>(nat_of_int(capacity)));
   {
     assume(false);//TODO 5m
   }
@@ -4319,19 +4309,19 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void buckets_hmap_put_key_insync<kt>(int* chns, int capacity,
-                                             hmap<kt> hm,
-                                             fixpoint (kt,int) hsh,
-                                             int start,
-                                             int fin,
-                                             kt k)
-  requires buckets_hmap_insync_Xchain(chns, capacity, hm, ?buckets,
-                                      hsh, start, fin);
+  lemma void buckets_ks_put_key_insync<kt>(int* chns, int capacity,
+                                           fixpoint (kt,int) hsh,
+                                           int start,
+                                           int fin,
+                                           kt k,
+                                           list<option<kt> > ks)
+  requires buckets_ks_insync_Xchain(chns, capacity, ?buckets,
+                                    hsh, start, fin, ks);
   ensures buckets_hmap_insync(chns, capacity,
-                              hmap_put_key_fp(hm, fin, k, hsh(k)),
                               buckets_put_key_fp(buckets, k, start,
                                                  fin, capacity),
-                              hsh);
+                              hsh,
+                              update(fin, some(k), ks));
   {
     assume(false);//TODO 30m
   }
@@ -4380,9 +4370,10 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     @*/
   //@ coherent_put_preserves_key_vals(hmap_ks_fp(hm), vals, m, index, k, value);
   //@ coherent_put_preserves_key_vals(hmap_ks_fp(hm), kps, addrs, index, k, keyp);
-  /*@ buckets_hmap_put_key_insync(chns, capacity,
-                                  hm, hsh,
-                                  start, index, k);
+  /*@ buckets_ks_put_key_insync(chns, capacity,
+                                hsh,
+                                start, index, k,
+                                ks);
     @*/
   /*@ close mapping(map_put_fp(m, k, value), map_put_fp(addrs, k, keyp),
                     kp, recp, hsh, capacity, busybits, keyps, k_hashes, chns, values);
