@@ -210,7 +210,7 @@ conclude (\S\ref{sec:conclusion}).
 \section{Solution Overview}
 \label{sec:solution-overview}
 
-\subsection{Developer experience}
+\subsection{Developer Experience}
 
 This section motivates and explains at a high level what it's like to use Vigor
 when developing NFs. For the sake of illustration, say we wish to develop a
@@ -244,7 +244,7 @@ int main() {
 \end{lstlisting}
   \caption{Original implementation of the Drop protocol. Contains an infinite
     loop (ll.\ref{line:loop-begin}-\ref{line:loop-end}) and a latent ring
-    implementation (declared on l.\ref{line:pkt-def},\ref{line:iter-def})}
+    implementation (declared on ll.\ref{line:pkt-def},\ref{line:iter-def})}
   \label{lst:orig}
 \end{figure}
 
@@ -260,6 +260,12 @@ follows a common practice: it consists of a main event loop, it has no other
 complex loops, and it uses a ring, a popular data structure in network
 programming. As a result, our NF accumulates state in the ring thus making many
 existing verification approaches impractical.
+
+Vigor provides two things: a verified library of components and a verification
+toolchain. Each component consists of an API with formal specification, verified
+implementation and a set of symbolic models. The toolchain verifies the NF code
+and stitches it with the relevant components to produce a single reliable
+application.
 
 Fig.~\ref{lst:vigor} shows the annotated code, ready for the verification with
 Vigor. It is the result of applying the first two steps shown below.
@@ -357,8 +363,10 @@ resulting executable is guaranteed to be free of crashes, and hold the
 properties formulated in \code{VIGOR_CHECK}, subject to the assumptions listed
 in~\S\ref{sec:limitations}.
 
-\subsection{Under the hood}
+\subsection{Under The Hood}
 \label{sec:under-the-hood}
+
+\subsubsection{Symbolic Execution}
 
 To verify that this NF does not crash, one could use the approach of Dobrescu et
 al.~\cite{dobrescu2014software} and run exhaustive symbolic execution. The
@@ -394,21 +402,21 @@ loop gives rise to an infinite number of paths.
 
 Vigor transforms infinite loops using loop
 invariants~\cite[\S~2.1]{cormen2009introduction} that allow to model all the
-iterations of a loop in a single one. To support this kind of generalization, we
-added automatic havoc-ing~\cite{barnett2005boogie} to KLEE. Havoc-ing simply
-replaces all the variables that may change in the loop by unconstrained symbols
-at the beginning of the iteration. In our example that would be the variables
-\code{begin} and \code{queue_len} and the contents of \code{packets[0..CAP]},
-but not the value of the \code{packets} pointer because it never changes. The
-step 1 enables Vigor to reduce each problematic loop to a single generalized
-iteration that allows reasoning in one pass.
+iterations of a loop in a single one. To support this, we added automatic
+havoc-ing~\cite{barnett2005boogie} to KLEE. Havoc-ing simply replaces all the
+variables that may change in the loop by unconstrained symbols at the beginning
+of the iteration. In our example that would be the variables \code{begin} and
+\code{queue_len} and the contents of \code{packets[0..CAP]}, but not the value
+of the \code{packets} pointer itself because it never changes. Step 1 enables Vigor
+to reduce each problematic loop to a single generalized iteration that allows
+reasoning in one pass.
 
 This change makes SE feasible, albeit impractical: for \code{CAP=5}, it takes 10
 sec to exhaustively SE the code; for \code{CAP=30} it takes 15 min, for
 \code{CAP=60} it takes 3 hours, and so on. Another classic SE challenge ---
 ``symbolic
-indexing''~\cite{sen2005cute,godefroid2008automated,boonstoppel2008rwset} spoils
-the party here. When indexing an array with a symbolic variable (or when
+indexing''~\cite{sen2005cute,godefroid2008automated,boonstoppel2008rwset} ---
+spoils the party here. When indexing an array with a symbolic variable (or when
 dereferencing a symbolic pointer), the constraints on program state become
 extremely complex, because the symbolic pointer or index could be referencing
 many different possible locations. The complexity of the constraints chokes the
@@ -425,26 +433,55 @@ program state into well-defined data structures and putting them into a
 development, because the NF code uses a relatively small set of standard
 structures, such as ring buffers, hash tables, least-prefix-match tables, etc.
 We provide to the SEE symbolic models of these abstracted components that
-``hide'' symbolic indexes and pointers from the SEE.
+``hide'' symbolic indexes and pointers from the SEE. After the step 2 exhaustive
+SE takes less than 100 millisec regardless of the value of \code{CAP}.
 
-After the step 2 exhaustive SE takes less than 100 millisec regardless of the
-value of \code{CAP}. The fact that the code does not crash on any path amounts
-to a proof of crash freedom. Or does it? The validity of the proof depends on
-our library implementation of \code{ring} not crashing; and the symbolic model
-of \code{ring} accurately capturing how the \code{ring} implementation works.
+SE is a first step on the way of a complete proof. After the exhaustive SE found
+no crashes in the application code, we need to verify for each component (e.g.
+for the ring component) that (1) the actual component implementation does not
+crash itself and follows the declared API specification, and (2) the model used
+during SE faithfully approximated the same specification.
+
+\subsubsection{Formal Verification}
 
 The Vigor library comes with a formal specification and a formal proof that the
 implementation satisfies that specification. In other words, there is a formal
 spec for \code{ring} and a proof that the \code{ring} implementation satisfies
-the spec. This is how we enable SE to verify the high level code, while using
+the spec. This is how we enable SE to verify the NF code, while using
 separation logic to verify the library of components --- two different
-verifications techniques for two different parts of the complete application.
+verification techniques for two different parts of the complete application.
 Doing the library verification requires deep expertise in program verification,
 but our effort is amortized across all NFs that use the library.
 
 Vigor makes it possible for NF developers to verify their code without having to
 understand verification. Note that stating invariants(step 3) for dataplane
 software turns out to require no verification expertise.
+
+Figure~\ref{lst:contract} shows the formal specification and a proven
+implementation of the example function \code{ring_pop_front}. This C code is
+intermingled with the correctness proof annotations that help the formal
+verification engine (VeriFast) with small steps to transform the initial state,
+given in \code{requires} to the final state, specified in \code{ensures}. After
+proving the correctness of this transformation, the formal verification engine
+will use \code{requires/ensures} formulas as pre- and post- conditions for
+\code{ring_pop_front} contract. The trigraph \code{&*&} separates different
+statements that hold together. For example
+
+\begin{lstlisting}
+ringp(r, user_property, tail(lst), cap) &*&
+packetp(p, head(lst)) &*&
+true == user_property(head(lst));
+\end{lstlisting}
+means:
+\begin{itemize}
+\item \code{r} points to a healthy ring of capacity \code{cap}, that contains
+  \code{tail(lst)} packets, that all satisfy the \code{user_property}.
+\item \code{p} points to a packet ``\code{head(lst)}''.
+\item ``\code{head(lst)}'' satisfies the \code{user_property}.
+\end{itemize}
+
+Note that \code{user_property(head(lst));} in the post condition ensures
+\code{p->port != 9} property (Fig.~\ref{lst:customizations}).
 
 \begin{figure}[h!]
 \begin{lstlisting}
@@ -483,44 +520,26 @@ void ring_pop_front(struct ring* r,
   \label{lst:contract}
 \end{figure}
 
+\subsubsection{Symbolic Models}
 
-Figure~\ref{lst:contract} shows the formal specification and a proven
-implementation of the example function \code{ring_pop_front}. This C code is
-intermingled with the correctness proof annotations that help the formal
-verification engine (VeriFast) with small steps to transform the initial state,
-given in \code{requires} to the final state, specified in \code{ensures}. After
-proving the correctness of this transformation, the formal verification engine
-will use \code{requires/ensures} formulas as pre- and post- conditions for
-\code{ring_pop_front} contract. The trigraph \code{&*&} separates different
-statements that hold together. For example
-
-\begin{lstlisting}
-ringp(r, user_property, tail(lst), cap) &*&
-packetp(p, head(lst)) &*&
-true == user_property(head(lst));
-\end{lstlisting}
-means:
-\begin{itemize}
-\item \code{r} points to a healthy ring of capacity \code{cap}, that contains
-  \code{tail(lst)} packets, that all satisfy the \code{user_property}.
-\item \code{p} points to a packet ``\code{head(lst)}''.
-\item ``\code{head(lst)}'' satisfies the \code{user_property}.
-\end{itemize}
-
-Note that \code{user_property(head(lst));} in the post condition ensures
-\code{p->port != 9} property (Fig.~\ref{lst:customizations}).
+The real implementation, even the correct one will inevitably complicate SE
+of the NF code bringing back all the problems that we were so carefully
+avoiding. To make the exhaustive SE feasible, Vigor uses symbolic models,
+simplified implementation with small state that approximately mimics the real
+thing in most cases.
 
 \begin{figure}[h!]
 \begin{lstlisting}
 void ring_pop_front(struct ring* r,
                     struct packet* p) {
-  FILL_SYMBOLIC(p, sizeof(struct packet),
+  FILL_SYMBOLIC(p, sizeof(struct packet), ^\label{line:fill-symbolic}^
                 "popped_packet");
   ASSUME(packet_constraints(p));^\label{line:assume}^
 }
 \end{lstlisting}
   \caption{A symbolic model for \code{ring_pop_front}. It fills symbolically a
-    packet and adds a constraint to it.}
+    packet (l.\ref{line:fill-symbolic}) and adds a constraint to it
+    (l.\ref{line:assume}).}
   \label{lst:symbolic-model}
 \end{figure}
 
@@ -537,6 +556,8 @@ The model of \code{ring_pop_front} used for this example is shown on
 Fig.~\ref{lst:symbolic-model}. This model is simple enough to enable
 exhaustive SE, but preserves the vital property --- \code{packet_constraints}
 (Fig.\ref{lst:customizations}).
+
+\subsubsection{Model Validation}
 
 To validate the model fit for the particular use case, SEE dumps all the call
 sequences (30 in this example) extracted from the execution paths. Vigor
@@ -587,7 +608,7 @@ The formal verification engine checks this sequence using contracts like the one
 shown in the Fig.~\ref{lst:contract}, and ensures the abscence of misuse e.g.
 call for \code{ring_pop} on a possibly empty ring. It then checks that the model
 output covers all the possible outputs specified in the contract for the last
-function. This happens in the last line on the listing. The assert contains the
+function. This happens on the line~\ref{line:assert}. The assert contains the
 path-constraint generated by the symbolic model. In this case the contract
 (Fig.\ref{lst:contract}) guarantees that the popped packet satisfies
 \code{user_property} that entails \code{arg2.port != 9}, hence the trace is
@@ -600,10 +621,10 @@ sequence for model validation, and does not use further in the SE, because our
 model of \code{ring_push_back} discards the packet being pushed. However, the
 call to \code{ring_pop_front} (l.\ref{line:pop-front}) reintroduces this
 constraint formulated in \code{packet_constraints}
-(Fig.~\ref{lst:customizations},l.\ref{line:c-pkt-cnstr}), according to the
+(Fig.~\ref{lst:customizations}~l.\ref{line:c-pkt-cnstr}), according to the
 symbolic model - Fig.~\ref{lst:symbolic-model}. Being applied to the fresh
-packet from the ring, it satisfies the \code{VIGOR_CHECK} (Fig.~\ref{lst:vigor}
-l.\ref{line:vigcheck}).
+packet from the ring, it satisfies the \code{VIGOR_CHECK}
+(Fig.~\ref{lst:vigor}~l.\ref{line:vigcheck}).
 
 During the operation, SEE produces call sequences that also capture the said
 constraint. E.g. the line~\ref{line:assert} on Fig.~\ref{lst:call-sequence}
@@ -622,13 +643,13 @@ Formal verification serves two purposes:
   Fig.~\ref{lst:call-sequence} l.\ref{line:assert}.
 \end{itemize}
 
-\subsection{Detecting model inconsistencies}
+\subsubsection{Detecting model inconsistencies}
 
-The component developer produces a number of model that capture the component
+The component developer produces several model that capture the component
 semantics in more or less details for different usecases. For a particular use
 case --- a NF, a particular model may be inappropriate. An inappropriate model
 may not compromise the verification result, because Vigor detects both
-overapproximate and underapproximate models.
+over- and under-approximations.
 
 Suppose we had an overapproximate model --- Fig.~\ref{lst:overapproximate}. Then
 the popped packet would come unconstrained and the \code{VIGOR_CHECK}
@@ -666,13 +687,14 @@ this case would look different:
 \begin{lstlisting}
 /*@ assert(arg2.port == 0); @*/
 \end{lstlisting}
-The assertion fails, because the contract (Fig.~\ref{lst:contract}) specifies
-a wider range for \code{arg2.port} than just \code{0}.
+Vigor model validation phase flags this inconsistency. Specifically, the
+assertion fails, because the contract (Fig.~\ref{lst:contract}) specifies a
+wider range for \code{arg2.port} than just \code{0}.
 
 Different models may work well for different usecases. E.g. the overapproximate
 model is just right for a buffer, that does not drop the packets with port 9.
 The underapproximate model would be just right for a buffer that forwards only the
-packets with port equeal to 0.
+packets with port equal to 0.
 
 
 % Note, that the \code{ring_pop} model does not even check whether it is called
