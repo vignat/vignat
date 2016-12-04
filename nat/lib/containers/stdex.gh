@@ -869,7 +869,8 @@ ensures append(a, b) != nil;
 
   lemma void filter_forall<t>(fixpoint (t,bool) f, list<t> l)
   requires true;
-  ensures true == (l == filter(f, l)) == forall(l, f);
+  ensures true == (l == filter(f, l)) == forall(l, f) &*&
+          true == forall(filter(f, l), f);
   {
     switch(l) {
       case nil:
