@@ -1918,14 +1918,14 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   fixpoint list<int> add_partial_chain_fp(int start,
                                           int len,
                                           list<int> chain_cnts) {
-    return (length(chain_cnts) < len + start)      ?
+    return (length(chain_cnts) < start + len)      ?
       add_partial_chain_rec_fp
         (add_partial_chain_rec_fp
            (chain_cnts, start, len),
          0,
          len + start - length(chain_cnts)) :
       add_partial_chain_rec_fp(chain_cnts, start, len);
-  }
+      }
 
   fixpoint nat chain_with_key_fp<kt>(list<pair<kt,nat> > chains, kt k) {
     switch(chains) {
@@ -3903,16 +3903,87 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   @*/
 
 /*@
+  lemma void add_part_chn_rec_add_one(list<int> chns, list<int> orig_chns,
+                                      int start, int len)
+  requires chns == add_partial_chain_rec_fp(orig_chns, start, len) &*&
+           start + len + 1 <= length(orig_chns);
+  ensures update(start + len, nth(start + len, chns) + 1, chns) ==
+          add_partial_chain_rec_fp(orig_chns, start, len + 1);
+  {
+    switch(orig_chns) {
+      case nil:
+      case cons(h,t):
+    }
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void add_part_chain_rec_overflow(list<int> chns,
+                                         int start,
+                                         int len1,
+                                         int len2)
+  requires length(chns) <= start + len1 &*& length(chns) <= start + len2;
+  ensures add_partial_chain_rec_fp(chns, start, len1) ==
+          add_partial_chain_rec_fp(chns, start, len2);
+  {
+    switch(chns) {
+      case nil:
+      case cons(h,t):
+        if (start == 0) {
+          assert 0 < len1;
+          assert 0 < len2;
+          add_part_chain_rec_overflow(t, 0, len1 - 1, len2 - 1);
+        } else {
+          add_part_chain_rec_overflow(t, start - 1, len1, len2);
+        }
+    }
+  }
+  @*/
+
+/*@
   lemma void Xchain_add_one(list<int> chns, list<int> orig_chns, int start,
                             int len, int capacity)
-  requires chns == add_partial_chain_fp(start, len, orig_chns);
+  requires chns == add_partial_chain_fp(start, len, orig_chns) &*&
+           length(orig_chns) == capacity &*&
+           0 <= start &*& start < capacity &*&
+           0 <= len &*& len < capacity;
   ensures update(loop_fp(start + len, capacity),
                  nth(loop_fp(start + len, capacity), chns) + 1,
                  chns) ==
           add_partial_chain_fp(start, len+1, orig_chns);
   {
-    assume(false);//TODO 10m
-  }
+    if (length(orig_chns) < start + len) {
+      add_part_chain_rec_overflow(orig_chns, start, len, len + 1);
+      add_part_chn_rec_same_len(start, len, orig_chns);
+      add_part_chn_rec_add_one(chns, add_partial_chain_rec_fp(orig_chns,
+                                                              start, len),
+                               0,
+                               start + len - length(orig_chns));
+      assert start + len - length(orig_chns) < capacity;
+      loop_injection_n(start + len - length(orig_chns), capacity, 1);
+      loop_bijection(start + len - length(orig_chns), capacity);
+    } else {
+      assert start + len <= capacity;
+      if (start + len == capacity) {
+        loop_injection_n(start + len - capacity, capacity, 1);
+        loop_bijection(start + len - capacity, capacity);
+        add_part_chain_rec_overflow(orig_chns, start, len, len + 1);
+        add_part_chn_rec_zero_len
+          (add_partial_chain_rec_fp(orig_chns, start, len+1), 0);
+        add_part_chn_rec_same_len(start, len + 1, orig_chns);
+        add_part_chn_rec_add_one(add_partial_chain_rec_fp
+                                   (orig_chns, start, len+1),
+                                 add_partial_chain_rec_fp
+                                   (orig_chns, start, len+1),
+                                 0, 0);
+      } else {
+        assert start + len < capacity;
+       	add_part_chn_rec_add_one(chns, orig_chns, start, len);
+       	loop_bijection(start + len, capacity);
+      }
+    }
+  }//took 55m
   @*/
 
 static
