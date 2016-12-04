@@ -2219,7 +2219,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
 
   lemma void add_part_chn_zero_len(list<int> chns, int start)
-  requires 0 <= start &*& start < length(chns);
+  requires 0 <= start &*& start < length(chns); //optional
   ensures add_partial_chain_fp(start, 0, chns) == chns;
   {
     add_part_chn_rec_zero_len(chns, start);
@@ -3906,15 +3906,30 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   lemma void add_part_chn_rec_add_one(list<int> chns, list<int> orig_chns,
                                       int start, int len)
   requires chns == add_partial_chain_rec_fp(orig_chns, start, len) &*&
-           start + len + 1 <= length(orig_chns);
+           start + len + 1 <= length(orig_chns) &*&
+           0 <= len &*&
+           0 <= start;
   ensures update(start + len, nth(start + len, chns) + 1, chns) ==
           add_partial_chain_rec_fp(orig_chns, start, len + 1);
   {
     switch(orig_chns) {
       case nil:
-      case cons(h,t):
+      case cons(oh,ot):
+        switch(chns) {
+          case nil:
+          case cons(rh,rt):
+            if (start == 0) {
+              if (len == 0) {
+                add_part_chn_rec_zero_len(orig_chns, 0);
+                add_part_chn_rec_zero_len(ot, 0);
+              } else {
+                add_part_chn_rec_add_one(rt, ot, 0, len - 1);
+              }
+            } else {
+              add_part_chn_rec_add_one(rt, ot, start - 1, len);
+            }
+        }
     }
-    assume(false);//TODO
   }
   @*/
 
@@ -3983,7 +3998,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
        	loop_bijection(start + len, capacity);
       }
     }
-  }//took 55m
+  }//took 75m
   @*/
 
 static
@@ -4313,17 +4328,130 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
   @*/
 
 /*@
+  lemma void empty_buckets_empty_wraparound<kt>(nat capacity)
+  requires true;
+  ensures get_wraparound(nil, empty_buckets_fp<kt>(capacity)) == nil;
+  {
+    switch(capacity) {
+      case zero:
+      case succ(n):
+        empty_buckets_empty_wraparound(n);
+    }
+  }
+  @*/
+
+/*@
+  lemma void empty_buckets_chns_zeros_rec<kt>(nat capacity)
+  requires true;
+  ensures zero_list_fp(capacity) ==
+          buckets_get_chns_rec_fp(nil, empty_buckets_fp<kt>(capacity));
+  {
+    switch(capacity) {
+      case zero:
+      case succ(n):
+        empty_buckets_chns_zeros_rec(n);
+    }
+  }
+
+  lemma void empty_buckets_chns_zeros<kt>(nat capacity)
+  requires true;
+  ensures zero_list_fp(capacity) ==
+          buckets_get_chns_fp(empty_buckets_fp<kt>(capacity));
+  {
+    empty_buckets_empty_wraparound(capacity);
+    empty_buckets_chns_zeros_rec(capacity);
+  }
+  @*/
+
+/*@
+  lemma void empty_buckets_ks_none_rec<kt>(nat capacity)
+  requires true;
+  ensures none_list_fp<kt>(capacity) ==
+          buckets_get_keys_rec_fp(nil, empty_buckets_fp<kt>(capacity));
+  {
+    switch(capacity) {
+      case zero:
+      case succ(n):
+        empty_buckets_ks_none_rec(n);
+    }
+  }
+
+  lemma void empty_buckets_ks_none<kt>(nat capacity)
+  requires capacity != zero;
+  ensures none_list_fp<kt>(capacity) ==
+          buckets_get_keys_fp(empty_buckets_fp<kt>(capacity));
+  {
+    empty_buckets_empty_wraparound(capacity);
+    empty_buckets_ks_none_rec(capacity);
+  }
+  @*/
+
+/*@
+  lemma void empty_buckets_ok_rec<kt>(nat capacity, int bound)
+  requires true;
+  ensures true == buckets_ok_rec(nil, empty_buckets_fp<kt>(capacity), bound);
+  {
+    switch(capacity) {
+      case zero:
+      case succ(n):
+        empty_buckets_ok_rec(n, bound);
+    }
+  }
+
+  lemma void empty_buckets_length<kt>(nat len)
+  requires true;
+  ensures length(empty_buckets_fp<kt>(len)) == int_of_nat(len);
+  {
+    switch(len) {
+      case zero:
+      case succ(n):
+        empty_buckets_length(n);
+    }
+  }
+
+  lemma void empty_buckets_ok<kt>(nat capacity)
+  requires capacity != zero;
+  ensures true == buckets_ok(empty_buckets_fp<kt>(capacity));
+  {
+    empty_buckets_empty_wraparound(capacity);
+    empty_buckets_length(capacity);
+    empty_buckets_ok_rec(capacity, int_of_nat(capacity));
+  }
+  @*/
+
+/*@
+  lemma void empty_keychains_start_on_hash<kt>(nat len,
+                                               fixpoint (kt,int) hash,
+                                               int pos, int capacity)
+  requires 0 < capacity;
+  ensures true == key_chains_start_on_hash_fp
+                    (empty_buckets_fp<kt>(len),
+                     pos, capacity, hash);
+  {
+    switch(len) {
+      case zero:
+      case succ(n):
+        empty_keychains_start_on_hash(n, hash, pos + 1, capacity);
+    }
+  }
+  @*/
+
+/*@
   lemma void empty_buckets_hmap_insync<kt>(int* chns, int capacity,
                                            list<int> khlist,
                                            fixpoint (kt,int) hash)
-  requires ints(chns, capacity, zero_list_fp(nat_of_int(capacity)));
+  requires ints(chns, capacity, zero_list_fp(nat_of_int(capacity))) &*&
+           0 < capacity;
   ensures buckets_ks_insync<kt>(chns, capacity,
                                 empty_buckets_fp<kt>(nat_of_int(capacity)),
                                 hash,
                                 none_list_fp<kt>(nat_of_int(capacity)));
   {
-    assume(false);//TODO 5m
-  }
+    empty_buckets_chns_zeros<kt>(nat_of_int(capacity));
+    empty_buckets_ok<kt>(nat_of_int(capacity));
+    empty_buckets_ks_none<kt>(nat_of_int(capacity));
+    empty_keychains_start_on_hash<kt>(nat_of_int(capacity), hash, 0, capacity);
+  }//took 25m
   @*/
 
 void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
