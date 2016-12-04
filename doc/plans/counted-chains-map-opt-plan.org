@@ -20,7 +20,8 @@ should also be compatible with the one Martin is implementing.
    :END:
 ** certify the single map optimization
    :LOGBOOK:
-   CLOCK: [2016-12-04 Son 16:12]
+   CLOCK: [2016-12-04 Son 18:54]--[2016-12-04 Son 19:54] =>  1:00
+   CLOCK: [2016-12-04 Son 16:12]--[2016-12-04 Son 16:44] =>  0:32
    CLOCK: [2016-12-04 Son 15:53]--[2016-12-04 Son 16:12] =>  0:19
    CLOCK: [2016-12-04 Son 15:39]--[2016-12-04 Son 15:53] =>  0:14
    CLOCK: [2016-12-04 Son 14:20]--[2016-12-04 Son 15:12] =>  0:52
