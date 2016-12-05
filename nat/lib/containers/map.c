@@ -5103,6 +5103,53 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  fixpoint list<bucket<kt> > keep_short_fp<kt>(list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil:
+        return nil;
+      case cons(bh,bt):
+        return switch(bh) { case bucket(chains):
+          return cons(bucket(filter((upper_limit)(length(bt)), chains)),
+                      keep_short_fp(bt));
+        };
+    }
+  }
+
+  fixpoint bool buckets_short_fp<kt>(list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil: return true;
+      case cons(bh,bt):
+        return switch(bh) { case bucket(chains):
+          return forall(chains, (upper_limit)(length(bt))) &&
+                 buckets_short_fp(bt);
+        };
+    }
+  }
+  @*/
+
+/*@
+  lemma void buckets_ok_short_ok<kt>(list<pair<kt, nat> > acc,
+                                     list<bucket<kt> > buckets,
+                                     int bound)
+  requires true == buckets_ok_rec(acc, buckets, bound);
+  ensures true == buckets_ok_rec(acc,
+                                 keep_short_fp(buckets),
+                                 length(buckets));
+  {
+    assume(false);//TODO
+  }
+
+  lemma void buckets_short_get_keys_rec<kt>(list<pair<kt, nat> > acc,
+                                            list<bucket<kt> > buckets)
+  requires true;
+  ensures buckets_get_keys_rec_fp(acc, buckets) ==
+          buckets_get_keys_rec_fp(acc, keep_short_fp(buckets));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
   lemma void acc_eq_buckets_ok_rec<kt>(list<pair<kt, nat> > acc1,
                                        list<pair<kt, nat> > acc2,
                                        list<bucket<kt> > buckets,
@@ -5136,7 +5183,9 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                           int bound)
   requires true == buckets_ok_rec(acc, buckets, bound) &*&
            0 <= start &*& start < bound &*&
-           0 <= dist &*& dist < bound;
+           0 <= dist &*& dist < bound &*&
+           start + dist < length(buckets) &*&
+           true == buckets_short_fp(buckets);
   ensures true == buckets_ok_rec(acc, buckets_put_key_fp(buckets, k, start,
                                                          dist),
                                  bound);
@@ -5160,6 +5209,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             buckets_ok_rec(advance_acc(acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist))),
                            t, bound);
         } else {
+          switch(h) { case bucket(chains): }
           buckets_put_still_ok_rec(advance_acc(acc_at_this_bucket(acc, h)),
                                    t, k, start - 1, dist, bound);
         }
@@ -5199,10 +5249,17 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       assert get_wraparound(nil, buckets_put_key_fp(buckets, k,
                                                     start, dist)) ==
              get_wraparound(nil, buckets);
+      buckets_ok_short_ok(get_wraparound(nil,
+                                         buckets_put_key_fp(buckets,
+                                                            k, start,
+                                                            dist)),
+                          buckets, length(buckets));
+      assume(length(buckets) == length(keep_short_fp(buckets)));//TODO
+      assume(buckets_short_fp(keep_short_fp(buckets)));//TODO
       buckets_put_still_ok_rec
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start,
                                                 dist)),
-         buckets, k, start, dist, length(buckets));
+         keep_short_fp(buckets), k, start, dist, length(buckets));
     }
   }
   @*/
@@ -5307,7 +5364,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                dist),
                             hsh,
                             update(fin, some(k), ks));
-  }//took 95m and counting
+  }//took 185m and counting
   @*/
 
 void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
