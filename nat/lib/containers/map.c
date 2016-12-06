@@ -5244,9 +5244,9 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void bucket_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > acc,
-                                             list<bucket<kt> > buckets,
-                                             int bound)
+  lemma void buckets_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > acc,
+                                              list<bucket<kt> > buckets,
+                                              int bound)
   requires true == buckets_ok_rec(acc, keep_short_fp(buckets), bound) &*&
            true == buckets_ok_rec(acc, keep_long_fp(buckets), bound);
   ensures true == buckets_ok_rec(acc, buckets, bound);
@@ -5283,15 +5283,45 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void buckets_put_still_ok_rec<kt>(list<pair<kt, nat> > acc,
-                                          list<bucket<kt> > buckets,
-                                          kt k, int start, int dist,
-                                          int bound)
+  lemma void buckets_put_wraparound_is_cons<kt>(list<pair<kt, nat> > acc,
+                                                list<bucket<kt> > buckets,
+                                                kt k, int start, int dist)
+  requires true;
+  ensures true == content_eq
+                    (get_wraparound(acc,
+                                    buckets_put_key_fp(buckets, k,
+                                                       start, dist)),
+                     cons(pair(k, nat_of_int(dist + start - length(buckets))),
+                          get_wraparound(acc, buckets)));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void no_key_especially_in_short_and_long<kt>(list<pair<kt, nat> > acc,
+                                                     list<bucket<kt> > buckets,
+                                                     int x)
+  requires 0 <= x &*& x < length(buckets) &*&
+           nth(x, buckets_get_keys_rec_fp(acc, buckets)) == none;
+  ensures nth(x, buckets_get_keys_rec_fp(acc, keep_long_fp(buckets))) == none &*&
+          nth(x, buckets_get_keys_rec_fp(acc, keep_short_fp(buckets))) == none;
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void short_buckets_put_still_ok_rec<kt>(list<pair<kt, nat> > acc,
+                                                list<bucket<kt> > buckets,
+                                                kt k, int start, int dist,
+                                                int bound)
   requires true == buckets_ok_rec(acc, buckets, bound) &*&
            0 <= start &*& start < bound &*&
            0 <= dist &*& dist < bound &*&
            start + dist < length(buckets) &*&
-           true == buckets_short_fp(buckets);
+           true == buckets_short_fp(buckets) &*&
+           nth(start + dist, buckets_get_keys_rec_fp(acc, buckets)) == none;
   ensures true == buckets_ok_rec(acc, buckets_put_key_fp(buckets, k, start,
                                                          dist),
                                  bound);
@@ -5316,10 +5346,24 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                            t, bound);
         } else {
           switch(h) { case bucket(chains): }
-          buckets_put_still_ok_rec(advance_acc(acc_at_this_bucket(acc, h)),
-                                   t, k, start - 1, dist, bound);
+          short_buckets_put_still_ok_rec(advance_acc(acc_at_this_bucket(acc, h)),
+                                         t, k, start - 1, dist, bound);
         }
     }
+  }
+
+  lemma void
+  acc_add_chain_buckets_ok_rec<kt>(list<pair<kt, nat> > acc,
+                                   list<bucket<kt> > buckets,
+                                   kt k, int dist,
+                                   int bound)
+  requires 0 <= dist &*& dist < length(buckets) &*&
+           nth(dist, buckets_get_keys_rec_fp(acc, buckets)) == none &*&
+           true == buckets_ok_rec(acc, buckets, bound);
+  ensures true == buckets_ok_rec(cons(pair(k, nat_of_int(dist)), acc),
+                                 buckets, bound);
+  {
+    assume(false);//TODO
   }
 
   lemma void
@@ -5334,21 +5378,85 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   {
     assume(false);//TODO, use short_chains_dont_matter in the leaf
   }
+  @*/
+
+/*@
+  lemma void buckets_put_key_keep_short_no_effect<kt>(list<bucket<kt> >buckets,
+                                                      kt k, int start, int dist)
+  requires length(buckets) <= start + dist;
+  ensures keep_short_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
+          keep_short_fp(buckets);
+  {
+    assume(false);//TODO
+  }
+
+  lemma void buckets_put_key_keep_long_swap<kt>(list<bucket<kt> > buckets,
+                                                kt k, int start, int dist)
+  requires length(buckets) <= start + dist;
+  ensures keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
+          buckets_put_key_fp(keep_long_fp(buckets), k, start, dist);
+  {
+    assume(false);
+  }
+  @*/
+
+/*@
+  lemma void long_buckets_put_still_ok_rec<kt>(list<pair<kt, nat> > acc,
+                                               list<bucket<kt> > buckets,
+                                               kt k, int start, int dist,
+                                               int bound)
+  requires true == buckets_ok_rec(acc, buckets, bound) &*&
+           true == buckets_long_fp(buckets) &*&
+           length(buckets) <= start + dist;
+  ensures true == buckets_ok_rec(acc, buckets_put_key_fp(buckets, k,
+                                                         start, dist),
+                                 bound);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
 
   lemma void buckets_put_still_ok<kt>(list<bucket<kt> > buckets,
                                       kt k, int start, int dist)
   requires true == buckets_ok(buckets) &*&
            0 <= start &*& start < length(buckets) &*&
-           0 <= dist &*& dist < length(buckets);
+           0 <= dist &*& dist < length(buckets) &*&
+           nth(loop_fp(start + dist, length(buckets)),
+               buckets_get_keys_fp(buckets)) == none;
   ensures true == buckets_ok(buckets_put_key_fp(buckets, k, start, dist));
   {
     buckets_put_same_len(buckets, k, start, dist);
     if (length(buckets) <= start + dist) {
-      assume(false);//TODO
+      assert true == buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
+      buckets_put_wraparound_is_cons(nil, buckets, k, start, dist);
+      loop_injection_n(start + dist - length(buckets), length(buckets), 1);
+      loop_bijection(start + dist - length(buckets), length(buckets));
+      acc_add_chain_buckets_ok_rec(get_wraparound(nil, buckets),
+                                   buckets,
+                                   k, start + dist - length(buckets),
+                                   length(buckets));
+      acc_eq_buckets_ok_rec(cons(pair(k, nat_of_int(start + dist - length(buckets))),
+                                 get_wraparound(nil, buckets)),
+                            get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                            buckets,
+                            length(buckets));
+      assert true == buckets_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)), buckets, length(buckets));
+      buckets_ok_short_long_ok
+        (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+         buckets, length(buckets));
+      buckets_put_key_keep_short_no_effect(buckets, k, start, dist);
+      buckets_put_key_keep_long_swap(buckets, k, start, dist);
+      assume(buckets_long_fp(keep_long_fp(buckets)));//TODO
+      assume(length(buckets) == length(keep_long_fp(buckets)));//TODO
+      long_buckets_put_still_ok_rec
+        (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+         keep_long_fp(buckets), k, start, dist, length(buckets));
+      buckets_split_ok_orig_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                                   buckets_put_key_fp(buckets, k, start, dist),
+                                   length(buckets));
     } else {
-      //assume(get_wraparound(nil, buckets_put_key_fp(buckets, k,
-      //                                              start, dist)) ==
-      //       get_wraparound(nil, buckets));
       buckets_put_short_chain_same_wraparound(nil, buckets, k,
                                               start, dist,
                                               length(buckets));
@@ -5360,13 +5468,19 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           buckets, length(buckets));
       assume(length(buckets) == length(keep_short_fp(buckets)));//TODO
       assume(buckets_short_fp(keep_short_fp(buckets)));//TODO
-      buckets_put_still_ok_rec
+      loop_bijection(start + dist, length(buckets));
+      no_key_especially_in_short_and_long
+        (get_wraparound(nil, buckets_put_key_fp(buckets, k, start,
+                                                dist)),
+         buckets,
+         start + dist);
+      short_buckets_put_still_ok_rec
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start,
                                                 dist)),
          keep_short_fp(buckets), k, start, dist, length(buckets));
       buckets_put_key_keep_short_swap(buckets, k, start, dist);
       buckets_put_key_keep_long_no_effect(buckets, k, start, dist);
-      bucket_split_ok_orig_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+      buckets_split_ok_orig_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
                                   buckets_put_key_fp(buckets, k, start, dist), length(buckets));
       assert true == buckets_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
                                     buckets_put_key_fp(buckets, k, start, dist),
@@ -5478,7 +5592,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                dist),
                             hsh,
                             update(fin, some(k), ks));
-  }//took 185m and counting
+  }//took 275m and counting
   @*/
 
 void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
