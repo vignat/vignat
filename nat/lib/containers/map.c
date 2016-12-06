@@ -5115,6 +5115,24 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     }
   }
 
+  fixpoint bool lower_limit<kt>(int lim, pair<kt, nat> x) {
+    switch(x) { case pair(key,dist):
+      return lim <= int_of_nat(dist);
+    }
+  }
+
+  fixpoint list<bucket<kt> > keep_long_fp<kt>(list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil:
+        return nil;
+      case cons(bh,bt):
+        return switch(bh) { case bucket(chains):
+          return cons(bucket(filter((lower_limit)(length(bt)), chains)),
+                      keep_long_fp(bt));
+        };
+    }
+  }
+
   fixpoint bool buckets_short_fp<kt>(list<bucket<kt> > buckets) {
     switch(buckets) {
       case nil: return true;
@@ -5125,16 +5143,70 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         };
     }
   }
+
+  fixpoint bool buckets_long_fp<kt>(list<bucket<kt> > buckets) {
+    switch(buckets) {
+      case nil: return true;
+      case cons(bh,bt):
+        return switch(bh) { case bucket(chains):
+          return forall(chains, (lower_limit)(length(bt))) &&
+                 buckets_long_fp(bt);
+        };
+    }
+  }
+
+  fixpoint list<bucket<kt> > join_buckets_fp<kt>(list<bucket<kt> > bkts1,
+                                                 list<bucket<kt> > bkts2) {
+    switch(bkts1) {
+      case nil:
+        return nil; //bkts2 should be nil
+      case cons(h1,t1):
+        return switch(bkts2) {
+          case nil:
+            return nil; //must never happen
+          case cons(h2,t2):
+            return switch(h1) { case bucket(chains1):
+              return switch(h2) { case bucket(chains2):
+                return cons(bucket(append(chains1, chains2)),
+                            join_buckets_fp(t1,t2));
+              };
+            };
+        };
+    }
+  }
+
+  fixpoint bool buckets_content_eq_fp<kt>(list<bucket<kt> > bkts1,
+                                          list<bucket<kt> > bkts2) {
+    switch(bkts1) {
+      case nil:
+        return bkts2 == nil;
+      case cons(h1,t1):
+        return switch(bkts2) {
+          case nil: return false;
+          case cons(h2,t2):
+            return switch(h1) { case bucket(chains1):
+              return switch(h2) { case bucket(chains2):
+                return content_eq(chains1, chains2) &&
+                       buckets_content_eq_fp(t1, t2);
+              };
+            };
+        };
+    }
+  }
+
   @*/
 
 /*@
-  lemma void buckets_ok_short_ok<kt>(list<pair<kt, nat> > acc,
-                                     list<bucket<kt> > buckets,
-                                     int bound)
+  lemma void buckets_ok_short_long_ok<kt>(list<pair<kt, nat> > acc,
+                                          list<bucket<kt> > buckets,
+                                          int bound)
   requires true == buckets_ok_rec(acc, buckets, bound);
   ensures true == buckets_ok_rec(acc,
                                  keep_short_fp(buckets),
-                                 length(buckets));
+                                 bound) &*&
+          true == buckets_ok_rec(acc,
+                                 keep_long_fp(buckets),
+                                 bound);
   {
     assume(false);//TODO
   }
@@ -5144,6 +5216,40 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true;
   ensures buckets_get_keys_rec_fp(acc, buckets) ==
           buckets_get_keys_rec_fp(acc, keep_short_fp(buckets));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void buckets_put_key_keep_short_swap<kt>(list<bucket<kt> > buckets,
+                                                 kt k, int start, int dist)
+  requires start + dist < length(buckets);
+  ensures keep_short_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
+          buckets_put_key_fp(keep_short_fp(buckets), k, start, dist);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void buckets_put_key_keep_long_no_effect<kt>(list<bucket<kt> > buckets,
+                                                     kt k, int start, int dist)
+  requires start + dist < length(buckets);
+  ensures keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
+          keep_long_fp(buckets);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void bucket_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > acc,
+                                             list<bucket<kt> > buckets,
+                                             int bound)
+  requires true == buckets_ok_rec(acc, keep_short_fp(buckets), bound) &*&
+           true == buckets_ok_rec(acc, keep_long_fp(buckets), bound);
+  ensures true == buckets_ok_rec(acc, buckets, bound);
   {
     assume(false);//TODO
   }
@@ -5249,17 +5355,25 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       assert get_wraparound(nil, buckets_put_key_fp(buckets, k,
                                                     start, dist)) ==
              get_wraparound(nil, buckets);
-      buckets_ok_short_ok(get_wraparound(nil,
-                                         buckets_put_key_fp(buckets,
-                                                            k, start,
-                                                            dist)),
-                          buckets, length(buckets));
+      buckets_ok_short_long_ok
+         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+          buckets, length(buckets));
       assume(length(buckets) == length(keep_short_fp(buckets)));//TODO
       assume(buckets_short_fp(keep_short_fp(buckets)));//TODO
       buckets_put_still_ok_rec
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start,
                                                 dist)),
          keep_short_fp(buckets), k, start, dist, length(buckets));
+      buckets_put_key_keep_short_swap(buckets, k, start, dist);
+      buckets_put_key_keep_long_no_effect(buckets, k, start, dist);
+      bucket_split_ok_orig_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                                  buckets_put_key_fp(buckets, k, start, dist), length(buckets));
+      assert true == buckets_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                                    buckets_put_key_fp(buckets, k, start, dist),
+                                    length(buckets));
+      assert true == buckets_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                                    buckets_put_key_fp(buckets, k, start, dist),
+                                    length(buckets_put_key_fp(buckets, k, start, dist)));
     }
   }
   @*/
