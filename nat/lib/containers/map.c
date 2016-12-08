@@ -5593,7 +5593,26 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures true == buckets_ok_rec(cons(pair(k, nat_of_int(dist)), acc),
                                  buckets, bound);
   {
-    assume(false);//TODO
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
+        list<pair<kt, nat> > new_acc_atb =
+          acc_at_this_bucket(cons(pair(k, nat_of_int(dist)), acc), h);
+        cons_acc_atb_swap(acc, h, pair(k, nat_of_int(dist)));
+        assert new_acc_atb == cons(pair(k, nat_of_int(dist)), acc_atb);
+        assert true == forall(new_acc_atb, (upper_limit)(bound));
+        no_chain_in_wraparound_not_here(advance_acc(acc_atb), t, dist-1);
+        advance_acc_keeps_tail_nonmem(acc_atb, nat_of_int(dist - 1));
+        assert true == distinct(get_just_tails(new_acc_atb));
+        acc_add_chain_abscent_in_wraparound_buckets_ok_rec
+          (advance_acc(acc_atb),
+           t, k, dist - 1, bound);
+        assert advance_acc(new_acc_atb) ==
+                cons(pair(k, nat_of_int(dist - 1)),
+                     advance_acc(acc_atb));
+        assert true == buckets_ok_rec(advance_acc(new_acc_atb), t, bound);
+    }
   }
   @*/
 
