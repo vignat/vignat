@@ -5460,7 +5460,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                   length(get_just_tails(new_acc_atb));
             content_eq_same_len_distinct_both
               (get_just_tails(cons(pair(k, nat_of_int(dist)), acc_atb)),
-              get_just_tails(new_acc_atb));
+               get_just_tails(new_acc_atb));
             assert true == distinct(get_just_tails(new_acc_atb));
             assert advance_acc(cons(pair(k, nat_of_int(dist)), acc_atb)) ==
                    cons(pair(k, nat_of_int(dist - 1)), advance_acc(acc_atb));
@@ -5521,6 +5521,36 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  lemma void no_chain_in_wraparound_not_here<kt>(list<pair<kt, nat> > acc,
+                                                 list<bucket<kt> > buckets,
+                                                 int dist)
+  requires false == mem(nat_of_int(dist - length(buckets)),
+                        get_just_tails(get_wraparound(acc, buckets)));
+  ensures false == mem(nat_of_int(dist), get_just_tails(acc));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void
+  acc_add_chain_abscent_in_wraparound_buckets_ok_rec<kt>
+    (list<pair<kt, nat> > acc,
+     list<bucket<kt> > buckets,
+     kt k, int dist,
+     int bound)
+  requires true == buckets_ok_rec(acc, buckets, bound) &*&
+           length(buckets) <= dist &*& dist < bound &*&
+           false == mem(nat_of_int(dist - length(buckets)),
+                        get_just_tails(get_wraparound(acc, buckets)));
+  ensures true == buckets_ok_rec(cons(pair(k, nat_of_int(dist)), acc),
+                                 buckets, bound);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
   lemma void long_buckets_put_still_ok_rec<kt>(list<pair<kt, nat> > acc,
                                                list<bucket<kt> > buckets,
                                                kt k, int start, int dist,
@@ -5540,7 +5570,42 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       case nil:
       case cons(h,t):
         if (start == 0) {
-          assume(false);//TODO
+          list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > new_acc_atb =
+            acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
+          acc_at_bucket_put_is_cons(acc, h, k, dist);
+          assert true == forall(cons(pair(k, nat_of_int(dist)), acc_atb),
+                                (upper_limit)(bound));
+          content_eq_forall_both(cons(pair(k, nat_of_int(dist)), acc_atb),
+                                 new_acc_atb,
+                                 (upper_limit)(bound));
+          assert true == forall(new_acc_atb, (upper_limit)(bound));
+          assert true == distinct(get_just_tails(acc_atb));
+          no_chain_in_wraparound_not_here(advance_acc(acc_atb), t, dist-1);
+          assert false == mem(nat_of_int(dist-1),
+                              get_just_tails(advance_acc(acc_atb)));
+          advance_acc_keeps_tail_nonmem(acc_atb, nat_of_int(dist - 1));
+          assert false == mem(nat_of_int(dist), get_just_tails(acc_atb));
+          assert length(cons(pair(k, nat_of_int(dist)), acc_atb)) ==
+                 length(new_acc_atb);
+          content_eq_map(cons(pair(k, nat_of_int(dist)), acc_atb),
+                         new_acc_atb,
+                         snd);
+          map_preserves_length(snd, cons(pair(k, nat_of_int(dist)), acc_atb));
+          map_preserves_length(snd, new_acc_atb);
+          content_eq_same_len_distinct_both
+            (get_just_tails(cons(pair(k, nat_of_int(dist)), acc_atb)),
+             get_just_tails(new_acc_atb));
+          assert true == distinct(get_just_tails(new_acc_atb));
+          acc_add_chain_abscent_in_wraparound_buckets_ok_rec
+            (advance_acc(acc_atb), t, k, dist - 1, bound);
+          advance_acc_still_eq(cons(pair(k, nat_of_int(dist)), acc_atb),
+                               new_acc_atb);
+          acc_eq_buckets_ok_rec(advance_acc(cons(pair(k, nat_of_int(dist)),
+                                                 acc_atb)),
+                                advance_acc(new_acc_atb),
+                                t, bound);
+          assert true == buckets_ok_rec(advance_acc(new_acc_atb), t, bound);
         } else {
           switch(h) { case bucket(chains):
             long_buckets_put_still_ok_rec
