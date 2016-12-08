@@ -5374,12 +5374,25 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  lemma void cons_acc_atb_swap<kt>(list<pair<kt, nat> > acc,
+                                   bucket<kt> b,
+                                   pair<kt, nat> x)
+  requires true;
+  ensures acc_at_this_bucket(cons(x, acc), b) ==
+          cons(x, acc_at_this_bucket(acc, b));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
   lemma void
   acc_add_chain_buckets_ok_rec<kt>(list<pair<kt, nat> > acc,
                                    list<bucket<kt> > buckets,
                                    kt k, int dist,
                                    int bound)
   requires 0 <= dist &*& dist < length(buckets) &*&
+           length(buckets) <= bound &*&
            nth(dist, buckets_get_keys_rec_fp(acc, buckets)) == none &*&
            true == buckets_ok_rec(acc, buckets, bound);
   ensures true == buckets_ok_rec(cons(pair(k, nat_of_int(dist)), acc),
@@ -5388,13 +5401,27 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     switch(buckets) {
       case nil:
       case cons(h,t):
+        list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
+        list<pair<kt, nat> > new_acc_atb =
+          acc_at_this_bucket(cons(pair(k, nat_of_int(dist)), acc), h);
+        cons_acc_atb_swap(acc, h, pair(k, nat_of_int(dist)));
+        assert new_acc_atb == cons(pair(k, nat_of_int(dist)), acc_atb);
+        assert true == forall(new_acc_atb, (upper_limit)(bound));
         if (dist == 0) {
-          assume(false);//TODO
+          assert advance_acc(acc_atb) == advance_acc(new_acc_atb);
+          assert get_current_key_fp(acc_atb) == none;
+          if (mem(zero, get_just_tails(acc_atb)))
+            nozero_no_current_key(acc_atb);
+
         } else {
-          assume(false);//TODO
-          //list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
-          //acc_add_chain_buckets_ok_rec(advance_acc(acc_atb),
-          //                             t, k, dist - 1, bound);
+          get_key_none_no_chain(advance_acc(acc_atb), t, k, dist - 1);
+          advance_acc_keeps_tail_nonmem(acc_atb, nat_of_int(dist - 1));
+          assert true == distinct(get_just_tails(new_acc_atb));
+          acc_add_chain_buckets_ok_rec(advance_acc(acc_atb),
+                                       t, k, dist - 1, bound);
+          assert advance_acc(new_acc_atb) ==
+                 cons(pair(k, nat_of_int(dist - 1)), advance_acc(acc_atb));
+          assert true == buckets_ok_rec(advance_acc(new_acc_atb), t, bound);
         }
     }
   }
@@ -5426,6 +5453,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            0 <= start &*& start < length(buckets) &*&
            0 <= dist &*& dist < bound &*&
            start + dist < length(buckets) &*&
+           length(buckets) <= bound &*&
            true == buckets_short_fp(buckets) &*&
            nth(start + dist, buckets_get_keys_rec_fp(acc, buckets)) == none;
   ensures true == buckets_ok_rec(acc, buckets_put_key_fp(buckets, k, start,
