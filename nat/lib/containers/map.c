@@ -5259,6 +5259,119 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
+/*@
+  lemma void content_eq_remove_both<t>(list<t> l1, list<t> l2, t x)
+  requires true == content_eq(l1, l2) &*&
+           true == distinct(l1) &*&
+           true == distinct(l2);
+  ensures true == content_eq(remove(x, l1), remove(x, l2));
+  {
+    distinct_unique(l1, x);
+    distinct_unique(l2, x);
+    remove_both_subset(x, l1, l2);
+    remove_both_subset(x, l2, l1);
+  }
+  @*/
+
+
+/*@
+  lemma void subset_nil_nil<t>(list<t> l)
+  requires true == subset(l, nil);
+  ensures l == nil;
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void content_eq_distinct_same_len<t>(list<t> l1,
+                                             list<t> l2)
+  requires true == content_eq(l1, l2) &*&
+           true == distinct(l1) &*&
+           true == distinct(l2);
+  ensures length(l1) == length(l2);
+  {
+    switch(l1) {
+      case nil:
+        subset_nil_nil(l2);
+      case cons(h,t):
+        content_eq_remove_both(l1, l2, h);
+        distinct_remove(h, l2);
+        content_eq_distinct_same_len(t, remove(h,l2));
+    }
+  }
+  @*/
+
+/*@
+  lemma void content_eq_forall_both<t>(list<t> l1, list<t> l2,
+                                       fixpoint (t,bool) prop)
+  requires true == content_eq(l1, l2);
+  ensures forall(l1, prop) == forall(l2, prop);
+  {
+    assume(false);//TODO 5m
+  }
+  @*/
+
+
+/*@
+  lemma void distinct_unmap<t1,t2>(list<t1> lst, fixpoint (t1,t2) f)
+  requires true == distinct(map(f, lst));
+  ensures true == distinct(lst);
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        if (mem(h, t)) {
+          mem_map(h, t, f);
+          assert true == mem(f(h), map(f, t));
+        }
+        distinct_unmap(t, f);
+    }
+  }
+  @*/
+
+/*@
+  lemma void content_eq_map<t1,t2>(list<t1> l1, list<t1> l2,
+                                   fixpoint (t1,t2) f)
+  requires true == content_eq(l1,l2);
+  ensures true == content_eq(map(f, l1), map(f, l2));
+  {
+    assume(false);//TODO 10m
+  }
+  @*/
+
+/*@
+  lemma void
+  content_eq_same_len_distinct_both<t>(list<t> l1, list<t> l2)
+  requires true == content_eq(l1, l2) &*& length(l1) == length(l2);
+  ensures distinct(l1) == distinct(l2);
+  {
+    assume(false);//TODO 30m
+  }
+  @*/
+
+/*@
+  lemma void accs_eq_tails_distinct<kt>(list<pair<kt, nat> > acc1,
+                                        list<pair<kt, nat> > acc2)
+  requires true == distinct(get_just_tails(acc1)) &*&
+           true == content_eq(acc1, acc2) &*&
+           length(acc1) == length(acc2);
+  ensures true == distinct(get_just_tails(acc2));
+  {
+    content_eq_map(acc1, acc2, snd);
+    map_preserves_length(snd, acc1);
+    map_preserves_length(snd, acc2);
+    content_eq_same_len_distinct_both(get_just_tails(acc1),
+                                      get_just_tails(acc2));
+  }
+
+  @*/
+
 /*@
   lemma void acc_eq_buckets_ok_rec<kt>(list<pair<kt, nat> > acc1,
                                        list<pair<kt, nat> > acc2,
@@ -5269,8 +5382,28 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == distinct(get_just_tails(acc2));
   ensures true == buckets_ok_rec(acc2, buckets, bound);
   {
-    assume(false);//TODO 50m
-  }
+    switch(buckets) {
+      case nil:
+        content_eq_forall_both(acc1, acc2, (upper_limit)(bound));
+      case cons(h,t):
+        list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
+        list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
+        switch(h) { case bucket(chains):
+          map_append(snd, acc1, chains);
+          distinct_unappend(get_just_tails(acc1), get_just_tails(chains));
+        }
+        distinct_unmap(acc1, snd);
+        distinct_unmap(acc2, snd);
+        content_eq_distinct_same_len(acc1, acc2);
+        assert length(atb1) == length(atb2);
+        acc_at_this_bucket_still_eq(acc1, acc2, h);
+        accs_eq_tails_distinct(atb1, atb2);
+        content_eq_forall_both(atb1, atb2, (upper_limit)(bound));
+        advance_acc_still_eq(atb1, atb2);
+        advance_acc_still_distinct(atb2);
+        acc_eq_buckets_ok_rec(advance_acc(atb1), advance_acc(atb2), t, bound);
+    }
+  }//took 60m
   @*/
 
 /*@
@@ -5334,16 +5467,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void content_eq_forall_both<t>(list<t> l1, list<t> l2,
-                                       fixpoint (t,bool) prop)
-  requires true == content_eq(l1, l2);
-  ensures forall(l1, prop) == forall(l2, prop);
-  {
-    assume(false);//TODO 5m
-  }
-  @*/
-
-/*@
   lemma void advance_acc_keeps_tail_nonmem<kt>(list<pair<kt, nat> > acc,
                                                nat dist)
   requires true;
@@ -5351,26 +5474,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           mem(succ(dist), get_just_tails(acc));
   {
     assume(false);//TODO 5m
-  }
-  @*/
-
-/*@
-  lemma void content_eq_map<t1,t2>(list<t1> l1, list<t1> l2,
-                                   fixpoint (t1,t2) f)
-  requires true == content_eq(l1,l2);
-  ensures true == content_eq(map(f, l1), map(f, l2));
-  {
-    assume(false);//TODO 10m
-  }
-  @*/
-
-/*@
-  lemma void
-  content_eq_same_len_distinct_both<t>(list<t> l1, list<t> l2)
-  requires true == content_eq(l1, l2) &*& length(l1) == length(l2);
-  ensures distinct(l1) == distinct(l2);
-  {
-    assume(false);//TODO 30m
   }
   @*/
 
@@ -5426,23 +5529,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         }
     }
   }
-  @*/
-
-/*@
-  lemma void accs_eq_tails_distinct<kt>(list<pair<kt, nat> > acc1,
-                                        list<pair<kt, nat> > acc2)
-  requires true == distinct(get_just_tails(acc1)) &*&
-           true == content_eq(acc1, acc2) &*&
-           length(acc1) == length(acc2);
-  ensures true == distinct(get_just_tails(acc2));
-  {
-    content_eq_map(acc1, acc2, snd);
-    map_preserves_length(snd, acc1);
-    map_preserves_length(snd, acc2);
-    content_eq_same_len_distinct_both(get_just_tails(acc1),
-                                      get_just_tails(acc2));
-  }
-
   @*/
 
 /*@
@@ -5756,8 +5842,14 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true;
   ensures length(buckets) == length(keep_long_fp(buckets));
   {
-    assume(false);//TODO 5m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains) :
+          keep_long_same_len(t);
+        }
+    }
+  }//took 2m
   @*/
 
 /*@
