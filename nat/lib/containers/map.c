@@ -3346,6 +3346,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                      buckets);
     }
   }//took 60m + 40m so far
+  //TODO 300m
   @*/
 
 /*@
@@ -5211,7 +5212,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                  keep_long_fp(buckets),
                                  bound);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
 
   lemma void buckets_short_get_keys_rec<kt>(list<pair<kt, nat> > acc,
@@ -5220,7 +5221,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures buckets_get_keys_rec_fp(acc, buckets) ==
           buckets_get_keys_rec_fp(acc, keep_short_fp(buckets));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5231,7 +5232,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures keep_short_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
           buckets_put_key_fp(keep_short_fp(buckets), k, start, dist);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5242,7 +5243,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
           keep_long_fp(buckets);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -5254,7 +5255,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == buckets_ok_rec(acc, keep_long_fp(buckets), bound);
   ensures true == buckets_ok_rec(acc, buckets, bound);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5268,7 +5269,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == distinct(get_just_tails(acc2));
   ensures true == buckets_ok_rec(acc2, buckets, bound);
   {
-    assume(false);//TODO
+    assume(false);//TODO 50m
   }
   @*/
 
@@ -5284,7 +5285,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           length(acc_at_this_bucket(acc, bucket_put_key_fp(bucket, k, dist))) ==
           length(acc_at_this_bucket(acc, bucket)) + 1;
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -5303,7 +5304,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                         start, dist))) ==
           length(get_wraparound(acc, buckets)) + 1;
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -5316,7 +5317,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures nth(x, buckets_get_keys_rec_fp(acc, keep_long_fp(buckets))) == none &*&
           nth(x, buckets_get_keys_rec_fp(acc, keep_short_fp(buckets))) == none;
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5328,7 +5329,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            nth(dist, buckets_get_keys_rec_fp(acc, buckets)) == none;
   ensures false == mem(nat_of_int(dist), get_just_tails(acc));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5338,7 +5339,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true == content_eq(l1, l2);
   ensures forall(l1, prop) == forall(l2, prop);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -5349,7 +5350,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures mem(dist, get_just_tails(advance_acc(acc))) ==
           mem(succ(dist), get_just_tails(acc));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -5359,7 +5360,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true == content_eq(l1,l2);
   ensures true == content_eq(map(f, l1), map(f, l2));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5369,7 +5370,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires true == content_eq(l1, l2) &*& length(l1) == length(l2);
   ensures distinct(l1) == distinct(l2);
   {
-    assume(false);//TODO
+    assume(false);//TODO 30m
   }
   @*/
 
@@ -5381,7 +5382,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures acc_at_this_bucket(cons(x, acc), b) ==
           cons(x, acc_at_this_bucket(acc, b));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -5543,8 +5544,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                  dist)) ==
           get_wraparound(acc, buckets);
   {
-    assume(false);//TODO, use short_chains_dont_matter in the leaf
-  }
+    assume(false);//TODO 10m
+    }//, use short_chains_dont_matter in the leaf
   @*/
 
 /*@
@@ -5554,7 +5555,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures keep_short_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
           keep_short_fp(buckets);
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
 
   lemma void buckets_put_key_keep_long_swap<kt>(list<bucket<kt> > buckets,
@@ -5563,7 +5564,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
           buckets_put_key_fp(keep_long_fp(buckets), k, start, dist);
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5575,7 +5576,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                         get_just_tails(get_wraparound(acc, buckets)));
   ensures false == mem(nat_of_int(dist), get_just_tails(acc));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5693,7 +5694,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures false == mem(nat_of_int(start + dist - length(buckets)),
                        get_just_tails(get_wraparound(nil, buckets)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 30m
   }
   @*/
 
@@ -5710,7 +5711,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures false == mem(chain, get_just_tails
                                 (get_wraparound(acc, buckets)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5724,7 +5725,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures mem(chain, get_just_tails(get_wraparound(acc1, buckets))) ==
           mem(chain, get_just_tails(get_wraparound(acc2, buckets)));
   {
-    assume(false);//TODO
+    assume(false);//TODO 10m
   }
   @*/
 
@@ -5737,7 +5738,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures false == mem(chain, get_just_tails
                                 (get_wraparound(acc, keep_long_fp(buckets))));
   {
-    assume(false);//TODO
+    assume(false);//TODO 5m
   }
   @*/
 
@@ -5877,7 +5878,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                         start, dist),
                      0, length(buckets), hash);
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -5890,7 +5891,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           buckets_get_keys_fp(buckets_put_key_fp(buckets, k, start,
                                                  dist));
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -5903,7 +5904,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           add_partial_chain_fp(start, dist,
                                buckets_get_chns_fp(buckets));
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
@@ -5916,7 +5917,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           add_partial_chain_fp(start, dist,
                                buckets_get_chns_fp(buckets));
   {
-    assume(false);//TODO
+    assume(false);//TODO 20m
   }
   @*/
 
