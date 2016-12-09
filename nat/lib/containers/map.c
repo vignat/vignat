@@ -5743,6 +5743,42 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  lemma void keep_long_indeed_long<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures true == buckets_long_fp(keep_long_fp(buckets));
+  {
+    assume(false);//TODO 5m
+  }
+  @*/
+
+/*@
+  lemma void keep_long_same_len<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures length(buckets) == length(keep_long_fp(buckets));
+  {
+    assume(false);//TODO 5m
+  }
+  @*/
+
+/*@
+  lemma void keep_short_indeed_short<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures true == buckets_short_fp(keep_short_fp(buckets));
+  {
+    assume(false);//TODO 5m
+  }
+  @*/
+
+/*@
+  lemma void keep_short_same_len<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures length(buckets) == length(keep_short_fp(buckets));
+  {
+    assume(false);//TODO 5m
+  }
+  @*/
+
+/*@
 
   lemma void buckets_put_still_ok<kt>(list<bucket<kt> > buckets,
                                       kt k, int start, int dist)
@@ -5786,8 +5822,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
          buckets, length(buckets));
       buckets_put_key_keep_short_no_effect(buckets, k, start, dist);
       buckets_put_key_keep_long_swap(buckets, k, start, dist);
-      assume(buckets_long_fp(keep_long_fp(buckets)));//TODO
-      assume(length(buckets) == length(keep_long_fp(buckets)));//TODO
+      keep_long_indeed_long(buckets);
+      keep_long_same_len(buckets);
       buckets_put_wraparound_is_cons(nil, buckets, k, start, dist);
       assert true == content_eq
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
@@ -5840,8 +5876,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       buckets_ok_short_long_ok
          (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
           buckets, length(buckets));
-      assume(length(buckets) == length(keep_short_fp(buckets)));//TODO
-      assume(buckets_short_fp(keep_short_fp(buckets)));//TODO
+      keep_short_indeed_short(buckets);
+      keep_short_same_len(buckets);
       loop_bijection(start + dist, length(buckets));
       no_key_especially_in_short_and_long
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start,
