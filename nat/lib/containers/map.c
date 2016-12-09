@@ -6010,17 +6010,48 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
+/*@
+  lemma void bucket_put_update_ks_nowraparound<kt>(list<pair<kt, nat> > acc,
+                                                   list<bucket<kt> > buckets,
+                                                   list<option<kt> > ks,
+                                                   kt k, int start, int dist)
+  requires ks == buckets_get_keys_rec_fp(acc, buckets) &*&
+           0 <= start &*& start < length(buckets) &*&
+           0 <= dist &*& start + dist < length(buckets);
+  ensures update(start + dist, some(k), ks) ==
+          buckets_get_keys_rec_fp(acc, buckets_put_key_fp(buckets, k,
+                                                          start, dist));
+  {
+    assume(false);//TODO 30m
+  }
+  @*/
+
+
 /*@
   lemma void buckets_put_update_ks<kt>(list<bucket<kt> > buckets,
                                        list<option<kt> > ks,
                                        kt k, int start, int dist)
-  requires ks == buckets_get_keys_fp(buckets);
+  requires ks == buckets_get_keys_fp(buckets) &*&
+           0 <= start &*& start < length(buckets) &*&
+           0 <= dist &*& dist < length(buckets) &*&
+           nth(loop_fp(start + dist, length(buckets)), ks) == none;
   ensures update(loop_fp(start + dist, length(buckets)), some(k), ks) ==
           buckets_get_keys_fp(buckets_put_key_fp(buckets, k, start,
                                                  dist));
   {
-    assume(false);//TODO 20m
-  }
+    if (start + dist < length(buckets)) {
+      loop_bijection(start + dist, length(buckets));
+      buckets_put_short_chain_same_wraparound
+        (nil, buckets, k,
+         start, dist,
+         length(buckets));
+      bucket_put_update_ks_nowraparound
+        (get_wraparound(nil, buckets), buckets, ks, k, start, dist);
+    } else {
+      assume(false);//TODO 40m
+    }
+  }//took 15m so far
   @*/
 
 /*@
