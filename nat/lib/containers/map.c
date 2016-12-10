@@ -5457,7 +5457,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void get_key_none_no_chain<kt>(list<pair<kt, nat> > acc,
                                        list<bucket<kt> > buckets,
-                                       kt k, int dist)
+                                       int dist)
   requires 0 <= dist &*& dist < length(buckets) &*&
            nth(dist, buckets_get_keys_rec_fp(acc, buckets)) == none;
   ensures false == mem(nat_of_int(dist), get_just_tails(acc));
@@ -5518,7 +5518,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             nozero_no_current_key(acc_atb);
 
         } else {
-          get_key_none_no_chain(advance_acc(acc_atb), t, k, dist - 1);
+          get_key_none_no_chain(advance_acc(acc_atb), t, dist - 1);
           advance_acc_keeps_tail_nonmem(acc_atb, nat_of_int(dist - 1));
           assert true == distinct(get_just_tails(new_acc_atb));
           acc_add_chain_buckets_ok_rec(advance_acc(acc_atb),
@@ -5584,7 +5584,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                   advance_acc(new_acc_atb),
                                   t, bound);
           } else {
-            get_key_none_no_chain(advance_acc(acc_atb), t, k, dist - 1);
+            get_key_none_no_chain(advance_acc(acc_atb), t, dist - 1);
             assert false == mem(nat_of_int(dist - 1), get_just_tails(advance_acc(acc_atb)));
             advance_acc_keeps_tail_nonmem(acc_atb, nat_of_int(dist - 1));
             assert false == mem(nat_of_int(dist), get_just_tails(acc_atb));
@@ -6029,19 +6029,117 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
+  lemma void cons_content_eq_same_cur_key<kt>(list<pair<kt, nat> > acc1, list<pair<kt, nat> > acc2, kt k, nat dst)
+  requires true == content_eq(cons(pair(k, dst), acc1), acc2) &*&
+           true == distinct(get_just_tails(acc2)) &*&
+           true == distinct(get_just_tails(acc1)) &*&
+           dst != zero;
+  ensures get_current_key_fp(acc1) == get_current_key_fp(acc2);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void content_eq_advance_acc_keeps_same_len<kt>(list<pair<kt, nat> > acc1,
+                                                       list<pair<kt, nat> > acc2)
+  requires true == content_eq(acc1, acc2) &*&
+           length(acc1) == length(acc2);
+  ensures length(advance_acc(acc1)) == length(advance_acc(acc2));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void acc_eq_same_ks<kt>(list<pair<kt, nat> > acc1,
+                                list<pair<kt, nat> > acc2,
+                                list<bucket<kt> > buckets,
+                                int bound)
+  requires true == content_eq(acc1, acc2) &*&
+           true == distinct(get_just_tails(acc2)) &*&
+           true == buckets_ok_rec(acc1, buckets, bound);
+  ensures buckets_get_keys_rec_fp(acc1, buckets) ==
+          buckets_get_keys_rec_fp(acc2, buckets);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void cons_content_eq_this_cur_key<kt>(list<pair<kt, nat> > acc1,
+                                              list<pair<kt, nat> > acc2,
+                                              kt k)
+  requires true == content_eq(cons(pair(k, zero), acc1), acc2) &*&
+           true == distinct(get_just_tails(acc2));
+  ensures get_current_key_fp(acc2) == some(k);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
   lemma void acc_eq_cons_update_ks<kt>(list<pair<kt, nat> > acc1,
                                        list<pair<kt, nat> > acc2,
                                        list<bucket<kt> > buckets,
                                        kt k,
-                                       int dist)
+                                       int dist,
+                                       int bound)
   requires true == content_eq(cons(pair(k, nat_of_int(dist)), acc1), acc2) &*&
            0 <= dist &*& dist < length(buckets) &*&
-           nth(dist, buckets_get_keys_rec_fp(acc1, buckets)) == none;
+           nth(dist, buckets_get_keys_rec_fp(acc1, buckets)) == none &*&
+           true == buckets_ok_rec(acc1, buckets, bound) &*&
+           length(acc1) + 1 == length(acc2);
   ensures buckets_get_keys_rec_fp(acc2, buckets) ==
           update(dist, some(k), buckets_get_keys_rec_fp(acc1, buckets));
   {
-    assume(false);//TODO 30m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
+        list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
+        cons_acc_atb_swap(acc1, h, pair(k, nat_of_int(dist)));
+        acc_at_this_bucket_still_eq(cons(pair(k, nat_of_int(dist)), acc1),
+                                    acc2,
+                                    h);
+        assert true == content_eq(cons(pair(k, nat_of_int(dist)), atb1),
+                                  atb2);
+        switch(h) { case bucket(chains):
+          assert length(atb1) + 1 == length(atb2);
+        }
+        assert length(atb1) + 1 == length(atb2);
+        if (dist == 0) {
+          nozero_no_current_key(atb1);
+        } else {
+          get_key_none_no_chain(advance_acc(atb1), t, dist - 1);
+          advance_acc_keeps_tail_nonmem(atb1, nat_of_int(dist-1));
+        }
+        accs_eq_tails_distinct(cons(pair(k, nat_of_int(dist)), atb1), atb2);
+        advance_acc_still_eq(cons(pair(k, nat_of_int(dist)), atb1), atb2);
+        advance_acc_still_distinct(atb2);
+
+        if (dist == 0) {
+          assert true == content_eq(advance_acc(atb1), advance_acc(atb2));
+          cons_content_eq_this_cur_key(atb1, atb2, k);
+          acc_eq_same_ks(advance_acc(atb1), advance_acc(atb2), t, bound);
+        } else {
+          cons_content_eq_same_cur_key(atb1, atb2, k, nat_of_int(dist));
+          assert get_current_key_fp(cons(pair(k, nat_of_int(dist)), atb1)) ==
+                 get_current_key_fp(atb2);
+          assert true == distinct(get_just_tails(atb1));
+          assert true == distinct(get_just_tails(atb2));
+          content_eq_advance_acc_keeps_same_len
+            (cons(pair(k, nat_of_int(dist)), atb1),
+             atb2);
+          acc_eq_cons_update_ks(advance_acc(atb1), advance_acc(atb2),
+                                t, k, dist - 1, bound);
+        }
+    }
+  }//took 90m + 4 more lemmas
   @*/
 
 
@@ -6052,6 +6150,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires ks == buckets_get_keys_fp(buckets) &*&
            0 <= start &*& start < length(buckets) &*&
            0 <= dist &*& dist < length(buckets) &*&
+           true == buckets_ok(buckets) &*&
            nth(loop_fp(start + dist, length(buckets)), ks) == none;
   ensures update(loop_fp(start + dist, length(buckets)), some(k), ks) ==
           buckets_get_keys_fp(buckets_put_key_fp(buckets, k, start,
@@ -6089,11 +6188,15 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                      get_wraparound(nil, buckets)),
                                 get_wraparound(nil, bpt));
       keep_short_same_len(buckets);
+      buckets_ok_short_long_ok(get_wraparound(nil, buckets),
+                               buckets,
+                               length(buckets));
       acc_eq_cons_update_ks(get_wraparound(nil, buckets),
                             get_wraparound(nil, bpt),
                             keep_short_fp(buckets),
                             k,
-                            start + dist - length(buckets));
+                            start + dist - length(buckets),
+                            length(buckets));
     }
   }//took 15m+35m so far
   @*/
