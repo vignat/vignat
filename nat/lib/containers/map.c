@@ -5426,7 +5426,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void buckets_put_wraparound_is_cons<kt>(list<pair<kt, nat> > acc,
                                                 list<bucket<kt> > buckets,
                                                 kt k, int start, int dist)
-  requires true;
+  requires length(buckets) <= dist + start;
   ensures true == content_eq
                     (get_wraparound(acc,
                                     buckets_put_key_fp(buckets, k,
@@ -6029,6 +6029,23 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
+  lemma void acc_eq_cons_update_ks<kt>(list<pair<kt, nat> > acc1,
+                                       list<pair<kt, nat> > acc2,
+                                       list<bucket<kt> > buckets,
+                                       kt k,
+                                       int dist)
+  requires true == content_eq(cons(pair(k, nat_of_int(dist)), acc1), acc2) &*&
+           0 <= dist &*& dist < length(buckets) &*&
+           nth(dist, buckets_get_keys_rec_fp(acc1, buckets)) == none;
+  ensures buckets_get_keys_rec_fp(acc2, buckets) ==
+          update(dist, some(k), buckets_get_keys_rec_fp(acc1, buckets));
+  {
+    assume(false);//TODO 30m
+  }
+  @*/
+
+
+/*@
   lemma void buckets_put_update_ks<kt>(list<bucket<kt> > buckets,
                                        list<option<kt> > ks,
                                        kt k, int start, int dist)
@@ -6049,9 +6066,36 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       bucket_put_update_ks_nowraparound
         (get_wraparound(nil, buckets), buckets, ks, k, start, dist);
     } else {
-      assume(false);//TODO 40m
+      loop_injection_n(start + dist - length(buckets), length(buckets), 1);
+      loop_bijection(start + dist - length(buckets), length(buckets));
+      buckets_short_get_keys_rec(get_wraparound(nil, buckets), buckets);
+      assert buckets_get_keys_rec_fp(get_wraparound(nil, buckets), buckets) ==
+             buckets_get_keys_rec_fp(get_wraparound(nil, buckets),
+                                     keep_short_fp(buckets));
+      list<bucket<kt> > bpt = buckets_put_key_fp(buckets, k, start, dist);
+      buckets_put_key_keep_short_no_effect (buckets, k, start, dist);
+      assert keep_short_fp(buckets) == keep_short_fp(bpt);
+      buckets_short_get_keys_rec(get_wraparound(nil, bpt), bpt);
+      assert buckets_get_keys_rec_fp(get_wraparound(nil, bpt),
+                                     bpt) ==
+             buckets_get_keys_rec_fp(get_wraparound(nil, bpt),
+                                     keep_short_fp(bpt));
+      assert buckets_get_keys_fp(bpt) ==
+             buckets_get_keys_rec_fp(get_wraparound(nil, bpt),
+                                     keep_short_fp(buckets));
+      nat tail_left = nat_of_int(start + dist - length(buckets));
+      buckets_put_wraparound_is_cons(nil, buckets, k, start, dist);
+      assert true == content_eq(cons(pair(k, tail_left),
+                                     get_wraparound(nil, buckets)),
+                                get_wraparound(nil, bpt));
+      keep_short_same_len(buckets);
+      acc_eq_cons_update_ks(get_wraparound(nil, buckets),
+                            get_wraparound(nil, bpt),
+                            keep_short_fp(buckets),
+                            k,
+                            start + dist - length(buckets));
     }
-  }//took 15m so far
+  }//took 15m+35m so far
   @*/
 
 /*@
