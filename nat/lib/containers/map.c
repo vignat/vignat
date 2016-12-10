@@ -5259,6 +5259,17 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+/*@
+  lemma void content_eq_remove_uniq_both<t>(list<t> l1, list<t> l2, t x)
+  requires true == content_eq(l1, l2) &*&
+           false == mem(x, remove(x, l1)) &*&
+           false == mem(x, remove(x, l2));
+  ensures true == content_eq(remove(x, l1), remove(x, l2));
+  {
+    remove_both_subset(x, l1, l2);
+    remove_both_subset(x, l2, l1);
+  }
+  @*/
 
 /*@
   lemma void content_eq_remove_both<t>(list<t> l1, list<t> l2, t x)
@@ -5269,8 +5280,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   {
     distinct_unique(l1, x);
     distinct_unique(l2, x);
-    remove_both_subset(x, l1, l2);
-    remove_both_subset(x, l2, l1);
+    content_eq_remove_uniq_both(l1, l2, x);
   }
   @*/
 
@@ -6029,15 +6039,126 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void cons_content_eq_same_cur_key<kt>(list<pair<kt, nat> > acc1, list<pair<kt, nat> > acc2, kt k, nat dst)
+  lemma void single_elem_cur_key_is_none<kt>(list<pair<kt, nat> > acc,
+                                             kt k, nat dst)
+  requires true == subset(acc, cons(pair(k, dst), nil)) &*&
+           dst != zero;
+  ensures get_current_key_fp(acc) == none;
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+        }
+        assert h == pair(k, dst);
+        single_elem_cur_key_is_none(t, k, dst);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void non_mem_map_remove<t1,t2>(list<t1> l, t2 x1, t1 x2,
+                                       fixpoint (t1,t2) f)
+  requires false == mem(x1, map(f, l));
+  ensures false == mem(x1, map(f, remove(x2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (h != x2) {
+          non_mem_map_remove(t, x1, x2, f);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void distinct_map_remove<t1,t2>(list<t1> l, fixpoint (t1,t2) f, t1 x)
+  requires true == distinct(map(f, l));
+  ensures true == distinct(map(f, remove(x, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (x != h) {
+          assert false == mem(f(h), map(f, t));
+          non_mem_map_remove(t, f(h), x, f);
+          assert false == mem(f(h), map(f, remove(x, t)));
+          distinct_map_remove(t, f, x);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void remove_chain_get_current_key<kt>(list<pair<kt, nat> > acc,
+                                              kt k, nat dst)
+  requires dst != zero;
+  ensures get_current_key_fp(remove(pair(k, dst), acc)) ==
+          get_current_key_fp(acc);
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              if (h != pair(k, dst))
+                remove_chain_get_current_key(t, k, dst);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void cons_content_eq_same_cur_key<kt>(list<pair<kt, nat> > acc1,
+                                              list<pair<kt, nat> > acc2,
+                                              kt k, nat dst)
   requires true == content_eq(cons(pair(k, dst), acc1), acc2) &*&
+           false == mem(dst, get_just_tails(acc1)) &*&
            true == distinct(get_just_tails(acc2)) &*&
            true == distinct(get_just_tails(acc1)) &*&
            dst != zero;
   ensures get_current_key_fp(acc1) == get_current_key_fp(acc2);
   {
-    assume(false);//TODO 
-  }
+      switch(acc1) {
+        case nil:
+          single_elem_cur_key_is_none(acc2, k, dst);
+        case cons(h,t):
+          switch(h) { case pair(key,dist):
+            switch(dist) {
+              case zero:
+                assert true == mem(h, acc2);
+                distinct_and_zero_this_is_the_key(acc2, key);
+              case succ(n):
+                distinct_map_remove(acc2, snd, h);
+                assert remove(h, cons(pair(k, dst), acc1)) ==
+                       cons(pair(k, dst), t);
+                distinct_unmap(acc1, snd);
+                distinct_unique(acc1, h);
+                distinct_unmap(acc2, snd);
+                distinct_unique(acc2, h);
+                if (h == pair(k, dst)) {
+                  assert true == mem(dst, get_just_tails(acc1));
+                }
+                assert false == mem(h, remove(h, cons(pair(k, dst), acc1)));
+                content_eq_remove_uniq_both(cons(pair(k, dst), acc1), acc2, h);
+                cons_content_eq_same_cur_key(t, remove(h, acc2), k, dst);
+                remove_chain_get_current_key(acc2, key, dist);
+            }
+          }
+      }
+  }//took 40m
   @*/
 
 
