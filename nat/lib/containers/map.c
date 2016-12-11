@@ -6335,17 +6335,35 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void
   buckets_put_chains_still_start_on_hash<kt>(list<bucket<kt> > buckets,
-                                             kt k, int start, int dist,
-                                             fixpoint (kt,int) hash)
-  requires true == key_chains_start_on_hash_fp(buckets, 0,
-                                               length(buckets), hash);
+                                             kt k, int shift,
+                                             int start, int dist,
+                                             fixpoint (kt,int) hash,
+                                             int capacity)
+  requires true == key_chains_start_on_hash_fp(buckets, shift,
+                                               capacity, hash) &*&
+           loop_fp(hash(k), capacity) == start + shift &*&
+           0 <= start &*& start < length(buckets) &*&
+           0 <= dist &*& dist < capacity;
   ensures true == key_chains_start_on_hash_fp
                     (buckets_put_key_fp(buckets, k,
                                         start, dist),
-                     0, length(buckets), hash);
+                     shift, capacity, hash);
   {
-    assume(false);//TODO 20m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          if (start == 0) {
+            assert true == has_given_hash_fp(hash, shift, capacity,
+                                             pair(k, nat_of_int(dist)));
+          } else {
+            buckets_put_chains_still_start_on_hash
+              (t, k, shift + 1, start - 1, dist, hash, capacity);
+
+          }
+        }
+    }
+  }//took 10m
   @*/
 
 
@@ -6767,6 +6785,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            capacity == length(buckets) &*&
            0 <= start &*& start < length(buckets) &*&
            0 <= fin &*& fin < length(buckets) &*&
+           start == loop_fp(hsh(k), capacity) &*&
            nth(fin, buckets_get_keys_fp(buckets)) == none;
   ensures buckets_ks_insync(chns, capacity,
                             buckets_put_key_fp(buckets, k, start,
@@ -6793,7 +6812,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     loop_bijection(fin, capacity);
     assert loop_fp(start + dist, capacity) == fin;
     buckets_put_still_ok(buckets, k, start, dist);
-    buckets_put_chains_still_start_on_hash(buckets, k, start, dist, hsh);
+    buckets_put_chains_still_start_on_hash
+      (buckets, k, 0, start, dist, hsh, length(buckets));
     buckets_put_update_ks(buckets, ks, k, start, dist);
     close buckets_ks_insync(chns, capacity,
                             buckets_put_key_fp(buckets, k, start,
