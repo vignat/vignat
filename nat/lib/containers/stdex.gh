@@ -654,6 +654,7 @@ ensures append(a, b) != nil;
     }
   }
 
+
   lemma void distinct2_subset_sublen<t>(list<t> xs, list<t> ys)
   requires true == distinct(xs) &*&
            true == distinct(ys) &*&
@@ -841,6 +842,39 @@ ensures append(a, b) != nil;
         distinct_map_filter(f1, f2, t);
     }
   }
+
+  lemma void non_mem_map_remove<t1,t2>(list<t1> l, t2 x1, t1 x2,
+                                       fixpoint (t1,t2) f)
+  requires false == mem(x1, map(f, l));
+  ensures false == mem(x1, map(f, remove(x2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (h != x2) {
+          non_mem_map_remove(t, x1, x2, f);
+        }
+    }
+  }
+
+
+  lemma void distinct_map_remove<t1,t2>(list<t1> l, fixpoint (t1,t2) f, t1 x)
+  requires true == distinct(map(f, l));
+  ensures true == distinct(map(f, remove(x, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (x != h) {
+          assert false == mem(f(h), map(f, t));
+          non_mem_map_remove(t, f(h), x, f);
+          assert false == mem(f(h), map(f, remove(x, t)));
+          distinct_map_remove(t, f, x);
+        }
+    }
+  }
+
+
 
   lemma void forall_filter<t>(fixpoint (t,bool) f1,
                               fixpoint (t,bool) f2,
