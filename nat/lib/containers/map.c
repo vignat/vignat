@@ -5080,6 +5080,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
 /*@
   lemma void advance_acc_still_eq<kt>(list<pair<kt, nat> > acc1,
                                       list<pair<kt, nat> > acc2)
@@ -5483,8 +5484,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     content_eq_map(acc1, acc2, snd);
     map_preserves_length(snd, acc1);
     map_preserves_length(snd, acc2);
-    content_eq_same_len_distinct_both(get_just_tails(acc1),
-                                      get_just_tails(acc2));
+    set_eq_same_len_distinct_both(get_just_tails(acc1),
+                                  get_just_tails(acc2));
   }
 
   @*/
