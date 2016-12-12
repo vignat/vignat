@@ -5456,17 +5456,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void set_eq_forall_both<t>(list<t> l1, list<t> l2,
-                                       fixpoint (t,bool) prop)
-  requires true == set_eq(l1, l2);
-  ensures forall(l1, prop) == forall(l2, prop);
-  {
-    assume(false);//TODO 5m
-  }
-  @*/
-
-
-/*@
   lemma void distinct_unmap<t1,t2>(list<t1> lst, fixpoint (t1,t2) f)
   requires true == distinct(map(f, lst));
   ensures true == distinct(lst);
@@ -5480,26 +5469,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         }
         distinct_unmap(t, f);
     }
-  }
-  @*/
-
-/*@
-  lemma void content_eq_map<t1,t2>(list<t1> l1, list<t1> l2,
-                                   fixpoint (t1,t2) f)
-  requires true == set_eq(l1,l2);
-  ensures true == set_eq(map(f, l1), map(f, l2));
-  {
-    assume(false);//TODO 10m
-  }
-  @*/
-
-/*@
-  lemma void
-  content_eq_same_len_distinct_both<t>(list<t> l1, list<t> l2)
-  requires true == set_eq(l1, l2) &*& length(l1) == length(l2);
-  ensures distinct(l1) == distinct(l2);
-  {
-    assume(false);//TODO 30m
   }
   @*/
 
