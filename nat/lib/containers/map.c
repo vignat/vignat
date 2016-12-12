@@ -5854,21 +5854,13 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                           cons(pair(k, nat_of_int(dist)), chains)) ==
                    filter((lower_limit)(length(buckets)), chains);
           } else {
-            assert keep_long_fp(buckets) ==
-                   cons(bucket(filter((lower_limit)(length(buckets)), chains)),
-                        keep_long_fp(t));
-            assert buckets_put_key_fp(buckets, k, start, dist) ==
-                   cons(h, buckets_put_key_fp(t, k, start - 1, dist));
-            assume(false);//TODO, not done yet here
-            assert keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
-                   cons(bucket(filter((lower_limit)(length(buckets)), chains)),
-                        keep_long_fp(buckets_put_key_fp(t, k, start - 1, dist)));
+            buckets_put_same_len(buckets, k, start, dist);
             keep_long_put_short_no_effect(t, k, start - 1, dist);
           }
         }
     }
   
-  }//took 25m so far
+  }//took 30m
   @*/
 
 
@@ -6807,9 +6799,15 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       case nil:
       case cons(h,t):
         switch(h) { case bucket(chains):
-          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h)
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
           if (start == 0) {
-            assume(false);//TODO
+            list<pair<kt, nat> > new_atb =
+              acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
+            assume(false);//TODO 50m
+            if (dist == 0) {
+              assert advance_acc(atb) == advance_acc(new_atb);
+            } else {
+            }
           } else {
             buckets_add_part_get_chns_norm_rec(advance_acc(atb),
                                                t, k, start - 1, dist);
@@ -6824,7 +6822,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                 kt k, int start, int dist)
   requires start + dist < length(buckets) &*&
            0 <= start &*& start < length(buckets) &*&
-           0 <= dist;
+           0 <= dist &*&
+           true == buckets_ok(buckets);
   ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                  start, dist)) ==
           add_partial_chain_fp(start, dist,
@@ -6850,7 +6849,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           add_partial_chain_fp(start, dist,
                                buckets_get_chns_fp(buckets));
   {
-    assume(false);//TODO 20m
+    assume(false);//TODO 120m
   }
   @*/
 
