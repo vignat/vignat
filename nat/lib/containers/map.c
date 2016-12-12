@@ -5081,16 +5081,10 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  fixpoint bool content_eq<t>(list<t> l1, list<t> l2) {
-    return subset(l1, l2) && subset(l2, l1);
-  }
-  @*/
-
-/*@
   lemma void advance_acc_still_eq<kt>(list<pair<kt, nat> > acc1,
                                       list<pair<kt, nat> > acc2)
-  requires true == content_eq(acc1, acc2);
-  ensures true == content_eq(advance_acc(acc1), advance_acc(acc2));
+  requires true == set_eq(acc1, acc2);
+  ensures true == set_eq(advance_acc(acc1), advance_acc(acc2));
   {
     advance_acc_subset(acc1, acc2);
     advance_acc_subset(acc2, acc1);
@@ -5099,8 +5093,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void acc_at_this_bucket_still_eq<kt>(list<pair<kt, nat> > acc1,
                                              list<pair<kt, nat> > acc2,
                                              bucket<kt> b)
-  requires true == content_eq(acc1, acc2);
-  ensures true == content_eq(acc_at_this_bucket(acc1, b),
+  requires true == set_eq(acc1, acc2);
+  ensures true == set_eq(acc_at_this_bucket(acc1, b),
                              acc_at_this_bucket(acc2, b));
   {
     acc_at_this_bucket_subset(acc1, acc2, b);
@@ -5192,7 +5186,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           case cons(h2,t2):
             return switch(h1) { case bucket(chains1):
               return switch(h2) { case bucket(chains2):
-                return content_eq(chains1, chains2) &&
+                return set_eq(chains1, chains2) &&
                        buckets_content_eq_fp(t1, t2);
               };
             };
@@ -5460,68 +5454,11 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
-/*@
-  lemma void content_eq_remove_uniq_both<t>(list<t> l1, list<t> l2, t x)
-  requires true == content_eq(l1, l2) &*&
-           false == mem(x, remove(x, l1)) &*&
-           false == mem(x, remove(x, l2));
-  ensures true == content_eq(remove(x, l1), remove(x, l2));
-  {
-    remove_both_subset(x, l1, l2);
-    remove_both_subset(x, l2, l1);
-  }
-  @*/
 
 /*@
-  lemma void content_eq_remove_both<t>(list<t> l1, list<t> l2, t x)
-  requires true == content_eq(l1, l2) &*&
-           true == distinct(l1) &*&
-           true == distinct(l2);
-  ensures true == content_eq(remove(x, l1), remove(x, l2));
-  {
-    distinct_unique(l1, x);
-    distinct_unique(l2, x);
-    content_eq_remove_uniq_both(l1, l2, x);
-  }
-  @*/
-
-
-/*@
-  lemma void subset_nil_nil<t>(list<t> l)
-  requires true == subset(l, nil);
-  ensures l == nil;
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void content_eq_distinct_same_len<t>(list<t> l1,
-                                             list<t> l2)
-  requires true == content_eq(l1, l2) &*&
-           true == distinct(l1) &*&
-           true == distinct(l2);
-  ensures length(l1) == length(l2);
-  {
-    switch(l1) {
-      case nil:
-        subset_nil_nil(l2);
-      case cons(h,t):
-        content_eq_remove_both(l1, l2, h);
-        distinct_remove(h, l2);
-        content_eq_distinct_same_len(t, remove(h,l2));
-    }
-  }
-  @*/
-
-/*@
-  lemma void content_eq_forall_both<t>(list<t> l1, list<t> l2,
+  lemma void set_eq_forall_both<t>(list<t> l1, list<t> l2,
                                        fixpoint (t,bool) prop)
-  requires true == content_eq(l1, l2);
+  requires true == set_eq(l1, l2);
   ensures forall(l1, prop) == forall(l2, prop);
   {
     assume(false);//TODO 5m
@@ -5549,8 +5486,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void content_eq_map<t1,t2>(list<t1> l1, list<t1> l2,
                                    fixpoint (t1,t2) f)
-  requires true == content_eq(l1,l2);
-  ensures true == content_eq(map(f, l1), map(f, l2));
+  requires true == set_eq(l1,l2);
+  ensures true == set_eq(map(f, l1), map(f, l2));
   {
     assume(false);//TODO 10m
   }
@@ -5559,7 +5496,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void
   content_eq_same_len_distinct_both<t>(list<t> l1, list<t> l2)
-  requires true == content_eq(l1, l2) &*& length(l1) == length(l2);
+  requires true == set_eq(l1, l2) &*& length(l1) == length(l2);
   ensures distinct(l1) == distinct(l2);
   {
     assume(false);//TODO 30m
@@ -5570,7 +5507,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void accs_eq_tails_distinct<kt>(list<pair<kt, nat> > acc1,
                                         list<pair<kt, nat> > acc2)
   requires true == distinct(get_just_tails(acc1)) &*&
-           true == content_eq(acc1, acc2) &*&
+           true == set_eq(acc1, acc2) &*&
            length(acc1) == length(acc2);
   ensures true == distinct(get_just_tails(acc2));
   {
@@ -5588,14 +5525,14 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                        list<pair<kt, nat> > acc2,
                                        list<bucket<kt> > buckets,
                                        int bound)
-  requires true == content_eq(acc1, acc2) &*&
+  requires true == set_eq(acc1, acc2) &*&
            true == buckets_ok_rec(acc1, buckets, bound) &*&
            true == distinct(get_just_tails(acc2));
   ensures true == buckets_ok_rec(acc2, buckets, bound);
   {
     switch(buckets) {
       case nil:
-        content_eq_forall_both(acc1, acc2, (upper_limit)(bound));
+        set_eq_forall_both(acc1, acc2, (upper_limit)(bound));
       case cons(h,t):
         list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
         list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
@@ -5605,11 +5542,11 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         }
         distinct_unmap(acc1, snd);
         distinct_unmap(acc2, snd);
-        content_eq_distinct_same_len(acc1, acc2);
+        set_eq_distinct_same_len(acc1, acc2);
         assert length(atb1) == length(atb2);
         acc_at_this_bucket_still_eq(acc1, acc2, h);
         accs_eq_tails_distinct(atb1, atb2);
-        content_eq_forall_both(atb1, atb2, (upper_limit)(bound));
+        set_eq_forall_both(atb1, atb2, (upper_limit)(bound));
         advance_acc_still_eq(atb1, atb2);
         advance_acc_still_distinct(atb2);
         acc_eq_buckets_ok_rec(advance_acc(atb1), advance_acc(atb2), t, bound);
@@ -5622,7 +5559,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                            bucket<kt> bucket,
                                            kt k, int dist)
   requires true;
-  ensures true == content_eq
+  ensures true == set_eq
                     (acc_at_this_bucket(acc, bucket_put_key_fp(bucket, k, dist)),
                      cons(pair(k, nat_of_int(dist)),
                           acc_at_this_bucket(acc, bucket))) &*&
@@ -5638,7 +5575,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                 list<bucket<kt> > buckets,
                                                 kt k, int start, int dist)
   requires length(buckets) <= dist + start;
-  ensures true == content_eq
+  ensures true == set_eq
                     (get_wraparound(acc,
                                     buckets_put_key_fp(buckets, k,
                                                        start, dist)),
@@ -5767,12 +5704,12 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
 
           acc_at_bucket_put_is_cons(acc, h, k, dist);
-          assert true == content_eq(cons(pair(k, nat_of_int(dist)),
+          assert true == set_eq(cons(pair(k, nat_of_int(dist)),
                                          acc_atb),
                                     new_acc_atb);
           assert true == forall(cons(pair(k, nat_of_int(dist)), acc_atb),
                                 (upper_limit)(bound));
-          content_eq_forall_both(cons(pair(k, nat_of_int(dist)), acc_atb),
+          set_eq_forall_both(cons(pair(k, nat_of_int(dist)), acc_atb),
                                  new_acc_atb, (upper_limit)(bound));
           assert true == forall(new_acc_atb, (upper_limit)(bound));
           assert true == distinct(get_just_tails(acc_atb));
@@ -6115,7 +6052,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           acc_at_bucket_put_is_cons(acc, h, k, dist);
           assert true == forall(cons(pair(k, nat_of_int(dist)), acc_atb),
                                 (upper_limit)(bound));
-          content_eq_forall_both(cons(pair(k, nat_of_int(dist)), acc_atb),
+          set_eq_forall_both(cons(pair(k, nat_of_int(dist)), acc_atb),
                                  new_acc_atb,
                                  (upper_limit)(bound));
           assert true == forall(new_acc_atb, (upper_limit)(bound));
@@ -6180,7 +6117,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                      list<pair<kt, nat> > acc2,
                                      list<bucket<kt> > buckets,
                                      nat chain)
-  requires true == content_eq(acc1, acc2);
+  requires true == set_eq(acc1, acc2);
   ensures mem(chain, get_just_tails(get_wraparound(acc1, buckets))) ==
           mem(chain, get_just_tails(get_wraparound(acc2, buckets)));
   {
@@ -6291,7 +6228,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       keep_long_indeed_long(buckets);
       keep_long_same_len(buckets);
       buckets_put_wraparound_is_cons(nil, buckets, k, start, dist);
-      assert true == content_eq
+      assert true == set_eq
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
          cons(pair(k, nat_of_int(start + dist - length(buckets))),
               get_wraparound(nil, buckets)));
@@ -6409,7 +6346,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void cons_content_eq_this_cur_key<kt>(list<pair<kt, nat> > acc1,
                                               list<pair<kt, nat> > acc2,
                                               kt k)
-  requires true == content_eq(cons(pair(k, zero), acc1), acc2) &*&
+  requires true == set_eq(cons(pair(k, zero), acc1), acc2) &*&
            true == distinct(get_just_tails(acc2));
   ensures get_current_key_fp(acc2) == some(k);
   {
@@ -6446,7 +6383,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                      list<pair<kt, nat> > acc2)
   requires true == distinct(get_just_tails(acc1)) &*&
            true == distinct(get_just_tails(acc2)) &*&
-           true == content_eq(acc1, acc2);
+           true == set_eq(acc1, acc2);
   ensures get_current_key_fp(acc1) == get_current_key_fp(acc2);
   {
     switch(acc1) {
@@ -6461,7 +6398,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             case succ(n):
               distinct_unmap(acc1, snd);
               distinct_unmap(acc2, snd);
-              content_eq_remove_both(acc1, acc2, h);
+              set_eq_remove_both(acc1, acc2, h);
               distinct_map_remove(acc2, snd, h);
               remove_chain_get_current_key(acc2, key, dist);
               acc_eq_same_cur_key(t, remove(h, acc2));
@@ -6477,7 +6414,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                 list<pair<kt, nat> > acc2,
                                 list<bucket<kt> > buckets,
                                 int bound)
-  requires true == content_eq(acc1, acc2) &*&
+  requires true == set_eq(acc1, acc2) &*&
            true == distinct(get_just_tails(acc2)) &*&
            true == buckets_ok_rec(acc1, buckets, bound);
   ensures buckets_get_keys_rec_fp(acc1, buckets) ==
@@ -6504,7 +6441,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         assert get_current_key_fp(atb1) ==
                get_current_key_fp(atb2);
         advance_acc_still_eq(atb1, atb2);
-        assert true == content_eq(advance_acc(atb1), advance_acc(atb2));
+        assert true == set_eq(advance_acc(atb1), advance_acc(atb2));
         advance_acc_still_distinct(atb2);
         acc_eq_same_ks(advance_acc(atb1), advance_acc(atb2),
                        t, bound);
@@ -6540,7 +6477,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void cons_content_eq_same_cur_key<kt>(list<pair<kt, nat> > acc1,
                                               list<pair<kt, nat> > acc2,
                                               kt k, nat dst)
-  requires true == content_eq(cons(pair(k, dst), acc1), acc2) &*&
+  requires true == set_eq(cons(pair(k, dst), acc1), acc2) &*&
            false == mem(dst, get_just_tails(acc1)) &*&
            true == distinct(get_just_tails(acc2)) &*&
            true == distinct(get_just_tails(acc1)) &*&
@@ -6568,7 +6505,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                   assert true == mem(dst, get_just_tails(acc1));
                 }
                 assert false == mem(h, remove(h, cons(pair(k, dst), acc1)));
-                content_eq_remove_uniq_both(cons(pair(k, dst), acc1), acc2, h);
+                set_eq_remove_uniq_both(cons(pair(k, dst), acc1), acc2, h);
                 cons_content_eq_same_cur_key(t, remove(h, acc2), k, dst);
                 remove_chain_get_current_key(acc2, key, dist);
             }
@@ -6585,7 +6522,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                        kt k,
                                        int dist,
                                        int bound)
-  requires true == content_eq(cons(pair(k, nat_of_int(dist)), acc1), acc2) &*&
+  requires true == set_eq(cons(pair(k, nat_of_int(dist)), acc1), acc2) &*&
            0 <= dist &*& dist < length(buckets) &*&
            nth(dist, buckets_get_keys_rec_fp(acc1, buckets)) == none &*&
            true == buckets_ok_rec(acc1, buckets, bound) &*&
@@ -6602,7 +6539,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         acc_at_this_bucket_still_eq(cons(pair(k, nat_of_int(dist)), acc1),
                                     acc2,
                                     h);
-        assert true == content_eq(cons(pair(k, nat_of_int(dist)), atb1),
+        assert true == set_eq(cons(pair(k, nat_of_int(dist)), atb1),
                                   atb2);
         switch(h) { case bucket(chains):
           assert length(atb1) + 1 == length(atb2);
@@ -6619,7 +6556,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         advance_acc_still_distinct(atb2);
 
         if (dist == 0) {
-          assert true == content_eq(advance_acc(atb1), advance_acc(atb2));
+          assert true == set_eq(advance_acc(atb1), advance_acc(atb2));
           cons_content_eq_this_cur_key(atb1, atb2, k);
           acc_eq_same_ks(advance_acc(atb1), advance_acc(atb2), t, bound);
         } else {
@@ -6642,7 +6579,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             (advance_acc(cons(pair(k, nat_of_int(dist)), atb1)), snd);
           distinct_unmap
             (advance_acc(atb2), snd);
-          content_eq_distinct_same_len
+          set_eq_distinct_same_len
             (advance_acc(cons(pair(k, nat_of_int(dist)), atb1)),
              advance_acc(atb2));
           assert length(advance_acc(cons(pair(k, nat_of_int(dist)), atb1))) ==
@@ -6693,11 +6630,11 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             cons_content_eq_this_cur_key(atb, new_atb, k);
             acc_eq_same_ks(advance_acc(atb), advance_acc(new_atb), t, bound);
           } else {
-            assert true == content_eq(advance_acc(cons(pair(k, nat_of_int(dist)), atb)), advance_acc(new_atb));
+            assert true == set_eq(advance_acc(cons(pair(k, nat_of_int(dist)), atb)), advance_acc(new_atb));
             assert succ(nat_of_int(dist-1)) == nat_of_int(dist);
             assert advance_acc((cons(pair(k, nat_of_int(dist)), atb))) ==
                    cons(pair(k, nat_of_int(dist-1)), advance_acc(atb));
-            assert true == content_eq(cons(pair(k, nat_of_int(dist-1)), advance_acc(atb)), advance_acc(new_atb));
+            assert true == set_eq(cons(pair(k, nat_of_int(dist-1)), advance_acc(atb)), advance_acc(new_atb));
             switch(h) { case bucket(chains):
               assert length(atb) + 1 == length(new_atb);
             }
@@ -6707,7 +6644,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
             distinct_unmap(advance_acc(cons(pair(k, nat_of_int(dist)), atb)),
                            snd);
             distinct_unmap(advance_acc(new_atb), snd);
-            content_eq_distinct_same_len
+            set_eq_distinct_same_len
               (advance_acc(cons(pair(k, nat_of_int(dist)), atb)),
                advance_acc(new_atb));
             acc_eq_cons_update_ks(advance_acc(atb), advance_acc(new_atb),
@@ -6768,7 +6705,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                      keep_short_fp(buckets));
       nat tail_left = nat_of_int(start + dist - length(buckets));
       buckets_put_wraparound_is_cons(nil, buckets, k, start, dist);
-      assert true == content_eq(cons(pair(k, tail_left),
+      assert true == set_eq(cons(pair(k, tail_left),
                                      get_wraparound(nil, buckets)),
                                 get_wraparound(nil, bpt));
       keep_short_same_len(buckets);

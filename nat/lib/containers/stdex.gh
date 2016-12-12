@@ -534,6 +534,177 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void drop_append_small<t>(int n, list<t> l1, list<t> l2)
+  requires 0 <= n &*& n <= length(l1);
+  ensures append(drop(n, l1), l2) == drop(n, append(l1, l2));
+  {
+    switch(l1) {
+      case nil: return;
+      case cons(h, t):
+        if (n == 0) return;
+        drop_append_small(n-1, t, l2);
+    }
+  }
+
+  lemma void take_append_small<t>(int n, list<t> l1, list<t> l2)
+  requires 0 <= n &*& n <= length(l1);
+  ensures take(n, l1) == take(n, append(l1, l2));
+  {
+    switch(l1) {
+      case nil: return;
+      case cons(h, t):
+        if (n == 0) return;
+        take_append_small(n-1, t, l2);
+    }
+  }
+
+  lemma void head_take<t>(int n, list<t> l)
+  requires 0 < n;
+  ensures head(l) == head(take(n, l));
+  {
+    switch(l) {
+      case nil: return;
+      case cons(h,t):
+        if (n == 1) return;
+        else head_take(n-1, t);
+    }
+  }
+
+  lemma void nonmem_map_filter<t1,t2>(fixpoint (t1,t2) f1,
+                                      fixpoint (t1,bool) f2,
+                                      list<t1> l,
+                                      t1 el)
+  requires false == mem(f1(el), map(f1, l));
+  ensures false == mem(f1(el), map(f1, filter(f2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        nonmem_map_filter(f1, f2, t, el);
+    }
+  }
+
+  lemma void distinct_map_filter<t1,t2>(fixpoint (t1,t2) f1,
+                                        fixpoint (t1,bool) f2,
+                                        list<t1> l)
+  requires true == distinct(map(f1, l));
+  ensures true == distinct(map(f1, filter(f2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        nonmem_map_filter(f1, f2, t, h);
+        distinct_map_filter(f1, f2, t);
+    }
+  }
+
+  lemma void non_mem_map_remove<t1,t2>(list<t1> l, t2 x1, t1 x2,
+                                       fixpoint (t1,t2) f)
+  requires false == mem(x1, map(f, l));
+  ensures false == mem(x1, map(f, remove(x2, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (h != x2) {
+          non_mem_map_remove(t, x1, x2, f);
+        }
+    }
+  }
+
+
+  lemma void distinct_map_remove<t1,t2>(list<t1> l, fixpoint (t1,t2) f, t1 x)
+  requires true == distinct(map(f, l));
+  ensures true == distinct(map(f, remove(x, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (x != h) {
+          assert false == mem(f(h), map(f, t));
+          non_mem_map_remove(t, f(h), x, f);
+          assert false == mem(f(h), map(f, remove(x, t)));
+          distinct_map_remove(t, f, x);
+        }
+    }
+  }
+
+
+
+  lemma void forall_filter<t>(fixpoint (t,bool) f1,
+                              fixpoint (t,bool) f2,
+                              list<t> l)
+  requires true == forall(l, f1);
+  ensures true == forall(filter(f2, l), f1);
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        forall_filter(f1, f2, t);
+    }
+  }
+
+  lemma void filter_append_idemp<t>(list<t> l1, list<t> l2,
+                                    fixpoint (t,bool) f)
+  requires true;
+  ensures filter(f, append(l1, l2)) == append(filter(f, l1), filter(f, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        filter_append_idemp(t, l2, f);
+    }
+  }
+
+  lemma void filter_forall<t>(fixpoint (t,bool) f, list<t> l)
+  requires true;
+  ensures true == (l == filter(f, l)) == forall(l, f) &*&
+          true == forall(filter(f, l), f);
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        filter_forall(f, t);
+        if (f(h)) {
+        } else {
+          assert false == forall(l, f);
+          assert filter(f,l) == filter(f,t);
+          filter_no_increase_len(f, t);
+          assert length(filter(f, l)) < length(l);
+          assert l != filter(f,l);
+        }
+    }
+  }
+
+  lemma void double_mem_append_nondistinct<t>(list<t> l1, list<t> l2, t x)
+  requires true == mem(x, l1) &*& true == mem(x, l2);
+  ensures false == distinct(append(l1, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        if (h == x) {
+          mem_append(x, t, l2);
+        } else {
+          double_mem_append_nondistinct(t, l2, x);
+        }
+    }
+  }
+
+  lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
+  requires true == distinct(append(l1,l2));
+  ensures true == distinct(l1) &*& true == distinct(l2);
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        mem_append(h, t, l2);
+        distinct_unappend(t, l2);
+    }
+  }
+
+//-----===== Set lemmas =====-----
+
   lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
   requires true == subset(xs, ys);
   ensures true == subset(remove(el, xs), ys);
@@ -744,39 +915,35 @@ ensures append(a, b) != nil;
     }
   }
 
-  lemma void drop_append_small<t>(int n, list<t> l1, list<t> l2)
-  requires 0 <= n &*& n <= length(l1);
-  ensures append(drop(n, l1), l2) == drop(n, append(l1, l2));
+  lemma void subset_append_distinct<t>(list<t> xs, list<t> ys, list<t> zs)
+  requires true == subset(xs, ys) &*&
+           true == distinct(xs) &*&
+           true == distinct(append(ys, zs));
+  ensures true == distinct(append(xs, zs));
   {
-    switch(l1) {
-      case nil: return;
-      case cons(h, t):
-        if (n == 0) return;
-        drop_append_small(n-1, t, l2);
-    }
-  }
-
-  lemma void take_append_small<t>(int n, list<t> l1, list<t> l2)
-  requires 0 <= n &*& n <= length(l1);
-  ensures take(n, l1) == take(n, append(l1, l2));
-  {
-    switch(l1) {
-      case nil: return;
-      case cons(h, t):
-        if (n == 0) return;
-        take_append_small(n-1, t, l2);
-    }
-  }
-
-  lemma void head_take<t>(int n, list<t> l)
-  requires 0 < n;
-  ensures head(l) == head(take(n, l));
-  {
-    switch(l) {
-      case nil: return;
+    switch(xs) {
+      case nil:
+        distinct_unappend(ys, zs);
       case cons(h,t):
-        if (n == 1) return;
-        else head_take(n-1, t);
+        mem_append(h, t, zs);
+        if (mem(h, zs)) {
+          assert true == mem(h, ys);
+          double_mem_append_nondistinct(ys, zs, h);
+          assert false == distinct(append(ys, zs));
+        }
+        subset_append_distinct(t, ys, zs);
+    }
+  }
+
+  lemma void subset_map<t1,t2>(list<t1> l1, list<t1> l2, fixpoint (t1,t2) f)
+  requires true == subset(l1, l2);
+  ensures true == subset(map(f, l1), map(f, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        mem_map(h, l2, f);
+        subset_map(t, l2, f);
     }
   }
 
@@ -815,168 +982,55 @@ ensures append(a, b) != nil;
     subset_append(ys, xs, append(ys, zs));
   }
 
-  lemma void nonmem_map_filter<t1,t2>(fixpoint (t1,t2) f1,
-                                      fixpoint (t1,bool) f2,
-                                      list<t1> l,
-                                      t1 el)
-  requires false == mem(f1(el), map(f1, l));
-  ensures false == mem(f1(el), map(f1, filter(f2, l)));
+  fixpoint bool set_eq<t>(list<t> l1, list<t> l2) {
+    return subset(l1, l2) && subset(l2, l1);
+  }
+
+  lemma void set_eq_remove_uniq_both<t>(list<t> l1, list<t> l2, t x)
+  requires true == set_eq(l1, l2) &*&
+           false == mem(x, remove(x, l1)) &*&
+           false == mem(x, remove(x, l2));
+  ensures true == set_eq(remove(x, l1), remove(x, l2));
+  {
+    remove_both_subset(x, l1, l2);
+    remove_both_subset(x, l2, l1);
+  }
+
+  lemma void set_eq_remove_both<t>(list<t> l1, list<t> l2, t x)
+  requires true == set_eq(l1, l2) &*&
+           true == distinct(l1) &*&
+           true == distinct(l2);
+  ensures true == set_eq(remove(x, l1), remove(x, l2));
+  {
+    distinct_unique(l1, x);
+    distinct_unique(l2, x);
+    set_eq_remove_uniq_both(l1, l2, x);
+  }
+
+  lemma void subset_nil_nil<t>(list<t> l)
+  requires true == subset(l, nil);
+  ensures l == nil;
   {
     switch(l) {
       case nil:
       case cons(h,t):
-        nonmem_map_filter(f1, f2, t, el);
     }
   }
 
-  lemma void distinct_map_filter<t1,t2>(fixpoint (t1,t2) f1,
-                                        fixpoint (t1,bool) f2,
-                                        list<t1> l)
-  requires true == distinct(map(f1, l));
-  ensures true == distinct(map(f1, filter(f2, l)));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        nonmem_map_filter(f1, f2, t, h);
-        distinct_map_filter(f1, f2, t);
-    }
-  }
-
-  lemma void non_mem_map_remove<t1,t2>(list<t1> l, t2 x1, t1 x2,
-                                       fixpoint (t1,t2) f)
-  requires false == mem(x1, map(f, l));
-  ensures false == mem(x1, map(f, remove(x2, l)));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        if (h != x2) {
-          non_mem_map_remove(t, x1, x2, f);
-        }
-    }
-  }
-
-
-  lemma void distinct_map_remove<t1,t2>(list<t1> l, fixpoint (t1,t2) f, t1 x)
-  requires true == distinct(map(f, l));
-  ensures true == distinct(map(f, remove(x, l)));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        if (x != h) {
-          assert false == mem(f(h), map(f, t));
-          non_mem_map_remove(t, f(h), x, f);
-          assert false == mem(f(h), map(f, remove(x, t)));
-          distinct_map_remove(t, f, x);
-        }
-    }
-  }
-
-
-
-  lemma void forall_filter<t>(fixpoint (t,bool) f1,
-                              fixpoint (t,bool) f2,
-                              list<t> l)
-  requires true == forall(l, f1);
-  ensures true == forall(filter(f2, l), f1);
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        forall_filter(f1, f2, t);
-    }
-  }
-
-  lemma void filter_append_idemp<t>(list<t> l1, list<t> l2,
-                                    fixpoint (t,bool) f)
-  requires true;
-  ensures filter(f, append(l1, l2)) == append(filter(f, l1), filter(f, l2));
+  lemma void set_eq_distinct_same_len<t>(list<t> l1,
+                                         list<t> l2)
+  requires true == set_eq(l1, l2) &*&
+           true == distinct(l1) &*&
+           true == distinct(l2);
+  ensures length(l1) == length(l2);
   {
     switch(l1) {
       case nil:
+        subset_nil_nil(l2);
       case cons(h,t):
-        filter_append_idemp(t, l2, f);
-    }
-  }
-
-  lemma void filter_forall<t>(fixpoint (t,bool) f, list<t> l)
-  requires true;
-  ensures true == (l == filter(f, l)) == forall(l, f) &*&
-          true == forall(filter(f, l), f);
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        filter_forall(f, t);
-        if (f(h)) {
-        } else {
-          assert false == forall(l, f);
-          assert filter(f,l) == filter(f,t);
-          filter_no_increase_len(f, t);
-          assert length(filter(f, l)) < length(l);
-          assert l != filter(f,l);
-        }
-    }
-  }
-
-  lemma void double_mem_append_nondistinct<t>(list<t> l1, list<t> l2, t x)
-  requires true == mem(x, l1) &*& true == mem(x, l2);
-  ensures false == distinct(append(l1, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        if (h == x) {
-          mem_append(x, t, l2);
-        } else {
-          double_mem_append_nondistinct(t, l2, x);
-        }
-    }
-  }
-
-  lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
-  requires true == distinct(append(l1,l2));
-  ensures true == distinct(l1) &*& true == distinct(l2);
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        mem_append(h, t, l2);
-        distinct_unappend(t, l2);
-    }
-  }
-
-  lemma void subset_append_distinct<t>(list<t> xs, list<t> ys, list<t> zs)
-  requires true == subset(xs, ys) &*&
-           true == distinct(xs) &*&
-           true == distinct(append(ys, zs));
-  ensures true == distinct(append(xs, zs));
-  {
-    switch(xs) {
-      case nil:
-        distinct_unappend(ys, zs);
-      case cons(h,t):
-        mem_append(h, t, zs);
-        if (mem(h, zs)) {
-          assert true == mem(h, ys);
-          double_mem_append_nondistinct(ys, zs, h);
-          assert false == distinct(append(ys, zs));
-        }
-        subset_append_distinct(t, ys, zs);
-    }
-  }
-
-  lemma void subset_map<t1,t2>(list<t1> l1, list<t1> l2, fixpoint (t1,t2) f)
-  requires true == subset(l1, l2);
-  ensures true == subset(map(f, l1), map(f, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        mem_map(h, l2, f);
-        subset_map(t, l2, f);
+        set_eq_remove_both(l1, l2, h);
+        distinct_remove(h, l2);
+        set_eq_distinct_same_len(t, remove(h,l2));
     }
   }
 
