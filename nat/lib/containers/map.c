@@ -5830,19 +5830,202 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         }
     }
   }
+  @*/
+
+
+/*@
+  lemma void keep_long_put_short_no_effect<kt>(list<bucket<kt> > buckets,
+                                               kt k, int start, int dist)
+  requires 0 <= start &*& start < length(buckets) &*&
+           0 <= dist &*&
+           start + dist < length(buckets);
+  ensures keep_long_fp(buckets) ==
+          keep_long_fp(buckets_put_key_fp(buckets, k, start, dist));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          if (start == 0) {
+            assert dist < length(buckets);
+            assert int_of_nat(nat_of_int(dist)) == dist;
+            assert false == lower_limit(length(buckets), pair(k, nat_of_int(dist)));
+            assert filter((lower_limit)(length(buckets)),
+                          cons(pair(k, nat_of_int(dist)), chains)) ==
+                   filter((lower_limit)(length(buckets)), chains);
+          } else {
+            assert keep_long_fp(buckets) ==
+                   cons(bucket(filter((lower_limit)(length(buckets)), chains)),
+                        keep_long_fp(t));
+            assert buckets_put_key_fp(buckets, k, start, dist) ==
+                   cons(h, buckets_put_key_fp(t, k, start - 1, dist));
+            assume(false);//TODO, not done yet here
+            assert keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
+                   cons(bucket(filter((lower_limit)(length(buckets)), chains)),
+                        keep_long_fp(buckets_put_key_fp(t, k, start - 1, dist)));
+            keep_long_put_short_no_effect(t, k, start - 1, dist);
+          }
+        }
+    }
+  
+  }//took 25m so far
+  @*/
+
+
+/*@
+  lemma void filter_zero_lower_limit_no_effect<kt>(list<pair<kt, nat> > acc)
+  requires true;
+  ensures filter((lower_limit)(0), acc) == acc;
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+          filter_zero_lower_limit_no_effect(t);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void advance_acc_filter_keep_long_swap<kt>(list<pair<kt, nat> > acc,
+                                                   int cutoff)
+  requires 0 < cutoff;
+  ensures advance_acc(filter((lower_limit)(cutoff), acc)) ==
+          filter((lower_limit)(cutoff-1), advance_acc(acc));
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key, dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+          advance_acc_filter_keep_long_swap(t, cutoff);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void filter_acc_keep_wraparound<kt>(list<pair<kt, nat> > acc,
+                                            list<bucket<kt> > buckets)
+  requires true;
+  ensures get_wraparound(acc, buckets) ==
+          get_wraparound(filter((lower_limit)(length(buckets)), acc), buckets);
+  {
+    switch(buckets) {
+      case nil:
+        filter_zero_lower_limit_no_effect(acc);
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > f_atb =
+            append(filter((lower_limit)(length(buckets)), acc), chains);
+          list<pair<kt, nat> > filt_all_atb =
+            append(filter((lower_limit)(length(buckets)), acc),
+                   filter((lower_limit)(length(buckets)), chains));
+          filter_append_idemp(acc, chains, (lower_limit)(length(buckets)));
+          filter_append_idemp(filter((lower_limit)(length(buckets)), acc),
+                              chains,
+                              (lower_limit)(length(buckets)));
+          filter_forall((lower_limit)(length(buckets)), acc);
+          filter_forall((lower_limit)(length(buckets)),
+                        filter((lower_limit)(length(buckets)), acc));
+          assert filter((lower_limit)(length(buckets)), atb) ==
+                 filt_all_atb;
+          assert filt_all_atb ==
+                 append(filter((lower_limit)(length(buckets)), filter((lower_limit)(length(buckets)), acc)),
+                        filter((lower_limit)(length(buckets)), chains));
+          assert filter((lower_limit)(length(buckets)), filter((lower_limit)(length(buckets)), acc)) ==
+                 filter((lower_limit)(length(buckets)), acc);
+          assert filter((lower_limit)(length(buckets)), f_atb) ==
+                 filt_all_atb;
+          advance_acc_filter_keep_long_swap(atb, length(buckets));
+          advance_acc_filter_keep_long_swap(f_atb, length(buckets));
+          assert filter((lower_limit)(length(t)), advance_acc(atb)) ==
+                 advance_acc(filt_all_atb);
+          assert filter((lower_limit)(length(t)), advance_acc(f_atb)) ==
+                 advance_acc(filt_all_atb);
+          filter_acc_keep_wraparound(advance_acc(atb), t);
+          filter_acc_keep_wraparound(advance_acc(f_atb), t);
+        }
+    }
+  }//took 30m
+  @*/
+
+/*@
+  lemma void keep_long_same_len<kt>(list<bucket<kt> > buckets)
+  requires true;
+  ensures length(buckets) == length(keep_long_fp(buckets));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains) :
+          keep_long_same_len(t);
+        }
+    }
+  }//took 2m
+  @*/
+
+/*@
+  lemma void keep_long_same_wraparound<kt>(list<pair<kt, nat> > acc,
+                                           list<bucket<kt> > buckets)
+  requires true;
+  ensures get_wraparound(acc, keep_long_fp(buckets)) ==
+          get_wraparound(acc, buckets);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > filter_acc =
+          filter((lower_limit)(length(buckets)), acc);
+        filter_acc_keep_wraparound(acc, buckets);
+        filter_acc_keep_wraparound(acc, keep_long_fp(buckets));
+        keep_long_same_len(buckets);
+        filter_forall((lower_limit)(length(buckets)), acc);
+        switch(h) {case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(filter_acc, h);
+          list<pair<kt, nat> > long_atb =
+            append(filter_acc, filter((lower_limit)(length(buckets)),
+                                      chains));
+          filter_append_idemp(filter_acc, chains,
+                              (lower_limit)(length(buckets)));
+          filter_forall((lower_limit)(length(buckets)), filter_acc);
+          assert long_atb == filter((lower_limit)(length(buckets)), atb);
+          filter_acc_keep_wraparound(advance_acc(atb), t);
+          advance_acc_filter_keep_long_swap(atb, length(buckets));
+          keep_long_same_wraparound(advance_acc(long_atb), t);
+        }
+    }
+  }
+  @*/
+
+/*@
 
   lemma void
   buckets_put_short_chain_same_wraparound<kt>(list<pair<kt, nat> > acc,
                                               list<bucket<kt> > buckets,
                                               kt k, int start, int dist,
                                               int capacity)
-  requires start + dist < length(buckets);
+  requires 0 <= start &*& start < length(buckets) &*&
+           start + dist < length(buckets) &*&
+           0 <= dist;
   ensures get_wraparound(acc, buckets_put_key_fp(buckets, k, start,
                                                  dist)) ==
           get_wraparound(acc, buckets);
   {
-    assume(false);//TODO 10m
-    }//, use short_chains_dont_matter in the leaf
+
+    keep_long_same_wraparound(acc, buckets);
+    keep_long_same_wraparound(acc, buckets_put_key_fp(buckets, k, start, dist));
+    keep_long_put_short_no_effect(buckets, k, start, dist);
+  }
   @*/
 
 /*@
@@ -6029,109 +6212,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }//took 5m
   @*/
 
-
-/*@
-  lemma void filter_zero_lower_limit_no_effect<kt>(list<pair<kt, nat> > acc)
-  requires true;
-  ensures filter((lower_limit)(0), acc) == acc;
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-            case succ(n):
-          }
-          filter_zero_lower_limit_no_effect(t);
-        }
-    }
-  }
-  @*/
-
-/*@
-  lemma void advance_acc_filter_keep_long_swap<kt>(list<pair<kt, nat> > acc,
-                                                   int cutoff)
-  requires 0 < cutoff;
-  ensures advance_acc(filter((lower_limit)(cutoff), acc)) ==
-          filter((lower_limit)(cutoff-1), advance_acc(acc));
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key, dist):
-          switch(dist) {
-            case zero:
-            case succ(n):
-          }
-          advance_acc_filter_keep_long_swap(t, cutoff);
-        }
-    }
-  }
-  @*/
-
-/*@
-  lemma void filter_acc_keep_wraparound<kt>(list<pair<kt, nat> > acc,
-                                            list<bucket<kt> > buckets)
-  requires true;
-  ensures get_wraparound(acc, buckets) ==
-          get_wraparound(filter((lower_limit)(length(buckets)), acc), buckets);
-  {
-    switch(buckets) {
-      case nil:
-        filter_zero_lower_limit_no_effect(acc);
-      case cons(h,t):
-        switch(h) { case bucket(chains):
-          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
-          list<pair<kt, nat> > f_atb =
-            append(filter((lower_limit)(length(buckets)), acc), chains);
-          list<pair<kt, nat> > filt_all_atb =
-            append(filter((lower_limit)(length(buckets)), acc),
-                   filter((lower_limit)(length(buckets)), chains));
-          filter_append_idemp(acc, chains, (lower_limit)(length(buckets)));
-          filter_append_idemp(filter((lower_limit)(length(buckets)), acc),
-                              chains,
-                              (lower_limit)(length(buckets)));
-          filter_forall((lower_limit)(length(buckets)), acc);
-          filter_forall((lower_limit)(length(buckets)),
-                        filter((lower_limit)(length(buckets)), acc));
-          assert filter((lower_limit)(length(buckets)), atb) ==
-                 filt_all_atb;
-          assert filt_all_atb ==
-                 append(filter((lower_limit)(length(buckets)), filter((lower_limit)(length(buckets)), acc)),
-                        filter((lower_limit)(length(buckets)), chains));
-          assert filter((lower_limit)(length(buckets)), filter((lower_limit)(length(buckets)), acc)) ==
-                 filter((lower_limit)(length(buckets)), acc);
-          assert filter((lower_limit)(length(buckets)), f_atb) ==
-                 filt_all_atb;
-          advance_acc_filter_keep_long_swap(atb, length(buckets));
-          advance_acc_filter_keep_long_swap(f_atb, length(buckets));
-          assert filter((lower_limit)(length(t)), advance_acc(atb)) ==
-                 advance_acc(filt_all_atb);
-          assert filter((lower_limit)(length(t)), advance_acc(f_atb)) ==
-                 advance_acc(filt_all_atb);
-          filter_acc_keep_wraparound(advance_acc(atb), t);
-          filter_acc_keep_wraparound(advance_acc(f_atb), t);
-        }
-    }
-  }//took 30m
-  @*/
-
-/*@
-  lemma void keep_long_same_len<kt>(list<bucket<kt> > buckets)
-  requires true;
-  ensures length(buckets) == length(keep_long_fp(buckets));
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case bucket(chains) :
-          keep_long_same_len(t);
-        }
-    }
-  }//took 2m
-  @*/
-
 /*@
   lemma void keep_long_indeed_long<kt>(list<bucket<kt> > buckets)
   requires true;
@@ -6152,40 +6232,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           assert true == buckets_long_fp(keep_long_fp(t));
           assert true == buckets_long_fp(cons(bucket(filter((lower_limit)(length(buckets)), chains)),
                                               keep_long_fp(t)));
-        }
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void keep_long_same_wraparound<kt>(list<pair<kt, nat> > acc,
-                                           list<bucket<kt> > buckets)
-  requires true;
-  ensures get_wraparound(acc, keep_long_fp(buckets)) ==
-          get_wraparound(acc, buckets);
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        list<pair<kt, nat> > filter_acc =
-          filter((lower_limit)(length(buckets)), acc);
-        filter_acc_keep_wraparound(acc, buckets);
-        filter_acc_keep_wraparound(acc, keep_long_fp(buckets));
-        keep_long_same_len(buckets);
-        filter_forall((lower_limit)(length(buckets)), acc);
-        switch(h) {case bucket(chains):
-          list<pair<kt, nat> > atb = acc_at_this_bucket(filter_acc, h);
-          list<pair<kt, nat> > long_atb =
-            append(filter_acc, filter((lower_limit)(length(buckets)),
-                                      chains));
-          filter_append_idemp(filter_acc, chains,
-                              (lower_limit)(length(buckets)));
-          filter_forall((lower_limit)(length(buckets)), filter_acc);
-          assert long_atb == filter((lower_limit)(length(buckets)), atb);
-          filter_acc_keep_wraparound(advance_acc(atb), t);
-          advance_acc_filter_keep_long_swap(atb, length(buckets));
-          keep_long_same_wraparound(advance_acc(long_atb), t);
         }
     }
   }
@@ -6748,15 +6794,50 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  lemma void buckets_add_part_get_chns_norm_rec<kt>(list<pair<kt, nat> > acc,
+                                                    list<bucket<kt> > buckets,
+                                                    kt k, int start, int dist)
+  requires start + dist < length(buckets);
+  ensures buckets_get_chns_rec_fp(acc, buckets_put_key_fp(buckets, k,
+                                                          start, dist)) ==
+          add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets),
+                                   start, dist);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h)
+          if (start == 0) {
+            assume(false);//TODO
+          } else {
+            buckets_add_part_get_chns_norm_rec(advance_acc(atb),
+                                               t, k, start - 1, dist);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
   lemma void buckets_add_part_get_chns_norm<kt>(list<bucket<kt> > buckets,
                                                 kt k, int start, int dist)
-  requires start + dist < length(buckets);
+  requires start + dist < length(buckets) &*&
+           0 <= start &*& start < length(buckets) &*&
+           0 <= dist;
   ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                  start, dist)) ==
           add_partial_chain_fp(start, dist,
                                buckets_get_chns_fp(buckets));
   {
-    assume(false);//TODO 20m
+    buckets_put_short_chain_same_wraparound(nil, buckets,
+                                            k, start, dist,
+                                            length(buckets));
+    buckets_add_part_get_chns_norm_rec(get_wraparound(nil, buckets),
+                                       buckets, k, start, dist);
+    buckets_keys_chns_same_len(buckets);
+    buckets_put_same_len(buckets, k, start, dist);
+    buckets_keys_chns_same_len(buckets_put_key_fp(buckets, k, start, dist));
   }
   @*/
 
