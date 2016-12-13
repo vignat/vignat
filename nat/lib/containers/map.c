@@ -71,7 +71,7 @@
     switch(buckets) {
       case nil:
         return distinct(get_just_tails(acc)) &&
-               forall(acc, (upper_limit)(bound));
+               forall(acc, (upper_limit)(bound - 1));
       case cons(bkh,bkt):
         return distinct(get_just_tails(acc_at_this_bucket(acc, bkh))) &&
                forall(acc_at_this_bucket(acc, bkh), (upper_limit)(bound)) &&
@@ -126,7 +126,7 @@
     switch(buckets) {
       case nil: return nil;
       case cons(bh,bt):
-        return cons(length(acc_at_this_bucket(acc, bh)),
+        return cons(length(advance_acc(acc_at_this_bucket(acc, bh))),
                     buckets_get_chns_rec_fp(advance_acc
                                               (acc_at_this_bucket(acc, bh)),
                                             bt));
@@ -167,7 +167,7 @@
                                                    list<bucket<kt> > buckets,
                                                    int bound)
   requires true == buckets_ok_rec(acc, buckets, bound);
-  ensures true == forall(get_wraparound(acc, buckets), (upper_limit)(bound));
+  ensures true == forall(get_wraparound(acc, buckets), (upper_limit)(bound - 1));
   {
     switch(buckets) {
       case nil:
@@ -253,12 +253,13 @@
 
   lemma void buckets_ok_wraparound_bounded<kt>(list<bucket<kt> > buckets)
   requires true == buckets_ok(buckets);
-  ensures true == forall(get_wraparound(nil, buckets), (upper_limit)(length(buckets)));
+  ensures true == forall(get_wraparound(nil, buckets),
+                         (upper_limit)(length(buckets) - 1));
   {
     buckets_ok_wraparound_bounded_rec
       (get_wraparound(nil, buckets), buckets, length(buckets));
     holds_for_subset_wraparound(get_wraparound(nil, buckets), nil,
-                                buckets, (upper_limit)(length(buckets)));
+                                buckets, (upper_limit)(length(buckets)-1));
   }
   @*/
 /*@
@@ -267,10 +268,10 @@
         list<bucket<kt> > buckets,
         int index) {
     switch(buckets) {
-      case nil: return acc; //index must be 0 here
+      case nil: return acc; //index must be -1 here
       case cons(h,t):
         return (index == 0) ?
-          (acc_at_this_bucket(acc, h)) :
+          (advance_acc(acc_at_this_bucket(acc, h))) :
           (get_crossing_chains_rec_fp
              (advance_acc(acc_at_this_bucket(acc, h)), t, index - 1));
     }
@@ -286,7 +287,7 @@
                                                     list<bucket<kt> > buckets)
   requires true;
   ensures get_wraparound(acc, buckets) ==
-          get_crossing_chains_rec_fp(acc, buckets, length(buckets));
+          get_crossing_chains_rec_fp(acc, buckets, length(buckets) - 1);
   {
     switch(buckets) {
       case nil: return;
@@ -385,8 +386,8 @@
                                           list<bucket<kt> > buckets,
                                           int uplim, int index)
   requires true == forall(shrt, (upper_limit)(uplim)) &*&
-           uplim <= index &*&
-           index <= length(buckets);
+           uplim <= index + 1 &*&
+           index + 1 <= length(buckets);
   ensures get_crossing_chains_rec_fp(append(shrt, acc), buckets, index) ==
           get_crossing_chains_rec_fp(acc, buckets, index);
   {
@@ -394,12 +395,12 @@
       case nil:
         upper_limit_nonpos_no_tail(shrt, uplim);
       case cons(h,t):
+        advance_acc_append_commute(shrt, acc_at_this_bucket(acc,h));
+        append_acc_at_this_commute(shrt, acc, h);
+        advance_acc_lower_limit(shrt, uplim);
         if (index == 0) {
-          upper_limit_nonpos_no_tail(shrt, uplim);
+          upper_limit_nonpos_no_tail(advance_acc(shrt), uplim - 1);
         } else {
-          advance_acc_append_commute(shrt, acc_at_this_bucket(acc,h));
-          append_acc_at_this_commute(shrt, acc, h);
-          advance_acc_lower_limit(shrt, uplim);
           short_chains_dont_matter(advance_acc(shrt),
                                    advance_acc(acc_at_this_bucket(acc, h)),
                                    t, uplim - 1, index - 1);
@@ -416,7 +417,7 @@
   {
     buckets_ok_wraparound_bounded(buckets);
     short_chains_dont_matter(get_wraparound(nil, buckets), nil,
-                             buckets, length(buckets), length(buckets));
+                             buckets, length(buckets) - 1, length(buckets) - 1);
     wraparound_is_last_crossing_chains(nil, buckets);
     wraparound_is_last_crossing_chains(get_wraparound(nil, buckets), buckets);
   }
@@ -444,9 +445,9 @@
       case cons(bh,bt):
         if (0 == index) {
           assert get_crossing_chains_rec_fp(acc, buckets, index) ==
-                 acc_at_this_bucket(acc, bh);
+                 advance_acc(acc_at_this_bucket(acc, bh));
 
-          length_0_nil(acc_at_this_bucket(acc, bh));
+          length_0_nil(advance_acc(acc_at_this_bucket(acc, bh)));
         } else {
           no_crossing_chains_rec(advance_acc(acc_at_this_bucket(acc, bh)),
                                  bt, index - 1);
@@ -1451,12 +1452,12 @@ int loop(int k, int capacity)
                                         kt k,
                                         list<pair<kt, nat> > acc,
                                         int capacity)
-  requires true == up_to(i,
+  requires true == up_to(succ(i),
                          (nthProp)(buckets_get_keys_rec_fp(acc, buckets),
                                    (not_my_key)(k))) &*&
            true == mem(k, map(fst, acc)) &*&
            true == buckets_ok_rec(acc, buckets, capacity) &*&
-           int_of_nat(i) <= length(buckets);
+           int_of_nat(i) < length(buckets);
   ensures true == mem(k, map(fst, get_crossing_chains_rec_fp(acc, buckets,
                                                              int_of_nat(i))));
   {
@@ -1465,9 +1466,7 @@ int loop(int k, int capacity)
       case cons(bh,bt):
         switch(i) {
           case zero:
-            switch(bh) { case bucket(chains):
-              map_append(fst, acc, chains);
-            }
+            next_cell_keeps_keys(acc, bh, k);
           case succ(n):
             buckets_keys_chns_same_len_rec(acc, buckets);
             assert buckets_get_keys_rec_fp(acc, buckets) == cons(?bgkh, ?bgkt);
@@ -1548,12 +1547,12 @@ int loop(int k, int capacity)
                                                       kt k,
                                                       list<pair<kt, nat> > acc)
   requires buckets != nil &*&
-           true == up_to(i,
+           true == up_to(succ(i),
                          (byLoopNthProp)(buckets_get_keys_rec_fp(acc, buckets),
                                          (not_my_key)(k),
                                          capacity,
                                          start)) &*&
-           start + int_of_nat(i) <= length(buckets) &*&
+           start + int_of_nat(i) < length(buckets) &*&
            length(buckets) <= capacity &*&
            0 <= start &*&
            true == buckets_ok_rec(acc, buckets, capacity) &*&
@@ -1566,12 +1565,16 @@ int loop(int k, int capacity)
       case cons(h,t):
         if (start == 0) {
           bucket_has_then_acc_has_key(h, acc, k);
-          byLoopNthPropEqNthPropUpTo(i, buckets_get_keys_rec_fp(acc, buckets),
+          byLoopNthPropEqNthPropUpTo(succ(i), buckets_get_keys_rec_fp(acc, buckets),
                                      (not_my_key)(k), capacity);
-          assert true == up_to(i, (nthProp)(buckets_get_keys_rec_fp(acc, buckets),
-                                            (not_my_key)(k)));
+          assert true == up_to(succ(i), (nthProp)(buckets_get_keys_rec_fp(acc, buckets),
+                                                  (not_my_key)(k)));
           switch(i) {
             case zero:
+              switch(h) { case bucket(chains):
+                map_append(fst, acc, chains);
+                advance_acc_preserves_key(acc_at_this_bucket(acc, h), k);
+              }
             case succ(n):
               assert buckets_get_keys_rec_fp(acc, buckets) ==
                      cons(get_current_key_fp(acc_at_this_bucket(acc, h)),
@@ -1583,18 +1586,19 @@ int loop(int k, int capacity)
               assert true == mem(k, map(fst, acc_at_this_bucket(acc, h)));
               advance_acc_preserves_key(acc_at_this_bucket(acc, h), k);
               assert true == mem(k, map(fst, advance_acc(acc_at_this_bucket(acc, h))));
-              assert int_of_nat(i) <= length(buckets);
+              assert int_of_nat(i) < length(buckets);
               assert int_of_nat(n) <= length(t);
               next_i_cells_keep_keys(t, n, k, advance_acc(acc_at_this_bucket(acc, h)), capacity);
           }
 
         } else {
-          upToByLoopNthPropShift1(i, get_current_key_fp(acc_at_this_bucket(acc, h)),
-                                  buckets_get_keys_rec_fp(advance_acc(acc_at_this_bucket(acc, h)), t),
-                                  (not_my_key)(k),
-                                  capacity,
-                                  start);
-          crossing_chains_keep_key_hlp_inbound(t, i, start - 1, capacity, k, advance_acc(acc_at_this_bucket(acc, h)));
+          assume(false);//TODO VF bug 68
+          //upToByLoopNthPropShift1(i, get_current_key_fp(acc_at_this_bucket(acc, h)),
+          //                        buckets_get_keys_rec_fp(advance_acc(acc_at_this_bucket(acc, h)), t),
+          //                        (not_my_key)(k),
+          //                        capacity,
+          //                        start);
+          //crossing_chains_keep_key_hlp_inbound(t, i, start - 1, capacity, k, advance_acc(acc_at_this_bucket(acc, h)));
         }
     }
   }
@@ -1607,7 +1611,7 @@ int loop(int k, int capacity)
                                                   int capacity,
                                                   kt k)
   requires buckets != nil &*&
-           true == up_to(i,
+           true == up_to(succ(i),
                          (byLoopNthProp)(buckets_get_keys_fp(buckets),
                                          (not_my_key)(k),
                                          capacity,
@@ -1617,7 +1621,7 @@ int loop(int k, int capacity)
            start < length(buckets) &*&
            length(buckets) == capacity &*&
            true == buckets_ok(buckets) &*&
-           start + int_of_nat(i) <= capacity;
+           start + int_of_nat(i) < capacity;
   ensures true == mem(k, map(fst, get_crossing_chains_fp(buckets, start + int_of_nat(i))));
   {
     crossing_chains_keep_key_hlp_inbound(buckets, i, start, capacity, k, get_wraparound(nil, buckets));
@@ -1685,14 +1689,14 @@ int loop(int k, int capacity)
                                           int start,
                                           int capacity,
                                           kt k)
-  requires 0 <= i &*& i <= capacity &*&
+  requires 0 <= i &*& i < capacity &*&
            0 <= start &*&
            start < length(buckets) &*&
            start + i - capacity + 1 <= capacity &*&
            buckets != nil &*&
            true == buckets_ok(buckets) &*&
            length(buckets) == capacity &*&
-           true == up_to(nat_of_int(i),
+           true == up_to(nat_of_int(i+1),
                          (byLoopNthProp)(buckets_get_keys_fp(buckets),
                                          (not_my_key)(k),
                                          capacity,
@@ -1703,31 +1707,31 @@ int loop(int k, int capacity)
     if (capacity <= start + i) {
       buckets_keys_chns_same_len(buckets);
       break_down_up_to_by_loop(buckets_get_keys_fp(buckets),
-                               i, start, capacity, (not_my_key)(k));
+                               i+1, start, capacity, (not_my_key)(k));
       crossing_chains_keep_key_inbound(buckets,
-                                       nat_of_int(capacity - start),
+                                       nat_of_int(capacity - start - 1),
                                        start, capacity, k);
       wraparound_is_last_crossing_chains
         (get_wraparound(nil, buckets), buckets);
       assert get_wraparound(get_wraparound(nil, buckets), buckets) ==
-             get_crossing_chains_fp(buckets, length(buckets));
+             get_crossing_chains_fp(buckets, length(buckets)-1);
       assert true == mem(k, map(fst,
                                 get_crossing_chains_fp
                                   (buckets,
                                     start +
                                       int_of_nat(nat_of_int(capacity -
-                                                            start)))));
+                                                            start - 1)))));
       assert true == mem(k, map(fst, get_crossing_chains_fp
-                                       (buckets, capacity)));
+                                       (buckets, capacity - 1)));
       buckets_ok_get_wraparound_idemp(buckets);
 
       assert get_wraparound(nil, buckets) ==
              get_wraparound(get_wraparound(nil, buckets), buckets);
       assert get_wraparound(nil, buckets) ==
-             get_crossing_chains_fp(buckets, capacity);
+             get_crossing_chains_fp(buckets, capacity - 1);
 
       assert true == mem(k, map(fst, get_crossing_chains_fp(buckets,
-                                                            capacity)));
+                                                            capacity - 1)));
       assert true == mem(k, map(fst, get_wraparound
                                        (get_wraparound(nil, buckets),
                                         buckets)));
@@ -1754,7 +1758,7 @@ int loop(int k, int capacity)
                                          int capacity,
                                          fixpoint (kt,int) hash)
   requires buckets != nil &*&
-           true == up_to(nat_of_int(i),
+           true == up_to(nat_of_int(i + 1),
                          (byLoopNthProp)(buckets_get_keys_fp(buckets),
                                          (not_my_key)(k),
                                          capacity,
@@ -1848,6 +1852,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       }
       //@ recover_pred_mapping(kps, bbs, ks, index);
     } else {
+      //@ if (bb != 0) no_hash_no_key(ks, khs, k, index, hsh);
+      //@ if (bb == 0) no_bb_no_key(ks, bbs, index);
       if (chn == 0) {
         //@ assert length(chnlist) == capacity;
         //@ buckets_keys_chns_same_len(buckets);
@@ -1857,6 +1863,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         //@ key_is_contained_in_the_bucket(buckets, capacity, hsh, k);
         //@ assert true == up_to(nat_of_int(i), (byLoopNthProp)(ks, (not_my_key)(k), capacity, start));
         //@ assert true == up_to(nat_of_int(i), (byLoopNthProp)(ks, (not_my_key)(k), capacity, loop_fp(hsh(k), capacity)));
+        //@ assert true == up_to(succ(nat_of_int(i)), (byLoopNthProp)(ks, (not_my_key)(k), capacity, loop_fp(hsh(k), capacity)));
+        //@ assert true == up_to(nat_of_int(i+1), (byLoopNthProp)(ks, (not_my_key)(k), capacity, loop_fp(hsh(k), capacity)));
         //@ assert buckets != nil;
         //@ chains_depleted_no_hope(buckets, i, loop_fp(hsh(k), capacity), k, capacity, hsh);
         //@ assert false == hmap_exists_key_fp(hm, k);
@@ -1865,8 +1873,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         return -1;
       }
       //@ assert(length(ks) == capacity);
-      //@ if (bb != 0) no_hash_no_key(ks, khs, k, index, hsh);
-      //@ if (bb == 0) no_bb_no_key(ks, bbs, index);
     }
     //@ assert(nth(index, ks) != some(k));
     //@ assert(true == not_my_key(k, nth(index, ks)));
@@ -2810,7 +2816,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     switch(buckets) {
       case nil:
         assert true == distinct(get_just_tails(acc1));
-        subset_forall(acc1, acc2, (upper_limit)(bound));
+        subset_forall(acc1, acc2, (upper_limit)(bound - 1));
       case cons(h,t):
         acc_at_this_bucket_subset(acc1, acc2, h);
         assert true == subset(acc_at_this_bucket(acc1, h),
@@ -3779,6 +3785,7 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   }
   @*/
 
+
 /*@
   lemma void buckets_ok_chn_bound_rec<kt>(list<pair<kt, nat> > acc,
                                           list<bucket<kt> > buckets,
@@ -3786,10 +3793,10 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
                                           int bound)
   requires true == buckets_ok_rec(acc, buckets, bound) &*&
            0 <= i &*& i < length(buckets) &*&
-           0 <= bound;
+           0 < bound;
   ensures length(buckets_get_chns_rec_fp(acc, buckets)) == length(buckets) &*&
           0 <= nth(i, buckets_get_chns_rec_fp(acc, buckets)) &*&
-          nth(i, buckets_get_chns_rec_fp(acc, buckets)) <= bound;
+          nth(i, buckets_get_chns_rec_fp(acc, buckets)) <= bound - 1;
   {
     switch(buckets) {
       case nil:
@@ -3798,17 +3805,19 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
         list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
         if (i == 0) {
           assert nth(i, buckets_get_chns_rec_fp(acc, buckets)) ==
-                 length(acc_atb);
-          assert 0 <= length(acc_atb);
-          list<nat> tails = get_just_tails(acc_atb);
-          map_preserves_length(snd, acc_atb);
-          assert length(acc_atb) == length(tails);
-          assert true == forall(acc_atb, (upper_limit)(bound));
-          upper_bound_less_than(acc_atb, bound);
-          assert true == forall(tails, (less_than)(bound));
+                 length(advance_acc(acc_atb));
+          assert 0 <= length(advance_acc(acc_atb));
+          advance_acc_lower_limit(acc_atb, bound);
+          list<nat> tails = get_just_tails(advance_acc(acc_atb));
+          map_preserves_length(snd, advance_acc(acc_atb));
+          assert length(advance_acc(acc_atb)) == length(tails);
+          assert true == forall(advance_acc(acc_atb), (upper_limit)(bound - 1));
+          upper_bound_less_than(advance_acc(acc_atb), bound - 1);
+          assert true == forall(tails, (less_than)(bound - 1));
+          advance_acc_still_distinct(acc_atb);
           assert true == distinct(tails);
-          less_than_distinct_few(tails, bound);
-          assert length(acc_atb) <= bound;
+          less_than_distinct_few(tails, bound - 1);
+          assert length(advance_acc(acc_atb)) <= bound - 1;
         } else {
           buckets_ok_chn_bound_rec(advance_acc(acc_atb), t, i - 1, bound);
         }
@@ -5214,8 +5223,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   {
     switch(buckets) {
       case nil:
-        subset_forall(acc1, acc, (upper_limit)(bound));
-        subset_forall(acc2, acc, (upper_limit)(bound));
+        subset_forall(acc1, acc, (upper_limit)(bound - 1));
+        subset_forall(acc2, acc, (upper_limit)(bound - 1));
       case cons(h,t):
         list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
         switch(h) { case bucket(chains):
@@ -5502,7 +5511,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   {
     switch(buckets) {
       case nil:
-        set_eq_forall_both(acc1, acc2, (upper_limit)(bound));
+        set_eq_forall_both(acc1, acc2, (upper_limit)(bound - 1));
       case cons(h,t):
         list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
         list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
@@ -5967,7 +5976,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
      kt k, int dist,
      int bound)
   requires true == buckets_ok_rec(acc, buckets, bound) &*&
-           length(buckets) <= dist &*& dist < bound &*&
+           length(buckets) <= dist &*& dist < bound - 1 &*&
            false == mem(nat_of_int(dist - length(buckets)),
                         get_just_tails(get_wraparound(acc, buckets)));
   ensures true == buckets_ok_rec(cons(pair(k, nat_of_int(dist)), acc),
@@ -6069,13 +6078,13 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires false == mem(chain, get_just_tails
                                  (get_wraparound(acc,
                                                  buckets))) &*&
-           true == forall(more_acc, (upper_limit)(length(buckets)));
+           true == forall(more_acc, (upper_limit)(length(buckets) - 1));
   ensures false == mem(chain, get_just_tails
                                 (get_wraparound(append(more_acc, acc),
                                                 buckets)));
   {
-    short_chains_dont_matter(more_acc, acc, buckets, length(buckets),
-                             length(buckets));
+    short_chains_dont_matter(more_acc, acc, buckets, length(buckets) - 1,
+                             length(buckets) - 1);
     wraparound_is_last_crossing_chains(acc, buckets);
     wraparound_is_last_crossing_chains(append(more_acc, acc), buckets);
   }
@@ -6204,10 +6213,10 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
               get_wraparound(nil, buckets)));
       buckets_ok_wraparound_bounded(buckets);
       assert true == forall(get_wraparound(nil, buckets),
-                            (upper_limit)(length(buckets)));
+                            (upper_limit)(length(buckets) - 1));
       assert true == forall(cons(pair(k, dist_left),
                                  get_wraparound(nil, buckets)),
-                            (upper_limit)(length(buckets)));
+                            (upper_limit)(length(buckets) - 1));
       acc_bounded_still_no_chain_in_wraparound
         (nil,
          cons(pair(k, dist_left), get_wraparound(nil, buckets)),
@@ -6692,15 +6701,81 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }//took 15m+35m so far
   @*/
 
+
+/*@
+  lemma void
+  acc_eq_cons_get_chns_like_add_part_chn<kt>(list<pair<kt, nat> > acc,
+                                             list<pair<kt, nat> > orig,
+                                             list<bucket<kt> > buckets,
+                                             kt k, int dist)
+  requires 0 <= dist &*&
+           true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig));
+  ensures buckets_get_chns_rec_fp(acc, buckets) ==
+          add_partial_chain_rec_fp(buckets_get_chns_rec_fp(orig, buckets),
+                                   0, dist + 1);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
+                                         list<pair<kt, nat> > acc2)
+  requires true == multiset_eq(acc1, acc2);
+  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void cons_in_the_middle_multiset_eq<t>(list<t> l1, list<t> l2, t x)
+  requires true;
+  ensures true == multiset_eq(append(l1, cons(x, l2)), cons(x, append(l1, l2)));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void advance_acc_eliminate_zero_chain<kt>(list<pair<kt, nat> > acc1,
+                                                  list<pair<kt, nat> > acc2,
+                                                  kt k)
+  requires true;
+  ensures advance_acc(append(acc1, cons(pair(k, zero), acc2))) ==
+          advance_acc(append(acc1, acc2));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void add_no_partial_chain_rec(list<int> chns)
+  requires true;
+  ensures add_partial_chain_rec_fp(chns, 0, 0) == chns;
+  {
+    switch(chns) {
+      case nil:
+      case cons(h,t):
+    }
+  }
+  @*/
+
+
 /*@
   lemma void buckets_add_part_get_chns_norm_rec<kt>(list<pair<kt, nat> > acc,
                                                     list<bucket<kt> > buckets,
                                                     kt k, int start, int dist)
-  requires start + dist < length(buckets);
+  requires start + dist < length(buckets) &*&
+           0 <= dist;
   ensures buckets_get_chns_rec_fp(acc, buckets_put_key_fp(buckets, k,
                                                           start, dist)) ==
           add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets),
-                                   start, dist);
+                                   start, dist+1);
   {
     switch(buckets) {
       case nil:
@@ -6710,10 +6785,37 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           if (start == 0) {
             list<pair<kt, nat> > new_atb =
               acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
-            assume(false);//TODO 50m
+            assert new_atb == append(acc, cons(pair(k, nat_of_int(dist)), chains));
+            cons_in_the_middle_multiset_eq(acc, chains,
+                                           pair(k, nat_of_int(dist)));
+            assert true == multiset_eq(new_atb, cons(pair(k, nat_of_int(dist)), atb));
+            assert length(new_atb) == length(atb) + 1;
             if (dist == 0) {
+              advance_acc_eliminate_zero_chain(acc, chains, k);
               assert advance_acc(atb) == advance_acc(new_atb);
+              add_no_partial_chain_rec(buckets_get_chns_rec_fp(advance_acc(atb), t));
+              assert add_partial_chain_rec_fp(buckets_get_chns_rec_fp(advance_acc(atb), t), start, dist) == buckets_get_chns_rec_fp(advance_acc(atb), t);
+              assert add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets), start, dist + 1) ==
+                     cons(length(atb) + 1,
+                          buckets_get_chns_rec_fp(advance_acc(atb), t));
             } else {
+              advance_acc_multiset_eq(new_atb,
+                                      cons(pair(k, nat_of_int(dist)), atb));
+              nat m = nat_of_int(dist - 1);
+              assert succ(m) == nat_of_int(dist);
+              assert true == multiset_eq(advance_acc(new_atb),
+                                         cons(pair(k, nat_of_int(dist-1)),
+                                              advance_acc(atb)));
+              acc_eq_cons_get_chns_like_add_part_chn(advance_acc(new_atb),
+                                                     advance_acc(atb),
+                                                     t, k, dist - 1);
+                                                     
+              assert buckets_get_chns_rec_fp(acc, buckets_put_key_fp(buckets, k, start, dist)) ==
+                     cons(length(new_atb),
+                          buckets_get_chns_rec_fp(advance_acc(new_atb),
+                                                  t));
+              assert add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets), start, dist + 1) ==
+                     cons(length(atb) + 1, add_partial_chain_rec_fp(buckets_get_chns_rec_fp(advance_acc(atb), t), start, dist));
             }
           } else {
             buckets_add_part_get_chns_norm_rec(advance_acc(atb),
@@ -6733,7 +6835,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == buckets_ok(buckets);
   ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                  start, dist)) ==
-          add_partial_chain_fp(start, dist,
+          add_partial_chain_fp(start, dist + 1,
                                buckets_get_chns_fp(buckets));
   {
     buckets_put_short_chain_same_wraparound(nil, buckets,
@@ -6753,7 +6855,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires length(buckets) <= start + dist;
   ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                  start, dist)) ==
-          add_partial_chain_fp(start, dist,
+          add_partial_chain_fp(start, dist + 1,
                                buckets_get_chns_fp(buckets));
   {
     assume(false);//TODO 120m
