@@ -731,6 +731,17 @@ ensures append(a, b) != nil;
     }
   }
 
+  lemma void append_remove_first<t>(list<t> l1, list<t> l2, t el)
+  requires true == mem(el, l1);
+  ensures remove(el, append(l1, l2)) == append(remove(el, l1), l2);
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        if (h != el) append_remove_first(t, l2, el);
+    }
+  }
+
 //-----===== Set lemmas =====-----
 
   lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
@@ -1207,6 +1218,57 @@ ensures append(a, b) != nil;
         distinct_set_eq_multiset_eq(t, remove(h, l2));
         true == multiset_eq(t, remove(h, l2));
         assert true == mem(h, l2);
+    }
+  }
+
+  lemma void multiset_eq_refl<t>(list<t> l)
+  requires true;
+  ensures true == multiset_eq(l, l);
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        multiset_eq_refl(t);
+    }
+  }
+
+  lemma void cons_in_the_middle_multiset_eq<t>(list<t> l1, list<t> l2, t x)
+  requires true;
+  ensures true == multiset_eq(append(l1, cons(x, l2)), cons(x, append(l1, l2)));
+  {
+    switch(l1) {
+      case nil:
+        multiset_eq_refl(cons(x, l2));
+      case cons(h,t):
+        cons_in_the_middle_multiset_eq(t, l2, x);
+    }
+  }
+
+  lemma void multiset_eq_same_len<t>(list<t> l1, list<t> l2)
+  requires true == multiset_eq(l1, l2);
+  ensures length(l1) == length(l2);
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        length_remove(h, l2);
+        multiset_eq_same_len(t, remove(h, l2));
+    }
+  }
+
+  lemma void multiset_eq_append_both<t>(list<t> l1, list<t> l2, list<t> l3)
+  requires true == multiset_eq(l1, l2);
+  ensures true == multiset_eq(append(l1, l3),
+                              append(l2, l3));
+  {
+    switch(l1) {
+      case nil:
+        multiset_eq_refl(l3);
+      case cons(h,t):
+        multiset_eq_append_both(t, remove(h, l2), l3);
+        assert true == mem(h, append(l2, l3));
+        append_remove_first(l2, l3, h);
+        assert remove(h, append(l2, l3)) == append(remove(h, l2), l3);
     }
   }
 

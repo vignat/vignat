@@ -727,6 +727,7 @@ int loop(int k, int capacity)
   } //took 5m
   @*/
 
+
 /*@
   lemma void advance_acc_still_no_key<kt>(list<pair<kt, nat> > acc, kt k)
   requires false == mem(k, map(fst, acc));
@@ -973,10 +974,10 @@ int loop(int k, int capacity)
   @*/
 
 /*@
-  lemma void advance_acc_reduces_chain<kt>(list<pair<kt, nat> > acc,
-                                           pair<kt, nat> chain)
-  requires true == mem(chain, acc) &*& chain == pair(?k,succ(?n));
-  ensures true == mem(pair(k,n), advance_acc(acc));
+  lemma void mem_advance_acc_swap<kt>(list<pair<kt, nat> > acc,
+                                      kt k, nat d)
+  requires true;
+  ensures mem(pair(k, d), advance_acc(acc)) == mem(pair(k, succ(d)), acc);
   {
     switch(acc) {
       case nil:
@@ -984,15 +985,26 @@ int loop(int k, int capacity)
         switch(h) { case pair(hk,hd):
           switch(hd) {
             case zero:
-              advance_acc_reduces_chain(t, chain);
+              mem_advance_acc_swap(t, k, d);
             case succ(hdn):
-              if (h == chain) {
-              } else {
-                advance_acc_reduces_chain(t, chain);
+              if (h != pair(k, succ(d))) {
+                mem_advance_acc_swap(t, k, d);
               }
           }
         }
     }
+  
+  }
+  @*/
+
+
+/*@
+  lemma void advance_acc_reduces_chain<kt>(list<pair<kt, nat> > acc,
+                                           pair<kt, nat> chain)
+  requires true == mem(chain, acc) &*& chain == pair(?k,succ(?n));
+  ensures true == mem(pair(k,n), advance_acc(acc));
+  {
+    mem_advance_acc_swap(acc, k, n);
   }
   @*/
 
@@ -6703,6 +6715,96 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
+  lemma void remove_advance_acc_swap<kt>(list<pair<kt, nat> > acc, kt k, nat n)
+  requires true;
+  ensures remove(pair(k, n), advance_acc(acc)) ==
+          advance_acc(remove(pair(k, succ(n)), acc));
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(x):
+          }
+        }
+        if (h != pair(k, succ(n))) remove_advance_acc_swap(t, k, n);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void advance_acc_removes_zero<kt>(list<pair<kt, nat> > acc, kt k)
+  requires true;
+  ensures advance_acc(remove(pair(k, zero), acc)) == advance_acc(acc);
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(x):
+          }
+        }
+      if (h != pair(k, zero)) advance_acc_removes_zero(t, k);
+    }
+  }
+  @*/
+
+
+
+/*@
+  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
+                                         list<pair<kt, nat> > acc2)
+  requires true == multiset_eq(acc1, acc2);
+  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
+  {
+    switch(acc1) {
+      case nil:
+      case cons(h,t):
+        advance_acc_multiset_eq(t, remove(h, acc2));
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+              advance_acc_removes_zero(acc2, key);
+            case succ(n):
+              mem_advance_acc_swap(acc2, key, n);
+              remove_advance_acc_swap(acc2, key, n);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void acc_eq_get_chns_eq<kt>(list<pair<kt, nat> > acc1,
+                                    list<pair<kt, nat> > acc2,
+                                    list<bucket<kt> > buckets)
+  requires true == multiset_eq(acc1, acc2);
+  ensures buckets_get_chns_rec_fp(acc1, buckets) ==
+          buckets_get_chns_rec_fp(acc2, buckets);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
+          list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
+          multiset_eq_append_both(acc1, acc2, chains);
+          advance_acc_multiset_eq(atb1, atb2);
+          multiset_eq_same_len(advance_acc(atb1), advance_acc(atb2));
+          acc_eq_get_chns_eq(advance_acc(atb1), advance_acc(atb2), t);
+        }
+    }
+  }
+  @*/
+
+
+/*@
   lemma void
   acc_eq_cons_get_chns_like_add_part_chn<kt>(list<pair<kt, nat> > acc,
                                              list<pair<kt, nat> > orig,
@@ -6712,30 +6814,37 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig));
   ensures buckets_get_chns_rec_fp(acc, buckets) ==
           add_partial_chain_rec_fp(buckets_get_chns_rec_fp(orig, buckets),
-                                   0, dist + 1);
+                                   0, dist);
   {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
-                                         list<pair<kt, nat> > acc2)
-  requires true == multiset_eq(acc1, acc2);
-  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void cons_in_the_middle_multiset_eq<t>(list<t> l1, list<t> l2, t x)
-  requires true;
-  ensures true == multiset_eq(append(l1, cons(x, l2)), cons(x, append(l1, l2)));
-  {
-    assume(false);//TODO 
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+        list<pair<kt, nat> > orig_atb = acc_at_this_bucket(orig, h);
+        switch(h) { case bucket(chains):
+          multiset_eq_append_both(acc, cons(pair(k, nat_of_int(dist)), orig),
+                                  chains);
+          assert true == multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
+                                               orig_atb));
+          advance_acc_multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
+                                            orig_atb));
+          multiset_eq_same_len(advance_acc(atb),
+                               advance_acc(cons(pair(k, nat_of_int(dist)),
+                                                orig_atb)));
+          if (dist == 0) {
+            assert advance_acc(cons(pair(k, nat_of_int(dist)), orig_atb)) ==
+                   advance_acc(orig_atb);
+            assert true == multiset_eq(advance_acc(atb), advance_acc(orig_atb));
+            acc_eq_get_chns_eq(advance_acc(atb), advance_acc(orig_atb), t);
+          } else {
+            nat prev_d = nat_of_int(dist - 1);
+            assert nat_of_int(dist) == succ(prev_d);
+            acc_eq_cons_get_chns_like_add_part_chn(advance_acc(atb),
+                                                   advance_acc(orig_atb),
+                                                   t, k, dist - 1);
+          }
+        }
+    }
   }
   @*/
 
@@ -6748,7 +6857,17 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures advance_acc(append(acc1, cons(pair(k, zero), acc2))) ==
           advance_acc(append(acc1, acc2));
   {
-    assume(false);//TODO 
+    switch(acc1) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+        }
+        advance_acc_eliminate_zero_chain(t, acc2, k);
+    }
   }
   @*/
 
@@ -6775,7 +6894,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures buckets_get_chns_rec_fp(acc, buckets_put_key_fp(buckets, k,
                                                           start, dist)) ==
           add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets),
-                                   start, dist+1);
+                                   start, dist);
   {
     switch(buckets) {
       case nil:
@@ -6795,9 +6914,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
               assert advance_acc(atb) == advance_acc(new_atb);
               add_no_partial_chain_rec(buckets_get_chns_rec_fp(advance_acc(atb), t));
               assert add_partial_chain_rec_fp(buckets_get_chns_rec_fp(advance_acc(atb), t), start, dist) == buckets_get_chns_rec_fp(advance_acc(atb), t);
-              assert add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets), start, dist + 1) ==
-                     cons(length(atb) + 1,
-                          buckets_get_chns_rec_fp(advance_acc(atb), t));
             } else {
               advance_acc_multiset_eq(new_atb,
                                       cons(pair(k, nat_of_int(dist)), atb));
@@ -6806,16 +6922,11 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
               assert true == multiset_eq(advance_acc(new_atb),
                                          cons(pair(k, nat_of_int(dist-1)),
                                               advance_acc(atb)));
+              multiset_eq_same_len(advance_acc(new_atb), cons(pair(k, nat_of_int(dist-1)), advance_acc(atb)));
+              assert length(advance_acc(new_atb)) == length(advance_acc(atb)) + 1;
               acc_eq_cons_get_chns_like_add_part_chn(advance_acc(new_atb),
                                                      advance_acc(atb),
                                                      t, k, dist - 1);
-                                                     
-              assert buckets_get_chns_rec_fp(acc, buckets_put_key_fp(buckets, k, start, dist)) ==
-                     cons(length(new_atb),
-                          buckets_get_chns_rec_fp(advance_acc(new_atb),
-                                                  t));
-              assert add_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets), start, dist + 1) ==
-                     cons(length(atb) + 1, add_partial_chain_rec_fp(buckets_get_chns_rec_fp(advance_acc(atb), t), start, dist));
             }
           } else {
             buckets_add_part_get_chns_norm_rec(advance_acc(atb),
@@ -6835,7 +6946,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == buckets_ok(buckets);
   ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                  start, dist)) ==
-          add_partial_chain_fp(start, dist + 1,
+          add_partial_chain_fp(start, dist,
                                buckets_get_chns_fp(buckets));
   {
     buckets_put_short_chain_same_wraparound(nil, buckets,
@@ -6846,7 +6957,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     buckets_keys_chns_same_len(buckets);
     buckets_put_same_len(buckets, k, start, dist);
     buckets_keys_chns_same_len(buckets_put_key_fp(buckets, k, start, dist));
-  }
+  }//took 200m
   @*/
 
 /*@
@@ -6855,7 +6966,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires length(buckets) <= start + dist;
   ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                  start, dist)) ==
-          add_partial_chain_fp(start, dist + 1,
+          add_partial_chain_fp(start, dist,
                                buckets_get_chns_fp(buckets));
   {
     assume(false);//TODO 120m
