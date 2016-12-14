@@ -5464,14 +5464,34 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void buckets_put_key_keep_long_no_effect<kt>(list<bucket<kt> > buckets,
-                                                     kt k, int start, int dist)
-  requires start + dist < length(buckets);
-  ensures keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
-          keep_long_fp(buckets);
+                                               kt k, int start, int dist)
+  requires 0 <= start &*& start < length(buckets) &*&
+           0 <= dist &*&
+           start + dist < length(buckets);
+  ensures keep_long_fp(buckets) ==
+          keep_long_fp(buckets_put_key_fp(buckets, k, start, dist));
   {
-    assume(false);//TODO 5m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          if (start == 0) {
+            assert dist < length(buckets);
+            assert int_of_nat(nat_of_int(dist)) == dist;
+            assert false == lower_limit(length(buckets), pair(k, nat_of_int(dist)));
+            assert filter((lower_limit)(length(buckets)),
+                          cons(pair(k, nat_of_int(dist)), chains)) ==
+                   filter((lower_limit)(length(buckets)), chains);
+          } else {
+            buckets_put_same_len(buckets, k, start, dist);
+            buckets_put_key_keep_long_no_effect(t, k, start - 1, dist);
+          }
+        }
+    }
+  
+  }//took 30m
   @*/
+
 
 /*@
   lemma void buckets_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > acc,
@@ -5771,37 +5791,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void keep_long_put_short_no_effect<kt>(list<bucket<kt> > buckets,
-                                               kt k, int start, int dist)
-  requires 0 <= start &*& start < length(buckets) &*&
-           0 <= dist &*&
-           start + dist < length(buckets);
-  ensures keep_long_fp(buckets) ==
-          keep_long_fp(buckets_put_key_fp(buckets, k, start, dist));
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case bucket(chains):
-          if (start == 0) {
-            assert dist < length(buckets);
-            assert int_of_nat(nat_of_int(dist)) == dist;
-            assert false == lower_limit(length(buckets), pair(k, nat_of_int(dist)));
-            assert filter((lower_limit)(length(buckets)),
-                          cons(pair(k, nat_of_int(dist)), chains)) ==
-                   filter((lower_limit)(length(buckets)), chains);
-          } else {
-            buckets_put_same_len(buckets, k, start, dist);
-            keep_long_put_short_no_effect(t, k, start - 1, dist);
-          }
-        }
-    }
-  
-  }//took 30m
-  @*/
-
-
-/*@
   lemma void filter_zero_lower_limit_no_effect<kt>(list<pair<kt, nat> > acc)
   requires true;
   ensures filter((lower_limit)(0), acc) == acc;
@@ -5953,7 +5942,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
     keep_long_same_wraparound(acc, buckets);
     keep_long_same_wraparound(acc, buckets_put_key_fp(buckets, k, start, dist));
-    keep_long_put_short_no_effect(buckets, k, start, dist);
+    buckets_put_key_keep_long_no_effect(buckets, k, start, dist);
   }
   @*/
 
@@ -5964,8 +5953,21 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures keep_short_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
           keep_short_fp(buckets);
   {
-    assume(false);//TODO 5m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        buckets_put_same_len(buckets, k, start, dist);
+        switch(h) { case bucket(chains):
+          if (start == 0) {
+            assert filter((upper_limit)(length(buckets)), chains) ==
+                   filter((upper_limit)(length(buckets)),
+                          cons(pair(k, nat_of_int(dist)), chains));
+          } else {
+            buckets_put_key_keep_short_no_effect(t, k, start - 1, dist);
+          }
+        }
+    }
+  }//took 3m
 
   lemma void buckets_put_key_keep_long_swap<kt>(list<bucket<kt> > buckets,
                                                 kt k, int start, int dist)
@@ -5973,8 +5975,22 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures keep_long_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
           buckets_put_key_fp(keep_long_fp(buckets), k, start, dist);
   {
-    assume(false);//TODO 10m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        buckets_put_same_len(buckets, k, start, dist);
+        switch(h) { case bucket(chains):
+          if (start == 0) {
+            assert cons(pair(k, nat_of_int(dist)),
+                        filter((lower_limit)(length(buckets)), chains)) ==
+                   filter((lower_limit)(length(buckets)),
+                          cons(pair(k, nat_of_int(dist)), chains));
+          } else {
+            buckets_put_key_keep_long_swap(t, k, start - 1, dist);
+          }
+        }
+    }
+  }//took 15m
   @*/
 
 
