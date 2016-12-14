@@ -6974,11 +6974,49 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                      list<pair<kt, nat> > acc2,
                                                      list<bucket<kt> > buckets,
                                                      kt k)
-  requires true == multiset_eq(acc1, cons(pair(k, zero), acc2));
+  requires true == multiset_eq(acc1, cons(pair(k, zero), acc2)) &*&
+           buckets != nil;
   ensures buckets_get_chns_rec_fp(acc1, buckets) ==
           buckets_get_chns_rec_fp(acc2, buckets);
   {
-    assume(false);//TODO 
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+    }
+    assert 0 < length(buckets);
+    acc_eq_cons_get_chns_like_add_part_chn(acc1, acc2, buckets, k, 0);
+    add_part_chn_zero_len(buckets_get_chns_rec_fp(acc2, buckets), 0);
+  }
+  @*/
+
+/*@
+  lemma void long_chain_in_acc_to_wraparound<kt>(list<pair<kt, nat> > acc,
+                                                 list<pair<kt, nat> > orig,
+                                                 list<bucket<kt> > buckets,
+                                                 kt k, int dist)
+  requires true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig)) &*&
+           length(buckets) <= dist;
+  ensures true == multiset_eq(get_wraparound(acc, buckets),
+                              cons(pair(k, nat_of_int(dist - length(buckets))),
+                                   get_wraparound(orig, buckets)));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > orig_atb = acc_at_this_bucket(orig, h);
+          multiset_eq_append_both(acc, cons(pair(k, nat_of_int(dist)), orig),
+                                  chains);
+          assert 0 < dist;
+          int prev_dist = dist - 1;
+          assert nat_of_int(dist) == succ(nat_of_int(prev_dist));
+          advance_acc_multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
+                                            orig_atb));
+          long_chain_in_acc_to_wraparound(advance_acc(atb), advance_acc(orig_atb),
+                                          t, k, dist - 1);
+        }
+    }
   }
   @*/
 
@@ -6987,7 +7025,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   buckets_put_chain_lim_wraparound_add_zero_chain<kt>(list<pair<kt, nat> > acc,
                                                       list<bucket<kt> > buckets,
                                                       kt k, int start)
-  requires true;
+  requires 0 <= start &*& start < length(buckets);
   ensures true == multiset_eq
                     (get_wraparound(acc, buckets_put_key_fp(buckets,
                                                             k, start,
@@ -6995,7 +7033,32 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                               start)),
                      cons(pair(k, zero), get_wraparound(acc, buckets)));
   {
-    assume(false);//TODO 
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          int dist = length(buckets) - start;
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > new_atb =
+            acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
+          if (start == 0) {
+            cons_in_the_middle_multiset_eq(acc, chains,
+                                           pair(k, nat_of_int(dist)));
+            assert true == multiset_eq
+                             (new_atb, cons(pair(k, nat_of_int(dist)), atb));
+            advance_acc_multiset_eq(new_atb, cons(pair(k, nat_of_int(dist)),
+                                                  atb));
+            assert 0 < dist;
+            int prev_dist = dist - 1;
+            assert nat_of_int(dist) == succ(nat_of_int(prev_dist));
+            long_chain_in_acc_to_wraparound
+              (advance_acc(new_atb), advance_acc(atb), t, k, prev_dist);
+          } else {
+            buckets_put_chain_lim_wraparound_add_zero_chain
+              (advance_acc(atb), t, k, start - 1);
+          }
+        }
+    }
   }
   @*/
 
