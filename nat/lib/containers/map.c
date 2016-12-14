@@ -5977,16 +5977,59 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
+/*@
+  lemma void advance_acc_dec_mem<kt>(list<pair<kt, nat> > acc, nat n)
+  requires true;
+  ensures mem(n, get_just_tails(advance_acc(acc))) ==
+          mem(succ(n), get_just_tails(acc));
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key, dist):
+          switch(dist) {
+            case zero:
+            case succ(m):
+          }
+          advance_acc_dec_mem(t, n);
+        }
+    }
+  }
+  @*/
+
+
 /*@
   lemma void no_chain_in_wraparound_not_here<kt>(list<pair<kt, nat> > acc,
                                                  list<bucket<kt> > buckets,
                                                  int dist)
   requires false == mem(nat_of_int(dist - length(buckets)),
-                        get_just_tails(get_wraparound(acc, buckets)));
+                        get_just_tails(get_wraparound(acc, buckets))) &*&
+           length(buckets) <= dist;
   ensures false == mem(nat_of_int(dist), get_just_tails(acc));
   {
-    assume(false);//TODO 10m
-  }
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+        no_chain_in_wraparound_not_here(advance_acc(atb), t, dist - 1);
+        assert false == mem(nat_of_int(dist - 1),
+                            get_just_tails(advance_acc(atb)));
+        if (mem(nat_of_int(dist), get_just_tails(acc))) {
+          switch(h) { case bucket(chains):
+            map_append(snd, acc, chains);
+            mem_append(nat_of_int(dist), get_just_tails(acc), get_just_tails(chains));
+            assert true == mem(nat_of_int(dist), get_just_tails(atb));
+          }
+          assert succ(nat_of_int(dist - 1)) == nat_of_int(dist);
+          advance_acc_dec_mem(atb, nat_of_int(dist - 1));
+          assert true == mem(nat_of_int(dist - 1),
+                             get_just_tails(advance_acc(atb)));
+
+          assert false;
+        }
+    }
+  }//took 15m
   @*/
 
 /*@
@@ -6166,20 +6209,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
-
-/*@
-  lemma void
-  wraparound_no_chain_long_still_no_chain<kt>(list<pair<kt, nat> > acc,
-                                              list<bucket<kt> > buckets,
-                                              nat chain)
-  requires false == mem(chain, get_just_tails(get_wraparound(acc, buckets)));
-  ensures false == mem(chain, get_just_tails
-                                (get_wraparound(acc, keep_long_fp(buckets))));
-  {
-    assume(false);//TODO 5m
-  }
-  @*/
-
 /*@
 
   lemma void buckets_put_still_ok<kt>(list<bucket<kt> > buckets,
@@ -6261,10 +6290,9 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                                       k, start,
                                                                       dist)),
                                buckets)));
-      wraparound_no_chain_long_still_no_chain
-        (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
-         buckets,
-         dist_left);
+       keep_long_same_wraparound
+         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+          buckets);
       long_buckets_put_still_ok_rec
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
          keep_long_fp(buckets), k, start, dist, length(buckets));
@@ -7269,7 +7297,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            add_partial_chain_rec_fp
              (buckets_get_chns_rec_fp(get_wraparound(nil, buckets), buckets),
                                       start, dist);
-  }
+  }//took 240m
   @*/
 
 /*@
