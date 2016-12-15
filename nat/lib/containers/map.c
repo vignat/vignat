@@ -5601,8 +5601,15 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           length(acc_at_this_bucket(acc, bucket_put_key_fp(bucket, k, dist))) ==
           length(acc_at_this_bucket(acc, bucket)) + 1;
   {
-    assume(false);//TODO 20m
-  }
+    switch(bucket) { case bucket(chains):
+      list<pair<kt, nat> > atb = acc_at_this_bucket(acc, bucket);
+      list<pair<kt, nat> > atb_add =
+        acc_at_this_bucket(acc, bucket_put_key_fp(bucket, k, dist));
+      cons_in_the_middle_multiset_eq(acc, chains, pair(k, nat_of_int(dist)));
+      multiset_eq_set_eq(atb_add, cons(pair(k, nat_of_int(dist)), atb));
+      multiset_eq_same_len(atb_add, cons(pair(k, nat_of_int(dist)), atb));
+    }
+  }//took 5m (again, kind of a duplicate of another lemma)
   @*/
 
 
