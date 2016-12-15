@@ -5605,11 +5605,237 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
+/*@
+  lemma void remove_advance_acc_swap<kt>(list<pair<kt, nat> > acc, kt k, nat n)
+  requires true;
+  ensures remove(pair(k, n), advance_acc(acc)) ==
+          advance_acc(remove(pair(k, succ(n)), acc));
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(x):
+          }
+        }
+        if (h != pair(k, succ(n))) remove_advance_acc_swap(t, k, n);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void advance_acc_removes_zero<kt>(list<pair<kt, nat> > acc, kt k)
+  requires true;
+  ensures advance_acc(remove(pair(k, zero), acc)) == advance_acc(acc);
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(x):
+          }
+        }
+      if (h != pair(k, zero)) advance_acc_removes_zero(t, k);
+    }
+  }
+  @*/
+
+
+
+/*@
+  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
+                                         list<pair<kt, nat> > acc2)
+  requires true == multiset_eq(acc1, acc2);
+  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
+  {
+    switch(acc1) {
+      case nil:
+      case cons(h,t):
+        advance_acc_multiset_eq(t, remove(h, acc2));
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+              advance_acc_removes_zero(acc2, key);
+            case succ(n):
+              mem_advance_acc_swap(acc2, key, n);
+              remove_advance_acc_swap(acc2, key, n);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void acc_eq_get_chns_eq<kt>(list<pair<kt, nat> > acc1,
+                                    list<pair<kt, nat> > acc2,
+                                    list<bucket<kt> > buckets)
+  requires true == multiset_eq(acc1, acc2);
+  ensures buckets_get_chns_rec_fp(acc1, buckets) ==
+          buckets_get_chns_rec_fp(acc2, buckets);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
+          list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
+          multiset_eq_append_both(acc1, acc2, chains);
+          advance_acc_multiset_eq(atb1, atb2);
+          multiset_eq_same_len(advance_acc(atb1), advance_acc(atb2));
+          acc_eq_get_chns_eq(advance_acc(atb1), advance_acc(atb2), t);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void
+  acc_eq_cons_get_chns_like_add_part_chn<kt>(list<pair<kt, nat> > acc,
+                                             list<pair<kt, nat> > orig,
+                                             list<bucket<kt> > buckets,
+                                             kt k, int dist)
+  requires 0 <= dist &*&
+           true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig));
+  ensures buckets_get_chns_rec_fp(acc, buckets) ==
+          add_partial_chain_rec_fp(buckets_get_chns_rec_fp(orig, buckets),
+                                   0, dist);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+        list<pair<kt, nat> > orig_atb = acc_at_this_bucket(orig, h);
+        switch(h) { case bucket(chains):
+          multiset_eq_append_both(acc, cons(pair(k, nat_of_int(dist)), orig),
+                                  chains);
+          assert true == multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
+                                               orig_atb));
+          advance_acc_multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
+                                            orig_atb));
+          multiset_eq_same_len(advance_acc(atb),
+                               advance_acc(cons(pair(k, nat_of_int(dist)),
+                                                orig_atb)));
+          if (dist == 0) {
+            assert advance_acc(cons(pair(k, nat_of_int(dist)), orig_atb)) ==
+                   advance_acc(orig_atb);
+            assert true == multiset_eq(advance_acc(atb), advance_acc(orig_atb));
+            acc_eq_get_chns_eq(advance_acc(atb), advance_acc(orig_atb), t);
+          } else {
+            nat prev_d = nat_of_int(dist - 1);
+            assert nat_of_int(dist) == succ(prev_d);
+            acc_eq_cons_get_chns_like_add_part_chn(advance_acc(atb),
+                                                   advance_acc(orig_atb),
+                                                   t, k, dist - 1);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void acc_additional_zero_chain_same_chns<kt>(list<pair<kt, nat> > acc1,
+                                                     list<pair<kt, nat> > acc2,
+                                                     list<bucket<kt> > buckets,
+                                                     kt k)
+  requires true == multiset_eq(acc1, cons(pair(k, zero), acc2)) &*&
+           buckets != nil;
+  ensures buckets_get_chns_rec_fp(acc1, buckets) ==
+          buckets_get_chns_rec_fp(acc2, buckets);
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+    }
+    assert 0 < length(buckets);
+    acc_eq_cons_get_chns_like_add_part_chn(acc1, acc2, buckets, k, 0);
+    add_part_chn_zero_len(buckets_get_chns_rec_fp(acc2, buckets), 0);
+  }
+  @*/
+
+/*@
+  lemma void long_chain_in_acc_to_wraparound<kt>(list<pair<kt, nat> > acc,
+                                                 list<pair<kt, nat> > orig,
+                                                 list<bucket<kt> > buckets,
+                                                 kt k, int dist)
+  requires true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig)) &*&
+           length(buckets) <= dist;
+  ensures true == multiset_eq(get_wraparound(acc, buckets),
+                              cons(pair(k, nat_of_int(dist - length(buckets))),
+                                   get_wraparound(orig, buckets)));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > orig_atb = acc_at_this_bucket(orig, h);
+          multiset_eq_append_both(acc, cons(pair(k, nat_of_int(dist)), orig),
+                                  chains);
+          assert 0 < dist;
+          int prev_dist = dist - 1;
+          assert nat_of_int(dist) == succ(nat_of_int(prev_dist));
+          advance_acc_multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
+                                            orig_atb));
+          long_chain_in_acc_to_wraparound(advance_acc(atb), advance_acc(orig_atb),
+                                          t, k, dist - 1);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void buckets_put_wraparound_eq_cons<kt>(list<pair<kt, nat> > acc,
+                                                list<bucket<kt> > buckets,
+                                                kt k, int start, int dist)
+  requires length(buckets) <= start + dist &*&
+           0 <= start &*& start < length(buckets);
+  ensures true == multiset_eq(get_wraparound(acc, buckets_put_key_fp
+                                                    (buckets, k, start, dist)),
+                              cons(pair(k, nat_of_int(dist + start -
+                                                      length(buckets))),
+                                   get_wraparound(acc, buckets)));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          if (start == 0) {
+            list<pair<kt, nat> > new_atb =
+              acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
+            cons_in_the_middle_multiset_eq(acc, chains,
+                                           pair(k, nat_of_int(dist)));
+            assert true == multiset_eq
+                             (new_atb, cons(pair(k, nat_of_int(dist)), atb));
+            advance_acc_multiset_eq(new_atb, cons(pair(k, nat_of_int(dist)),
+                                                  atb));
+            assert 0 < dist;
+            int prev_dist = dist - 1;
+            assert nat_of_int(dist) == succ(nat_of_int(prev_dist));
+            long_chain_in_acc_to_wraparound
+              (advance_acc(new_atb), advance_acc(atb), t, k, prev_dist);
+          } else {
+            buckets_put_wraparound_eq_cons
+              (advance_acc(atb), t, k, start - 1, dist);
+          }
+        }
+    }
+  }
+  @*/
 /*@
   lemma void buckets_put_wraparound_is_cons<kt>(list<pair<kt, nat> > acc,
                                                 list<bucket<kt> > buckets,
                                                 kt k, int start, int dist)
-  requires length(buckets) <= dist + start;
+  requires length(buckets) <= dist + start &*&
+           0 <= start &*& start < length(buckets);
   ensures true == set_eq
                     (get_wraparound(acc,
                                     buckets_put_key_fp(buckets, k,
@@ -5620,8 +5846,17 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                         start, dist))) ==
           length(get_wraparound(acc, buckets)) + 1;
   {
-    assume(false);//TODO 20m
-  }
+    buckets_put_wraparound_eq_cons(acc, buckets, k, start, dist);
+    list<pair<kt, nat> > wrp1 = get_wraparound(acc,
+                                               buckets_put_key_fp(buckets, k,
+                                                                  start, dist));
+    list<pair<kt, nat> > wrp2 =
+      cons(pair(k, nat_of_int(dist + start - length(buckets))),
+           get_wraparound(acc, buckets));
+
+    multiset_eq_set_eq(wrp1, wrp2);
+    multiset_eq_same_len(wrp1, wrp2);
+  }//took 10m (it is kind of a duplicate of another, more strong lemma)
   @*/
 
 
@@ -6891,141 +7126,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void remove_advance_acc_swap<kt>(list<pair<kt, nat> > acc, kt k, nat n)
-  requires true;
-  ensures remove(pair(k, n), advance_acc(acc)) ==
-          advance_acc(remove(pair(k, succ(n)), acc));
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-            case succ(x):
-          }
-        }
-        if (h != pair(k, succ(n))) remove_advance_acc_swap(t, k, n);
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void advance_acc_removes_zero<kt>(list<pair<kt, nat> > acc, kt k)
-  requires true;
-  ensures advance_acc(remove(pair(k, zero), acc)) == advance_acc(acc);
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-            case succ(x):
-          }
-        }
-      if (h != pair(k, zero)) advance_acc_removes_zero(t, k);
-    }
-  }
-  @*/
-
-
-
-/*@
-  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
-                                         list<pair<kt, nat> > acc2)
-  requires true == multiset_eq(acc1, acc2);
-  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
-  {
-    switch(acc1) {
-      case nil:
-      case cons(h,t):
-        advance_acc_multiset_eq(t, remove(h, acc2));
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-              advance_acc_removes_zero(acc2, key);
-            case succ(n):
-              mem_advance_acc_swap(acc2, key, n);
-              remove_advance_acc_swap(acc2, key, n);
-          }
-        }
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void acc_eq_get_chns_eq<kt>(list<pair<kt, nat> > acc1,
-                                    list<pair<kt, nat> > acc2,
-                                    list<bucket<kt> > buckets)
-  requires true == multiset_eq(acc1, acc2);
-  ensures buckets_get_chns_rec_fp(acc1, buckets) ==
-          buckets_get_chns_rec_fp(acc2, buckets);
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case bucket(chains):
-          list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
-          list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
-          multiset_eq_append_both(acc1, acc2, chains);
-          advance_acc_multiset_eq(atb1, atb2);
-          multiset_eq_same_len(advance_acc(atb1), advance_acc(atb2));
-          acc_eq_get_chns_eq(advance_acc(atb1), advance_acc(atb2), t);
-        }
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void
-  acc_eq_cons_get_chns_like_add_part_chn<kt>(list<pair<kt, nat> > acc,
-                                             list<pair<kt, nat> > orig,
-                                             list<bucket<kt> > buckets,
-                                             kt k, int dist)
-  requires 0 <= dist &*&
-           true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig));
-  ensures buckets_get_chns_rec_fp(acc, buckets) ==
-          add_partial_chain_rec_fp(buckets_get_chns_rec_fp(orig, buckets),
-                                   0, dist);
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
-        list<pair<kt, nat> > orig_atb = acc_at_this_bucket(orig, h);
-        switch(h) { case bucket(chains):
-          multiset_eq_append_both(acc, cons(pair(k, nat_of_int(dist)), orig),
-                                  chains);
-          assert true == multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
-                                               orig_atb));
-          advance_acc_multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
-                                            orig_atb));
-          multiset_eq_same_len(advance_acc(atb),
-                               advance_acc(cons(pair(k, nat_of_int(dist)),
-                                                orig_atb)));
-          if (dist == 0) {
-            assert advance_acc(cons(pair(k, nat_of_int(dist)), orig_atb)) ==
-                   advance_acc(orig_atb);
-            assert true == multiset_eq(advance_acc(atb), advance_acc(orig_atb));
-            acc_eq_get_chns_eq(advance_acc(atb), advance_acc(orig_atb), t);
-          } else {
-            nat prev_d = nat_of_int(dist - 1);
-            assert nat_of_int(dist) == succ(prev_d);
-            acc_eq_cons_get_chns_like_add_part_chn(advance_acc(atb),
-                                                   advance_acc(orig_atb),
-                                                   t, k, dist - 1);
-          }
-        }
-    }
-  }
-  @*/
-
-
-/*@
   lemma void advance_acc_eliminate_zero_chain<kt>(list<pair<kt, nat> > acc1,
                                                   list<pair<kt, nat> > acc2,
                                                   kt k)
@@ -7134,97 +7234,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     buckets_put_same_len(buckets, k, start, dist);
     buckets_keys_chns_same_len(buckets_put_key_fp(buckets, k, start, dist));
   }//took 200m
-  @*/
-
-/*@
-  lemma void acc_additional_zero_chain_same_chns<kt>(list<pair<kt, nat> > acc1,
-                                                     list<pair<kt, nat> > acc2,
-                                                     list<bucket<kt> > buckets,
-                                                     kt k)
-  requires true == multiset_eq(acc1, cons(pair(k, zero), acc2)) &*&
-           buckets != nil;
-  ensures buckets_get_chns_rec_fp(acc1, buckets) ==
-          buckets_get_chns_rec_fp(acc2, buckets);
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-    }
-    assert 0 < length(buckets);
-    acc_eq_cons_get_chns_like_add_part_chn(acc1, acc2, buckets, k, 0);
-    add_part_chn_zero_len(buckets_get_chns_rec_fp(acc2, buckets), 0);
-  }
-  @*/
-
-/*@
-  lemma void long_chain_in_acc_to_wraparound<kt>(list<pair<kt, nat> > acc,
-                                                 list<pair<kt, nat> > orig,
-                                                 list<bucket<kt> > buckets,
-                                                 kt k, int dist)
-  requires true == multiset_eq(acc, cons(pair(k, nat_of_int(dist)), orig)) &*&
-           length(buckets) <= dist;
-  ensures true == multiset_eq(get_wraparound(acc, buckets),
-                              cons(pair(k, nat_of_int(dist - length(buckets))),
-                                   get_wraparound(orig, buckets)));
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case bucket(chains):
-          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
-          list<pair<kt, nat> > orig_atb = acc_at_this_bucket(orig, h);
-          multiset_eq_append_both(acc, cons(pair(k, nat_of_int(dist)), orig),
-                                  chains);
-          assert 0 < dist;
-          int prev_dist = dist - 1;
-          assert nat_of_int(dist) == succ(nat_of_int(prev_dist));
-          advance_acc_multiset_eq(atb, cons(pair(k, nat_of_int(dist)),
-                                            orig_atb));
-          long_chain_in_acc_to_wraparound(advance_acc(atb), advance_acc(orig_atb),
-                                          t, k, dist - 1);
-        }
-    }
-  }
-  @*/
-
-/*@
-  lemma void buckets_put_wraparound_eq_cons<kt>(list<pair<kt, nat> > acc,
-                                                list<bucket<kt> > buckets,
-                                                kt k, int start, int dist)
-  requires length(buckets) <= start + dist &*&
-           0 <= start &*& start < length(buckets);
-  ensures true == multiset_eq(get_wraparound(acc, buckets_put_key_fp
-                                                    (buckets, k, start, dist)),
-                              cons(pair(k, nat_of_int(dist + start -
-                                                      length(buckets))),
-                                   get_wraparound(acc, buckets)));
-  {
-    switch(buckets) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case bucket(chains):
-          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
-          if (start == 0) {
-            list<pair<kt, nat> > new_atb =
-              acc_at_this_bucket(acc, bucket_put_key_fp(h, k, dist));
-            cons_in_the_middle_multiset_eq(acc, chains,
-                                           pair(k, nat_of_int(dist)));
-            assert true == multiset_eq
-                             (new_atb, cons(pair(k, nat_of_int(dist)), atb));
-            advance_acc_multiset_eq(new_atb, cons(pair(k, nat_of_int(dist)),
-                                                  atb));
-            assert 0 < dist;
-            int prev_dist = dist - 1;
-            assert nat_of_int(dist) == succ(nat_of_int(prev_dist));
-            long_chain_in_acc_to_wraparound
-              (advance_acc(new_atb), advance_acc(atb), t, k, prev_dist);
-          } else {
-            buckets_put_wraparound_eq_cons
-              (advance_acc(atb), t, k, start - 1, dist);
-          }
-        }
-    }
-  }
   @*/
 
 /*@
