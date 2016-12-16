@@ -5507,16 +5507,356 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }//took 30m
   @*/
 
+/*@
+  lemma void remove_advance_acc_swap<kt>(list<pair<kt, nat> > acc, kt k, nat n)
+  requires true;
+  ensures remove(pair(k, n), advance_acc(acc)) ==
+          advance_acc(remove(pair(k, succ(n)), acc));
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(x):
+          }
+        }
+        if (h != pair(k, succ(n))) remove_advance_acc_swap(t, k, n);
+    }
+  }
+  @*/
+
 
 /*@
-  lemma void buckets_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > acc,
+  lemma void advance_acc_removes_zero<kt>(list<pair<kt, nat> > acc, kt k)
+  requires true;
+  ensures advance_acc(remove(pair(k, zero), acc)) == advance_acc(acc);
+  {
+    switch(acc) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(x):
+          }
+        }
+      if (h != pair(k, zero)) advance_acc_removes_zero(t, k);
+    }
+  }
+  @*/
+
+
+
+/*@
+  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
+                                         list<pair<kt, nat> > acc2)
+  requires true == multiset_eq(acc1, acc2);
+  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
+  {
+    switch(acc1) {
+      case nil:
+      case cons(h,t):
+        advance_acc_multiset_eq(t, remove(h, acc2));
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+              advance_acc_removes_zero(acc2, key);
+            case succ(n):
+              mem_advance_acc_swap(acc2, key, n);
+              remove_advance_acc_swap(acc2, key, n);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void lower_and_upper_limit_complement<kt>(list<pair<kt, nat> > l,
+                                                  int lim)
+  requires true;
+  ensures true == multiset_eq(append(filter((lower_limit)(lim), l),
+                                     filter((upper_limit)(lim), l)), l) &*&
+          intersection(get_just_tails(filter((lower_limit)(lim), l)),
+                       get_just_tails(filter((upper_limit)(lim), l))) == nil;
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void distinct_and_disjoint_append<t>(list<t> l1, list<t> l2)
+  requires true == distinct(l1) &*&
+           true == distinct(l2) &*&
+           intersection(l1, l2) == nil;
+  ensures true == distinct(append(l1,l2));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_map<t1,t2>(fixpoint (t1,t2) f,
+                                    list<t1> l1,
+                                    list<t1> l2)
+  requires true == multiset_eq(l1, l2);
+  ensures true == multiset_eq(map(f, l1), map(f, l2));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_distinct<t>(list<t> l1, list<t> l2)
+  requires true == multiset_eq(l1, l2);
+  ensures distinct(l1) == distinct(l2);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+/*@
+  lemma void multiset_eq_forall<t>(list<t> l1, list<t> l2, fixpoint (t,bool) f)
+  requires true == multiset_eq(l1, l2);
+  ensures forall(l1, f) == forall(l2, f);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_append_assoc<t>(list<t> l1, list<t> l2, list<t> l3)
+  requires true;
+  ensures true == multiset_eq(append(append(l1, l2), l3),
+                              append(l1, append(l2, l3)));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_append<t>(list<t> l1, list<t> l2,
+                                   list<t> l3, list<t> l4)
+  requires true == multiset_eq(l1, l2) &*&
+           true == multiset_eq(l3, l4);
+  ensures true == multiset_eq(append(l1, l3), append(l2, l4));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_append_comm<t>(list<t> l1, list<t> l2)
+  requires true;
+  ensures true == multiset_eq(append(l1, l2), append(l2, l1));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_trans<t>(list<t> l1, list<t> l2, list<t> l3)
+  requires true == multiset_eq(l1, l2) &*&
+           true == multiset_eq(l2, l3);
+  ensures true == multiset_eq(l1, l3);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void eq_multiset_eq<t>(list<t> l1, list<t> l2)
+  requires l1 == l2;
+  ensures true == multiset_eq(l1, l2);
+  {
+    multiset_eq_refl(l1);
+  }
+  @*/
+
+
+/*@
+  lemma void intersection_comm<t>(list<t> l1, list<t> l2)
+  requires true;
+  ensures intersection(l1, l2) == intersection(l2, l1);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+/*@
+  lemma void intersection_nil_append<t>(list<t> l1, list<t> l2,
+                                        list<t> l3, list<t> l4)
+  requires intersection(l1, l3) == nil &*&
+           intersection(l2, l4) == nil;
+  ensures intersection(append(l1, l2), append(l3, l4)) == nil;
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+/*@
+  lemma void advance_acc_still_disjoint<kt>(list<pair<kt, nat> > acc1,
+                                            list<pair<kt, nat> > acc2)
+  requires intersection(get_just_tails(acc1),
+                        get_just_tails(acc2)) == nil;
+  ensures intersection(get_just_tails(advance_acc(acc1)),
+                       get_just_tails(advance_acc(acc2))) == nil;
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_reshuffle_appends<t>(list<t> l1, list<t> l2,
+                                              list<t> l3, list<t> l4,
+                                              list<t> l5)
+  requires true == multiset_eq(l1, append(append(l2, l3), append(l4, l5)));
+  ensures true == multiset_eq(l1, append(append(l2, l5), append(l3, l4)));
+  {
+    multiset_eq_append_assoc(l2, l3, append(l4, l5));
+    multiset_eq_trans(l1, append(append(l2, l3),
+                                  append(l4, l5)),
+                      append(l2, append(l3, append(l4, l5))));
+    assert true == multiset_eq(l1, append(l2, append(l3, append(l4, l5))));
+    multiset_eq_append_assoc(l3, l4, l5);
+    multiset_eq_comm(append(append(l3, l4), l5),
+                      append(l3, append(l4, l5)));
+    multiset_eq_append_comm(append(l3, l4), l5);
+    multiset_eq_trans(append(l3, append(l4, l5)),
+                      append(append(l3, l4), l5),
+                      append(l5, append(l3, l4)));
+    multiset_eq_refl(l2);
+    multiset_eq_append(l2, l2,
+                        append(l3, append(l4, l5)),
+                        append(l5, append(l3, l4)));
+    multiset_eq_trans(l1,
+                      append(l2, append(l3, append(l4, l5))),
+                      append(l2, append(l5, append(l3, l4))));
+    assert true == multiset_eq(l1, append(l2, append(l5, append(l3, l4))));
+    multiset_eq_append_assoc(l2, l5, append(l3, l4));
+    multiset_eq_comm(append(append(l2, l5), append(l3, l4)),
+                      append(l2, append(l5, append(l3, l4))));
+    assert true == multiset_eq(append(l2, append(l5, append(l3, l4))),
+                                append(append(l2, l5), append(l3, l4)));
+    assert true == multiset_eq(append(l2, append(l5, append(l3, l4))),
+                                append(append(l2, l5), append(l3, l4)));
+
+    multiset_eq_trans(l1, append(l2, append(l5, append(l3, l4))),
+                      append(append(l2, l5), append(l3, l4)));
+  }
+  @*/
+
+
+/*@
+  lemma void buckets_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > sacc,
+                                              list<pair<kt, nat> > lacc,
+                                              list<pair<kt, nat> > acc,
+                                              list<bucket<kt> > buckets,
+                                              int bound)
+  requires true == buckets_ok_rec(sacc, keep_short_fp(buckets), bound) &*&
+           true == buckets_ok_rec(lacc, keep_long_fp(buckets), bound) &*&
+           intersection(get_just_tails(sacc), get_just_tails(lacc)) == nil &*&
+           true == multiset_eq(acc, append(sacc, lacc));
+  ensures true == buckets_ok_rec(acc, buckets, bound);
+  {
+    switch(buckets) {
+      case nil:
+        map_append(snd, sacc, lacc);
+        distinct_and_disjoint_append(get_just_tails(sacc), get_just_tails(lacc));
+        multiset_eq_map(snd, acc, append(sacc, lacc));
+        multiset_eq_distinct(get_just_tails(acc),
+                             get_just_tails(append(sacc, lacc)));
+        forall_append(sacc, lacc, (upper_limit)(bound - 1));
+        multiset_eq_forall(acc, append(sacc, lacc), (upper_limit)(bound - 1));
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          list<pair<kt, nat> > lchains =
+            filter((lower_limit)(length(buckets)), chains);
+          list<pair<kt, nat> > schains =
+            filter((upper_limit)(length(buckets)), chains);
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > satb = append(sacc, schains);
+          list<pair<kt, nat> > latb = append(lacc, lchains);
+
+          lower_and_upper_limit_complement(chains, length(buckets));
+          multiset_eq_comm(append(lchains, schains), chains);
+          map_append(snd, acc, chains);
+          map_append(snd, sacc, schains);
+          map_append(snd, lacc, lchains);
+          assert true == multiset_eq(acc, append(sacc, lacc));
+          assert true == multiset_eq(chains, append(lchains, schains));
+          assert atb == append(acc, chains);
+          eq_multiset_eq(atb, append(acc, chains));
+          multiset_eq_append(acc, append(sacc, lacc),
+                             chains, append(lchains, schains));
+          multiset_eq_trans(atb, append(acc, chains),
+                            append(append(sacc, lacc), append(lchains, schains)));
+
+
+          assert true == multiset_eq(atb, append(append(sacc, lacc), append(lchains, schains)));
+          multiset_eq_reshuffle_appends(atb, sacc, lacc, lchains, schains);
+          assert true == multiset_eq(atb, append(append(sacc, schains), append(lacc, lchains)));
+          assert true == multiset_eq(atb, append(satb, latb));
+          assert true == distinct(get_just_tails(satb));
+          assert true == distinct(get_just_tails(latb));
+          assert intersection(get_just_tails(sacc),
+                              get_just_tails(lacc)) == nil;
+          intersection_comm(get_just_tails(lchains),
+                            get_just_tails(schains));
+          assert intersection(get_just_tails(schains),
+                              get_just_tails(lchains)) == nil;
+          intersection_nil_append(get_just_tails(sacc), get_just_tails(schains),
+                                  get_just_tails(lacc), get_just_tails(lchains));
+          assert intersection(get_just_tails(satb),
+                              get_just_tails(latb)) == nil;
+          distinct_and_disjoint_append(get_just_tails(satb),
+                                       get_just_tails(latb));
+          map_append(snd, satb, latb);
+          assert true == distinct(get_just_tails(append(satb, latb)));
+          multiset_eq_map(snd, atb, append(satb, latb));
+          multiset_eq_distinct(get_just_tails(atb),
+                               get_just_tails(append(satb, latb)));
+          assert true == distinct(get_just_tails(atb));
+          advance_acc_still_distinct(atb);
+          assert true == forall(satb, (upper_limit)(bound));
+          assert true == forall(latb, (upper_limit)(bound));
+          forall_append(satb, latb, (upper_limit)(bound));
+          assert true == forall(append(satb, latb), (upper_limit)(bound));
+          multiset_eq_forall(atb, append(satb, latb), (upper_limit)(bound));
+          assert true == forall(atb, (upper_limit)(bound));
+          assert true == multiset_eq(atb, append(satb, latb));
+          advance_acc_multiset_eq(atb, append(satb, latb));
+          advance_acc_append_commute(satb, latb);
+          advance_acc_still_disjoint(satb, latb);
+          buckets_split_ok_orig_ok_rec(advance_acc(satb),
+                                       advance_acc(latb),
+                                       advance_acc(atb),
+                                       t,
+                                       bound);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void buckets_split_ok_orig_ok<kt>(list<pair<kt, nat> > acc,
                                               list<bucket<kt> > buckets,
                                               int bound)
   requires true == buckets_ok_rec(acc, keep_short_fp(buckets), bound) &*&
            true == buckets_ok_rec(acc, keep_long_fp(buckets), bound);
   ensures true == buckets_ok_rec(acc, buckets, bound);
   {
-    assume(false);//TODO 10m
+    assume(false);//TODO
   }
   @*/
 
@@ -5610,72 +5950,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       multiset_eq_same_len(atb_add, cons(pair(k, nat_of_int(dist)), atb));
     }
   }//took 5m (again, kind of a duplicate of another lemma)
-  @*/
-
-
-/*@
-  lemma void remove_advance_acc_swap<kt>(list<pair<kt, nat> > acc, kt k, nat n)
-  requires true;
-  ensures remove(pair(k, n), advance_acc(acc)) ==
-          advance_acc(remove(pair(k, succ(n)), acc));
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-            case succ(x):
-          }
-        }
-        if (h != pair(k, succ(n))) remove_advance_acc_swap(t, k, n);
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void advance_acc_removes_zero<kt>(list<pair<kt, nat> > acc, kt k)
-  requires true;
-  ensures advance_acc(remove(pair(k, zero), acc)) == advance_acc(acc);
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-            case succ(x):
-          }
-        }
-      if (h != pair(k, zero)) advance_acc_removes_zero(t, k);
-    }
-  }
-  @*/
-
-
-
-/*@
-  lemma void advance_acc_multiset_eq<kt>(list<pair<kt, nat> > acc1,
-                                         list<pair<kt, nat> > acc2)
-  requires true == multiset_eq(acc1, acc2);
-  ensures true == multiset_eq(advance_acc(acc1), advance_acc(acc2));
-  {
-    switch(acc1) {
-      case nil:
-      case cons(h,t):
-        advance_acc_multiset_eq(t, remove(h, acc2));
-        switch(h) { case pair(key,dist):
-          switch(dist) {
-            case zero:
-              advance_acc_removes_zero(acc2, key);
-            case succ(n):
-              mem_advance_acc_swap(acc2, key, n);
-              remove_advance_acc_swap(acc2, key, n);
-          }
-        }
-    }
-  }
   @*/
 
 
@@ -6671,15 +6945,15 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                                       k, start,
                                                                       dist)),
                                buckets)));
-       keep_long_same_wraparound
-         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
-          buckets);
+      keep_long_same_wraparound
+        (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+         buckets);
       long_buckets_put_still_ok_rec
         (get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
          keep_long_fp(buckets), k, start, dist, length(buckets));
-      buckets_split_ok_orig_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
-                                   buckets_put_key_fp(buckets, k, start, dist),
-                                   length(buckets));
+      buckets_split_ok_orig_ok(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                               buckets_put_key_fp(buckets, k, start, dist),
+                               length(buckets));
     } else {
       buckets_put_short_chain_same_wraparound(nil, buckets, k,
                                               start, dist,
@@ -6704,8 +6978,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
          keep_short_fp(buckets), k, start, dist, length(buckets));
       buckets_put_key_keep_short_swap(buckets, k, start, dist);
       buckets_put_key_keep_long_no_effect(buckets, k, start, dist);
-      buckets_split_ok_orig_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
-                                  buckets_put_key_fp(buckets, k, start, dist), length(buckets));
+      buckets_split_ok_orig_ok(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
+                                   buckets_put_key_fp(buckets, k, start, dist), length(buckets));
       assert true == buckets_ok_rec(get_wraparound(nil, buckets_put_key_fp(buckets, k, start, dist)),
                                     buckets_put_key_fp(buckets, k, start, dist),
                                     length(buckets));

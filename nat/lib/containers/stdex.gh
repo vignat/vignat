@@ -721,7 +721,8 @@ ensures append(a, b) != nil;
 
   lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
   requires true == distinct(append(l1,l2));
-  ensures true == distinct(l1) &*& true == distinct(l2);
+  ensures true == distinct(l1) &*& true == distinct(l2) &*&
+          intersection(l2, l1) == nil;
   {
     switch(l1) {
       case nil:
