@@ -1,0 +1,1 @@
+rm constraints* && /home/necto/proj/llvm-3.4.2/Release+Asserts/bin/clang fwd-function.c -emit-llvm -c -I ~/proj/klee/include -g && /home/necto/proj/klee/Release+Asserts/bin/klee fwd-function.bc && cat constraints*
