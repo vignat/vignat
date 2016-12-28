@@ -23,28 +23,32 @@ Internal flow ID := 5-tuple<in src_addr,
                             dst_ip,
                             dst_port,
                             protocol>
-Flow table := set of<Flow entry, timestamp>
-Expire(time, table) := filter table, keep only entries with `time < timestamp + Tmax`
+Flow table := set of<Flow entry, Timestamp>
+
+Expire(table, time) -> filter table: for every (flow entry, timestamp):
+    time - Tmin < timestamp -> keep
+    timestamp < time - Tmax -> discard
+    otherwise -> keep or discard
 #+END_SRC
 
 * definitions
 ** preconditions
-  - =ext flow F exists=: (map ~External Flow ID~ over Expire(~now~, ~Flow table~)) contains ~F~
-  - =int flow F exists=: (map ~Internal Flow ID~ over Expire(~now~, ~Flow table~)) contains ~F~
-  - =the flow table not full=: length(Expire(~now~, ~Flow table~)) < ~CAPACITY~
+  - =ext flow F exists=: (map ~External Flow ID~ over ~Flow table~) contains ~F~
+  - =int flow F exists=: (map ~Internal Flow ID~ over ~Flow table~) contains ~F~
+  - =the flow table not full=: length(~Flow table~) < ~CAPACITY~
   - =internal packet P comes=: `dpdk_receive` returns packet ~P~ attributed to the internal interface
   - =external packet P comes=: `dpdk_receive` returns packet ~P~ attributed to the external interface
 ** results
   - /packet P is forwarded/: `dpdk_transmit` is called with packet P with the same payload and header rewritten correspondingly to the flow table entry as specified in RFC3022 and the interface changed to the opposite one
-  - /new flow allocated for packet P/: ~Flow table~' = ~Flow table~ ++ ~New flow~, where ~New flow~ features a ~External flow ID~ such that not(=ext flow exists=), and fields corresponding to packet P. ~New flow~ timestamp = ~now~
+  - /new flow allocated for packet P/: ~Flow table~' = Expire(~Flow table~, ~now~) ++ ~New flow~, where ~New flow~ features an ~External flow ID~ such that not(=ext flow exists=), and fields corresponding to packet P. ~New flow~ timestamp = ~now~
   - /packet is dropped/: no call for `dpdk_transmit` in this round
-  - /flow F expiration timer reset/: ~Flow table~' = replace(~F~ with ~Rejuvenated flow~ in ~Flow table~), where ~Rejuvenated flow~ has the same flow entry with ~timestamp~ = ~now~
-  - /only flow F may be altered/: ~Flow table~ is modified in at most some of the three ways: flow ~F~ is added, flow ~F~ is removed, flow ~F~ is replaced with a flow of the same ~External flow ID~
+  - /flow F expiration timer is reset/: ~Flow table~' = replace(~F~ with ~Rejuvenated flow~ in Expire(~Flow table~, ~now~)), where ~Rejuvenated flow~ has the same flow entry with ~timestamp~ = ~now~
+  - /only flow F may be altered/: ~Flow table~' = X(Expire(~Flow table~, ~now~)), where X is either "add flow ~F~", "replace ~F~ with a flow of the same ~External flow ID~" or "noop"
 
 * rules
-1. =Internal packet P comes=, =int flow exists= -> /packet ~P~ is forwarded/, /flow ~F(P)~ expiration timer reset/
+1. =Internal packet P comes=, =int flow exists= -> /packet ~P~ is forwarded/, /flow ~F(P)~ expiration timer is reset/
 2. =External packet P comes=, =ext flow exists= -> /packet ~P~ is forwarded/, /flow ~F(P)~ expiration timer is reset/
-3. =Internal packet P comes=, not(=int flow exists=), =flow table is not full= -> /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
+3. =Internal packet P comes=, not(=int flow exists=), =flow table is not full= -> /new flow allocated for packet ~P~/ OR /flow ~F(P)~ expiration timer is reset/, /packet ~P~ is forwarded/
 4. =External packet P comes=, not(=ext flow exists=) -> /packet is dropped/
 5. =Internal packet P comes= -> /only flow ~F(P)~ may be altered/
 6. =External packet P comes= -> /only flow ~F(P)~ may be altered/
@@ -58,8 +62,10 @@ Allocator = list of <allocated index, timestamp>
 
 # Abstraction function:
 
-Flow table <- forall (allocated index, timestamp) in Allocator
-                find (ext-flow-id, int-flow-id, flow-entry) in Double map
-                 collect (Flow entry(ext-flow-id + int-flow-id), timestamp)
+Flow table (time) <-
+   forall (allocated index, timestamp) in Allocator
+     such that (time < timestamp + Tmax)
+     find (ext-flow-id, int-flow-id, flow-entry) in Double map
+     collect (Flow entry(ext-flow-id + int-flow-id), timestamp)
 
 #+END_SRC
