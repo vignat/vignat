@@ -1,0 +1,34 @@
+* parameters
+- ~CAPACITY~ - the maximum number of simultaniously active flows in the table
+- ~Tmin~ - the minimum expiration time. If the last packet in the flow was less
+  than ~Tmin~ ago, the flow must be present in the flow table
+- ~Tmax~ - the maximum expiration time. If the last packet in the flow was more
+  than ~Tmax~ ago, the flow must be expired.
+
+* definitions
+** preconditions
+  - =a flow exists=: the table contains the flow, and it is not expired (last
+    packet was < ~Tmin~ ago)
+  - =a flow does not exist=: the table does not contain the flow, or it is
+    expired (last packet was > ~Tmax~ ago)
+  - =the flow table not full=: the number of allocated and unexpired flows (in the
+    port-allocator) is less then ~CAPACITY~
+  - =internal packet comes=: `rte_eth_rx_burst` returns packet attributed to the
+    internal interface
+  - =external packet comes=: `rte_eth_rx_burst` returns packet attributed to the
+    external interface
+** results
+  - /packet is forwarded/: on the opposite NIC appears a packet with the
+  same payload and header rewritten correspondingly to the flow table entry as
+  specified in RFC3022
+  - /new flow allocated/: the new flow table entry
+  corresponding to the procreant packet is added.
+  - /packet is dropped/: nothing
+
+* rules
+1. =Internal packet comes=, =flow does not exist=, =flow table is not full= -> new flow allocated with unique 5-tuple, packet is forwarded
+2. =Internal packet comes=, =a flow exists= -> packet is forwarded, flow expiration timer reset
+3. =Internal packet comes= -> only the relevant flow may be altered
+3. =External packet comes= -> only the relevant flow may be altered
+4. =External packet comes=, =a flow does not exist= -> packet is dropped
+5. =External packet comes=, =a flow exists= -> packet is forwarded, flow expiration timer is reset
