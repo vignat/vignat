@@ -6,7 +6,7 @@ if [ -z $CONFIG_PATH ]; then
     CONFIG_PATH=.
 fi
 
-CONFIG_PATH=/home/necto/vnds/nat/testbed/hard
+CONFIG_PATH=$HOME/vnds/nat/testbed/hard
 
 . $CONFIG_PATH/config.sh
 

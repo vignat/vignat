@@ -43,9 +43,9 @@ SERVER_IP=192.168.200.10
 SERVER_MAC=00:1e:67:92:2a:2b
 SERVER_DEVICE=em4
 
-export RTE_SDK=/home/necto/dpdk
+export RTE_SDK=$HOME/dpdk
 export RTE_TARGET=x86_64-native-linuxapp-gcc
 
-NAT_SRC_PATH=/home/necto/vnds/nat
-OPT_NAT_SRC_PATH=/home/necto/vnds-opt/nat
-STUB_SRC_PATH=/home/necto/vnb-nat
+NAT_SRC_PATH=$HOME/vnds/nat
+OPT_NAT_SRC_PATH=$HOME/vnds-opt/nat
+STUB_SRC_PATH=$HOME/vnb-nat

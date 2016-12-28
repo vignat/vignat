@@ -9,7 +9,7 @@ sudo pkill -9 nat
 bash provision-lb.sh
 bash dpdk-setup-middlebox-lb.sh
 
-TEST_FILE="/home/necto/scripts/pktgen-scripts/regular-with-bin-mf.lua"
+TEST_FILE="$HOME/scripts/pktgen-scripts/regular-with-bin-mf.lua"
 
 if false
 then

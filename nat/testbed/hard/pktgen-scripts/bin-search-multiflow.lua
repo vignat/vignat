@@ -5,7 +5,7 @@ package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 
 require "Pktgen";
 
-dofile "/home/necto/pktgenparams.lua" -- defines numFlows and resultFile
+dofile "$HOME/pktgenparams.lua" -- defines numFlows and resultFile
 
 print(string.format("numFlows is %d\n",numFlows));
 

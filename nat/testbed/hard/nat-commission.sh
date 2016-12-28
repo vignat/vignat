@@ -12,6 +12,6 @@ sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp
 make config T=x86_64-native-linuxapp-gcc
 make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
-export RTE_SDK=/home/necto/dpdk
+export RTE_SDK=$HOME/dpdk
 export RTE_TARGET=x86_64-native-linuxapp-gcc
 
