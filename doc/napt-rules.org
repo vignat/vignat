@@ -22,13 +22,17 @@
   same payload and header rewritten correspondingly to the flow table entry as
   specified in RFC3022
   - /new flow allocated/: the new flow table entry
-  corresponding to the procreant packet is added.
+  corresponding to the procreant packet and unique across all the flows in the
+  table is added.
   - /packet is dropped/: nothing
+  - /flow expiration timer reset/: `dchain_rejuvenate_index` is called on the
+    index corresponding to the flow
 
 * rules
-1. =Internal packet comes=, =flow does not exist=, =flow table is not full= -> new flow allocated with unique 5-tuple, packet is forwarded
-2. =Internal packet comes=, =a flow exists= -> packet is forwarded, flow expiration timer reset
+1. =Internal packet comes=, =flow does not exist=, =flow table is not full= ->
+   /new flow allocated/, /packet is forwarded/
+2. =Internal packet comes=, =a flow exists= -> /packet is forwarded/, /flow expiration timer reset/
 3. =Internal packet comes= -> only the relevant flow may be altered
 3. =External packet comes= -> only the relevant flow may be altered
-4. =External packet comes=, =a flow does not exist= -> packet is dropped
-5. =External packet comes=, =a flow exists= -> packet is forwarded, flow expiration timer is reset
+4. =External packet comes=, =a flow does not exist= -> /packet is dropped/
+5. =External packet comes=, =a flow exists= -> /packet is forwarded/, /flow expiration timer is reset/
