@@ -60,6 +60,6 @@ Allocator = list of <allocated index, timestamp>
 
 Flow table <- forall (allocated index, timestamp) in Allocator
                 find (ext-flow-id, int-flow-id, flow-entry) in Double map
-                 collect (Flow entry(ext-flow-id + int-flow-id), timestamp
+                 collect (Flow entry(ext-flow-id + int-flow-id), timestamp)
 
 #+END_SRC
