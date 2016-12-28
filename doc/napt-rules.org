@@ -48,3 +48,18 @@ Expire(time, table) := filter table, keep only entries with `time < timestamp + 
 4. =External packet P comes=, not(=ext flow exists=) -> /packet is dropped/
 5. =Internal packet P comes= -> /only flow ~F(P)~ may be altered/
 6. =External packet P comes= -> /only flow ~F(P)~ may be altered/
+
+* abstraction function
+Our NAPT keeps its dynamic state in two datastructures:
+#+BEGIN_SRC 
+
+Double map = list of <ext-flow-id, int-flow-id, flow-entry, index>
+Allocator = list of <allocated index, timestamp>
+
+# Abstraction function:
+
+Flow table <- forall (allocated index, timestamp) in Allocator
+                find (ext-flow-id, int-flow-id, flow-entry) in Double map
+                 collect (Flow entry(ext-flow-id + int-flow-id), timestamp
+
+#+END_SRC
