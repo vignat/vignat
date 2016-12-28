@@ -1,38 +1,50 @@
 * parameters
 - ~CAPACITY~ - the maximum number of simultaniously active flows in the table
-- ~Tmin~ - the minimum expiration time. If the last packet in the flow was less
-  than ~Tmin~ ago, the flow must be present in the flow table
-- ~Tmax~ - the maximum expiration time. If the last packet in the flow was more
-  than ~Tmax~ ago, the flow must be expired.
+- ~Tmin~ - the minimum expiration time. If the last packet in the flow was less than ~Tmin~ ago, the flow must be present in the flow table
+- ~Tmax~ - the maximum expiration time. If the last packet in the flow was more than ~Tmax~ ago, the flow must be expired.
+
+* NAPT abstract state
+#+BEGIN_SRC 
+Flow entry := 7-tuple:<in src_addr,  -- IP address of the external host
+                       in src_port,  -- TCP/UDP port of the internal host
+                       ex src_addr,  -- source IP address of the packets as seen externally
+                       ex src_port,  -- source TCP/UDP port of the packets as seen externally
+                       dst_ip,       -- IP address of the external host
+                       dst_port,     -- TCP/UDP port of the external host
+                       protocol>     -- protocol: TCP or UDP (ICMP is under development)
+
+External flow ID := 5-tuple<ex src_addr,
+                            ex src_port,
+                            dst_ip,
+                            dst_port,
+                            protocol>
+Internal flow ID := 5-tuple<in src_addr,
+                            in src_port,
+                            dst_ip,
+                            dst_port,
+                            protocol>
+Flow table := set of<Flow entry, timestamp>
+Expire(time, table) := filter table, keep only entries with `time < timestamp + Tmax`
+#+END_SRC
 
 * definitions
 ** preconditions
-  - =a flow exists=: the table contains the flow, and it is not expired (last
-    packet was < ~Tmin~ ago)
-  - =a flow does not exist=: the table does not contain the flow, or it is
-    expired (last packet was > ~Tmax~ ago)
-  - =the flow table not full=: the number of allocated and unexpired flows (in the
-    port-allocator) is less then ~CAPACITY~
-  - =internal packet comes=: `rte_eth_rx_burst` returns packet attributed to the
-    internal interface
-  - =external packet comes=: `rte_eth_rx_burst` returns packet attributed to the
-    external interface
+  - =ext flow F exists=: (map ~External Flow ID~ over Expire(~now~, ~Flow table~)) contains ~F~
+  - =int flow F exists=: (map ~Internal Flow ID~ over Expire(~now~, ~Flow table~)) contains ~F~
+  - =the flow table not full=: length(Expire(~now~, ~Flow table~)) < ~CAPACITY~
+  - =internal packet P comes=: `dpdk_receive` returns packet ~P~ attributed to the internal interface
+  - =external packet P comes=: `dpdk_receive` returns packet ~P~ attributed to the external interface
 ** results
-  - /packet is forwarded/: on the opposite NIC appears a packet with the
-  same payload and header rewritten correspondingly to the flow table entry as
-  specified in RFC3022
-  - /new flow allocated/: the new flow table entry
-  corresponding to the procreant packet and unique across all the flows in the
-  table is added.
-  - /packet is dropped/: nothing
-  - /flow expiration timer reset/: `dchain_rejuvenate_index` is called on the
-    index corresponding to the flow
+  - /packet P is forwarded/: `dpdk_transmit` is called with packet P with the same payload and header rewritten correspondingly to the flow table entry as specified in RFC3022 and the interface changed to the opposite one
+  - /new flow allocated for packet P/: ~Flow table~' = ~Flow table~ ++ ~New flow~, where ~New flow~ features a ~External flow ID~ such that not(=ext flow exists=), and fields corresponding to packet P. ~New flow~ timestamp = ~now~
+  - /packet is dropped/: no call for `dpdk_transmit` in this round
+  - /flow F expiration timer reset/: ~Flow table~' = replace(~F~ with ~Rejuvenated flow~ in ~Flow table~), where ~Rejuvenated flow~ has the same flow entry with ~timestamp~ = ~now~
+  - /only flow F may be altered/: ~Flow table~ is modified in at most some of the three ways: flow ~F~ is added, flow ~F~ is removed, flow ~F~ is replaced with a flow of the same ~External flow ID~
 
 * rules
-1. =Internal packet comes=, =flow does not exist=, =flow table is not full= ->
-   /new flow allocated/, /packet is forwarded/
-2. =Internal packet comes=, =a flow exists= -> /packet is forwarded/, /flow expiration timer reset/
-3. =Internal packet comes= -> only the relevant flow may be altered
-3. =External packet comes= -> only the relevant flow may be altered
-4. =External packet comes=, =a flow does not exist= -> /packet is dropped/
-5. =External packet comes=, =a flow exists= -> /packet is forwarded/, /flow expiration timer is reset/
+1. =Internal packet P comes=, =int flow exists= -> /packet ~P~ is forwarded/, /flow ~F(P)~ expiration timer reset/
+2. =External packet P comes=, =ext flow exists= -> /packet ~P~ is forwarded/, /flow ~F(P)~ expiration timer is reset/
+3. =Internal packet P comes=, not(=int flow exists=), =flow table is not full= -> /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
+4. =External packet P comes=, not(=ext flow exists=) -> /packet is dropped/
+5. =Internal packet P comes= -> /only flow ~F(P)~ may be altered/
+6. =External packet P comes= -> /only flow ~F(P)~ may be altered/
