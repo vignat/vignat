@@ -48,13 +48,18 @@ Expire(table, time) -> filter table: for every (flow entry, timestamp):
 
 * rules
 #+BEGIN_SRC 
+
 # Triggers:
- =Packet P comes=  -> P is internal -> F(P) exists       -> (1)
-                                     -> not(F(P) exists) -> flow table is not full -> (2)
-                                                         -> otherwise              -> (3)
-                   -> P is external -> F(P) exists       -> (4)
-                                     -> not(F(P) exists) -> (5)
- No packet comes   -> (6)
+
+ Packet P comes  -> P is internal -> F(P) exists       -> (1)
+                                  -> not(F(P) exists) -> flow table is not full -> (2)
+                                                      -> otherwise              -> (3)
+                 -> P is external -> F(P) exists       -> (4)
+                                  -> not(F(P) exists) -> (5)
+ No packet comes -> (6)
+
+# Results:
+
 1. /flow ~F(P)~ expiration timer is reset/, /some flows expired/, /packet ~P~ is forwarded/
 2. /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
 3. /some flows expired/, may-be /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
