@@ -1,9 +1,11 @@
 * parameters
+This are external configuration parameters of the NAPT box
 - ~CAPACITY~ - the maximum number of simultaniously active flows in the table
 - ~Tmin~ - the minimum expiration time. If the last packet in the flow was less than ~Tmin~ ago, the flow must be present in the flow table
 - ~Tmax~ - the maximum expiration time. If the last packet in the flow was more than ~Tmax~ ago, the flow must be expired.
 
 * NAPT abstract state
+This defines the abstract representation of the NAPT dynamic state, that determines its behavior. Later we will connect real implementation state that is just a structured physical memory array with this abstract state using abstraction function.
 #+BEGIN_SRC 
 Flow entry := 7-tuple:<in src_addr,  -- IP address of the external host
                        in src_port,  -- TCP/UDP port of the internal host
@@ -13,19 +15,21 @@ Flow entry := 7-tuple:<in src_addr,  -- IP address of the external host
                        dst_port,     -- TCP/UDP port of the external host
                        protocol>     -- protocol: TCP or UDP (ICMP is under development)
 
-External flow ID := 5-tuple<ex src_addr,
-                            ex src_port,
-                            dst_ip,
-                            dst_port,
-                            protocol>
-Internal flow ID := 5-tuple<in src_addr,
-                            in src_port,
-                            dst_ip,
-                            dst_port,
-                            protocol>
-Flow table := set of<Flow entry, Timestamp>
+Ext flow-id := 5-tuple<ex src_addr,
+                       ex src_port,
+                       dst_ip,
+                       dst_port,
+                       protocol>
+Int flow-id := 5-tuple<in src_addr,
+                       in src_port,
+                       dst_ip,
+                       dst_port,
+                       protocol>
+
+Flow table := set of<Flow entry, Timestamp> unique by Ext flow-id and Int flow-id
 
 Expiration(table1, table2, time) ->
+   table2 is a subset of table1 and
    for all (flow, timestamp) in table1
      case time < timestamp + Tmin -> table2 contains (flow, timestamp)
      case timestamp + Tmax < time -> table2 does not contain (flow, *)
@@ -34,22 +38,32 @@ Expiration(table1, table2, time) ->
 #+END_SRC
 
 * definitions
+This section defines necessary terminology for specifying essential NAPT behavior cases.
 ** preconditions
-  - =ext flow F exists=: (map ~External Flow ID~ over ~Flow table~) contains ~F~
-  - =int flow F exists=: (map ~Internal Flow ID~ over ~Flow table~) contains ~F~
+These are the things that determine NAPT's behavior on every iteration of the event-loop.
+  - =ext flow F exists=: (map ~Ext flow-Id~ over ~Flow table~) contains ~F~
+  - =int flow F exists=: (map ~Int flow-Id~ over ~Flow table~) contains ~F~
   - =the flow table not full=: length(~Flow table~) < ~CAPACITY~
-  - =internal packet P comes=: `dpdk_receive` returns packet ~P~ attributed to the internal interface
-  - =external packet P comes=: `dpdk_receive` returns packet ~P~ attributed to the external interface
+  - =no packet comes=: `dpdk_receive` does not return any packet.
+  - =packet P comes=: `dpdk_receive` returns packet ~P~
+  - =P is internal=: ~P~ is attributed to the internal interface
+  - =P is external=: ~P~ is attributed to the external interface
+
 ** results
+These things may happen as a result of an event-loop iteration.
   - /packet P is forwarded/: `dpdk_transmit` is called with packet P with the same payload and header rewritten correspondingly to the flow table entry as specified in RFC3022 and the interface changed to the opposite one
-  - /new flow allocated for packet P/: ~Flow table~' = ~Flow table~ ++ ~New flow~, where ~New flow~ features an ~External flow ID~ such that not(=ext flow exists=), and fields corresponding to packet P. ~New flow~ timestamp = ~now~
+  - /new flow allocated for packet P/: ~Flow table~' = ~Flow table~ ++ ~New flow~, where ~New flow~ features an ~Ext flow-id~ such that not(=ext flow exists=), and fields corresponding to packet P. ~New flow~ timestamp = ~now~
   - /packet is dropped/: no call for `dpdk_transmit` in this round
   - /flow F expiration timer is reset/: ~Flow table~' = replace(~F~ with ~Rejuvenated flow~ in ~Flow table~), where ~Rejuvenated flow~ has the same flow entry with ~timestamp~ = ~now~
-  - /only flow F may be altered/: ~Flow table~' = X(~Flow table~), where X is either "add flow ~F~", "replace ~F~ with a flow of the same ~External flow ID~" or "noop"
+  - /only flow F may be altered/: ~Flow table~' = X(~Flow table~), where X is either "add flow ~F~", "replace ~F~ with a flow of the same ~Ext flow-id~" or "noop"
   - /some flows expired/: Expiration(~Flow table~, ~Flow table~', ~now~)
 
 * rules
-** Triggers
+The rules are split into two parts: "trigger" -> "result".
+"Trigger" is a precondition, an event that happened without NAPT participation (e.g. incoming packets) and the NAPT abstract state (i.e. flow table) that is a result of previous events.
+"Result" is a postcondition, a NAPT's response to the trigger. It describes the abstract state transformation (i.e. new flow in the table) and the reaction visible from the ouside (i.e. outgoing packets)
+** triggers
+This section divides the complete event space into classes that require different response from the NAPT box.
 #+BEGIN_SRC 
 Packet P comes  -> P is internal -> F(P) exists      -> (1)
                                  -> not(F(P) exists) -> flow table is not full -> (2)
@@ -59,23 +73,25 @@ Packet P comes  -> P is internal -> F(P) exists      -> (1)
 No packet comes -> (6)
 #+END_SRC
 
-** Results
+** results
+
 1. /flow ~F(P)~ expiration timer is reset/, /some flows expired/, /packet ~P~ is forwarded/
 2. /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
-3. /some flows expired/, may-be /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
+3. /some flows expired/, may-be(/new flow allocated for packet ~P~/, /packet ~P~ is forwarded/)
 4. /flow ~F(P)~ expiration timer is reset/, /some flows expired/, /packet ~P~ is forwarded/
 5. /some flows expired/, /packet is dropped/
 6. /some flows expired/
 
-* abstraction function
-Our NAPT keeps its dynamic state in two datastructures:
+* implementation specific state
+Our NAPT keeps its dynamic state in two datastructures: Double map and Allocator. VeriFast proof lifts their physical representation into the following logical form:
 #+BEGIN_SRC 
-
 Double map = list of <ext-flow-id, int-flow-id, flow-entry, index>
 Allocator = list of <allocated index, timestamp>
+#+END_SRC
 
-# Abstraction function:
-
+* abstraction function
+This section is implementation specific, and defines an abstract function that connects the defined above abstract state with the implementation specific state.
+#+BEGIN_SRC 
 Flow table (time) <-
    forall (allocated index, timestamp) in Allocator
      such that (time < timestamp + Tmax)
