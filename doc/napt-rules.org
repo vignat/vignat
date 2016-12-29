@@ -48,12 +48,12 @@ We divide all the postconditions into three domains:
 #+BEGIN_SRC
 Expire(flow_table, time) -> filter flow_table, keep only (flow, timestamp) where time < timestamp + Texp
 #+END_SRC
-- /some flows expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
-- /flow F expiration timer is reset/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
+- /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
+- /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
 *** flow management
-- /new flow allocated for packet P/: ~flow_table~' = ~flow_table~ ++ ~new_flow~, where not(=~Ext_flow_id~ (~new_flow~) flow exists=), if corresponds to packet P. ~timestamp~ (~new_flow~) = ~now~
+- /flow allocated for P/: ~flow_table~' = ~flow_table~ ++ ~new_flow~, where not(=~Ext_flow_id~ (~new_flow~) flow exists=), if corresponds to packet P. ~timestamp~ (~new_flow~) = ~now~
 *** packet forwarding
-- /packet P is forwarded/: `dpdk_transmit` is called with packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
+- /P is forwarded/: `dpdk_transmit` is called with packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
 - /packet is dropped/: no call for `dpdk_transmit` in this round
 
 * rules
@@ -68,17 +68,16 @@ Packet P comes  -> P is internal -> F(P) exists      -> (1)
                                                      -> otherwise              -> (3)
                 -> P is external -> F(P) exists      -> (1)
                                  -> not(F(P) exists) -> (3)
-No packet comes -> (6)
 #+END_SRC
 
 ** postconditions
 The postconditions chain the 3 groups of transformations described above. The transformations of different groups are separated by '|'. They allways follow as time-related|flow-management|packet-forwarding. Some of the groups may be abscent.
 
 #+BEGIN_SRC 
-1. /some flows expired/,
-   /flow ~F(P)~ expiration timer is reset/ |                                     | /packet ~P~ is forwarded/
-2. /some flows expired/                    | /new flow allocated for packet ~P~/ | /packet ~P~ is forwarded/
-3. /some flows expired/                    |                                     | /packet is dropped/
+1. /some flows are expired/,
+   /flow ~F(P)~ is refreshed/ |                          | /~P~ is forwarded/
+2. /some flows are expired/   | /flow allocated for ~P~/ | /~P~ is forwarded/
+3. /some flows are expired/   |                          | /packet is dropped/
 #+END_SRC
 
 * implementation specific state
