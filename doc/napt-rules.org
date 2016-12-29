@@ -23,7 +23,7 @@ Int_flow_id := tuple<int_src_ep,
                      protocol>
 
 flow_table := set of<Flow entry, Timestamp>
-              unique in Ext_flow_id and Int_flow_id projections
+              unique in each Ext_flow_id and Int_flow_id projections
 #+END_SRC
 
 * definitions
@@ -33,7 +33,7 @@ These are the things that determine NAPT's behavior on every event (on every pac
   - =Ext_flow_id F exists=: (projection ~Ext_flow_Id~ over ~flow_table~) contains ~F~
   - =Int_flow_id F exists=: (projection ~Int_flow_Id~ over ~flow_table~) contains ~F~
   - =the flow table not full=: length(~flow_table~) < ~CAPACITY~
-  - =packet P comes=: `dpdk_receive` returns packet ~P~
+  - =packet P comes=: A new packet ~P~ comes through one of the interfaces to the NAPT for processing
   - =P is internal=: packet ~P~ is attributed to the internal interface
   - =P is external=: packet ~P~ is attributed to the external interface
 
@@ -51,17 +51,17 @@ Expire(flow_table, time) -> filter flow_table, keep only (flow, timestamp) where
 - /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
 - /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
 *** flow management
-- /flow allocated for P/: ~flow_table~' = ~flow_table~ ++ ~new_flow~, where not(=~Ext_flow_id~ (~new_flow~) flow exists=), if corresponds to packet P. ~timestamp~ (~new_flow~) = ~now~
+- /flow allocated for P/: ~flow_table~' = ~flow_table~ ++ ~new_flow~, where not(=~Ext_flow_id~ (~new_flow~) flow exists=), and it corresponds to packet P. ~timestamp~ (~new_flow~) = ~now~
 *** packet forwarding
-- /P is forwarded/: `dpdk_transmit` is called with packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
-- /packet is dropped/: no call for `dpdk_transmit` in this round
+- /P is forwarded/: NAPT injects to the network packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
+- /packet is dropped/: do nothing, added for clarity
 
 * rules
 The rules are split into two parts: "precondition" -> "postcondition".
 "Precondition" is an event and all the conditions that determine the next NAPT generalized state change.
 "Postcondition" is the NAPT's response to that even. It describes the abstract state transformation (i.e. new flow in the table) and the reaction visible from the outside (i.e. outgoing packets)
 ** preconditions
-This section describes the all the conditions that may trigger a NAPT action (i.e. generalized state change).
+This section describes the all the conditions that may trigger a NAPT action (i.e. generalized state change). No other event may change the abstract state or cause the NAPT to performa an action (i.e. emit a packet). It also can not happen spontaneously.
 #+BEGIN_SRC 
 Packet P comes  -> P is internal -> F(P) exists      -> (1)
                                  -> not(F(P) exists) -> flow table is not full -> (2)
@@ -83,17 +83,19 @@ The postconditions chain the 3 groups of transformations described above. The tr
 * implementation specific state
 Our NAPT keeps its dynamic state in two datastructures: Double map and Allocator. VeriFast proof lifts their physical representation into the following logical form:
 #+BEGIN_SRC 
-Double map = list of <ext-flow-id, int-flow-id, flow-entry, index>
-Allocator = list of <allocated index, timestamp>
+allocator = list of <allocated_index, timestamp>
+            allocated_index'es are unique
+double_map = list of <Ext_flow_id, Int_flow_id, Flow_entry, index>
+             each flow_entry <=> (ext_flow_id + int_flow_id)
+             each index is present in the allocator
 #+END_SRC
 
 * abstraction function
-This section is implementation specific, and defines an abstract function that transforms the implementation state into the defined above.
+This section is implementation specific. It defines an abstraction function that transforms the implementation state into the abstract state.
 #+BEGIN_SRC 
-Flow table (time) <-
-   forall (allocated index, timestamp) in Allocator
-     such that (time < timestamp + Tmax)
-     find (ext-flow-id, int-flow-id, flow-entry) in Double map
-     collect (Flow entry(ext-flow-id + int-flow-id), timestamp)
-
+Abstraction(double_map, allocator, time) ->
+  forall (allocated_index, timestamp) in Allocator
+    such thet (time < timestamp + Texp) 
+    find (ext_flow_id, int_flow_id, flow_entry, allocated_index) in double_map
+    collect (flow_entry, timestamp)
 #+END_SRC
