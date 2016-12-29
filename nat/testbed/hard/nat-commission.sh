@@ -1,3 +1,6 @@
+#!/bin/bash
+pushd $HOME
+
 sudo apt-get update
 KERNEL_RELEASE=$(uname -r)
 sudo apt-get install -y tcpdump git wget build-essential libpcap-dev linux-headers-3.13.0-93 linux-headers-$KERNEL_RELEASE libglib2.0-dev daemon iperf3 netperf tmux
@@ -14,3 +17,5 @@ make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
 export RTE_SDK=$HOME/dpdk
 export RTE_TARGET=x86_64-native-linuxapp-gcc
+
+popd
