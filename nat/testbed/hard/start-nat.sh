@@ -1,4 +1,5 @@
 #!/bin/bash
+# Start the Vigor NAT in the background (as a daemon).
 
 . ./config.sh
 

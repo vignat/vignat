@@ -1,5 +1,5 @@
--- RFC2544 Throughput Test
--- as defined by https://www.ietf.org/rfc/rfc2544.txt
+-- Run search to find the point at which the middle box start
+-- loosing 1% of the packets
 
 package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 
@@ -16,6 +16,7 @@ local duration		= 40000;
 --local confirmDuration	= 80000;
 local pauseTime		= 2000;
 
+-- the part to start from
 local strtprt_int = 1000;
 
 

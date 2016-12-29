@@ -1,3 +1,5 @@
+# Setup middlebox for request-response(ping-pong) scenario in DPDK compatible mode
+# (unbind the necessary ifaces from the kernel)
 
 . ./config.sh
 

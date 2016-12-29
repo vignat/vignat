@@ -1,3 +1,5 @@
+# Setup tester machine to be ready to run DPDK test application (pktgen, likely)
+# for request-responce(ping-pong) scenario.
 
 . ~/scripts/config.sh
 

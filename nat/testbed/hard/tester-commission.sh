@@ -1,3 +1,5 @@
+# Prepare the tester to run the performance expreiments.
+# Install the necessary packages, in particular NetPerf and DPDK PktGen.
 sudo apt-get update
 KERNEL_RELEASE=$(uname -r)
 sudo apt-get install -y tcpdump hping3 python-scapy git wget build-essential libpcap-dev linux-headers-$KERNEL_RELEASE libglib2.0-dev daemon iperf3 netperf liblua5.2-dev make binutils gcc

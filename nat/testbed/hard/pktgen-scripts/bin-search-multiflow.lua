@@ -1,10 +1,13 @@
--- RFC2544 Throughput Test
+-- Throughput Test (somewhat close to RFC2544)
 -- as defined by https://www.ietf.org/rfc/rfc2544.txt
+--  I guess the script is outdated and does not work anymore.
+--  kept just in case
 
 package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 
 require "Pktgen";
 
+-- this file does not exists.
 dofile "$HOME/pktgenparams.lua" -- defines numFlows and resultFile
 
 print(string.format("numFlows is %d\n",numFlows));

@@ -1,3 +1,8 @@
+# A master script that runs one of the experiments for different
+# middleboxes and collects the results.
+# Measure latency for multi-flow request-responce scenario depending on the
+# number of concurrent flows.
+
 . ./config.sh
 
 mkdir -p latency-results

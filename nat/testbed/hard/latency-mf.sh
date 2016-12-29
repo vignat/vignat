@@ -1,3 +1,8 @@
+# Latency measurement for multiflow.
+# The scripts expects PktGen server to be running and listening on port 22022
+# It programs the PktGen server with a number of concurrent flows to be run, runs
+# an expriment and collects the results in the
+# file provided as the first argument $1
 
 . ~/scripts/config.sh
 

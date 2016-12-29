@@ -1,3 +1,7 @@
+# Set up NetFilter NAT (i.e. iptables MASQUERADE) for the loopback scenario.
+# The second part of the script tries to remove the artificially
+# software limits, to unleash the real power of NetFilter.
+
 . ./config.sh
 
 pkill -9 nat

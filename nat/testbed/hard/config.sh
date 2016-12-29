@@ -1,3 +1,6 @@
+# The main configuration file of the network for performance testing.
+# It binds the real hosts, addresses and ports to the abstract names used
+# throughout the scripts.
 
 # the network:
 # tester{icnalsp3s1}[em3] 192.168.3.5 -- 192.168.3.2 [em3]mdbox{icnalsp3s2}

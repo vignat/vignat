@@ -1,3 +1,7 @@
+# Master script that runs one of the experiments for different
+# middleboxes and collects the results.
+# Find the point where the middlebox starts dropping 1% of the packets.
+
 . ./config.sh
 
 mkdir -p results-1p-throughput

@@ -1,4 +1,11 @@
 #!/bin/bash
+# Start our Vigor DPDK-based NAT\beta (optimized)
+# configured for the request-responce (ping-pong) scenario.
+# The first argument ($1) specifies the directory that contains the expreiment
+# config file.
+# The second argument ($2) specifies the expiration time for the NAT
+# The third argument ($3) - the flow table capacity.
+
 
 CONFIG_PATH=$1
 

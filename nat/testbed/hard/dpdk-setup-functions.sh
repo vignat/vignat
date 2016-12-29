@@ -1,3 +1,5 @@
+# Functions that tweak the kernal to make it possible to run DPDK apps:
+# enable NUMA, reserver hugepages, bind/unbind network interfaces
 
 ######---------------------------------######
 #    Taken from the dpdk/tools/setup.sh

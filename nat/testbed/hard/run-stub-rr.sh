@@ -1,4 +1,7 @@
 #!/bin/bash
+# Run the no-op DPDK plain forwarding application as the middlebox for the
+# request-responce scenario.
+# The first argument ($1) provides the path to the config file.
 
 CONFIG_PATH=$1
 

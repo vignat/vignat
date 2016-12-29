@@ -1,3 +1,5 @@
+# Provision the network for the loopback scenario.
+
 . ./config.sh
 
 echo "syncing scripts"

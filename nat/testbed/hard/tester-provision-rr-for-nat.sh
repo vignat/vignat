@@ -1,3 +1,5 @@
+# Configure the tester for a request-response (ping-pong) scenario
+# with a NAT running on the middlebox.
 . ~/scripts/config.sh
 
 . ~/scripts/dpdk-setup-tester-rr.sh

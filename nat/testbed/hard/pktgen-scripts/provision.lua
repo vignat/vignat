@@ -1,5 +1,5 @@
--- RFC2544 Throughput Test
--- as defined by https://www.ietf.org/rfc/rfc2544.txt
+-- Prepare PktGen for performance experiments, that will be requested via
+-- the port 22022
 
 package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 

@@ -1,4 +1,7 @@
 #!/bin/bash
+# Run the no-op DPDK plain forwarding application as the middlebox for the
+# loopback scenario.
+# The first argument ($1) provides the path to the config file.
 
 CONFIG_PATH=$1
 
@@ -6,6 +9,7 @@ if [ -z $CONFIG_PATH ]; then
     CONFIG_PATH=.
 fi
 
+# WTF?
 CONFIG_PATH=$HOME/vnds/nat/testbed/hard
 
 . $CONFIG_PATH/config.sh

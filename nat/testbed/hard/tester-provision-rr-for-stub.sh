@@ -1,3 +1,5 @@
+# Configure the tester for the request-response (ping-pong) scenario
+# with middlebox running a no-op plain forwarding applicaiton.
 . ~/scripts/config.sh
 
 . ~/scripts/dpdk-setup-tester-rr.sh

@@ -1,3 +1,4 @@
+# Launch the PktGen with the script given as the first argument ($1)
 
 cd ~/pktgen
 

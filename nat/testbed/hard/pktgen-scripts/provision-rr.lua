@@ -1,5 +1,4 @@
--- RFC2544 Throughput Test
--- as defined by https://www.ietf.org/rfc/rfc2544.txt
+-- Prepare PktGen to run experiments in request-response fashion
 
 package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 

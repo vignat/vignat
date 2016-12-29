@@ -1,4 +1,6 @@
 #!/bin/bash
+# Commission the middlebox to prepare it to run various NATs,
+# especially DPDK-based ones.
 pushd $HOME
 
 sudo apt-get update

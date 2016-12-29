@@ -1,3 +1,5 @@
+# Setup tester machine to be ready to run DPDK test application (pktgen, likely)
+# for loopback scenario.
 
 . ~/scripts/config.sh
 

@@ -1,3 +1,5 @@
+# Configure the server for the request-responce (ping-pong) perf testing
+# topology involving a NAT.
 . ~/scripts/config.sh
 
 ifconfig $SERVER_DEVICE up
