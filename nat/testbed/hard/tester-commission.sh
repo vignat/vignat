@@ -4,7 +4,7 @@ sudo apt-get install -y tcpdump hping3 python-scapy git wget build-essential lib
 
 wget http://fast.dpdk.org/rel/dpdk-16.07.tar.xz -O dpdk.tar.xz
 tar xf dpdk.tar.xz
-mv dpdk-* dpdk
+mv -T dpdk-* dpdk
 rm dpdk.tar.xz
 
 cd dpdk
