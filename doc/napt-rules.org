@@ -25,10 +25,12 @@ Internal flow ID := 5-tuple<in src_addr,
                             protocol>
 Flow table := set of<Flow entry, Timestamp>
 
-Expire(table, time) -> filter table: for every (flow entry, timestamp):
-    time - Tmin < timestamp -> keep
-    timestamp < time - Tmax -> discard
-    otherwise -> keep or discard
+Expiration(table1, table2, time) ->
+   for all (flow, timestamp) in table1
+     case time < timestamp + Tmin -> table2 contains (flow, timestamp)
+     case timestamp + Tmax < time -> table2 does not contain (flow, *)
+     otherwise ->
+       table2 contains (flow, timestamp) or table2 does not ctontain (flow, *)
 #+END_SRC
 
 * definitions
@@ -44,7 +46,7 @@ Expire(table, time) -> filter table: for every (flow entry, timestamp):
   - /packet is dropped/: no call for `dpdk_transmit` in this round
   - /flow F expiration timer is reset/: ~Flow table~' = replace(~F~ with ~Rejuvenated flow~ in ~Flow table~), where ~Rejuvenated flow~ has the same flow entry with ~timestamp~ = ~now~
   - /only flow F may be altered/: ~Flow table~' = X(~Flow table~), where X is either "add flow ~F~", "replace ~F~ with a flow of the same ~External flow ID~" or "noop"
-  - /some flows expired/: ~Flow table~'=Expire(~Flow table~, ~now~)
+  - /some flows expired/: Expiration(~Flow table~, ~Flow table~', ~now~)
 
 * rules
 ** Triggers
@@ -58,15 +60,12 @@ No packet comes -> (6)
 #+END_SRC
 
 ** Results
-#+BEGIN_SRC 
 1. /flow ~F(P)~ expiration timer is reset/, /some flows expired/, /packet ~P~ is forwarded/
 2. /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
 3. /some flows expired/, may-be /new flow allocated for packet ~P~/, /packet ~P~ is forwarded/
 4. /flow ~F(P)~ expiration timer is reset/, /some flows expired/, /packet ~P~ is forwarded/
 5. /some flows expired/, /packet is dropped/
 6. /some flows expired/
-
-#+END_SRC
 
 * abstraction function
 Our NAPT keeps its dynamic state in two datastructures:
