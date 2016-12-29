@@ -5,7 +5,7 @@ sudo apt-get install -y tcpdump git wget build-essential libpcap-dev linux-heade
 wget http://fast.dpdk.org/rel/dpdk-16.07.tar.xz -O dpdk.tar.xz
 tar xf dpdk.tar.xz
 mv dpdk-* dpdk
-rm dpdk.tar.gz
+rm dpdk.tar.xz
 
 cd dpdk
 sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp
