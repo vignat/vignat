@@ -77,13 +77,13 @@ Expire(flow_table, time) -> maximum subset of flow_table, with time < timestamp 
 
 **** packet forwarding (transmit or drop packets)
 - /P is forwarded/: ~network.outcast_packet~ = ~P~
-- /P is read/: ~network.incast_packet~ = nil
+- /P is accepted/: ~network.incast_packet~ = nil
 
 ** rules
 #+BEGIN_SRC haskell
 -- All NAPT scenarios follow the same general script:
 Packet P arrives ->
-  P is read ->
+  P is accepted ->
   some flows are expired ->
   {flow-management} ->
   {forwarding}
