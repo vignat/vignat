@@ -53,44 +53,38 @@ These are the things that determine NAPT's behavior on every event (on every pac
 This section defines possible transformation of the generalized state (NAPT abstract state + packets in the network) that NAPT may perform.
 We divide the postconditions into three categories:
 
-**** time related (handle flow expiration)
+**** expiration
 #+BEGIN_SRC haskell
 Expire(flow_table, time) -> maximum subset of flow_table, with time < timestamp + T_EXP
 #+END_SRC
 - /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
-- /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
 **** flow management (add new flows to the table)
+- /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
 - /flow allocated for P/:
 #+BEGIN_SRC haskell
  flow_table' = flow_table ++ new_flow, where
     new_flow.int_flow_id = P.flow_id, and
     not(Ext_flow_id new_flow.ext_flow_id exists), and
     new_flow.timestamp = now
-
 #+END_SRC
 
 **** packet forwarding (transmit or drop packets)
 - /P is forwarded/: NAPT injects to the network packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
 - /packet is dropped/: do nothing, added for clarity
 
-** preconditions
-This section describes all the conditions that may trigger a NAPT reaction (i.e. generalized state change). The NAT will change abstract state and/or emit packets only if a precondition listed below holds.
-#+BEGIN_SRC haskell 
-Packet P arrives -> P is internal -> F(P) exists      -> (1)
-                                  -> not(F(P) exists) -> flow table is not full -> (2)
-                                                      -> otherwise              -> (3)
-                 -> P is external -> F(P) exists      -> (1)
-                                  -> not(F(P) exists) -> (3)
-#+END_SRC
+** rules
+#+BEGIN_SRC haskell
+-- All NAPT scenarios follow the same general script:
+Packet P arrives -> some flows are expired -> {flow-management} -> {packet-forwarding}
 
-** postconditions
-The postconditions chain the 3 groups of transformations described above. The transformations of different groups are separated by '|'. They are always in the same order: =time-related | flow-management | packet-forwarding=. Some of the groups may be absent.
+{flow-management}:
+P is internal -> F(P) exists      -> flow F(P) is refreshed
+                 not(F(P) exists) -> flow table is not full -> flow allocated for P
+P is external -> F(P) exists      -> flow F(P) is refreshed
 
-#+BEGIN_SRC haskell 
-1. /some flows are expired/,
-   /flow F(P) is refreshed/ |                        | /P is forwarded/
-2. /some flows are expired/ | /flow allocated for P/ | /P is forwarded/
-3. /some flows are expired/ |                        | /packet is dropped/
+{packet-forwarding}:
+P is internal -> F(P) exists -> /packet P is forwarded/
+P is external -> F(P) exists -> /packet P is forwarded/
 #+END_SRC
 
 * implementation specific state
