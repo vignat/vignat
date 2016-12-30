@@ -5573,20 +5573,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void lower_and_upper_limit_complement<kt>(list<pair<kt, nat> > l,
-                                                  int lim)
-  requires true;
-  ensures true == multiset_eq(append(filter((lower_limit)(lim), l),
-                                     filter((upper_limit)(lim), l)), l) &*&
-          intersection(get_just_tails(filter((lower_limit)(lim), l)),
-                       get_just_tails(filter((upper_limit)(lim), l))) == nil;
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
   lemma void distinct_and_disjoint_append<t>(list<t> l1, list<t> l2)
   requires true == distinct(l1) &*&
            true == distinct(l2) &*&
@@ -5715,6 +5701,96 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
+/*@
+  fixpoint bool ge_than(int lim, nat x) {return lim <= int_of_nat(x); }
+
+  lemma void lower_limit_ge_than<kt>(list<pair<kt, nat> > l, int lim)
+  requires true;
+  ensures true == forall(get_just_tails(filter((lower_limit)(lim), l)),
+                         (ge_than)(lim));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+/*@
+  lemma void upper_limit_less_than<kt>(list<pair<kt, nat> > l, int lim)
+  requires true;
+  ensures true == forall(get_just_tails(filter((upper_limit)(lim), l)),
+                         (less_than)(lim));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void less_than_and_ge_disjoint(list<nat> lst, int lim)
+  requires true == forall(lst, (less_than)(lim)) &*&
+           true == forall(lst, (ge_than)(lim));
+  ensures lst == nil;
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        assert true == less_than(lim, h);
+        assert true == ge_than(lim, h);
+    }
+  }
+  @*/
+
+/*@
+  lemma void intersection_subset<t>(list<t> l1, list<t> l2)
+  requires true;
+  ensures true == subset(intersection(l1, l2), l1) &*&
+          true == subset(intersection(l1, l2), l2);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void lower_and_upper_limit_complement<kt>(list<pair<kt, nat> > l,
+                                                  int lim)
+  requires true;
+  ensures true == multiset_eq(append(filter((lower_limit)(lim), l),
+                                     filter((upper_limit)(lim), l)), l) &*&
+          intersection(get_just_tails(filter((lower_limit)(lim), l)),
+                       get_just_tails(filter((upper_limit)(lim), l))) == nil;
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        lower_and_upper_limit_complement(t, lim);
+        switch(h) { case pair(key, dist): }
+        if (lower_limit(lim, h)) {
+        } else {
+          assert true == upper_limit(lim, h);
+          cons_in_the_middle_multiset_eq
+          (filter((lower_limit)(lim), t), filter((upper_limit)(lim), t), h);
+          multiset_eq_trans(append(filter((lower_limit)(lim), l),
+                                   filter((upper_limit)(lim), l)),
+                            cons(h, append(filter((lower_limit)(lim), t),
+                                           filter((upper_limit)(lim), t))),
+                            l);
+        }
+        upper_limit_less_than(l, lim);
+        lower_limit_ge_than(l, lim);
+        intersection_subset(get_just_tails(filter((lower_limit)(lim), l)),
+                            get_just_tails(filter((upper_limit)(lim), l)));
+        list<nat> inters =
+          intersection(get_just_tails(filter((lower_limit)(lim), l)),
+                      get_just_tails(filter((upper_limit)(lim), l)));
+        subset_forall(inters, get_just_tails(filter((lower_limit)(lim), l)),
+                      (ge_than)(lim));
+        subset_forall(inters, get_just_tails(filter((upper_limit)(lim), l)),
+                      (less_than)(lim));
+        less_than_and_ge_disjoint(inters, lim);
+    }
+  }//took 55m
+  @*/
 
 /*@
   lemma void multiset_eq_reshuffle_appends<t>(list<t> l1, list<t> l2,
