@@ -26,11 +26,17 @@ Flow_entry := tuple<int_flow_id : Int_flow_id, -- flow id, as seen in the public
                    int_flow_id.ext_ep == ext_flow_id.int_ep and
                    int_flow_id.protocol == ext_flow_id.protocol
 
-flow_table := set of<flow_entry : Flow_entry,
+Flow_table := set of<flow_entry : Flow_entry,
                      timestamp>
               such that flow_entry.int_flow_id and
                         flow_entry.ext_flow_id
               are unique across the whole set
+
+Network_interface := tuple<incast_packet, -- represents a new packet that arrives at the NAPT
+                           outcast_packet> -- represent a just forwarded packet, that NAPT injects
+
+state := tuple<flow_entry : Flow_entry,
+               network    : Network_interface>
 #+END_SRC
 
 * rules
@@ -45,9 +51,9 @@ These are the things that determine NAPT's behavior on every event (on every pac
   - =Ext_flow_id F exists=: exists ~Flow_entry X~ in ~flow_table~ such that ~f.ext_flow_id~ == F
   - =Int_flow_id F exists=: exists ~Flow_entry X~ in ~flow_table~ such that ~f.int_flow_id~ == F
   - =the flow table not full=: size(~flow_table~) < ~CAPACITY~
-  - =packet P arrives=: ~P~ arrives at one of the interfaces to the NAPT
-  - =packet P is internal=: ~P~ arrives at the internal interface
-  - =packet P is external=: ~P~ arrives at the external interface
+  - =packet P arrives=: ~network.incast_packet~ contains ~P~
+  - =packet P is internal=: ~P~.interface = external
+  - =packet P is external=: ~P~.interface = internal
 
 *** postcondition elements
 This section defines possible transformation of the generalized state (NAPT abstract state + packets in the network) that NAPT may perform.
@@ -58,6 +64,7 @@ We divide the postconditions into three categories:
 Expire(flow_table, time) -> maximum subset of flow_table, with time < timestamp + T_EXP
 #+END_SRC
 - /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
+
 **** flow management (add new flows to the table)
 - /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
 - /flow allocated for P/:
@@ -69,20 +76,24 @@ Expire(flow_table, time) -> maximum subset of flow_table, with time < timestamp 
 #+END_SRC
 
 **** packet forwarding (transmit or drop packets)
-- /P is forwarded/: NAPT injects to the network packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
-- /packet is dropped/: do nothing, added for clarity
+- /P is forwarded/: ~network.outcast_packet~ = ~P~
+- /P is read/: ~network.incast_packet~ = nil
 
 ** rules
 #+BEGIN_SRC haskell
 -- All NAPT scenarios follow the same general script:
-Packet P arrives -> some flows are expired -> {flow-management} -> {packet-forwarding}
+Packet P arrives ->
+  P is read ->
+  some flows are expired ->
+  {flow-management} ->
+  {forwarding}
 
 {flow-management}:
 P is internal -> F(P) exists      -> flow F(P) is refreshed
                  not(F(P) exists) -> flow table is not full -> flow allocated for P
 P is external -> F(P) exists      -> flow F(P) is refreshed
 
-{packet-forwarding}:
+{forwarding}:
 P is internal -> F(P) exists -> /packet P is forwarded/
 P is external -> F(P) exists -> /packet P is forwarded/
 #+END_SRC
