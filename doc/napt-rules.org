@@ -10,27 +10,28 @@ We focus here only on TCP and UDP, leaving out ICMP for simplicity.
 #+BEGIN_SRC haskell
 End_point := tuple<addr, port> -- IP address of a host and TCP/UDP port number
 
--- This flow entry naturally fits the packets going from the internal to the external network
--- for the returning packets, "dst" and "src" here should be swapped.
-Flow_entry := tuple<int_src_ep : End_point, -- internal host end point (addr + port)
-                    ext_src_ep : End_point, -- source end point for the packets as seen externally
-                    dst_ep     : End_point, -- external host end point (addr + port)
-                    protocol   : TCP/UDP>   -- protocol: TCP or UDP
-
 -- The key identifying a Flow_entry for an externally-sourced packet.
-Ext_flow_id := tuple<ext_src_ep,
-                     dst_ep,
-                     protocol>
+Ext_flow_id := tuple<int_pub_ep : End_point, -- internal host end point as seen externally
+                     ext_ep     : End_point, -- external host end point (addr + port)
+                     protocol   : TCP/UDP>
 
 -- The key identifying a Flow_entry for an internally-sourced packet.
-Int_flow_id := tuple<int_src_ep,
-                     dst_ep,
-                     protocol>
+Int_flow_id := tuple<int_priv_ep : End_point, -- internal host true end point (addr + port)
+                     ext_ep      : End_point, -- external host end point (addr + port)
+                     protocol    : TCP/UDP>
 
-flow_table := set of<Flow_entry, Timestamp>
-              unique in each Ext_flow_id and Int_flow_id projections
+Flow_entry := tuple<int_flow_id : Int_flow_id, -- flow id, as seen in the public network
+                    ext_flow_id : Ext_flow_id> -- flow id, as seen in the private network
+              with invariant:
+                   int_flow_id.ext_ep == ext_flow_id.int_ep and
+                   int_flow_id.protocol == ext_flow_id.protocol
+
+flow_table := set of<flow_entry : Flow_entry,
+                     timestamp>
+              such that flow_entry.int_flow_id and
+                        flow_entry.ext_flow_id
+              are unique across the whole set
 #+END_SRC
-Note, that ~Flow_entry~ <=> (~Ext_flow_id~ + ~Int_flow_id~).
 
 * rules
 The rules are split into two parts: "precondition" -> "postcondition".
@@ -41,12 +42,12 @@ First we define the building blocks for both preconditions and postconditions, a
 This section defines necessary terminology for specifying essential NAPT behavior cases.
 *** precondition elements
 These are the things that determine NAPT's behavior on every event (on every packet that comes in).
-  - =Ext_flow_id F exists=: (projection ~Ext_flow_Id~ over ~flow_table~) contains ~F~
-  - =Int_flow_id F exists=: (projection ~Int_flow_Id~ over ~flow_table~) contains ~F~
+  - =Ext_flow_id F exists=: exists ~Flow_entry X~ in ~flow_table~ such that ~f.ext_flow_id~ == F
+  - =Int_flow_id F exists=: exists ~Flow_entry X~ in ~flow_table~ such that ~f.int_flow_id~ == F
   - =the flow table not full=: size(~flow_table~) < ~CAPACITY~
-  - =packet P arrives=: A packet ~P~ arrives at one of the interfaces to the NAPT
-  - =P is internal=: packet ~P~ arrives at the internal interface
-  - =P is external=: packet ~P~ arrives at the external interface
+  - =packet P arrives=: ~P~ arrives at one of the interfaces to the NAPT
+  - =packet P is internal=: ~P~ arrives at the internal interface
+  - =packet P is external=: ~P~ arrives at the external interface
 
 *** postcondition elements
 This section defines possible transformation of the generalized state (NAPT abstract state + packets in the network) that NAPT may perform.
@@ -54,7 +55,7 @@ We divide the postconditions into three categories:
 
 **** time related (handle flow expiration)
 #+BEGIN_SRC haskell
-Expire(flow_table, time) -> maximum subset of flow_table, such that time < timestamp + T_EXP
+Expire(flow_table, time) -> maximum subset of flow_table, with time < timestamp + T_EXP
 #+END_SRC
 - /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
 - /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
