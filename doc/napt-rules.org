@@ -1,34 +1,45 @@
 * parameters
-This are external configuration parameters of the NAPT box
-- ~CAPACITY~ - the maximum number of simultaneously active flows in the table
-- ~Texp~ - the expiration time. If the last packet in the flow was less than ~Texp~ ago, the flow must be kept, otherwise it must be removed.
+These are external configuration parameters of the NAPT box
+- ~CAPACITY~ -- maximum number of flows that a NAPT can forward simultaniously (with interleaving packets)
+- ~Texp~ -- expiration time. If the last packet related to the flow was less than ~Texp~ ago, the flow must be preserved, otherwise it must be forgotten.
 
 * NAPT abstract state
-This defines the abstract representation of the NAPT dynamic state, that determines its behavior. Later we will connect real implementation state that is just a structured physical memory array with this abstract state using abstraction function.
-Our NAPT abstraction refers to an internal host that is an endpoint on the internal (private) network connecting through the NAT box to an external host that is on the external (public) network.
+This defines the abstract representation of the NAPT dynamic state, that determines its behavior. Note that there is also some static state (configuration), but we leave it out for simplicity. Later we will connect real implementation state that is just a structured physical memory array with this abstract state using abstraction function.
+Our NAPT abstraction refers to an /internal host/ that is an endpoint on the internal (private) network connecting through the NAPT box to an /external host/ that is on the external (public) network.
 We focus here only on the TCP and UDP, leaving out ICMP for simplicity.
-#+BEGIN_SRC 
+#+BEGIN_SRC haskell
 End_point := tuple<addr, port> -- IP address of a host and TCP/UDP port number
 
+-- This flow entry naturally fits the packets going from the internal to the external network
+-- for the returning packets, "dst" and "src" here should be swapped.
 Flow_entry := tuple<int_src_ep : End_point, -- internal host end point (addr + port)
                     ext_src_ep : End_point, -- source end point for the packets as seen externally
                     dst_ep     : End_point, -- external host end point (addr + port)
                     protocol   : TCP/UDP>   -- protocol: TCP or UDP
 
+-- The key identifying a Flow_entry for an externally-sourced packet.
 Ext_flow_id := tuple<ext_src_ep,
                      dst_ep,
                      protocol>
+
+-- The key identifying a Flow_entry for an internally-sourced packet.
 Int_flow_id := tuple<int_src_ep,
                      dst_ep,
                      protocol>
 
-flow_table := set of<Flow entry, Timestamp>
+flow_table := set of<Flow_entry, Timestamp>
               unique in each Ext_flow_id and Int_flow_id projections
 #+END_SRC
+Note, that ~Flow_entry~ <=> (~Ext_flow_id~ + ~Int_flow_id~).
 
-* definitions
+* rules
+The rules are split into two parts: "precondition" -> "postcondition".
+"Precondition" is an event and all the conditions that determine the next NAPT generalized state change.
+"Postcondition" is the NAPT's response to that even. It describes the abstract state transformation (i.e. new flow in the table) and the reaction visible from the outside (i.e. outgoing packets)
+First we define the bulding blocks for both preconditions and postconditions, and then define the rules themselves.
+** definitions
 This section defines necessary terminology for specifying essential NAPT behavior cases.
-** preconditions
+*** precondition elements
 These are the things that determine NAPT's behavior on every event (on every packet that comes in).
   - =Ext_flow_id F exists=: (projection ~Ext_flow_Id~ over ~flow_table~) contains ~F~
   - =Int_flow_id F exists=: (projection ~Int_flow_Id~ over ~flow_table~) contains ~F~
@@ -37,32 +48,28 @@ These are the things that determine NAPT's behavior on every event (on every pac
   - =P is internal=: packet ~P~ is attributed to the internal interface
   - =P is external=: packet ~P~ is attributed to the external interface
 
-** postconditions
+*** postcondition elements
 This section defines possible transformation of the generalized state (NAPT abstract state + packets in the network) that NAPT may perform.
 We divide all the postconditions into three domains:
 1. Time related: handle flow expiration
 2. Flow management: add new flows to the table, find existing ones
 3. Packet forwarding: transmit or drop packets.
 
-*** time related
-#+BEGIN_SRC
+**** time related
+#+BEGIN_SRC haskell
 Expire(flow_table, time) -> filter flow_table, keep only (flow, timestamp) where time < timestamp + Texp
 #+END_SRC
 - /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~now~)
 - /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~now~
-*** flow management
+**** flow management
 - /flow allocated for P/: ~flow_table~' = ~flow_table~ ++ ~new_flow~, where not(=~Ext_flow_id~ (~new_flow~) flow exists=), and it corresponds to packet P. ~timestamp~ (~new_flow~) = ~now~
-*** packet forwarding
+**** packet forwarding
 - /P is forwarded/: NAPT injects to the network packet ~P~ with the same payload and header rewritten according to ~F(P)~ as specified in RFC3022 and the network interface changed to the opposite one
 - /packet is dropped/: do nothing, added for clarity
 
-* rules
-The rules are split into two parts: "precondition" -> "postcondition".
-"Precondition" is an event and all the conditions that determine the next NAPT generalized state change.
-"Postcondition" is the NAPT's response to that even. It describes the abstract state transformation (i.e. new flow in the table) and the reaction visible from the outside (i.e. outgoing packets)
 ** preconditions
 This section describes the all the conditions that may trigger a NAPT action (i.e. generalized state change). No other event may change the abstract state or cause the NAPT to performa an action (i.e. emit a packet). It also can not happen spontaneously.
-#+BEGIN_SRC 
+#+BEGIN_SRC haskell 
 Packet P comes  -> P is internal -> F(P) exists      -> (1)
                                  -> not(F(P) exists) -> flow table is not full -> (2)
                                                      -> otherwise              -> (3)
@@ -71,9 +78,9 @@ Packet P comes  -> P is internal -> F(P) exists      -> (1)
 #+END_SRC
 
 ** postconditions
-The postconditions chain the 3 groups of transformations described above. The transformations of different groups are separated by '|'. They allways follow as time-related|flow-management|packet-forwarding. Some of the groups may be abscent.
+The postconditions chain the 3 groups of transformations described above. The transformations of different groups are separated by '|'. They are always in the same order: =time-related | flow-management | packet-forwarding=. Some of the groups may be absent.
 
-#+BEGIN_SRC 
+#+BEGIN_SRC haskell 
 1. /some flows are expired/,
    /flow ~F(P)~ is refreshed/ |                          | /~P~ is forwarded/
 2. /some flows are expired/   | /flow allocated for ~P~/ | /~P~ is forwarded/
@@ -81,8 +88,8 @@ The postconditions chain the 3 groups of transformations described above. The tr
 #+END_SRC
 
 * implementation specific state
-Our NAPT keeps its dynamic state in two datastructures: Double map and Allocator. VeriFast proof lifts their physical representation into the following logical form:
-#+BEGIN_SRC 
+Our NAPT keeps its dynamic state in two data-structures: Double Map and Allocator. We use Double Map to keep ~Flow_entry~'s accessible by both ~Ext_flow_id~ and ~Int_flow_id~. VeriFast proof lifts their physical representation into the following logical (intermediate) abstraction:
+#+BEGIN_SRC haskell 
 allocator = list of <allocated_index, timestamp>
             allocated_index'es are unique
 double_map = list of <Ext_flow_id, Int_flow_id, Flow_entry, index>
@@ -91,11 +98,11 @@ double_map = list of <Ext_flow_id, Int_flow_id, Flow_entry, index>
 #+END_SRC
 
 * abstraction function
-This section is implementation specific. It defines an abstraction function that transforms the implementation state into the abstract state.
-#+BEGIN_SRC 
+This section defines an abstraction function that transforms the implementation state into the abstract state.
+#+BEGIN_SRC haskell 
 Abstraction(double_map, allocator, time) ->
   forall (allocated_index, timestamp) in Allocator
-    such thet (time < timestamp + Texp) 
+    such that (time < timestamp + Texp) 
     find (ext_flow_id, int_flow_id, flow_entry, allocated_index) in double_map
     collect (flow_entry, timestamp)
 #+END_SRC
