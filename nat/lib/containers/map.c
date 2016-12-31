@@ -5697,8 +5697,19 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures intersection(get_just_tails(advance_acc(acc1)),
                        get_just_tails(advance_acc(acc2))) == nil;
   {
-    assume(false);//TODO 
-  }
+    switch(acc2) {
+      case nil:
+      case cons(h,t):
+        advance_acc_still_disjoint(acc1, t);
+        switch(h) { case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              advance_acc_dec_nonmem(n, acc1);
+          }
+        }
+    }
+  }//took 7m
   @*/
 
 
@@ -5710,7 +5721,12 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures true == forall(get_just_tails(filter((lower_limit)(lim), l)),
                          (ge_than)(lim));
   {
-    assume(false);//TODO 
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key, dist): }
+        lower_limit_ge_than(t, lim);
+    }
   }
   @*/
 
@@ -5720,7 +5736,13 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   ensures true == forall(get_just_tails(filter((upper_limit)(lim), l)),
                          (less_than)(lim));
   {
-    assume(false);//TODO 
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key, dist): }
+        upper_limit_less_than(t, lim);
+    }
+  
   }
   @*/
 
