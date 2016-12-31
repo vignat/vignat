@@ -106,14 +106,22 @@ allocator = list of <allocated_index, timestamp>
 double_map = list of <Ext_flow_id, Int_flow_id, Flow_entry, index>
              each flow_entry <=> (ext_flow_id + int_flow_id)
              each index is present in the allocator
+
+rte_eth_rx_burst polls network cards for incast packets
+rte_eth_tx_burst hands packets over to a network card
 #+END_SRC
 
 * abstraction function
 This section defines an abstraction function that transforms the implementation state into the abstract state.
 #+BEGIN_SRC haskell 
-Abstraction(double_map, allocator, time) ->
-  forall (allocated_index, timestamp) in Allocator
-    such that (time < timestamp + T_EXP) 
-    find (ext_flow_id, int_flow_id, flow_entry, allocated_index) in double_map
-    collect (flow_entry, timestamp)
+Abstraction(double_map, allocator, time,
+            rte_eth_rx_burst returns "outcast",
+            rte_eth_tx_burst is called with "incast") ->
+  flow_table = 
+    forall (allocated_index, timestamp) in Allocator
+      such that (time < timestamp + T_EXP) 
+      find (ext_flow_id, int_flow_id, flow_entry, allocated_index) in double_map
+      collect (flow_entry, timestamp)
+  network = (incast_packet = "incast", outcast_packet = "outcast")
+  state = (flow_table, network)
 #+END_SRC
