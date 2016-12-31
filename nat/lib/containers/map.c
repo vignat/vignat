@@ -5740,14 +5740,24 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
 /*@
   lemma void intersection_subset<t>(list<t> l1, list<t> l2)
   requires true;
   ensures true == subset(intersection(l1, l2), l1) &*&
           true == subset(intersection(l1, l2), l2);
   {
-    assume(false);//TODO 
-  }
+    switch(l2) {
+      case nil:
+      case cons(h,t):
+        intersection_subset(l1, t);
+        if (contains(l1, h)) {
+          subset_unremove(intersection(l1, l2), t, h);
+        } else {
+          add_extra_preserves_subset(intersection(l1, l2), t, h);
+        }
+    }
+  }//took 27m
   @*/
 
 
