@@ -32,10 +32,14 @@ Flow_table := set of<flow_entry : Flow_entry,
                         flow_entry.ext_flow_id
               are unique across the whole set
 
-Network_interface := tuple<incast_packet, -- represents a new packet that arrives at the NAPT
-                           outcast_packet> -- represent a just forwarded packet, that NAPT injects
+Packet := tuple<flow_id,
+                interface : internal/external,
+                payload>
 
-state := tuple<flow_entry : Flow_entry,
+Network_interface := tuple<incast_packet : Packet, -- just arrived packet
+                           outcast_packet : Packet> -- just forwarded packet
+
+state := tuple<flow_table : Flow_table,
                network    : Network_interface>
 #+END_SRC
 
@@ -54,6 +58,15 @@ These are the things that determine NAPT's behavior on every event (on every pac
   - =packet P arrives=: ~network.incast_packet~ contains ~P~
   - =packet P is internal=: ~P~.interface = external
   - =packet P is external=: ~P~.interface = internal
+  
+#+BEGIN_SRC haskell
+-- Find a flow corresponding to the packet P
+F(P) -> switch(P.interface)
+          case internal: find Flow_entry X in flow_table
+                         such that X.int_flow_id = P.flow_id
+          case external: find Flow_entry X in flow_table
+                         such that X.ext_flow_id = P.flow_id
+#+END_SRC
 
 *** postcondition elements
 This section defines possible transformation of the state that NAPT may perform.
@@ -115,13 +128,13 @@ rte_eth_tx_burst hands packets over to a network card
 This section defines an abstraction function that transforms the implementation state into the abstract state.
 #+BEGIN_SRC haskell 
 Abstraction(double_map, allocator, time,
-            rte_eth_rx_burst returns "outcast",
-            rte_eth_tx_burst is called with "incast") ->
+            rte_eth_rx_burst returns {outcast},
+            rte_eth_tx_burst is called with {incast}) ->
   flow_table = 
     forall (allocated_index, timestamp) in Allocator
       such that (time < timestamp + T_EXP) 
       find (ext_flow_id, int_flow_id, flow_entry, allocated_index) in double_map
       collect (flow_entry, timestamp)
-  network = (incast_packet = "incast", outcast_packet = "outcast")
+  network = (incast_packet = {incast}, outcast_packet = {outcast})
   state = (flow_table, network)
 #+END_SRC
