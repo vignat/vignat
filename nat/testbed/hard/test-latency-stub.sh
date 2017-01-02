@@ -1,3 +1,5 @@
+#!/bin/bash
+
 . ./config.sh
 
 mkdir -p latency-results

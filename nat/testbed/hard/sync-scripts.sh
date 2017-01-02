@@ -1,3 +1,4 @@
+#!/bin/bash
 # Use Rsync to propagate all the changes in the scripts in this
 # directory to the tester and the server.
 

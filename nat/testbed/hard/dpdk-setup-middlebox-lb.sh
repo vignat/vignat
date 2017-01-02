@@ -1,3 +1,4 @@
+#!/bin/bash
 # Setup middlebox for loopback scenario in DPDK compatible mode
 # (unbind the necessary ifaces from the kernel)
 

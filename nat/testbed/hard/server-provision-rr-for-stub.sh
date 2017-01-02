@@ -1,3 +1,4 @@
+#!/bin/bash
 # Configure the server for the request-responce (ping-pong) perf testing
 # topology involving a No-op plain forwarding middlebox.
 . ~/scripts/config.sh

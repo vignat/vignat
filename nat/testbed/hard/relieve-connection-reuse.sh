@@ -1,3 +1,4 @@
+#!/bin/bash
 # Sacrifice some the NetFilter fidelity to dead connections
 # (which is necessary only for accasional retransmissions),
 # and allow it to faster reuse ports for new connections.

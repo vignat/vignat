@@ -1,3 +1,4 @@
+#!/bin/bash
 # Provision the requrest-responce (ping-pong) scenario with the middlebox
 # running a plain forwarding (no-op)
 

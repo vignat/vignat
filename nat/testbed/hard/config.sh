@@ -1,3 +1,4 @@
+#!/bin/bash
 # The main configuration file of the network for performance testing.
 # It binds the real hosts, addresses and ports to the abstract names used
 # throughout the scripts.

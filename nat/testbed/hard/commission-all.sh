@@ -1,3 +1,4 @@
+#!/bin/bash
 # Setup all the necessary tools on the three machines described in config.sh
 # In particular setup the testing infrastructure on client and server and
 # the environment to run NATs (Vigor NAT, no-op and NetFilter) for the middlebox

@@ -1,3 +1,4 @@
+#!/bin/bash
 # Provision the network for request-responce (ping-pong) scenario with
 # the middlebox running NAT.
 

@@ -1,3 +1,4 @@
+#!/bin/bash
 # Provision the network for the loopback scenario.
 
 . ./config.sh

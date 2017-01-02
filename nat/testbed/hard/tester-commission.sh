@@ -1,3 +1,4 @@
+#!/bin/bash
 # Prepare the tester to run the performance expreiments.
 # Install the necessary packages, in particular NetPerf and DPDK PktGen.
 sudo apt-get update

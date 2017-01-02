@@ -1,3 +1,4 @@
+#!/bin/bash
 # Launch PktGen as a server listening 22022 in the background
 # This script contains a piece of wisdom copy&pasted from StackOverflow.
 # It is supposed to properly disconnect stdin and stdout using bahs pipe magic.
