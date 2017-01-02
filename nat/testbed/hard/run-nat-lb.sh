@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start our Vigor DPDK-based NAT\alpha configured for the loopback scenario.
+# Start our Vigor DPDK-based NAT configured for the loopback scenario.
 # The first argument ($1) specifies the directory that contains the expreiment
 # config file.
 # The second argument ($2) specifies the expiration time for the NAT

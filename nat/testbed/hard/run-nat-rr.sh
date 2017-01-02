@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start our Vigor DPDK-based NAT\alpha configured for
+# Start our Vigor DPDK-based NAT configured for
 # the request-responce (ping-pong) scenario.
 # The first argument ($1) specifies the directory that contains the expreiment
 # config file.

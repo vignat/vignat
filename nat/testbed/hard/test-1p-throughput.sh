@@ -53,21 +53,6 @@ sudo pkill -9 nat
 #sleep 2
 sleep 10
 
-echo "[TT]testing optimized VigNAT"
-# NAT
-(./run-opt-nat-lb.sh $PWD 10 61000 0<&- &>nat.log) &
-
-#sleep 5
-sleep 20
-
-ssh $TESTER_HOST "bash ~/scripts/run-pktgen.sh $TEST_FILE"
-scp $TESTER_HOST:pktgen/multi-flows.txt ./results-1p-throughput/vig-opt-nat-rt.txt
-
-sudo pkill -9 nat
-
-#sleep 2
-sleep 10
-
 echo "[TT]testing NetFilter"
 # NetFilter
 sudo ./nf-nat-lb.sh 0<&- &>nfn.log
