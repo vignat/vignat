@@ -20,7 +20,7 @@ ip addr add $TESTER_IP_FOR_STUB/24 dev $TESTER_DEVICE_INTERNAL
 echo "configure routes"
 ip route flush $SERVER_SUBNET
 ip route flush cache
-arp -s $SERVER_IP $MB_INTERNAL_MAC
+arp -s $SERVER_IP $MB_MAC_INTERNAL
 
 sudo bash ~/scripts/relieve-connection-reuse.sh
 echo "configured"

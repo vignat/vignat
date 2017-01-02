@@ -6,6 +6,6 @@
 ifconfig $SERVER_DEVICE up
 ip addr flush dev $SERVER_DEVICE
 ip addr add $SERVER_IP/24 dev $SERVER_DEVICE
-arp -s $TESTER_IP_FOR_STUB $MB_TO_SRV_MAC
+arp -s $TESTER_IP_FOR_STUB $MB_MAC_TO_SRV
 
 sudo bash ~/scripts/relieve-connection-reuse.sh
