@@ -74,7 +74,7 @@ case $2 in
         fi
 
         echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "bash ~/scripts/pktgen-scripts/run.sh ~/scripts/pktgen-scripts/$LUA_SCRIPT.lua"
+        ssh $TESTER_HOST "bash ~/scripts/pktgen/run.sh ~/scripts/pktgen/$LUA_SCRIPT.lua"
         scp $TESTER_HOST:pktgen/multi-flows.txt ./$RESULTS_FILE
         ssh $TESTER_HOST "rm pktgen/multi-flows.txt"
         ;;

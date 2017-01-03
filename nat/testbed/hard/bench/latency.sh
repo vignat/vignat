@@ -29,7 +29,7 @@ RESULT_FILE=$1
 rm -f $RESULT_FILE
 
 echo "[bench] Launching pktgen..."
-. ~/scripts/pktgen-scripts/run-in-background.sh
+. ~/scripts/pktgen/run-in-background.sh
 
 echo "[bench] Heating up tables..."
 END_PORT=$(($BEGIN_PORT+$NUM_SAMPLE_FLOWS))
@@ -49,14 +49,14 @@ for k in $(seq 1 $REPEAT); do
 		echo "pktgen.stop(\"0\")" > cmd.lua
 		echo "pktgen.dst_port(\"0\", \"max\", $RANGE_MAX_PORT)" >> cmd.lua
 		echo "pktgen.start(\"0\")" >> cmd.lua
-		. ~/scripts/pktgen-scripts/send-command.sh cmd.lua
+		. ~/scripts/pktgen/send-command.sh cmd.lua
 		sleep $FLOW_HEATUP
 		ncons=$(netperf -H $SERVER_HOST -P 0 -t TCP_RR -l $DURATION -- -H "$SERVER_IP   " -p $BEGIN_PORT,$END_PORT | head -n 1 | awk '{print $6}')
 		echo "[bench] $END_PORT - $BEGIN_PORT = $nflws -> $ncons"
 		echo $nflws $ncons >> $RESULT_FILE
 
 		echo "pktgen.stop(\"0\")" > cmd.lua
-		. ~/scripts/pktgen-scripts/send-command.sh cmd.lua
+		. ~/scripts/pktgen/send-command.sh cmd.lua
 
 		echo "[bench] Waiting for expiration..."
 		sleep $EXPIRATION_TIME
