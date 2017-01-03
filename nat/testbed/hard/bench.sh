@@ -53,7 +53,7 @@ LOG_FILE="bench-$1-$2.log"
 
 
 if [ $1 = "netfilter" ]; then
-    # Nothing to do, already configured by init-network
+    : # Nothing to do, already configured by init-network
 else
     echo "[bench] Launching $1..."
     # Run the app in the background

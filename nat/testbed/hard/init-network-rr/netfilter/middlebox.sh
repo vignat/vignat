@@ -14,7 +14,7 @@ sudo ip addr add $MB_IP_EXTERNAL/24 dev $MB_DEVICE_EXTERNAL
 
 echo "[init] Configuring middlebox forwarding rules..."
 sudo sysctl -w net.ipv4.ip_forward=1
-echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv4.ip_forward=1" | sudo dd of=/etc/sysctl.conf oflag=append conv=notrunc
 
 sudo iptables -F FORWARD
 sudo iptables -t nat -F POSTROUTING
