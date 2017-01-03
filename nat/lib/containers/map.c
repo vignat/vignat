@@ -2815,6 +2815,26 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
+
+/*@
+  lemma void buckets_ok_rec_acc_tails_distinct<kt>(list<pair<kt, nat> > acc,
+                                                   list<bucket<kt> > buckets,
+                                                   int bound)
+  requires true == buckets_ok_rec(acc, buckets, bound);
+  ensures true == distinct(get_just_tails(acc));
+  {
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case bucket(chains):
+          map_append(snd, acc, chains);
+          distinct_unappend(get_just_tails(acc), get_just_tails(chains));
+        }
+    }
+  }
+  @*/
+
+
 /*@
   lemma void acc_subset_buckets_still_ok_rec<kt>(list<pair<kt, nat> > acc1,
                                                  list<pair<kt, nat> > acc2,
@@ -5670,9 +5690,10 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void intersection_comm<t>(list<t> l1, list<t> l2)
+  lemma void intersection_nil_comm<t>(list<t> l1, list<t> l2)
   requires true;
-  ensures intersection(l1, l2) == intersection(l2, l1);
+  ensures true == ((intersection(l1, l2) == nil) ==
+                   (intersection(l2, l1) == nil));
   {
     assume(false);//TODO 
   }
@@ -5919,7 +5940,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           assert true == distinct(get_just_tails(latb));
           assert intersection(get_just_tails(sacc),
                               get_just_tails(lacc)) == nil;
-          intersection_comm(get_just_tails(lchains),
+          intersection_nil_comm(get_just_tails(lchains),
                             get_just_tails(schains));
           assert intersection(get_just_tails(schains),
                               get_just_tails(lchains)) == nil;
@@ -5957,15 +5978,85 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
+  fixpoint bool msubset<t>(list<t> l1, list<t> l2) {
+    switch(l1) {
+      case nil: return true;
+      case cons(h,t):
+        return true == mem(h, l2) && msubset(t, remove(h, l2));
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void filter_msubset<t>(fixpoint (t, bool) f, list<t> l)
+  requires true;
+  ensures true == msubset(filter(f, l), l);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+
+/*@
+  lemma void msubset_distinct<t>(list<t> l1, list<t> l2)
+  requires true == msubset(l1, l2) &*& true == distinct(l2);
+  ensures true == distinct(l1);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void msubset_subset<t>(list<t> l1, list<t> l2)
+  requires true == msubset(l1, l2);
+  ensures true == subset(l1, l2);
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
+  lemma void msubset_map<t1, t2>(fixpoint (t1, t2) f, list<t1> l1, list<t1> l2)
+  requires true == msubset(l1, l2);
+  ensures true == msubset(map(f, l1), map(f, l2));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+
+/*@
   lemma void buckets_split_ok_orig_ok<kt>(list<pair<kt, nat> > acc,
-                                              list<bucket<kt> > buckets,
-                                              int bound)
+                                          list<bucket<kt> > buckets,
+                                          int bound)
   requires true == buckets_ok_rec(acc, keep_short_fp(buckets), bound) &*&
            true == buckets_ok_rec(acc, keep_long_fp(buckets), bound);
   ensures true == buckets_ok_rec(acc, buckets, bound);
   {
-    assume(false);//TODO
-  }
+    list<pair<kt, nat> > sacc = filter((upper_limit)(length(buckets)), acc);
+    list<pair<kt, nat> > lacc = filter((lower_limit)(length(buckets)), acc);
+    filter_msubset((upper_limit)(length(buckets)), acc);
+    filter_msubset((lower_limit)(length(buckets)), acc);
+    msubset_subset(sacc, acc);
+    msubset_subset(lacc, acc);
+    msubset_map(snd, sacc, acc);
+    msubset_map(snd, lacc, acc);
+    buckets_ok_rec_acc_tails_distinct(acc, keep_short_fp(buckets), bound);
+    msubset_distinct(get_just_tails(sacc), get_just_tails(acc));
+    msubset_distinct(get_just_tails(lacc), get_just_tails(acc));
+    lower_and_upper_limit_complement(acc, length(buckets));
+    acc_subset_buckets_still_ok_rec(sacc, acc, keep_short_fp(buckets), bound);
+    acc_subset_buckets_still_ok_rec(lacc, acc, keep_long_fp(buckets), bound);
+    intersection_nil_comm(get_just_tails(sacc), get_just_tails(lacc));
+    multiset_eq_append_comm(sacc, lacc);
+    multiset_eq_trans(append(sacc, lacc), append(lacc, sacc), acc);
+    multiset_eq_comm(append(sacc, lacc), acc);
+    buckets_split_ok_orig_ok_rec(sacc, lacc, acc,
+                                 buckets, bound);
+  }//took 40m
   @*/
 
 
