@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Functions that tweak the kernal to make it possible to run DPDK apps:
 # enable NUMA, reserver hugepages, bind/unbind network interfaces
 
@@ -49,7 +47,7 @@ set_numa_pages()
 	  echo > .echo_tmp
 	  for d in /sys/devices/system/node/node? ; do
 		    node=$(basename $d)
-        Pages=1600
+                    Pages=1600
 		    echo "echo $Pages > $d/hugepages/hugepages-2048kB/nr_hugepages" >> .echo_tmp
 	  done
 	  echo "Reserving hugepages"
@@ -102,7 +100,7 @@ bind_nics_to_igb_uio()
 {
 	  if  /sbin/lsmod  | grep -q igb_uio ; then
 		    PCI_PATH=$1
-        echo "Binding PCI device: $PCI_PATH ..."
+                    echo "Binding PCI device: $PCI_PATH ..."
 		    sudo ${RTE_SDK}/tools/dpdk-devbind.py -b igb_uio $PCI_PATH && echo "OK"
 	  else
 		    echo "# Please load the 'igb_uio' kernel module before querying or "

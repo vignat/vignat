@@ -1,5 +1,6 @@
 #!/bin/bash
 . ./config.sh
+. ./util/functions.sh
 
 echo "[init] Configuring middlebox IPs..."
 sudo ifconfig $MB_DEVICE_TO_SRV up
@@ -14,7 +15,7 @@ sudo ip addr add $MB_IP_EXTERNAL/24 dev $MB_DEVICE_EXTERNAL
 
 echo "[init] Configuring middlebox forwarding rules..."
 sudo sysctl -w net.ipv4.ip_forward=1
-echo "net.ipv4.ip_forward=1" | sudo dd of=/etc/sysctl.conf oflag=append conv=notrunc
+sudo_append /etc/sysctl.conf "net.ipv4.ip_forward=1"
 
 sudo iptables -F FORWARD
 sudo iptables -t nat -F POSTROUTING

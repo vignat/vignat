@@ -48,21 +48,34 @@ fi
 . ./init-network.sh $2 $MIDDLEBOX_APP
 
 
-RESULTS_FILE="bench-$1-$2.results"
-LOG_FILE="bench-$1-$2.log"
+CLEAN_APP_NAME=`echo "$1" | tr '/' '_'`
+RESULTS_FILE="bench-$CLEAN_APP_NAME-$2.results"
+LOG_FILE="bench-$CLEAN_APP_NAME-$2.log"
+
+if [ -f "$RESULTS_FILE" ]; then
+    rm "$RESULTS_FILE"
+fi
+
+if [ -f rm "$LOG_FILE" ]; then
+    rm "$LOG_FILE"
+fi
 
 
-if [ $1 = "netfilter" ]; then
+if [ "$1" = "netfilter" ]; then
     : # Nothing to do, already configured by init-network
 else
     echo "[bench] Launching $1..."
+
+    case $2 in
+        "loopback"|"1p") SIMPLE_SCENARIO="loopback";;
+        "passthrough"|"rr") SIMPLE_SCENARIO="rr";;
+    esac
+
     # Run the app in the background
-    (./bench/run-dpdk.sh \
-        $1 \
-        # The arguments are not always necessary, but they'll be ignored if unneeded
+    # The arguments are not always necessary, but they'll be ignored if unneeded
+    (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$1" \
         "--expire 10 --max-flows 61000 --starting-port 1025" \
-        # Close stdin, redirect output to a log file (useful iff something goes wrong)
-        0<&- &>$LOG_FILE) &
+        0<&- &>"$LOG_FILE") &
 
     # Wait for it to have started
     sleep 20
@@ -79,7 +92,7 @@ case $2 in
 
         echo "[bench] Benchmarking throughput..."
         ssh $TESTER_HOST "bash ~/scripts/pktgen/run.sh ~/scripts/pktgen/$LUA_SCRIPT.lua"
-        scp $TESTER_HOST:pktgen/multi-flows.txt ./$RESULTS_FILE
+        scp $TESTER_HOST:pktgen/multi-flows.txt "./$RESULTS_FILE"
         ssh $TESTER_HOST "rm pktgen/multi-flows.txt"
         ;;
 
@@ -88,7 +101,7 @@ case $2 in
 
         echo "[bench] Benchmarking latency..."
         ssh $TESTER_HOST "bash ~/scripts/bench/latency.sh ~/bench.results"
-        scp $TESTER_HOST:bench.results ./$RESULTS_FILE
+        scp $TESTER_HOST:bench.results "./$RESULTS_FILE"
         ssh $TESTER_HOST "rm ~/bench.results"
         ;;
 

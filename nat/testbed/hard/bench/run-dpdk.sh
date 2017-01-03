@@ -10,12 +10,12 @@
 # $3: Additional arguments for the app
 
 if [ $1 != "loopback" -a $1 != "rr" ]; then
-    echo "[run] Unknown scenario specified in run-app" 1>&2
+    echo "[run] Unknown scenario specified in run-dpdk" 1>&2
     exit 1
 fi
 
 if [ -z $2 ]; then
-    echo "[run] No app folder specified in run-app" 1>&2
+    echo "[run] No app folder specified in run-dpdk" 1>&2
     exit 2
 fi
 
