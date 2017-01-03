@@ -1,5 +1,6 @@
 -- Prepare PktGen for performance experiments, that will be requested via
 -- the port 22022
+-- Unused (for now?)
 
 package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 
