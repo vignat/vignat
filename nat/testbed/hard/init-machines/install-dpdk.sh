@@ -8,7 +8,7 @@ DPDK_RELEASE=16.07
 pushd $HOME >> /dev/null
 
 # Check if it's already installed; we manually create a file with the version
-if [ ! -f dpdk/.version -o "$(cat dpdk/.version)" != $DPDK_RELEASE ]; then
+if [ ! -f dpdk/.version ] || [ "$(cat dpdk/.version)" != $DPDK_RELEASE ]; then
     echo "[init] DPDK not found or obsolete, installing..."
 
     # Install required packages
@@ -30,10 +30,6 @@ if [ ! -f dpdk/.version -o "$(cat dpdk/.version)" != $DPDK_RELEASE ]; then
     sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp
     make config T=x86_64-native-linuxapp-gcc
     make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
-
-    # Export the required vars to compile DPDK apps
-    export RTE_SDK=$HOME/dpdk
-    export RTE_TARGET=x86_64-native-linuxapp-gcc
 
     # Write out the version for next run
     echo $DPDK_RELEASE > .version

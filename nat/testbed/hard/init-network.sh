@@ -5,10 +5,10 @@
 # by running the appropriate scripts on all three machines.
 
 # Parameters:
-# $1: Scenario; there must exist a folder 'init-network-$1',
-#     with a 'tester.sh' script and optionally a 'server.sh' script
-# $2: App; there must exist a folder 'init-network-$1/$2',
-#     with a 'middlebox.sh' script.
+# $1: Scenario; there must exist a folder "init-network-$1",
+#     with a "tester.sh" script and optionally a "server.sh" script
+# $2: App; there must exist a folder "init-network-$1/$2",
+#     with a "middlebox.sh" script.
 
 
 if [ -z $1 ]; then
@@ -32,13 +32,10 @@ if [ ! -d ./init-network-$1/$2 ]; then
 fi
 
 
-. ./init-machines.sh
-
-
 if [ -f ./init-network-$1/server.sh ]; then
-    ssh $SERVER_HOST 'bash ~/scripts/init-network-$1/server.sh'
+    ssh $SERVER_HOST "bash ~/scripts/init-network-$1/server.sh"
 fi
 
-ssh $TESTER_HOST 'bash ~/scripts/init-network-$1/tester.sh'
+ssh $TESTER_HOST "bash ~/scripts/init-network-$1/tester.sh"
 
 . ./init-network-$1/$2/middlebox.sh

@@ -33,10 +33,11 @@ if [ -z $2 ]; then
     exit 2
 fi
 
+# Initialize the machines, i.e. software+scripts
+. ./init-machines.sh
 
 # Clean first, just in case
 . ./clean.sh
-
 
 # Initialize the network;
 # to do that, we need to know whether we'll run a DPDK app or not.
@@ -44,7 +45,6 @@ MIDDLEBOX_APP="dpdk"
 if [ $1 = "netfilter" ]; then
     MIDDLEBOX_APP="netfilter"
 fi
-
 . ./init-network.sh $2 $MIDDLEBOX_APP
 
 

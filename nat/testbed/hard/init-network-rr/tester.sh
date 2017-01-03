@@ -10,15 +10,15 @@ echo "[init] Binding TESTER_DEVICE_EXTERNAL to DPDK..."
 bind_nics_to_igb_uio $TESTER_PCI_EXTERNAL
 
 echo "[init] Configuring tester IP..."
-ifconfig $TESTER_DEVICE_INTERNAL up
-ip addr flush dev $TESTER_DEVICE_INTERNAL
-ip addr add $TESTER_IP_INTERNAL/24 dev $TESTER_DEVICE_INTERNAL
+sudo ifconfig $TESTER_DEVICE_INTERNAL up
+sudo ip addr flush dev $TESTER_DEVICE_INTERNAL
+sudo ip addr add $TESTER_IP_INTERNAL/24 dev $TESTER_DEVICE_INTERNAL
 
 echo "[init] Configuring tester route..."
-ip route flush $SERVER_SUBNET
-ip route add $SERVER_SUBNET/24 via $MB_IP_INTERNAL dev $TESTER_DEVICE_INTERNAL
-ip route flush cache
-arp -s $MB_IP_INTERNAL $MB_MAC_INTERNAL
+sudo ip route flush $SERVER_SUBNET
+sudo ip route add $SERVER_SUBNET/24 via $MB_IP_INTERNAL dev $TESTER_DEVICE_INTERNAL
+sudo ip route flush cache
+sudo arp -s $MB_IP_INTERNAL $MB_MAC_INTERNAL
 
 echo "[init] Configuring tester connection reuse speed..."
 . ~/scripts/util/relieve-connection-reuse.sh
