@@ -7,8 +7,5 @@ set_numa_pages
 load_igb_uio_module
 
 echo "[init] Binding tester interfaces to DPDK..."
-sudo ifconfig $TESTER_DEVICE_INTERNAL down
-sudo ifconfig $TESTER_DEVICE_EXTERNAL down
-
 bind_nics_to_igb_uio $TESTER_PCI_INTERNAL
 bind_nics_to_igb_uio $TESTER_PCI_EXTERNAL

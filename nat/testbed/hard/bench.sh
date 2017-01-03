@@ -34,7 +34,11 @@ if [ -z $2 ]; then
 fi
 
 
-# First, initialize the network;
+# Clean first, just in case
+. ./clean.sh
+
+
+# Initialize the network;
 # to do that, we need to know whether we'll run a DPDK app or not.
 MIDDLEBOX_APP="dpdk"
 if [ $1 = "netfilter" ]; then
@@ -93,3 +97,7 @@ case $2 in
         exit 10
         ;;
 esac
+
+
+# Leave the machines in a proper state
+. ./clean.sh

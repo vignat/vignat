@@ -7,12 +7,7 @@ set_numa_pages
 load_igb_uio_module
 
 echo "[init] Binding TESTER_DEVICE_EXTERNAL to DPDK..."
-sudo ifconfig $TESTER_DEVICE_EXTERNAL down
 bind_nics_to_igb_uio $TESTER_PCI_EXTERNAL
-
-echo "[init] Unbinding TESTER_PCI_INTERNAL from DPDK..."
-$RTE_SDK/tools/dpdk-devbind.py -b igb $TESTER_PCI_INTERNAL
-sleep 8
 
 echo "[init] Configuring tester IP..."
 ifconfig $TESTER_DEVICE_EXTERNAL down

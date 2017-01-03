@@ -1,10 +1,6 @@
 #!/bin/bash
 . ./config.sh
 
-echo "[init] Unbinding middlebox interfaces from DPDK..."
-sudo ~/dpdk/tools/dpdk-devbind.py -b igb $MB_PCI_INTERNAL $MB_PCI_EXTERNAL $MB_PCI_TO_SRV
-sleep 8
-
 echo "[init] Configuring middlebox IPs..."
 ifconfig $MB_DEVICE_EXTERNAL up
 ip addr flush dev $MB_DEVICE_EXTERNAL
