@@ -6019,12 +6019,27 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
+  lemma void map_remove_swap<t1,t2>(fixpoint (t1,t2) f, t1 x, list<t1> l)
+  requires true;
+  ensures map(f, remove(x, l)) == remove(f(x), map(f, l));
+  {
+    assume(false);//TODO 
+  }
+  @*/
+
+/*@
   lemma void msubset_map<t1, t2>(fixpoint (t1, t2) f, list<t1> l1, list<t1> l2)
   requires true == msubset(l1, l2);
   ensures true == msubset(map(f, l1), map(f, l2));
   {
-    assume(false);//TODO 
-  }
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        msubset_map(f, t, remove(h, l2));
+        map_remove_swap(f, h, l2);
+        mem_map(h, l2, f);
+    }
+  }//took 10m
   @*/
 
 
