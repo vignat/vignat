@@ -8,4 +8,4 @@ ip addr add $SERVER_IP/24 dev $SERVER_DEVICE
 arp -s $MB_IP_TO_SRV $MB_MAC_TO_SRV
 
 echo "[init] Configuring server connection reuse speed..."
-. ~/scripts/relieve-connection-reuse.sh
+. ~/scripts/util/relieve-connection-reuse.sh
