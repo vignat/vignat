@@ -41,6 +41,4 @@ fi
 
 ssh $TESTER_HOST 'bash ~/scripts/init-network-$1/tester.sh'
 
-if [ ! -z $2 ]; then
-    . ./init-network-$1/$2/middlebox.sh
-fi
+. ./init-network-$1/$2/middlebox.sh
