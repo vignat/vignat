@@ -56,7 +56,7 @@ if [ -f "$RESULTS_FILE" ]; then
     rm "$RESULTS_FILE"
 fi
 
-if [ -f rm "$LOG_FILE" ]; then
+if [ -f "$LOG_FILE" ]; then
     rm "$LOG_FILE"
 fi
 
@@ -66,10 +66,10 @@ if [ "$1" = "netfilter" ]; then
 else
     echo "[bench] Launching $1..."
 
-    case $2 in
-        "loopback"|"1p") SIMPLE_SCENARIO="loopback";;
-        "passthrough"|"rr") SIMPLE_SCENARIO="rr";;
-    esac
+    SIMPLE_SCENARIO=$2
+    if [ $2 = "1p" ]; then
+        SIMPLE_SCENARIO="loopback"
+    fi
 
     # Run the app in the background
     # The arguments are not always necessary, but they'll be ignored if unneeded

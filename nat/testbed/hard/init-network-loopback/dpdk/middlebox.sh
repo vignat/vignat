@@ -2,7 +2,7 @@
 . ./config.sh
 
 echo "[init] Initializing DPDK on middlebox..."
-. ./util/dpdk-setup-functions.sh
+. ./util/dpdk-functions.sh
 set_numa_pages
 load_igb_uio_module
 
