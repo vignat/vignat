@@ -9,6 +9,6 @@ sudo apt-get install -yqq \
     libpcap-dev libglib2.0-dev \
     daemon iperf3 netperf liblua5.2-dev make binutils gcc
 
-. ~/scripts/init/install-dpdk.sh
+. ~/scripts/init-machines/install-dpdk.sh
 
-. ~/scripts/init/install-pktgen.sh
+. ~/scripts/init-machines/install-pktgen.sh

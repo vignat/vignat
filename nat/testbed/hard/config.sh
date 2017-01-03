@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Configuration file mapping real hosts, addresses and ports
 # to abstract names used in the scripts.
 

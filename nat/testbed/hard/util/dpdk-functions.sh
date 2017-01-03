@@ -1,9 +1,9 @@
 #!/bin/bash
+
 # Functions that tweak the kernal to make it possible to run DPDK apps:
 # enable NUMA, reserver hugepages, bind/unbind network interfaces
 
-######---------------------------------######
-#    Taken from the dpdk/tools/setup.sh
+# Taken from dpdk/tools/setup.sh
 
 create_mnt_huge()
 {
@@ -109,6 +109,3 @@ bind_nics_to_igb_uio()
 		    echo "# adjusting NIC device bindings"
 	  fi
 }
-
-#
-######---------------------------------######

@@ -1,11 +1,11 @@
 #!/bin/bash
-# Configure the server for the request-responce (ping-pong) perf testing
-# topology involving a NAT.
 . ~/scripts/config.sh
 
+echo "[init] Configuring server IP..."
 ifconfig $SERVER_DEVICE up
 ip addr flush dev $SERVER_DEVICE
 ip addr add $SERVER_IP/24 dev $SERVER_DEVICE
 arp -s $MB_IP_TO_SRV $MB_MAC_TO_SRV
 
-sudo bash ~/scripts/relieve-connection-reuse.sh
+echo "[init] Configuring server connection reuse speed..."
+. ~/scripts/relieve-connection-reuse.sh

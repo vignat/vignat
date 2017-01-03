@@ -1,16 +1,12 @@
 #!/bin/bash
-# Setup tester machine to be ready to run DPDK test application (pktgen, likely)
-# for loopback scenario.
-
 . ~/scripts/config.sh
 
-. ~/scripts/dpdk-setup-functions.sh
-
-sudo pkill -9 pktgen
-
+echo "[init] Initializing DPDK on tester..."
+. ~/scripts/util/dpdk-functions.sh
 set_numa_pages
 load_igb_uio_module
 
+echo "[init] Binding tester interfaces to DPDK..."
 sudo ifconfig $TESTER_DEVICE_INTERNAL down
 sudo ifconfig $TESTER_DEVICE_EXTERNAL down
 
