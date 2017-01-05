@@ -10,7 +10,6 @@ echo "[init] Binding TESTER_DEVICE_EXTERNAL to DPDK..."
 bind_nics_to_igb_uio $TESTER_PCI_EXTERNAL
 
 echo "[init] Configuring tester IP..."
-sudo ifconfig $TESTER_DEVICE_EXTERNAL down
 sudo ifconfig $TESTER_DEVICE_INTERNAL up
 sudo ip addr flush dev $TESTER_DEVICE_INTERNAL
 sudo ip addr add $TESTER_IP_FOR_STUB/24 dev $TESTER_DEVICE_INTERNAL

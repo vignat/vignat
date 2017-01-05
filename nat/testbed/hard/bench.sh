@@ -33,6 +33,14 @@ if [ -z $2 ]; then
     exit 2
 fi
 
+
+# HACK: The NAT isn't yet verified with 3 interfaces
+#       Thus it has to be patched to support it
+if [ $1 != "netfilter" ] && [ $2 = "rr" ]; then
+    sed -i -- "s~//{2, 0, 0}~{2, 0, 0}~g" $1/main.c
+fi
+
+
 # Initialize the machines, i.e. software+scripts
 . ./init-machines.sh
 
@@ -66,10 +74,10 @@ if [ "$1" = "netfilter" ]; then
 else
     echo "[bench] Launching $1..."
 
-    SIMPLE_SCENARIO=$2
-    if [ $2 = "1p" ]; then
-        SIMPLE_SCENARIO="loopback"
-    fi
+    case $2 in
+        "1p"|"loopback") SIMPLE_SCENARIO="loopback";;
+        "rr"|"passthrough") SIMPLE_SCENARIO="rr";;
+    esac
 
     # Run the app in the background
     # The arguments are not always necessary, but they'll be ignored if unneeded
@@ -96,7 +104,7 @@ case $2 in
         ssh $TESTER_HOST "rm pktgen/multi-flows.txt"
         ;;
 
-    "passthrough"|"rr")
+    "rr"|"passthrough")
         # No difference from a benchmarking point of view, only setup varies
 
         echo "[bench] Benchmarking latency..."
@@ -110,6 +118,12 @@ case $2 in
         exit 10
         ;;
 esac
+
+
+# HACK: See above HACK
+if [ $1 != "netfilter" ] && [ $2 = "rr" ]; then
+    sed -i -- "s~{2, 0, 0}~//{2, 0, 0}~g" $1/main.c
+fi
 
 
 # Leave the machines in a proper state

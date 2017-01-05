@@ -2,8 +2,9 @@
 . ./config.sh
 
 echo "[init] Cloning scripts..."
-rsync -tv -r ./ $TESTER_HOST:scripts
-rsync -tv -r ./ $SERVER_HOST:scripts
+for h in $TESTER_HOST $SERVER_HOST; do
+    rsync -q -t -r --exclude '*.log' --exclude '*.results' ./ $h:scripts
+done
 
 echo "[init] Initializing all machines..."
 ssh $TESTER_HOST 'bash ~/scripts/init-machines/tester.sh'
