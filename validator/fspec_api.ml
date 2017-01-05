@@ -29,6 +29,8 @@ sig
   val fixpoints : Ir.tterm Core.Std.String.Map.t
   val boundary_fun : string
   val finishing_fun : string
+  val eventproc_iteration_begin : string
+  val eventproc_iteration_end : string
 end
 
 let spec : (module Spec) option ref = ref None

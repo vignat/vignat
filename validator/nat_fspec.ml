@@ -809,6 +809,8 @@ ensures arrp_bat(_, ptr);\n\
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"
   let finishing_fun = "loop_invariant_consume"
+  let eventproc_iteration_begin = "loop_invariant_produce"
+  let eventproc_iteration_end = "loop_invariant_consume"
 end
 
 (* Register the module *)

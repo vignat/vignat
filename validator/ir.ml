@@ -98,6 +98,7 @@ type ir = {
   tip_call:tip_call;
   export_point:string;
   finishing:bool;
+  complete_event_loop_iteration:bool;
   semantic_checks:string;
 } with sexp
 

@@ -8,7 +8,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
     (*TODO: check that the types of Str (_,fts)
       are the same as in fields*)
     String.concat (List.map fields ~f:(fun {name;value} ->
-      render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=Unknown} value))
+        render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=Unknown} value))
   | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 
@@ -37,8 +37,8 @@ let render_post_assumptions post_statements =
 let render_tip_post_sttmts {args_post_conditions;
                             ret_val=_;post_statements} =
   ""
-  (* (render_post_assumptions post_statements) ^ "\n" ^ *)
-  (* (render_args_post_conditions ~is_assert:true args_post_conditions) *)
+(* (render_post_assumptions post_statements) ^ "\n" ^ *)
+(* (render_args_post_conditions ~is_assert:true args_post_conditions) *)
 
 let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   match ret_name with
@@ -60,7 +60,7 @@ let rec render_assignment {lhs;rhs;} =
 let render_extra_pre_conditions context =
   String.concat
     (List.map context.extra_pre_conditions ~f:(fun eq_cond ->
-       (render_assignment eq_cond)))
+         (render_assignment eq_cond)))
 
 let render_hist_fun_call {context;result} =
   (render_extra_pre_conditions context) ^
@@ -168,8 +168,8 @@ let split_assignments assignments =
                t=assignment.rhs.t}}::
          symbolic)
       | Struct (_, []) -> (* printf "skipping empty assignment: %s = %s" *)
-                          (*  (render_tterm assignment.lhs) *)
-                          (*  (render_tterm assignment.rhs); *)
+        (*  (render_tterm assignment.lhs) *)
+        (*  (render_tterm assignment.rhs); *)
         (concrete,symbolic)
       | _ -> failwith ("unsupported assignment: " ^
                        (render_tterm assignment.lhs) ^
@@ -177,11 +177,11 @@ let split_assignments assignments =
 
 let apply_assignments assignments terms =
   List.fold assignments ~init:terms ~f:(fun terms {lhs;rhs} ->
-    List.map terms ~f:(replace_term_in_tterm lhs.v rhs.v))
+      List.map terms ~f:(replace_term_in_tterm lhs.v rhs.v))
 
 let render_input_assumptions terms =
   String.concat ~sep:"\n" (List.map terms ~f:(fun term ->
-    "//@ assume(" ^ (render_tterm term) ^ ");"))
+      "//@ assume(" ^ (render_tterm term) ^ ");"))
 
 let ids_from_term term =
   String.Set.of_list
@@ -192,7 +192,7 @@ let ids_from_term term =
 
 let ids_from_terms terms =
   List.fold terms ~init:String.Set.empty ~f:(fun ids term ->
-    String.Set.union ids (ids_from_term term))
+      String.Set.union ids (ids_from_term term))
 
 let ids_from_eq_conditions eq_conds =
   List.fold eq_conds ~init:String.Set.empty ~f:(fun ids cond ->
@@ -213,14 +213,14 @@ let render_some_assignments_as_assumptions assignments =
 
 let render_concrete_assignments_as_assertions assignments =
   String.concat ~sep:"\n"
-     (List.map assignments ~f:(fun {lhs;rhs} ->
-        match rhs.t with
-        | Ptr _ ->
-          "/*@ assert(" ^ (render_tterm rhs) ^ " == " ^
-          (render_tterm lhs) ^ "); @*/"
-        | _ ->
-          "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
-          (render_tterm rhs) ^ "); @*/"))
+    (List.map assignments ~f:(fun {lhs;rhs} ->
+         match rhs.t with
+         | Ptr _ ->
+           "/*@ assert(" ^ (render_tterm rhs) ^ " == " ^
+           (render_tterm lhs) ^ "); @*/"
+         | _ ->
+           "/*@ assert(" ^ (render_tterm lhs) ^ " == " ^
+           (render_tterm rhs) ^ "); @*/"))
 
 let expand_conjunctions terms =
   let rec expand_tterm tterm =
@@ -368,8 +368,12 @@ let render_tip_fun_call
      "")
 
 let render_semantic_checks semantic_checks =
-  "// Semantics checks\n" ^
-  "/*@ {\n" ^ semantic_checks ^ "} @*/\n"
+  if (String.equal semantic_checks "") then
+    "\n// No semantic checks for this trace\n"
+  else
+    "\n// Semantics checks (rendered before the final call,\n" ^
+    "// because the final call should be the invariant_consume)\n" ^
+    "/*@ {\n" ^ semantic_checks ^ "} @*/\n"
 
 
 let render_vars_declarations ( vars : var_spec list ) =
@@ -399,7 +403,7 @@ let render_tmps tmps =
 
 let render_context_assumptions assumptions  =
   String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
-    "//@ assume(" ^ (render_tterm t) ^ ");")) ^ "\n"
+      "//@ assume(" ^ (render_tterm t) ^ ");")) ^ "\n"
 
 let render_allocated_args args =
   String.concat ~sep:"\n"
@@ -452,12 +456,12 @@ let render_ir ir fout ~render_assertions =
       Out_channel.output_string cout (render_tmps ir.tmps);
       Out_channel.output_string cout (render_assignments ir.arguments);
       Out_channel.output_string cout (render_hist_calls ir.hist_calls);
+      Out_channel.output_string cout (render_semantic_checks ir.semantic_checks);
       Out_channel.output_string cout (render_tip_fun_call
                                         ir.tip_call ir.export_point
                                         ir.free_vars
                                         hist_symbols
                                         ~render_assertions);
-      Out_channel.output_string cout (render_semantic_checks ir.semantic_checks);
       Out_channel.output_string cout (render_final ir.finishing
                                         ~catch_leaks:render_assertions);
       Out_channel.output_string cout "}\n")

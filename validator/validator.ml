@@ -22,7 +22,10 @@ let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
                        ir_fname ^ " " ^
                        intermediate_fout ^ " " ^
                        export_fout));
-  let ir = Import.build_ir Spec.fun_types fin Spec.preamble Spec.boundary_fun Spec.finishing_fun in
+  let ir =
+    Import.build_ir Spec.fun_types fin Spec.preamble Spec.boundary_fun Spec.finishing_fun
+      Spec.eventproc_iteration_begin Spec.eventproc_iteration_end
+  in
   let ir = Forwarding_semantics.add_semantic_checks ir in
   Out_channel.write_all ir_fname ~data:(Sexp.to_string (sexp_of_ir ir));
   match Verifier.verify_ir

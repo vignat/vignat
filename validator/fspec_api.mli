@@ -24,5 +24,7 @@ module type Spec =
     val fixpoints : Ir.tterm Core.Std.String.Map.t
     val boundary_fun : bytes
     val finishing_fun : bytes
+    val eventproc_iteration_begin : bytes
+    val eventproc_iteration_end : bytes
   end
 val spec : (module Spec) option ref

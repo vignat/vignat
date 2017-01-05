@@ -931,26 +931,33 @@ let strip_context call =
   (* TODO: why do we erase the return value? *)
   {call with ret = None; call_context = []; ret_context = [];}
 
-let get_relevant_segment pref boundary_fun =
-  let rec last_relevant_seg hist candidat =
+(* Returns the segment and whether it is a part of an iteration or not*)
+let get_relevant_segment pref boundary_fun eventproc_iteration_begin =
+  let rec last_relevant_seg hist candidate =
     match hist with
     | c :: rest ->
       if (String.equal c.fun_name boundary_fun) then
         last_relevant_seg rest hist
+      else if (String.equal c.fun_name eventproc_iteration_begin) then
+        let (seg,_) = last_relevant_seg rest hist in
+        (seg, true)
       else
-        last_relevant_seg rest candidat
-    | [] -> candidat
+        last_relevant_seg rest candidate
+    | [] -> (candidate, false)
   in
   match pref.tip_calls with
   | [] -> failwith "must have at least one tip call."
   | hd :: _ ->
-    if (String.equal hd.fun_name boundary_fun) then
-      {history=[]; tip_calls = List.map pref.tip_calls ~f:strip_context}
+    if (String.equal hd.fun_name boundary_fun) ||
+       (String.equal hd.fun_name eventproc_iteration_begin) then
+      ({history=[]; tip_calls = List.map pref.tip_calls ~f:strip_context},
+       false)
     else
       match last_relevant_seg pref.history [] with
-      | bnd :: rest ->
-        {history = strip_context bnd :: rest; tip_calls = pref.tip_calls}
-      | [] -> pref
+      | (bnd :: rest, inside_iteration) ->
+        ({history = strip_context bnd :: rest; tip_calls = pref.tip_calls},
+         inside_iteration)
+      | ([], _) -> (pref, false)
 
 let is_the_last_function_finishing pref finishing_fun =
   String.equal (List.hd_exn pref.tip_calls).fun_name finishing_fun
@@ -991,18 +998,25 @@ let typed_vars_to_varspec free_vars =
         String.Map.add acc ~key:vname
           ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
 
-let build_ir fun_types fin preamble boundary_fun finishing_fun =
+let build_ir fun_types fin preamble boundary_fun finishing_fun
+  eventproc_iteration_begin eventproc_iteration_end =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
     | Some spec -> spec
     | None -> failwith ("unknown function " ^ fun_name)
   in
-  let pref = get_relevant_segment
+  let (pref,inside_iteration) = get_relevant_segment
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin))
-      boundary_fun
+      boundary_fun eventproc_iteration_begin
   in
   let pref = distribute_ids pref in
-  let finishing = is_the_last_function_finishing pref finishing_fun in
+  let finishing_iteration =
+    is_the_last_function_finishing pref eventproc_iteration_end
+  in
+  let finishing =
+    (is_the_last_function_finishing pref finishing_fun) ||
+    finishing_iteration
+  in
   let preamble = preamble in
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
@@ -1016,4 +1030,6 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let free_vars = typed_vars_to_varspec free_vars in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
-   export_point;finishing;semantic_checks=""}
+   export_point;finishing;
+   complete_event_loop_iteration = inside_iteration && finishing_iteration;
+   semantic_checks=""}
