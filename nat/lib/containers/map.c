@@ -6019,13 +6019,114 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void map_remove_swap<t1,t2>(fixpoint (t1,t2) f, t1 x, list<t1> l)
+  lemma void msubset_refl<t>(list<t> l)
   requires true;
-  ensures map(f, remove(x, l)) == remove(f(x), map(f, l));
+  ensures true == msubset(l, l);
   {
-    assume(false);//TODO 
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        msubset_refl(t);
+    }
   }
   @*/
+
+
+/*@
+  lemma void multiset_eq_map_cons_remove<t1,t2>(fixpoint (t1,t2) f,
+                                                list<t1> l,
+                                                t1 x, t1 y)
+  requires true == mem(x, l) &*& f(x) == f(y);
+  ensures true == multiset_eq(map(f, l),
+                              map(f, cons(y, remove(x, l))));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (h == x) {
+          multiset_eq_refl(map(f, l));
+        }
+        else {
+          multiset_eq_map_cons_remove(f, t, x, y);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void multiset_eq_msubset<t>(list<t> l1, list<t> l2)
+  requires true == multiset_eq(l1, l2);
+  ensures true == msubset(l1, l2);
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        multiset_eq_msubset(t, remove(h, l2));
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void map_remove_swap<t1,t2>(fixpoint (t1,t2) f,
+                                    t1 x, list<t1> l)
+  requires true == mem(x, l);
+  ensures true == multiset_eq(remove(f(x), map(f, l)),
+                              map(f, remove(x, l)));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        if (h == x) {
+           multiset_eq_refl(map(f, remove(x, l)));
+        } else {
+          if (f(h) == f(x)) {
+            multiset_eq_map_cons_remove(f, t, x, h);
+          } else {
+            map_remove_swap(f, x, t);
+          }
+        }
+    }
+  }//took 40m
+  @*/
+
+
+/*@
+  lemma void msubset_remove<t>(list<t> l1, list<t> l2, t x)
+  requires true == msubset(l1, l2);
+  ensures true == msubset(remove(x, l1), remove(x, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        if (h == x) {}
+        else {
+          msubset_remove(t, remove(h, l2), x);
+          neq_mem_remove(h, x, l2);
+          remove_commutes(l2, h, x);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void msubset_trans<t>(list<t> l1, list<t> l2, list<t> l3)
+  requires true == msubset(l1, l2) &*& true == msubset(l2, l3);
+  ensures true == msubset(l1, l3);
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        msubset_remove(l2, l3, h);
+        msubset_trans(t, remove(h, l2), remove(h, l3));
+        msubset_subset(l2, l3);
+        subset_mem_trans(l2, l3, h);
+    }
+  }//took 10m
+  @*/
+
 
 /*@
   lemma void msubset_map<t1, t2>(fixpoint (t1, t2) f, list<t1> l1, list<t1> l2)
@@ -6037,6 +6138,12 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       case cons(h,t):
         msubset_map(f, t, remove(h, l2));
         map_remove_swap(f, h, l2);
+        multiset_eq_comm(remove(f(h), map(f, l2)),
+                         map(f, remove(h, l2)));
+        multiset_eq_msubset(map(f, remove(h, l2)),
+                            remove(f(h), map(f, l2)));
+        msubset_trans(map(f, t), map(f, remove(h, l2)),
+                      remove(f(h), map(f, l2)));
         mem_map(h, l2, f);
     }
   }//took 10m
