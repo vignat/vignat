@@ -128,8 +128,8 @@ rte_eth_tx_burst hands packets over to a network card
 This section defines an abstraction function that transforms the implementation state into the abstract state.
 #+BEGIN_SRC haskell 
 Abstraction(double_map, allocator, time,
-            rte_eth_rx_burst returns {outcast},
-            rte_eth_tx_burst is called with {incast}) ->
+            rte_eth_rx_burst returns {incast},
+            rte_eth_tx_burst is called with {outcast}) ->
   flow_table = 
     forall (allocated_index, timestamp) in Allocator
       such that (time < timestamp + T_EXP) 

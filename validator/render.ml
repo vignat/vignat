@@ -367,6 +367,10 @@ let render_tip_fun_call
    else
      "")
 
+let render_semantic_checks semantic_checks =
+  "// Semantics checks\n" ^
+  "/*@ {\n" ^ semantic_checks ^ "} @*/\n"
+
 
 let render_vars_declarations ( vars : var_spec list ) =
   String.concat ~sep:"\n"
@@ -453,6 +457,7 @@ let render_ir ir fout ~render_assertions =
                                         ir.free_vars
                                         hist_symbols
                                         ~render_assertions);
+      Out_channel.output_string cout (render_semantic_checks ir.semantic_checks);
       Out_channel.output_string cout (render_final ir.finishing
                                         ~catch_leaks:render_assertions);
       Out_channel.output_string cout "}\n")

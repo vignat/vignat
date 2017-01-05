@@ -1016,4 +1016,4 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let free_vars = typed_vars_to_varspec free_vars in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
-   export_point;finishing}
+   export_point;finishing;semantic_checks=""}

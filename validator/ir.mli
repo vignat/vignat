@@ -99,6 +99,7 @@ type ir = {
   tip_call : tip_call;
   export_point : bytes;
   finishing : bool;
+  semantic_checks:bytes;
 }
 val __ir_of_sexp__ : Sexp.t -> ir
 val ir_of_sexp : Sexp.t -> ir

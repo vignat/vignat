@@ -98,6 +98,7 @@ type ir = {
   tip_call:tip_call;
   export_point:string;
   finishing:bool;
+  semantic_checks:string;
 } with sexp
 
 let strip_outside_parens str =
