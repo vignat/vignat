@@ -10,23 +10,23 @@
 # $3: Additional arguments for the app
 
 if [ $1 != "loopback" -a $1 != "rr" ]; then
-    echo "[run] Unknown scenario specified in run-dpdk" 1>&2
+    echo "[bench] Unknown scenario specified in run-dpdk" 1>&2
     exit 1
 fi
 
 if [ -z $2 ]; then
-    echo "[run] No app folder specified in run-dpdk" 1>&2
+    echo "[bench] No app folder specified in run-dpdk" 1>&2
     exit 2
 fi
 
 
 pushd $2 >> /dev/null
 
-echo "[run] Building $1..."
+echo "[bench] Building $2..."
 sudo rm build -rf
 make
 
-echo "[run] Running $1..."
+echo "[bench] Running $2..."
 if [ $1 = "loopback" ]; then
     sudo ./build/nat -c 0x01 -n 2 -- -p 0x3 --wan 0 \
         $3 \
