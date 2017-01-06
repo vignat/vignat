@@ -14,8 +14,8 @@ Flow_id := tuple<int_ep     : Endpoint, -- internal host endpoint identity
                  ext_ep     : Endpoint, -- external host endpoint identity
                  protocol   : TCP/UDP>
 
-Flow_entry := tuple<int_flow_id : Flow_id, -- flow id, as seen in the public network
-                    ext_flow_id : Flow_id> -- flow id, as seen in the private network
+Flow_entry := tuple<int_flow_id : Flow_id, -- flow id, as seen in the private network
+                    ext_flow_id : Flow_id> -- flow id, as seen in the public network
               with invariant:
                    int_flow_id.ext_ep == ext_flow_id.ext_ep and
                    int_flow_id.protocol == ext_flow_id.protocol
@@ -23,16 +23,15 @@ Flow_entry := tuple<int_flow_id : Flow_id, -- flow id, as seen in the public net
 Flow_table := set<flow_entry : Flow_entry,
                   timestamp>
               with invariant:
-                   flow_entry.int_flow_id and
-                   flow_entry.ext_flow_id
-                   are unique across the whole set
+                   flow_entry.int_flow_id is unique across set, and
+                   flow_entry.ext_flow_id is unique across set
 
 Packet := tuple<flow_id   : Flow_id,
                 interface : private/public,
                 payload>
 
 Network := tuple<incast_packet : Packet, -- packet waiting in the receive buffer 
-                           outcast_packet : Packet> -- last forwarded packet 
+                 outcast_packet : Packet> -- last forwarded packet 
 
 state := tuple<flow_table : Flow_table,
                network    : Network>
@@ -40,22 +39,20 @@ state := tuple<flow_table : Flow_table,
 
 * rules
 The rules are in the form: "precondition" -> "postcondition".
-"Precondition" is all the abstract state properties that determine the NAPT state change on the next packet arrival.
+"Precondition" is all the abstract state properties that determine the NAPT state change on a packet arrival.
 "Postcondition" is the NAPT's response to that event: abstract state transformation (i.e., new flow in the table) and the reaction visible from the outside (i.e., outgoing packets).
 First we define the building blocks for both preconditions and postconditions, and then define the rules themselves.
 ** definitions
 This section defines necessary terminology for specifying essential NAPT behavior cases.
 *** precondition elements
 These are the things that determine NAPT's behavior on every event (on every packet that comes in).
-  - =Ext_flow_id F exists=: exists ~Flow_entry X~ in ~flow_table~ such that ~f.ext_flow_id~ == F
-  - =Int_flow_id F exists=: exists ~Flow_entry X~ in ~flow_table~ such that ~f.int_flow_id~ == F
   - =the flow table not full=: size(~flow_table~) < ~CAPACITY~
   - =packet P arrives=: ~network.incast_packet~ contains ~P~
-  - =packet P is internal=: ~P~.interface = internal 
-  - =packet P is external=: ~P~.interface = external 
+  - =packet P is internal=: ~P~.interface == internal 
+  - =packet P is external=: ~P~.interface == external 
   
 #+BEGIN_SRC haskell
--- Find a flow corresponding to the packet P
+-- Find a flow corresponding to the packet P (if none found, then we say F(P) doesn't exist)
 F(P) := switch(P.interface)
           case internal: find Flow_entry X in flow_table
                          such that X.int_flow_id = P.flow_id
@@ -64,8 +61,8 @@ F(P) := switch(P.interface)
 #+END_SRC
 
 *** postcondition elements
-This section defines possible transformation of the state that NAPT may perform.
-We divide the postconditions into three categories (~t~ refers to the time when a packet arrives):
+This section defines possible transformations of the state that the NAPT may perform.
+We divide the postconditions into three categories (~t~ refers to the time when a packet arrives and is processed):
 
 **** expiration
 #+BEGIN_SRC haskell
@@ -88,7 +85,7 @@ Expire(flow_table, time) := maximum subset of flow_table, with time < timestamp 
 - /P is accepted/: ~network.incast_packet~ = nil
 
 ** rules
-Note: '=>' is a separator of the sequence of rule classes. "A => B" means "after A follows B".
+Note: "A => B" means "B follows A".
 #+BEGIN_SRC haskell
 -- All NAPT scenarios follow the same general script:
 Packet P arrives at time t =>
@@ -111,7 +108,7 @@ P is external -> F(P) exists -> packet P is forwarded
 #+END_SRC
 
 * implementation specific state
-Our NAPT keeps its dynamic state in two data structures: Double_Map and Allocator. We use Double_Map to keep ~Flow_entry~'s accessible by both ~Ext_flow_id~ and ~Int_flow_id~. VeriFast proof lifts their physical representation into the following logical (intermediate) abstraction (note, we use list for any container, as VeriFast lacks built-in set or map):
+Our NAPT keeps its dynamic state in two data structures: Double_ Map and Allocator. We use Double_ Map to keep ~Flow_entry~'s accessible by both ~Ext_flow_id~ and ~Int_flow_id~. VeriFast proof lifts their physical representation into the following logical (intermediate) abstraction (note, we use list for containers, because VeriFast lacks built-in set or map):
 #+BEGIN_SRC haskell 
 allocator = list<index, timestamp>
             index'es are unique
@@ -136,7 +133,7 @@ Abstraction(double_map, allocator, time,
             rte_eth_rx_burst returns {incast},
             rte_eth_tx_burst is called with {outcast}) :=
   flow_table = 
-    forall (index, timestamp) in Allocator
+    forall (index, timestamp) in allocator
       such that (time < timestamp + T_EXP) 
       find (ext_flow_id, int_flow_id, flow_entry, index) in double_map
       collect (flow_entry, timestamp)
