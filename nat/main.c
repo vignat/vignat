@@ -230,6 +230,11 @@ send_burst(struct lcore_conf *qconf, struct Batcher *mbufs, uint8_t port)
 /* Enqueue a single packet, and send burst if queue is filled */
 static inline int
 send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
+#ifdef KLEE_VERIFICATION
+{
+  return 0;
+}
+#else//KLEE_VERIFICATION
 {
   struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs, port);
   batcher_push(mbufs, m);
@@ -243,6 +248,7 @@ send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
   mbufs = 0;
   return 0;
 }
+#endif//KLEE_VERIFICATION
 
 static uint16_t get_src_port(struct rte_mbuf *m) {
     struct ipv4_hdr *ipv4_hdr = 
@@ -286,14 +292,15 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
     }
 }
 
-static inline __attribute__((always_inline)) void
-simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
+static void simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
 {
   struct ether_hdr *eth_hdr;
   struct ipv4_hdr *ipv4_hdr;
   uint8_t dst_device;
 
   eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
+
+  expire_flows(current_time());
 
   if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
       (m->packet_type == 0 &&
@@ -421,145 +428,114 @@ simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
   }
 }
 
-static uint64_t lcore_loop(unsigned lcore_id, uint64_t prev_tsc,
-                           struct lcore_conf *qconf) {
-  uint8_t portid, queueid;
-  int i, j, nb_rx;
-  uint64_t diff_tsc, cur_tsc;
-  const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) /
-    US_PER_S * BURST_TX_DRAIN_US;
-  struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
-  //loop starts here
-  {
-
-        expire_flows(current_time());
-
-        cur_tsc = rte_rdtsc();
-
-        /*
-         * TX burst queue drain
-         */
-        diff_tsc = cur_tsc - prev_tsc;
-        if (unlikely(diff_tsc > drain_tsc)) {
-
-          /*
-           * This could be optimized (use queueid instead of
-           * portid), but it is not called so often
-           */
-          for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
-            struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs,
-                                                           portid);
-            int is_empty = batcher_is_empty(mbufs);
-            if (is_empty)
-              continue;
-            send_burst(qconf, mbufs, portid);
-            array_bat_end_access(&qconf->tx_mbufs);
-            mbufs = 0;
-          }
-
-          prev_tsc = cur_tsc;
-        }
-
-        /*
-         * Read packet from RX queues
-         */
-#ifdef KLEE_VERIFICATION
-        klee_make_symbolic(&i, sizeof(int), "queue_num_i");
-        loop_enumeration_begin(get_dmap_pp(), get_dchain_pp(),
-                               &lcore_conf, lcore_id, qconf,
-                               current_time(), max_flows, start_port,
-                               i);
-        for (i = 0; klee_induce_invariants() & (i < qconf->n_rx_queue); ++i)
-#else //KLEE_VERIFICATION
-          for (i = 0; i < qconf->n_rx_queue; ++i)
-#endif //KLEE_VERIFICATION
-            {
-
-#ifdef KLEE_VERIFICATION
-              loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
-                                         &lcore_conf, lcore_id, qconf,
-                                         current_time(), max_flows, start_port);
-              array_lcc_reset(&lcore_conf);
-              klee_assume(i < qconf->n_rx_queue);
-              klee_assume(0 <= i);
-#endif//KLEE_VERIFICATION
-
-              struct lcore_rx_queue *rx_queue =
-                array_rq_begin_access(&qconf->rx_queue_list, i);
-              portid = rx_queue->port_id;
-              queueid = rx_queue->queue_id;
-              array_rq_end_access(&qconf->rx_queue_list);
-              nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
-                                       MAX_PKT_BURST);
-              //too verbose. LOG("received %d packets\n", nb_rx);
-              if (nb_rx != 0) {
-
-                /* Prefetch first packets */
-                for (j = 0; j < PREFETCH_OFFSET && j < nb_rx; j++) {
-                  rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[j], void *));
-                }
-
-                /* Prefetch and forward already prefetched packets */
-                for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
-                  rte_prefetch0(rte_pktmbuf_mtod
-                                (pkts_burst[j + PREFETCH_OFFSET], void *));
-                  simple_forward(pkts_burst[j], portid, qconf);
-                }
-
-                /* Forward remaining prefetched packets */
-                for (; j < nb_rx; j++) {
-                  simple_forward(pkts_burst[j], portid, qconf);
-                }
-              }
-            }
-#ifdef KLEE_VERIFICATION
-        loop_enumeration_end(get_dmap_pp(), get_dchain_pp(),
-                             &lcore_conf, lcore_id, qconf,
-                             current_time(), max_flows, start_port);
-#endif//KLEE_VERIFICATION
-      }
-  return prev_tsc;
-}
-
 /* main processing loop */
 static int
-main_loop(__attribute__((unused)) void *dummy)
+main_loop(void* one_iteration)
+#ifdef KLEE_VERIFICATION
 {
+  void (*forward_packet)(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf) = one_iteration;
+  int x = klee_int("loop_termination");
+  unsigned lcore_id = rte_lcore_id();
+  struct lcore_conf* qconf = array_lcc_begin_access(&lcore_conf, lcore_id);
+  loop_iteration_begin(get_dmap_pp(), get_dchain_pp(), &lcore_conf,
+                       lcore_id, qconf, starting_time, max_flows, start_port);
+  while (klee_induce_invariants() & x) {
+    loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+                               &lcore_conf, lcore_id, qconf,
+                               starting_time, max_flows, start_port);
+    struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
+    int portid = klee_range(0, RTE_MAX_ETHPORTS, "port_id");
+    int queueid = klee_int("queue_id");
+    int nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
+                                 MAX_PKT_BURST);
+    if (0 < nb_rx) {
+      forward_packet(pkts_burst[0], portid, qconf);
+    }
+  }
+  loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
+                     &lcore_conf, lcore_id, qconf,
+                     current_time(), max_flows, start_port);
+  array_lcc_end_access(&lcore_conf);
+  return 0;
+}
+#else//KLEE_VERIFICATION
+{
+  void (*forward_packet)(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf) = one_iteration;
   uint64_t prev_tsc = 0;
   unsigned lcore_id = rte_lcore_id();
   struct lcore_conf* qconf = array_lcc_begin_access(&lcore_conf, lcore_id);
 
-#ifdef KLEE_VERIFICATION
-    int x = klee_int("loop_termination");
-    loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
-                         &lcore_conf, lcore_id, qconf,
-                         starting_time, max_flows, start_port);
-    while (klee_induce_invariants() & x)
-#else //KLEE_VERIFICATION
-      while (1) 
-#endif //KLEE_VERIFICATION
-        {
-#ifdef KLEE_VERIFICATION
-          loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
-                                     &lcore_conf, lcore_id, qconf,
-                                     starting_time, max_flows, start_port);
-          array_lcc_reset(&lcore_conf);
-#endif//KLEE_VERIFICATION
+  while (1) {
+    uint8_t portid, queueid;
+    int i, j, nb_rx;
+    uint64_t diff_tsc, cur_tsc;
+    const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) /
+      US_PER_S * BURST_TX_DRAIN_US;
+    struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
+    cur_tsc = rte_rdtsc();
 
-          //#### VV Here it is: VV ######
-          prev_tsc = lcore_loop(lcore_id, prev_tsc, qconf);
-          //#### ^^^^^^^^^^^^^^^^^ ######
+    /*
+     * TX burst queue drain
+     */
+    diff_tsc = cur_tsc - prev_tsc;
+    if (unlikely(diff_tsc > drain_tsc)) {
 
-#ifdef KLEE_VERIFICATION
-          loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
-                             &lcore_conf, lcore_id, qconf,
-                             current_time(), max_flows, start_port);
-#endif//KLEE_VERIFICATION
+      /*
+       * This could be optimized (use queueid instead of
+       * portid), but it is not called so often
+       */
+      for (portid = 0; portid < RTE_MAX_ETHPORTS; portid++) {
+        struct Batcher *mbufs = array_bat_begin_access(&qconf->tx_mbufs,
+                                                       portid);
+        int is_empty = batcher_is_empty(mbufs);
+        if (is_empty)
+          continue;
+        send_burst(qconf, mbufs, portid);
+        array_bat_end_access(&qconf->tx_mbufs);
+        mbufs = 0;
+      }
+
+      prev_tsc = cur_tsc;
+    }
+
+    /*
+     * Read packet from RX queues
+     */
+    for (i = 0; i < qconf->n_rx_queue; ++i) {
+      struct lcore_rx_queue *rx_queue =
+        array_rq_begin_access(&qconf->rx_queue_list, i);
+      portid = rx_queue->port_id;
+      queueid = rx_queue->queue_id;
+      array_rq_end_access(&qconf->rx_queue_list);
+      nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
+                               MAX_PKT_BURST);
+      //too verbose. LOG("received %d packets\n", nb_rx);
+      if (nb_rx != 0) {
+
+        /* Prefetch first packets */
+        for (j = 0; j < PREFETCH_OFFSET && j < nb_rx; j++) {
+          rte_prefetch0(rte_pktmbuf_mtod(pkts_burst[j], void *));
         }
-    array_lcc_end_access(&lcore_conf);
-    qconf = 0;
-    return 0;
+
+        /* Prefetch and forward already prefetched packets */
+        for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
+          rte_prefetch0(rte_pktmbuf_mtod
+                        (pkts_burst[j + PREFETCH_OFFSET], void *));
+          forward_packet(pkts_burst[j], portid, qconf);
+        }
+
+        /* Forward remaining prefetched packets */
+        for (; j < nb_rx; j++) {
+          forward_packet(pkts_burst[j], portid, qconf);
+        }
+      }
+    }
+  }
+  array_lcc_end_access(&lcore_conf);
+  qconf = 0;
+  return 0;
 }
+#endif//KLEE_VERIFICATION
 
 static int
 check_lcore_params(void)
@@ -1132,7 +1108,7 @@ main(int argc, char **argv)
   unsigned lcore_id;
   init(argc, argv);
   /* launch per-lcore init on every lcore */
-  rte_eal_mp_remote_launch(main_loop, NULL, CALL_MASTER);
+  rte_eal_mp_remote_launch(main_loop, simple_forward, CALL_MASTER);
   RTE_LCORE_FOREACH_SLAVE(lcore_id) {
     if (rte_eal_wait_lcore(lcore_id) < 0)
       return -1;
