@@ -232,6 +232,10 @@ static inline int
 send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
 #ifdef KLEE_VERIFICATION
 {
+  klee_trace_ret();
+  klee_trace_param_just_ptr(m, sizeof(*m), "m");
+  klee_trace_param_i32(port, "portid");
+  klee_trace_param_just_ptr(qconf, sizeof(*qconf), "qconf");
   return 0;
 }
 #else//KLEE_VERIFICATION
@@ -428,6 +432,16 @@ static void simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf
   }
 }
 
+#ifdef KLEE_VERIFICATION
+static void received_packet(uint8_t portid, uint8_t queueid, struct rte_mbuf *mbuf)
+{
+  klee_trace_ret();
+  klee_trace_param_i32(portid, "portid");
+  klee_trace_param_i32(queueid, "queueid");
+  klee_trace_param_just_ptr(mbuf, sizeof(*mbuf), "mbuf");
+}
+#endif//KLEE_VERIFICATION
+
 /* main processing loop */
 static int
 main_loop(void* one_iteration)
@@ -449,6 +463,7 @@ main_loop(void* one_iteration)
     int nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
                                  MAX_PKT_BURST);
     if (0 < nb_rx) {
+      received_packet(portid, queueid, pkts_burst[0]);
       forward_packet(pkts_burst[0], portid, qconf);
     }
   }
