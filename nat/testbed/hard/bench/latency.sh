@@ -34,11 +34,11 @@ echo "[bench] Launching pktgen..."
 echo "[bench] Heating up tables..."
 END_PORT=$(($BEGIN_PORT+$NUM_SAMPLE_FLOWS))
 ncons=$(netperf -H $SERVER_HOST -P 0 -t TCP_CC -l $DURATION -- -H "$SERVER_IP   " -p $BEGIN_PORT,$END_PORT | head -n 1 | awk '{print $6}')
-echo "[bench] Heatup latency: $ncons"
+echo "[bench] Heatup reqs/s: $ncons"
 
 echo "[bench] Testing begins..."
 for k in $(seq 1 $REPEAT); do
-	for nflws in 35000 40000 50000 55000; do #1000 10000 25000 35000; do #30000 28000 26000 22000 21000 20000 23000 24000 25000 27000 32000 35000; do # 28000 35000; do #40000 42500 45000 47500 50000; do #1000 5000 10000 15000 20000 25000 33000 40000 50000; do
+	for nflws in 1000 5000 10000 15000 20000 25000 30000 35000 40000 45000 50000 55000 60000; do
 		BEGIN_PORT=$(($END_PORT + ($RANDOM % 500)))
 		END_PORT=$(($BEGIN_PORT+10))
 		if [ $MAX_PORT -le $END_PORT ]; then
@@ -46,16 +46,19 @@ for k in $(seq 1 $REPEAT); do
 			END_PORT=$(($BEGIN_PORT+10))
 		fi
 		RANGE_MAX_PORT=$((1000+$nflws))
-		echo "pktgen.stop(\"0\")" > cmd.lua
+		echo 'pktgen.stop("0")' > cmd.lua
 		echo "pktgen.dst_port(\"0\", \"max\", $RANGE_MAX_PORT)" >> cmd.lua
-		echo "pktgen.start(\"0\")" >> cmd.lua
+		echo 'pktgen.start("0")' >> cmd.lua
 		. ~/scripts/pktgen/send-command.sh cmd.lua
 		sleep $FLOW_HEATUP
 		ncons=$(netperf -H $SERVER_HOST -P 0 -t TCP_RR -l $DURATION -- -H "$SERVER_IP   " -p $BEGIN_PORT,$END_PORT | head -n 1 | awk '{print $6}')
-		echo "[bench] $END_PORT - $BEGIN_PORT = $nflws -> $ncons"
-		echo $nflws $ncons >> $RESULT_FILE
 
-		echo "pktgen.stop(\"0\")" > cmd.lua
+                # lat = 1/(req/s); one-way lat = lat/2; in milliseconds, *1000
+                lat=`bc -l <<< "scale=3; (1000 / $ncons) / 2"`
+		echo "[bench] begin:$BEGIN_PORT end:$END_PORT flows:$nflws req/s:$ncons lat:$lat"
+		echo $nflws $ncons $lat >> $RESULT_FILE
+
+		echo 'pktgen.stop("0")' > cmd.lua
 		. ~/scripts/pktgen/send-command.sh cmd.lua
 
 		echo "[bench] Waiting for expiration..."
