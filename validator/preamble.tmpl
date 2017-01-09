@@ -20,3 +20,13 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 {
    return 0;
 }
+
+void send_single_packet(struct rte_mbuf *m, uint8_t port,
+                        struct lcore_conf *qconf);
+//@ requires true;
+//@ ensures true;
+
+void received_packet(uint8_t portid, uint8_t queueid,
+                     struct rte_mbuf *mbuf);
+//@ requires true;
+//@ ensures true;

@@ -368,12 +368,21 @@ let rec is_bool_expr exp =
   | _ -> false
 
 (* TODO: elaborate. *)
-let guess_type _ = Unknown
+let guess_type exp t =
+  lprintf "guessing for %s, know %s\n" (Sexp.to_string exp) (ttype_to_str t);
+  match t with
+  | Uunknown -> begin match exp with
+      | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
+        when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
+      | _ -> t
+    end
+  | _ -> t
 
-let rec guess_type_l exps =
+
+let rec guess_type_l exps t =
   match exps with
-  | hd :: tl -> begin match guess_type hd with
-      | Unknown -> guess_type_l tl
+  | hd :: tl -> begin match guess_type hd t with
+      | Unknown -> guess_type_l tl t
       | s -> s
     end
   | [] -> Unknown
@@ -385,7 +394,7 @@ let rec get_sexp_value exp t =
   | Sexp.Atom v ->
     begin
       let t = match t with
-        |Unknown|Sunknown|Uunknown -> guess_type exp
+        |Unknown|Sunknown|Uunknown -> guess_type exp t
         |_ -> t
       in
       match t with
@@ -445,7 +454,7 @@ let rec get_sexp_value exp t =
     {v=Bop (Lt,(get_sexp_value lhs Uunknown),(get_sexp_value rhs Uunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
-    let ty = guess_type_l [lhs;rhs] in
+    let ty = guess_type_l [lhs;rhs] Unknown in
     {v=Bop (Eq,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t}
   | Sexp.List [Sexp.Atom f; _; e]
     when String.equal f "ZExt" ->
@@ -463,7 +472,12 @@ let rec get_sexp_value exp t =
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> {v=Id name;t}
-      | None -> make_cmplx_val exp t
+      | None ->
+        let t = match t with
+          |Unknown|Sunknown|Uunknown -> guess_type exp t
+          |_ -> t
+        in
+        make_cmplx_val exp t
     end
 
 let rec get_struct_val_value valu t =
@@ -936,11 +950,11 @@ let get_relevant_segment pref boundary_fun eventproc_iteration_begin =
   let rec last_relevant_seg hist candidate =
     match hist with
     | c :: rest ->
-      if (String.equal c.fun_name boundary_fun) then
-        last_relevant_seg rest hist
-      else if (String.equal c.fun_name eventproc_iteration_begin) then
+      if (String.equal c.fun_name eventproc_iteration_begin) then
         let (seg,_) = last_relevant_seg rest hist in
         (seg, true)
+      else if (String.equal c.fun_name boundary_fun) then
+        last_relevant_seg rest hist
       else
         last_relevant_seg rest candidate
     | [] -> (candidate, false)
@@ -1009,6 +1023,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin))
       boundary_fun eventproc_iteration_begin
   in
+  lprintf "inside_iteration: %s\n" (if inside_iteration then "true" else "false");
   let pref = distribute_ids pref in
   let finishing_iteration =
     is_the_last_function_finishing pref eventproc_iteration_end

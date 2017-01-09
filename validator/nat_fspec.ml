@@ -719,7 +719,16 @@ let fun_types =
      "batcher_is_empty", {ret_type = Sint32;
                           arg_types = [Ptr batcher_struct;];
                           lemmas_before = [];
-                         lemmas_after = [];}
+                          lemmas_after = [];};
+     "received_packet", {ret_type = Void;
+                         arg_types = [Ir.Uint8; Ir.Uint8; Ptr rte_mbuf_struct;];
+                         lemmas_before = [];
+                         lemmas_after = [];};
+     "send_single_packet", {ret_type = Void;
+                            arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
+                                         Ptr lcore_conf_struct];
+                            lemmas_before = [];
+                            lemmas_after = [];};
     ]
 
 let fixpoints =
