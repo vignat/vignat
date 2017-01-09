@@ -228,7 +228,7 @@ send_burst(struct lcore_conf *qconf, struct Batcher *mbufs, uint8_t port)
 }
 
 /* Enqueue a single packet, and send burst if queue is filled */
-static inline int
+static void
 send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
 #ifdef KLEE_VERIFICATION
 {
@@ -236,7 +236,6 @@ send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
   klee_trace_param_just_ptr(m, sizeof(*m), "m");
   klee_trace_param_i32(port, "portid");
   klee_trace_param_just_ptr(qconf, sizeof(*qconf), "qconf");
-  return 0;
 }
 #else//KLEE_VERIFICATION
 {
@@ -250,7 +249,6 @@ send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
   }
   array_bat_end_access(&qconf->tx_mbufs);
   mbufs = 0;
-  return 0;
 }
 #endif//KLEE_VERIFICATION
 
@@ -466,10 +464,10 @@ main_loop(void* one_iteration)
       received_packet(portid, queueid, pkts_burst[0]);
       forward_packet(pkts_burst[0], portid, qconf);
     }
+    loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
+                       &lcore_conf, lcore_id, qconf,
+                       current_time(), max_flows, start_port);
   }
-  loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
-                     &lcore_conf, lcore_id, qconf,
-                     current_time(), max_flows, start_port);
   array_lcc_end_access(&lcore_conf);
   return 0;
 }
