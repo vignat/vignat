@@ -8,9 +8,9 @@ require "Pktgen";
 
 -- define packet sizes to test
 -- local pkt_sizes		= { 64, 128, 256, 512, 1024, 1280, 1518 };
-local pkt_sizes		= { 64};--, 128};
+local pkt_sizes		= { 64 };
 
-local flows_nums = {28000}; -- {50000, 59000}; -- {40000, 50000}; --{1, 7500, 20000}; --{ 1, 100, 1000, 7500, 20000, 30000 };
+local flows_nums = { 1000, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000 };
 
 -- Time in seconds to transmit for
 local duration		= 40000;
@@ -20,8 +20,8 @@ local pauseTime		= 2000;
 local strtprt_int = 1000;
 
 
-local num_reg_steps = 23;--20;
-local num_bin_steps = 0;--3;
+local num_reg_steps = 23;
+local num_bin_steps = 0;
 
 local srcUDPPort = "1234";
 
