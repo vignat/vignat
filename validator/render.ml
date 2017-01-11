@@ -384,7 +384,7 @@ let render_semantic_checks semantic_checks =
   else
     "\n// Semantics checks (rendered before the final call,\n" ^
     "// because the final call should be the invariant_consume)\n" ^
-    "/*@ {\n" ^ semantic_checks ^ "} @*/\n"
+    "/*@ {\n" ^ semantic_checks ^ "\n} @*/\n"
 
 
 let render_vars_declarations ( vars : var_spec list ) =

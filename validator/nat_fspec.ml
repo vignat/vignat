@@ -803,13 +803,13 @@ let fun_types =
                          arg_types = [Ir.Uint8; Ir.Uint8; Ptr rte_mbuf_struct;];
                          extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
-                         lemmas_after = [];};
+                         lemmas_after = [fun _ -> "a_packet_received = true;\n"];};
      "send_single_packet", {ret_type = Void;
                             arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
                                          Ptr lcore_conf_struct];
                             extra_ptr_types = ["user_buf_addr", user_buf_struct];
                             lemmas_before = [];
-                            lemmas_after = [];};
+                            lemmas_after = [fun _ -> "a_packet_sent = true;\n"];};
     ]
 
 let fixpoints =
@@ -877,30 +877,23 @@ module Iface : Fspec_api.Spec =
 struct
   let preamble = (In_channel.read_all "preamble.tmpl") ^
                  "\
-/*@\n\
-lemma void introduce_arrp_rq(void* ptr);\n\
-requires true;\n\
-ensures arrp_rq(_, ptr);\n\
-\n\
-lemma void introduce_arrp_u16(void* ptr);\n\
-requires true;\n\
-ensures arrp_u16(_, ptr);\n\
-\n\
-lemma void introduce_arrp_bat(void* ptr);\n\
-requires true;\n\
-ensures arrp_bat(_, ptr);\n\
-@*/\n\
  void to_verify()\n\
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
                   struct lcore_conf *last_lcc;\n\
-                  struct lcore_rx_queue *last_rq;\n"
+                  struct lcore_rx_queue *last_rq;\n\
+                 struct rte_mbuf* received_packet;\n\
+                 bool a_packet_received = false;\n\
+                 struct rte_mbuf* sent_packet;\n\
+                 bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"
   let finishing_fun = "loop_invariant_consume"
   let eventproc_iteration_begin = "loop_invariant_produce"
   let eventproc_iteration_end = "loop_invariant_consume"
+  let user_check_for_complete_iteration =
+    (In_channel.read_all "forwarding_property.tmpl")
 end
 
 (* Register the module *)

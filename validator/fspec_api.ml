@@ -32,6 +32,7 @@ sig
   val finishing_fun : string
   val eventproc_iteration_begin : string
   val eventproc_iteration_end : string
+  val user_check_for_complete_iteration : string
 end
 
 let spec : (module Spec) option ref = ref None

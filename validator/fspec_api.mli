@@ -27,5 +27,6 @@ module type Spec =
     val finishing_fun : bytes
     val eventproc_iteration_begin : bytes
     val eventproc_iteration_end : bytes
+  val user_check_for_complete_iteration : bytes
   end
 val spec : (module Spec) option ref
