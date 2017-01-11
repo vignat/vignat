@@ -48,12 +48,16 @@ fi
 . ./clean.sh
 
 # Initialize the network;
-# to do that, we need to know whether we'll run a DPDK app or not.
-MIDDLEBOX_APP="dpdk"
-if [ $1 = "netfilter" ]; then
-    MIDDLEBOX_APP="netfilter"
+# to do that, we need to know which scenario we use, and whether we'll run a DPDK app or not.
+NETWORK_SCENARIO=$2
+if [ $2 = "1p" ]; then
+    NETWORK_SCENARIO="loopback"
 fi
-. ./init-network.sh $2 $MIDDLEBOX_APP
+NETWORK_APP="dpdk"
+if [ $1 = "netfilter" ]; then
+    NETWORK_APP="netfilter"
+fi
+. ./init-network.sh $NETWORK_SCENARIO $NETWORK_APP
 
 
 CLEAN_APP_NAME=`echo "$1" | tr '/' '_'`

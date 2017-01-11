@@ -20,9 +20,16 @@ if [ ! -f pktgen/.version -o "$(cat pktgen/.version)" != $PKTGEN_RELEASE ]; then
     tar xf pktgen-$PKTGEN_RELEASE.tar.gz
     mv pktgen-$PKTGEN_RELEASE pktgen
     rm pktgen-$PKTGEN_RELEASE.tar.gz
+    cd pktgen
+
+    # Patch it to support 65536 flows instead of 8192
+    patch -p1 -i ~/scripts/init-machines/pktgen.patch
+
+    # Define DPDK environment variables for compilation
+    export RTE_SDK=$HOME/dpdk
+    export RTE_TARGET=x86_64-native-linuxapp-gcc
 
     # Compile it
-    cd pktgen
     make -j
 
     # Write out the version for next run
