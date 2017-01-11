@@ -69,9 +69,33 @@ let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
                                                 "tx_mbufs", arr_bat_struct;])
 let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
                                                         "queue_id", Uint8;])
-let user_buf = Ir.Str ("user_buf", [])
+
+let ether_hdr_struct = Ir.Str ("ether_hdr", ["ether_type", Uint16;])
+let ipv4_hdr_struct = Ir.Str ("ipv4_hdr", ["version_ihl", Uint8;
+                                           "type_of_service", Uint8;
+                                           "total_length", Uint16;
+                                           "packet_id", Uint16;
+                                           "fragment_offset", Uint16;
+                                           "time_to_live", Uint8;
+                                           "next_proto_id", Uint8;
+                                           "hdr_checksum", Uint16;
+                                           "src_addr", Uint32;
+                                           "dst_addr", Uint32;])
+let tcp_hdr_struct = Ir.Str ("tcp_hdr", ["src_port", Uint16;
+                                         "dst_port", Uint16;
+                                         "sent_seq", Uint32;
+                                         "recv_ack", Uint32;
+                                         "data_off", Uint8;
+                                         "tcp_flags", Uint8;
+                                         "rx_win", Uint16;
+                                         "cksum", Uint16;
+                                         "tcp_urp", Uint16;])
+
+let user_buf_struct = Ir.Str ("user_buf", ["ether", ether_hdr_struct;
+                                           "ipv4", ipv4_hdr_struct;
+                                           "tcp", tcp_hdr_struct;])
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
-                               ["buf_addr", Ptr user_buf;
+                               ["buf_addr", Ptr user_buf_struct;
                                 "buf_physaddr", Uint64;
                                 "buf_len", Uint16;
                                 "data_off", Uint16;
@@ -777,13 +801,13 @@ let fun_types =
                           lemmas_after = [];};
      "received_packet", {ret_type = Void;
                          arg_types = [Ir.Uint8; Ir.Uint8; Ptr rte_mbuf_struct;];
-                         extra_ptr_types = ["user_buf_addr", user_buf];
+                         extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [];};
      "send_single_packet", {ret_type = Void;
                             arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
                                          Ptr lcore_conf_struct];
-                            extra_ptr_types = ["user_buf_addr", user_buf];
+                            extra_ptr_types = ["user_buf_addr", user_buf_struct];
                             lemmas_before = [];
                             lemmas_after = [];};
     ]

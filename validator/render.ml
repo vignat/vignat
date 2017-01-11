@@ -109,7 +109,7 @@ let rec gen_plain_equalities {lhs;rhs} =
            gen_plain_equalities
              {lhs={v=Str_idx (lhs, name);t=ttype};
               rhs=v.value}))
-  | Str (_, fields), Id _ ->
+  | Str (_, fields), _ ->
     List.join
       (List.map fields ~f:(fun (name,ttype) ->
            gen_plain_equalities
@@ -120,8 +120,11 @@ let rec gen_plain_equalities {lhs;rhs} =
   | Sint32, Bop (Add, {v=Id _;t=_}, {v=Int _; t=_})
   | Sint8, Int _
   | Uint32, Int _
+  | Uint32, Str_idx _
   | Uint16, Int _
+  | Uint16, Str_idx _
   | Uint8, Int _
+  | Uint8, Str_idx _
   | Sint32, Id _
   | Sint8, Id _
   | Uint64, Id _
@@ -145,7 +148,6 @@ let rec gen_plain_equalities {lhs;rhs} =
                t=Boolean}}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | Ptr _, Zeroptr -> []
-  | Str _, Undef -> []
   | _ -> failwith ("unsupported output type: " ^
                    (ttype_to_str rhs.t) ^
                    " : " ^
@@ -179,6 +181,7 @@ let split_assignments assignments =
         (*  (render_tterm assignment.lhs) *)
         (*  (render_tterm assignment.rhs); *)
         (concrete,symbolic)
+      | Str_idx _ -> (assignment::concrete,symbolic)
       | _ -> failwith ("unsupported assignment in split_assignments: " ^
                        (render_tterm assignment.lhs) ^
                        " = " ^ (render_tterm assignment.rhs)))

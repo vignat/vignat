@@ -45,6 +45,18 @@ let infer_type_sign f =
   else Noidea
 
 let expand_shorted_sexp sexp =
+  let rec remove_defs exp =
+    let rec do_list lst =
+      match lst with
+      | Sexp.Atom v :: tl when String.is_suffix v ~suffix:":" ->
+        do_list tl
+      | hd :: tl -> (remove_defs hd) :: (do_list tl)
+      | [] -> []
+    in
+    match exp with
+    | Sexp.List lst -> Sexp.List (do_list lst)
+    | Sexp.Atom _ -> exp
+  in
   let rec get_defs sexp =
     let merge_defs d1 d2 =
       String.Map.merge d1 d2
@@ -60,25 +72,13 @@ let expand_shorted_sexp sexp =
       | Sexp.Atom v :: def :: tl when String.is_suffix v ~suffix:":" ->
         merge_defs (get_defs def) (String.Map.add (do_list tl)
                                      ~key:(String.prefix v ((String.length v) - 1))
-                                     ~data:def)
+                                     ~data:(remove_defs def))
       | hd :: tl -> merge_defs (get_defs hd) (do_list tl)
       | [] -> String.Map.empty
     in
     match sexp with
     | Sexp.List lst -> do_list lst
     | Sexp.Atom _ -> String.Map.empty
-  in
-  let rec remove_defs exp =
-    let rec do_list lst =
-      match lst with
-      | Sexp.Atom v :: tl when String.is_suffix v ~suffix:":" ->
-        do_list tl
-      | hd :: tl -> (remove_defs hd) :: (do_list tl)
-      | [] -> []
-    in
-    match exp with
-    | Sexp.List lst -> Sexp.List (do_list lst)
-    | Sexp.Atom _ -> exp
   in
   let rec expand_exp exp vars =
     match exp with
@@ -95,15 +95,36 @@ let expand_shorted_sexp sexp =
       | None -> (exp,false)
   in
   let expand_map map defs =
-    String.Map.map map ~f:(fun el ->
-        let (new_el, _) = expand_exp el defs in new_el)
+    let new_map_expanded = List.map (Map.to_alist map) ~f:(fun (name,el) -> (name, expand_exp el defs)) in
+    let changed =
+      List.exists (List.map new_map_expanded ~f:(Fn.compose snd snd)) ~f:Fn.id
+    in
+    let new_map =
+      String.Map.of_alist_exn (List.map new_map_expanded
+                                 ~f:(fun (name,(new_el,changed)) -> (name,new_el)))
+    in
+    (new_map,changed)
   in
-  let map_non_expandable map defs =
-    not (List.exists (String.Map.data map) ~f:(fun el -> (snd (expand_exp el defs))))
+  let rec cross_expand_defs_fixp defs =
+    let (new_defs, expanded) = expand_map defs defs in
+    if expanded then cross_expand_defs_fixp new_defs
+    else defs
+  in
+  let map_expandable map defs =
+    List.exists (String.Map.data map) ~f:(fun el -> (snd (expand_exp el defs)))
   in
   let defs = get_defs sexp in
-  let defs = expand_map defs defs in
-  assert(map_non_expandable defs defs);
+  let defs = cross_expand_defs_fixp defs in
+  if (map_expandable defs defs) then begin
+    lprintf "failed expansion on sexp: \n%s\n" (Sexp.to_string sexp);
+    lprintf "defs: ";
+    Map.iter (get_defs sexp) ~f:(fun ~key ~data ->
+        lprintf "%s ::: %s\n" key (Sexp.to_string data));
+    lprintf "expanded defs: ";
+    Map.iter defs ~f:(fun ~key ~data ->
+        lprintf "%s ::: %s\n" key (Sexp.to_string data));
+    failwith ("incomplete map expansion for " ^ (Sexp.to_string sexp));
+  end;
   (fst (expand_exp (remove_defs sexp) defs))
 
 let get_fun_arg_type ftype_of fun_name arg_num =
@@ -251,7 +272,9 @@ let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.M
         match tl with
         | [tl] -> get_var_decls_of_sexp
                     tl {s=(Sure Unsgn);w=Noidea;precise=Unknown} known_vars
-        | _ -> failwith "ZExt may have only one argument (besides w..)."
+        | _ ->
+          lprintf "ZExt may have only one argument: %s\n" (Sexp.to_string exp);
+          failwith "ZExt may have only one argument (besides w..)."
       else
         let si = choose_guess (infer_type_sign f) s in
         (List.join (List.map tl ~f:(fun e ->
@@ -302,7 +325,7 @@ let rec get_vars_from_struct_val v (ty:ttype) (known_vars:typed_var String.Map.t
           get_vars_from_struct_val v.value t acc)
   | ty -> match v.full with
     | Some v ->
-      get_vars_from_plain_val v (type_guess_of_ttype ty) known_vars
+      get_vars_from_plain_val (expand_shorted_sexp v) (type_guess_of_ttype ty) known_vars
     | None -> known_vars
 
 let name_gen prefix = object
@@ -574,6 +597,12 @@ let get_basic_vars ftype_of tpref =
       in
       get_vars_from_struct_val ptee.after ptee_type before_vars
     in
+    let get_extra_ptr_pointee_vars ptee ptee_type accumulator =
+      let before_vars =
+        get_vars_from_struct_val ptee.before ptee_type accumulator
+      in
+      get_vars_from_struct_val ptee.after ptee_type before_vars
+    in
     let get_ret_pointee_vars ptee ptee_type accumulator =
       assert(ptee.before.full = None);
       assert(ptee.before.break_down = []);
@@ -603,12 +632,18 @@ let get_basic_vars ftype_of tpref =
             let arg_type = get_fun_arg_type ftype_of call.fun_name i in
             complex_value_vars arg.value arg.ptr arg_type false acc)
     in
+    let extra_ptr_vars = List.fold call.extra_ptrs ~init:arg_vars
+        ~f:(fun acc {pname;value;ptee} ->
+            let ptee_type =
+              get_fun_extra_ptr_type ftype_of call.fun_name pname in
+          get_extra_ptr_pointee_vars ptee ptee_type acc)
+    in
     let ret_vars = match call.ret with
       | Some ret ->
         complex_value_vars
           ret.value ret.ptr
-          (get_fun_ret_type ftype_of call.fun_name) true arg_vars
-      | None -> arg_vars in
+          (get_fun_ret_type ftype_of call.fun_name) true extra_ptr_vars
+      | None -> extra_ptr_vars in
     let add_vars_from_ctxt vars ctxt =
       map_set_n_update_alist vars
         (make_name_alist_from_var_decls

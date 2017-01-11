@@ -253,6 +253,48 @@ struct str_field_descr mbuf_descrs[] = {
   {offsetof(struct rte_mbuf, timesync), sizeof(uint16_t), "timesync"},
 };
 
+struct nested_field_descr user_buf_nested[] = {
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, version_ihl),
+   sizeof(uint8_t), "version_ihl"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, type_of_service),
+   sizeof(uint8_t), "type_of_service"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, total_length),
+   sizeof(uint16_t), "total_length"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, packet_id),
+   sizeof(uint16_t), "packet_id"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, fragment_offset),
+   sizeof(uint16_t), "fragment_offset"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, time_to_live),
+   sizeof(uint8_t), "time_to_live"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, next_proto_id),
+   sizeof(uint8_t), "next_proto_id"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, hdr_checksum),
+   sizeof(uint16_t), "hdr_checksum"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, src_addr),
+   sizeof(uint32_t), "src_addr"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, dst_addr),
+   sizeof(uint32_t), "dst_addr"},
+
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, src_port),
+   sizeof(uint16_t), "src_port"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, dst_port),
+   sizeof(uint16_t), "dst_port"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, sent_seq),
+   sizeof(uint32_t), "sent_seq"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, recv_ack),
+   sizeof(uint32_t), "recv_ack"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, data_off),
+   sizeof(uint8_t), "data_off"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, tcp_flags),
+   sizeof(uint8_t), "tcp_flags"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, rx_win),
+   sizeof(uint16_t), "rx_win"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, cksum),
+   sizeof(uint16_t), "cksum"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, tcp_urp),
+   sizeof(uint16_t), "tcp_urp"},
+};
+
 #define KLEE_TRACE_MBUF(m_ptr)                                          \
   klee_trace_param_ptr(m_ptr, sizeof(*m_ptr), #m_ptr);                  \
   klee_trace_param_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
@@ -263,7 +305,24 @@ struct str_field_descr mbuf_descrs[] = {
                                mbuf_descrs[i].width,                    \
                                mbuf_descrs[i].name);                    \
   }                                                                     \
-  klee_trace_extra_ptr(m_ptr->buf_addr, sizeof(struct user_buf), "user_buf_addr");
+  klee_trace_extra_ptr(m_ptr->buf_addr, sizeof(struct user_buf), "user_buf_addr"); \
+  klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, ether), \
+                             sizeof(struct ether_hdr), "ether");        \
+  klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, ipv4), \
+                             sizeof(struct ipv4_hdr), "ipv4");          \
+  klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, tcp), \
+                             sizeof(struct tcp_hdr), "tcp");            \
+  klee_trace_extra_ptr_nested_field(m_ptr->buf_addr,                    \
+                                    offsetof(struct user_buf, ether),   \
+                                    offsetof(struct ether_hdr, ether_type), \
+                                    sizeof(uint16_t), "ether_type");    \
+  for (int i = 0; i < sizeof(user_buf_nested)/sizeof(user_buf_nested[0]); ++i) {\
+    klee_trace_extra_ptr_nested_field(m_ptr->buf_addr,                  \
+                                      user_buf_nested[i].base_offset,   \
+                                      user_buf_nested[i].offset,        \
+                                      user_buf_nested[i].width,         \
+                                      user_buf_nested[i].name);         \
+  }
 #endif//KLEE_VERIFICATION
 
 /* Enqueue a single packet, and send burst if queue is filled */
