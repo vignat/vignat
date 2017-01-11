@@ -227,13 +227,52 @@ send_burst(struct lcore_conf *qconf, struct Batcher *mbufs, uint8_t port)
   array_u16_end_access(&qconf->tx_queue_id);
 }
 
+
+#ifdef KLEE_VERIFICATION
+struct str_field_descr mbuf_descrs[] = {
+  //Do not forget about "buf_addr" -- it is a pointer that is why it is not listed here.
+  {offsetof(struct rte_mbuf, buf_physaddr), sizeof(uint64_t), "buf_physaddr"},
+  {offsetof(struct rte_mbuf, buf_len), sizeof(uint16_t), "buf_len"},
+  {offsetof(struct rte_mbuf, data_off), sizeof(uint16_t), "data_off"},
+  {offsetof(struct rte_mbuf, refcnt), sizeof(uint16_t), "refcnt"},
+  {offsetof(struct rte_mbuf, nb_segs), sizeof(uint8_t), "nb_segs"},
+  {offsetof(struct rte_mbuf, port), sizeof(uint8_t), "port"},
+  {offsetof(struct rte_mbuf, ol_flags), sizeof(uint64_t), "ol_flags"},
+  {offsetof(struct rte_mbuf, packet_type), sizeof(uint32_t), "packet_type"},
+  {offsetof(struct rte_mbuf, pkt_len), sizeof(uint32_t), "pkt_len"},
+  {offsetof(struct rte_mbuf, data_len), sizeof(uint16_t), "data_len"},
+  {offsetof(struct rte_mbuf, vlan_tci), sizeof(uint16_t), "vlan_tci"},
+  {offsetof(struct rte_mbuf, hash), sizeof(uint32_t), "hash"},
+  {offsetof(struct rte_mbuf, seqn), sizeof(uint32_t), "seqn"},
+  {offsetof(struct rte_mbuf, vlan_tci_outer), sizeof(uint16_t), "vlan_tci_outer"},
+  {offsetof(struct rte_mbuf, udata64), sizeof(uint64_t), "udata64"},
+  {offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"},
+  {offsetof(struct rte_mbuf, next), sizeof(struct rte_mbuf*), "next"},
+  {offsetof(struct rte_mbuf, tx_offload), sizeof(uint64_t), "tx_offload"},
+  {offsetof(struct rte_mbuf, priv_size), sizeof(uint16_t), "priv_size"},
+  {offsetof(struct rte_mbuf, timesync), sizeof(uint16_t), "timesync"},
+};
+
+#define KLEE_TRACE_MBUF(m_ptr)                                          \
+  klee_trace_param_ptr(m_ptr, sizeof(*m_ptr), #m_ptr);                  \
+  klee_trace_param_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
+                             sizeof(struct user_buf*), "buf_addr");     \
+  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) { \
+    klee_trace_param_ptr_field(m_ptr,                                   \
+                               mbuf_descrs[i].offset,                   \
+                               mbuf_descrs[i].width,                    \
+                               mbuf_descrs[i].name);                    \
+  }                                                                     \
+  klee_trace_extra_ptr(m_ptr->buf_addr, sizeof(struct user_buf), "user_buf_addr");
+#endif//KLEE_VERIFICATION
+
 /* Enqueue a single packet, and send burst if queue is filled */
 static void
 send_single_packet(struct rte_mbuf *m, uint8_t port, struct lcore_conf *qconf)
 #ifdef KLEE_VERIFICATION
 {
   klee_trace_ret();
-  klee_trace_param_just_ptr(m, sizeof(*m), "m");
+  KLEE_TRACE_MBUF(m);
   klee_trace_param_i32(port, "portid");
   klee_trace_param_just_ptr(qconf, sizeof(*qconf), "qconf");
 }
@@ -436,7 +475,7 @@ static void received_packet(uint8_t portid, uint8_t queueid, struct rte_mbuf *mb
   klee_trace_ret();
   klee_trace_param_i32(portid, "portid");
   klee_trace_param_i32(queueid, "queueid");
-  klee_trace_param_just_ptr(mbuf, sizeof(*mbuf), "mbuf");
+  KLEE_TRACE_MBUF(mbuf);
 }
 #endif//KLEE_VERIFICATION
 

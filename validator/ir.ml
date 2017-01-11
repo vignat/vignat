@@ -11,6 +11,7 @@ type bop = Eq | Le | Lt | Ge | Gt
 type ttype = | Ptr of ttype
              | Sint32
              | Sint8
+             | Uint64
              | Uint32
              | Uint16
              | Uint8
@@ -22,6 +23,9 @@ type ttype = | Ptr of ttype
              | Sunknown
              | Uunknown
              | Unknown
+with sexp
+
+type term_util = Ptr_placeholder of int64
 with sexp
 
 type term = Bop of bop*tterm*tterm
@@ -38,6 +42,7 @@ type term = Bop of bop*tterm*tterm
           | Cast of ttype*tterm
           | Zeroptr
           | Undef
+          | Utility of term_util
 and tterm = {v:term; t:ttype}
 and var_spec = {name: string; value:tterm}
 with sexp
@@ -47,7 +52,8 @@ type eq_condition = {lhs: tterm; rhs: tterm} with sexp
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
   | Sint32 -> "int" | Sint8 -> "char"
-  | Uint32 -> "uint32_t" | Uint16 -> "uint16_t" | Uint8 -> "uint8_t"
+  | Uint64 -> "uint64_t"| Uint32 -> "uint32_t"
+  | Uint16 -> "uint16_t" | Uint8 -> "uint8_t"
   | Void -> "void" | Str (name, _) -> "struct " ^ name
   | Ctm name -> name | Fptr name -> name ^ "*" | Boolean -> "bool"
   | Unknown -> "???"
@@ -90,7 +96,7 @@ type tip_call = {context:fun_call_context;
 type ir = {
   preamble:string;
   free_vars:var_spec String.Map.t; (* TODO: var_spec -> typed_var *)
-  arguments:var_spec list;
+  arguments:var_spec list; (*FIXME: holds also extra ptrs*)
   tmps:var_spec String.Map.t;
   cmplxs:var_spec String.Map.t;
   context_assumptions:tterm list;
@@ -128,6 +134,13 @@ let rec simplify_term term =
   | Str_idx (x,fname) -> Str_idx ({v=simplify_term x.v;t=x.t}, fname)
   | _ -> term
 
+let render_utility = function
+  | Ptr_placeholder addr -> "?placeholder addr:" ^ (Int64.to_string addr)
+
+let int_type_postfix = function
+  | Uint64 -> "ULL"
+  | _ -> ""
+
 let rec render_tterm (t:tterm) =
   match t.v with  (*strip parens: account for weird VeriFast parser*)
   | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
@@ -142,9 +155,9 @@ let rec render_tterm (t:tterm) =
              (List.map fields ~f:(fun {name;value} ->
                   name ^ " = " ^ (render_tterm value)))) ^
     "}"
-  | Int 0 -> if (t.t = Boolean) then "false" else "0"
-  | Int 1 -> if (t.t = Boolean) then "true" else "1"
-  | Int i -> string_of_int i
+  | Int 0 -> if (t.t = Boolean) then "false" else ("0"^ (int_type_postfix t.t))
+  | Int 1 -> if (t.t = Boolean) then "true" else ("1"^ (int_type_postfix t.t))
+  | Int i -> string_of_int i ^ (int_type_postfix t.t)
   | Bool b -> string_of_bool b
   | Not t -> "!(" ^ (render_tterm t) ^ ")"
   | Str_idx ({v=Id x;t=_}, field_name) -> x ^ "." ^ field_name
@@ -159,7 +172,12 @@ let rec render_tterm (t:tterm) =
   | Cast (t,v) -> "(" ^ ttype_to_str t ^ ")" ^ (render_tterm v)
   | Zeroptr -> "0"(*"NULL"*)
   | Undef -> "???"
+  | Utility util -> render_utility util
 and render_term t = render_tterm {v=t;t=Unknown} (*TODO: reformulate this coupled definition*)
+
+let term_utility_eq a b =
+  match a, b with
+  | Ptr_placeholder x, Ptr_placeholder y -> (x = y)
 
 let rec term_eq a b =
   match a,b with
@@ -184,9 +202,50 @@ let rec term_eq a b =
   | Addr tta, Addr ttb -> term_eq tta.v ttb.v
   | Cast (ctypea,terma), Cast (ctypeb,termb) -> (ctypea = ctypeb) && (term_eq terma.v termb.v)
   | Undef, Undef -> true
+  | Utility ua, Utility ub -> term_utility_eq ua ub
   | _, _ -> false
 
+let rec call_recursively_on_tterm (f:tterm -> tterm option) tterm =
+  let recursion_in_utility f = function
+    | Ptr_placeholder x -> Ptr_placeholder x
+  in
+  let tterm =
+    {v= begin
+        match tterm.v with
+        | Bop (op,lhs,rhs) ->
+          Bop (op, call_recursively_on_tterm f lhs, call_recursively_on_tterm f rhs)
+        | Apply (fname,args) ->
+          Apply (fname, List.map args ~f:(call_recursively_on_tterm f))
+        | Id x -> Id x
+        | Struct (name,fds) ->
+          Struct (name,List.map fds ~f:(fun field ->
+              {field with value = call_recursively_on_tterm f field.value}))
+        | Int i -> Int i
+        | Bool b -> Bool b
+        | Not x -> Not (call_recursively_on_tterm f x)
+        | Str_idx (tt,fname) -> Str_idx (call_recursively_on_tterm f tt,fname)
+        | Deref tt -> Deref (call_recursively_on_tterm f tt)
+        | Fptr fname -> Fptr fname
+        | Addr tt -> Addr (call_recursively_on_tterm f tt)
+        | Cast (ctype,tt) -> Cast (ctype,call_recursively_on_tterm f tt)
+        | Undef -> Undef
+        | Zeroptr -> Zeroptr
+        | Utility u -> Utility (recursion_in_utility f u)
+      end;
+     t=tterm.t} in
+  match f tterm with
+  | Some tt -> tt
+  | None -> tterm
+
+let call_recursively_on_term (f:term -> term option) tterm =
+  call_recursively_on_tterm (fun {v;t} -> match f v with
+      | Some v -> Some {v;t}
+      | None -> None) tterm
+
 let rec replace_term_in_term old_t new_t term =
+  let replace_in_utility old_t new_t = function
+    | Ptr_placeholder x -> Ptr_placeholder x
+  in
   if term_eq term old_t then new_t else
     match term with
     | Bop (opa,lhs,rhs) ->
@@ -209,40 +268,17 @@ let rec replace_term_in_term old_t new_t term =
       Cast (ctype,replace_term_in_tterm old_t new_t tterm)
     | Undef -> Undef
     | Zeroptr -> Zeroptr
+    | Utility util -> Utility (replace_in_utility old_t new_t util)
 and replace_term_in_tterm old_t new_t tterm =
   {tterm with v=replace_term_in_term old_t new_t tterm.v}
 and replace_term_in_tterms old_t new_t tterm_list =
   List.map tterm_list ~f:(replace_term_in_tterm old_t new_t)
 
-let rec call_recursively_on_tterm f tterm =
-  let tterm =
-    {v= begin
-        match tterm.v with
-        | Bop (op,lhs,rhs) ->
-          Bop (op, call_recursively_on_tterm f lhs, call_recursively_on_tterm f rhs)
-        | Apply (fname,args) ->
-          Apply (fname, List.map args ~f:(call_recursively_on_tterm f))
-        | Id x -> Id x
-        | Struct (name,fds) ->
-          Struct (name,List.map fds ~f:(fun field ->
-              {field with value = call_recursively_on_tterm f field.value}))
-        | Int i -> Int i
-        | Bool b -> Bool b
-        | Not x -> Not (call_recursively_on_tterm f x)
-        | Str_idx (tt,fname) -> Str_idx (call_recursively_on_tterm f tt,fname)
-        | Deref tt -> Deref (call_recursively_on_tterm f tt)
-        | Fptr fname -> Fptr fname
-        | Addr tt -> Addr (call_recursively_on_tterm f tt)
-        | Cast (ctype,tt) -> Cast (ctype,call_recursively_on_tterm f tt)
-        | Undef -> Undef
-        | Zeroptr -> Zeroptr
-      end;
-     t=tterm.t} in
-  match f tterm.v with
-  | Some tt -> {v=tt;t=tterm.t}
-  | None -> tterm
 
 let rec collect_nodes f tterm =
+  let collect_on_utility f = function
+    | Ptr_placeholder _ -> []
+  in
   match f tterm with
   | Some x -> [x]
   | None ->
@@ -263,8 +299,12 @@ let rec collect_nodes f tterm =
     | Cast (_,v) -> collect_nodes f v
     | Undef -> []
     | Zeroptr -> []
+    | Utility u -> collect_on_utility f u
 
 let rec term_contains_term super sub =
+  let utility_contains sub = function
+    | Ptr_placeholder _ -> false
+  in
   if term_eq super sub then true else
     match super with
     | Bop (_,lhs,rhs) ->
@@ -286,12 +326,16 @@ let rec term_contains_term super sub =
       tterm_contains_term tterm sub
     | Undef -> false
     | Zeroptr -> false
+    | Utility u -> utility_contains sub u
 and tterm_contains_term super sub =
   term_contains_term super.v sub
 and tterms_contain_term supers sub =
   List.exists supers ~f:(fun sup -> tterm_contains_term sup sub)
 
 let rec is_const term =
+  let is_utility_const = function
+    | Ptr_placeholder _ -> false
+  in
   match term with
   | Bop (_,lhs,rhs) -> (is_constt lhs) && (is_constt rhs)
   | Apply (_,args) -> List.for_all args ~f:is_constt
@@ -308,4 +352,5 @@ let rec is_const term =
   | Cast (_,tterm) -> is_constt tterm
   | Undef -> true
   | Zeroptr -> true
+  | Utility u -> is_utility_const u
 and is_constt tterm = is_const tterm.v

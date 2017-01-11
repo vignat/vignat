@@ -14,6 +14,7 @@ val on_rez_nz : (lemma_params -> bytes) -> lemma_params -> bytes
 type fun_spec = {
   ret_type : Ir.ttype;
   arg_types : Ir.ttype list;
+  extra_ptr_types: (bytes * Ir.ttype) list;
   lemmas_before : blemma list;
   lemmas_after : lemma list;
 }

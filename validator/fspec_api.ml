@@ -20,6 +20,7 @@ let on_rez_nz f = (fun params ->
     "/*@ if(" ^ params.ret_name ^ "!=0) " ^ (f params) ^ " @*/")
 
 type fun_spec = {ret_type: ttype; arg_types: ttype list;
+                 extra_ptr_types: (string * ttype) list;
                  lemmas_before: blemma list; lemmas_after: lemma list;}
 
 module type Spec =

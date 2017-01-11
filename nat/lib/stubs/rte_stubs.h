@@ -810,6 +810,12 @@ typedef struct s__m128i {
     uint64_t most;
 } __m128i;
 
+struct user_buf {
+  //uint8_t some_data[100];
+  struct ether_hdr ether;
+  struct ipv4_hdr ipv4;
+  struct tcp_hdr tcp;
+};
 // Below goes gutted rte functions.
 
 

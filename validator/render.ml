@@ -109,6 +109,13 @@ let rec gen_plain_equalities {lhs;rhs} =
            gen_plain_equalities
              {lhs={v=Str_idx (lhs, name);t=ttype};
               rhs=v.value}))
+  | Str (_, fields), Id _ ->
+    List.join
+      (List.map fields ~f:(fun (name,ttype) ->
+           gen_plain_equalities
+             {lhs={v=Str_idx (lhs, name);t=ttype};
+              rhs={v=Str_idx (rhs, name);t=ttype}}))
+  | Uint64, Int _
   | Sint32, Int _
   | Sint32, Bop (Add, {v=Id _;t=_}, {v=Int _; t=_})
   | Sint8, Int _
@@ -117,6 +124,7 @@ let rec gen_plain_equalities {lhs;rhs} =
   | Uint8, Int _
   | Sint32, Id _
   | Sint8, Id _
+  | Uint64, Id _
   | Uint32, Id _
   | Uint16, Id _
   | Uint8, Id _
@@ -171,7 +179,7 @@ let split_assignments assignments =
         (*  (render_tterm assignment.lhs) *)
         (*  (render_tterm assignment.rhs); *)
         (concrete,symbolic)
-      | _ -> failwith ("unsupported assignment: " ^
+      | _ -> failwith ("unsupported assignment in split_assignments: " ^
                        (render_tterm assignment.lhs) ^
                        " = " ^ (render_tterm assignment.rhs)))
 

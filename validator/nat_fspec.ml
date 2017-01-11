@@ -1,6 +1,7 @@
 
 open Core.Std
 open Fspec_api
+open Ir
 
 type map_key = Int | Ext
 
@@ -68,16 +69,40 @@ let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
                                                 "tx_mbufs", arr_bat_struct;])
 let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
                                                         "queue_id", Uint8;])
-let rte_mbuf_struct = Ir.Str ( "rte_mbuf", [] )
+let user_buf = Ir.Str ("user_buf", [])
+let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
+                               ["buf_addr", Ptr user_buf;
+                                "buf_physaddr", Uint64;
+                                "buf_len", Uint16;
+                                "data_off", Uint16;
+                                "refcnt", Uint16;
+                                "nb_segs", Uint8;
+                                "port", Uint8;
+                                "ol_flags", Uint64;
+                                "packet_type", Uint32;
+                                "pkt_len", Uint32;
+                                "data_len", Uint16;
+                                "vlan_tci", Uint16;
+                                "hash", Uint32;
+                                "seqn", Uint32;
+                                "vlan_tci_outer", Uint16;
+                                "udata64", Uint64;
+                                "pool", Ptr Void;
+                                "next", Ptr Void;
+                                "tx_offload", Uint64;
+                                "priv_size", Uint16;
+                                "timesync", Uint16] )
 
 let fun_types =
   String.Map.of_alist_exn
     ["current_time", {ret_type = Uint32;
                       arg_types = [];
+                      extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [];};
      "start_time", {ret_type = Uint32;
                     arg_types = [];
+                    extra_ptr_types = [];
                     lemmas_before = [];
                     lemmas_after = [];};
      "dmap_allocate", {ret_type = Sint32;
@@ -89,6 +114,7 @@ let fun_types =
                           Ptr (Ctm "dmap_extract_keys"); Ptr (Ctm "dmap_pack_keys");
                           Sint32;
                           Ptr (Ptr dmap_struct)];
+                       extra_ptr_types = [];
                        lemmas_before = [
                          tx_bl "produce_function_pointer_chunk \
                                 map_keys_equality<int_k>(int_key_eq)(int_k_p)(a, b) \
@@ -163,10 +189,12 @@ let fun_types =
                                <int_k,ext_k,flw>(1024);";];};
      "dmap_set_entry_condition", {ret_type = Void;
                                   arg_types = [Ptr (Ctm "entry_condition")];
+                                  extra_ptr_types = [];
                                   lemmas_before = [];
                                   lemmas_after = [];};
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = [Sint32; Ptr (Ptr dchain_struct)];
+                         extra_ptr_types = [];
                          lemmas_before = [];
                          lemmas_after = [
                            on_rez_nonzero
@@ -182,6 +210,7 @@ let fun_types =
                                              Uint32;
                                              Sint32;
                                              Sint32];
+                                extra_ptr_types = [];
                                 lemmas_before = [
                                   tx_bl "close lcore_confp(_, last_lcc);";
                                   (fun args _ ->
@@ -211,6 +240,7 @@ let fun_types =
                                              Ptr Uint32;
                                              Sint32;
                                              Sint32];
+                                extra_ptr_types = [];
                                 lemmas_before = [
                                   (fun _ _ ->
                                      "int start_port;\n");];
@@ -242,6 +272,7 @@ let fun_types =
                                 ];};
      "dmap_get_b", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
+                    extra_ptr_types = [];
                     lemmas_before = [
                       capture_map "cur_map" 0;
                       (fun args _ ->
@@ -293,6 +324,7 @@ let fun_types =
                     ];};
      "dmap_get_a", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr int_key_struct; Ptr Sint32;];
+                    extra_ptr_types = [];
                     lemmas_before = [
                       capture_map "cur_map" 0;
                       (fun args _ ->
@@ -341,6 +373,7 @@ let fun_types =
                     ];};
      "dmap_put", {ret_type = Sint32;
                   arg_types = [Ptr dmap_struct; Ptr flw_struct; Sint32;];
+                  extra_ptr_types = [];
                   lemmas_before = [
                     capture_map_ex "cur_map" "vk1" "vk2" 0;
                     (fun args _ -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
@@ -474,6 +507,7 @@ let fun_types =
                   ];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];
+                        extra_ptr_types = [];
                         lemmas_before = [
                           capture_map "cur_map" 0;
                           (fun _ tmp ->
@@ -515,6 +549,7 @@ let fun_types =
                       arg_types = [Ptr dchain_struct;
                                    Ptr dmap_struct;
                                    Uint32;];
+                      extra_ptr_types = [];
                       lemmas_before = [
                         capture_chain "cur_ch" 0;
                         capture_map_ex "cur_map" "vk1" "vk2" 1;
@@ -578,6 +613,7 @@ let fun_types =
                       ];};
      "dchain_allocate_new_index", {ret_type = Sint32;
                                    arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];
+                                   extra_ptr_types = [];
                                    lemmas_before = [
                                      capture_chain "cur_ch" 0;
                                    ];
@@ -602,6 +638,7 @@ let fun_types =
                                    ];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
                                  arg_types = [Ptr dchain_struct; Sint32; Uint32;];
+                                 extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
                                    (fun _ tmp ->
@@ -630,18 +667,22 @@ let fun_types =
                                       (List.nth_exn params.args 2) ^ ");\n}@*/");];};
      "array_bat_init", {ret_type = Void;
                         arg_types = [Ptr arr_bat_struct;];
+                        extra_ptr_types = [];
                         lemmas_before = [];
                         lemmas_after = [];};
      "array_bat_begin_access", {ret_type = Ptr batcher_struct;
                                 arg_types = [Ptr arr_bat_struct; Sint32;];
+                                extra_ptr_types = [];
                                 lemmas_before = [];
                                 lemmas_after = [];};
      "array_bat_end_access", {ret_type = Void;
-                           arg_types = [Ptr arr_bat_struct;];
-                           lemmas_before = [];
-                           lemmas_after = [];};
+                              arg_types = [Ptr arr_bat_struct;];
+                              extra_ptr_types = [];
+                              lemmas_before = [];
+                              lemmas_after = [];};
      "array_lcc_init", {ret_type = Void;
                         arg_types = [Ptr arr_lcc_struct;];
+                        extra_ptr_types = [];
                         lemmas_before = [];
                         lemmas_after = [
                           (fun params ->
@@ -649,6 +690,7 @@ let fun_types =
                              "");];};
      "array_lcc_begin_access", {ret_type = Ptr lcore_conf_struct;
                                 arg_types = [Ptr arr_lcc_struct; Sint32;];
+                                extra_ptr_types = [];
                                 lemmas_before = [];
                                 lemmas_after = [
                                   (fun params ->
@@ -663,12 +705,15 @@ let fun_types =
                                 ];};
      "array_lcc_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_lcc_struct;];
+                              extra_ptr_types = ["returned_cell",
+                                                lcore_conf_struct];
                               lemmas_before = [
                                tx_bl "close lcore_confp(_, last_lcc);";
                               ];
                               lemmas_after = [];};
      "array_rq_begin_access", {ret_type = Ptr lcore_rx_queue_struct;
                                arg_types = [Ptr arr_rq_struct; Sint32;];
+                               extra_ptr_types = [];
                                lemmas_before = [];
                                lemmas_after = [
                                  (fun params ->
@@ -678,55 +723,67 @@ let fun_types =
                                ];};
      "array_rq_end_access", {ret_type = Void;
                              arg_types = [Ptr arr_rq_struct;];
+                             extra_ptr_types = ["returned_rq_cell",
+                                                lcore_rx_queue_struct];
                              lemmas_before = [
                                tx_bl "close rx_queuep(_, last_rq);";
                              ];
                              lemmas_after = [];};
      "array_u16_begin_access", {ret_type = Ptr Uint16;
-                               arg_types = [Ptr arr_u16_struct; Sint32;];
+                                arg_types = [Ptr arr_u16_struct; Sint32;];
+                                extra_ptr_types = [];
                                 lemmas_before = [];
-                               lemmas_after = [
-                                 (fun params ->
-                                    if params.is_tip then
-                                      "//@ close some_u16p(" ^ params.ret_val ^ ");"
-                                    else "");
-                                 (fun params ->
-                                    if params.is_tip then
-                                      "//@ close some_u16p(" ^ params.ret_name ^ ");"
-                                    else "")];};
+                                lemmas_after = [
+                                  (fun params ->
+                                     if params.is_tip then
+                                       "//@ close some_u16p(" ^ params.ret_val ^ ");"
+                                     else "");
+                                  (fun params ->
+                                     if params.is_tip then
+                                       "//@ close some_u16p(" ^ params.ret_name ^ ");"
+                                     else "")];};
      "array_u16_end_access", {ret_type = Void;
                               arg_types = [Ptr arr_u16_struct;];
+                              extra_ptr_types = ["returned_u16_cell",
+                                                 Uint16];
                               lemmas_before = [];
                               lemmas_after = [];};
      "batcher_push", {ret_type = Void;
                       arg_types = [Ptr batcher_struct; Ptr rte_mbuf_struct;];
+                      extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [];};
      "batcher_take_all", {ret_type = Void;
                           arg_types = [Ptr batcher_struct;
                                        Ptr (Ptr (Ptr rte_mbuf_struct));
                                        Ptr Sint32];
+                          extra_ptr_types = [];
                           lemmas_before = [];
                           lemmas_after = [];};
      "batcher_empty", {ret_type = Void;
                        arg_types = [Ptr batcher_struct;];
+                       extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};
      "batcher_full", {ret_type = Sint32;
                       arg_types = [Ptr batcher_struct;];
+                      extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [];};
      "batcher_is_empty", {ret_type = Sint32;
                           arg_types = [Ptr batcher_struct;];
+                          extra_ptr_types = [];
                           lemmas_before = [];
                           lemmas_after = [];};
      "received_packet", {ret_type = Void;
                          arg_types = [Ir.Uint8; Ir.Uint8; Ptr rte_mbuf_struct;];
+                         extra_ptr_types = ["user_buf_addr", user_buf];
                          lemmas_before = [];
                          lemmas_after = [];};
      "send_single_packet", {ret_type = Void;
                             arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
                                          Ptr lcore_conf_struct];
+                            extra_ptr_types = ["user_buf_addr", user_buf];
                             lemmas_before = [];
                             lemmas_after = [];};
     ]

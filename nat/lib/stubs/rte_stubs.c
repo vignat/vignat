@@ -24,12 +24,7 @@ uint64_t rte_rdtsc(){
   return 0;
 }
 
-struct user_buf {
-    //uint8_t some_data[100];
-    struct ether_hdr ether;
-    struct ipv4_hdr ipv4;
-    struct tcp_hdr tcp;
-} user_buf;
+struct user_buf user_buf;
 
 struct rte_mbuf incoming_package; //for two ports
 int incoming_package_allocated;

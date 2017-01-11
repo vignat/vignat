@@ -91,7 +91,7 @@ let register_symbs_z3 sttmts ctx ints =
     | None -> really_add ()
   in
   List.iter sttmts ~f:(fun sttmt ->
-      ignore (Ir.call_recursively_on_tterm (function
+      ignore (Ir.call_recursively_on_term (function
       | Ir.Id x -> add_var x;
         None
       | Ir.Apply (fname,args) ->

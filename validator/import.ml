@@ -109,6 +109,13 @@ let expand_shorted_sexp sexp =
 let get_fun_arg_type ftype_of fun_name arg_num =
   List.nth_exn (ftype_of fun_name).arg_types arg_num
 
+let get_fun_extra_ptr_type ftype_of fun_name exptr_name =
+  match List.Assoc.find (ftype_of fun_name).extra_ptr_types
+          ~equal:String.equal exptr_name with
+  | Some t -> t
+  | None -> failwith ("Could not find extra_ptr " ^ exptr_name ^
+                      " type for function " ^ fun_name)
+
 let get_fun_ret_type ftype_of fun_name = (ftype_of fun_name).ret_type
 
 let to_symbol str =
@@ -387,6 +394,16 @@ let rec guess_type_l exps t =
     end
   | [] -> Unknown
 
+let find_first_known_address addr =
+  lprintf "looking for first *%Ld\n" addr;
+  Option.map (Int64.Map.find !known_addresses addr)
+    ~f:(fun lst -> (List.hd_exn lst).value)
+
+let find_first_known_address_or_dummy addr =
+  match find_first_known_address addr with
+  | Some tt -> tt
+  | None -> {v=Utility (Ptr_placeholder addr); t=Unknown}
+
 let rec get_sexp_value exp t =
   let exp = expand_shorted_sexp exp in
   let exp = eliminate_false_eq_0 exp t in
@@ -403,7 +420,14 @@ let rec get_sexp_value exp t =
         if String.equal v "true" then {v=Bool true;t=Boolean}
         else if String.equal v "false" then {v=Bool false;t=Boolean}
         (*FIXME: deduce the true integer type for the value: *)
-        else if is_int v then {v=Int (int_of_string v);t}
+        else if is_int v then
+          let addr = (Int64.of_int (int_of_string v)) in
+          if addr = 0L then {v=Int 0; t}
+          else
+            match t with
+            | Ptr x ->
+              find_first_known_address_or_dummy addr
+            | _ -> {v=Int (int_of_string v);t}
         else {v=Id v;t}
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
@@ -661,6 +685,30 @@ let allocate_rets ftype_of tpref =
           let ret = Int.Map.find_exn rets call.id in
           Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"})
 
+let allocate_extra_ptrs ftype_of tpref =
+  let alloc_call_extra_ptrs call =
+    let alloc_extra_ptr p_name addr str_value tterm =
+      lprintf "looking for *%Ld\n" addr;
+      match Int64.Map.find !known_addresses addr with
+      | Some spec -> known_addresses :=
+          Int64.Map.add !known_addresses
+            ~key:addr ~data:(List.map spec ~f:(fun spec ->
+                {spec with value=update_tterm spec.value tterm}));
+        None
+      | None ->
+        add_to_known_addresses
+          {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
+          str_value.break_down
+          addr call.id 0;
+        Some {name=p_name;value=tterm}
+    in
+    List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
+        let addr = value in
+        let ptee_type = get_fun_extra_ptr_type ftype_of call.fun_name pname in
+        alloc_extra_ptr (pname ^ call.fun_name) addr ptee.before (get_struct_val_value ptee.before ptee_type))
+  in
+  List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_extra_ptrs)
+
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
     let alloc_arg addr str_value tterm =
@@ -724,15 +772,6 @@ let allocate_args ftype_of tpref arg_name_gen =
 
 let compose_fcall_preamble ftype_of call args tmp_gen =
   (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
-
-let find_first_known_address addr =
-  lprintf "looking for first *%Ld\n" addr;
-  Option.map (Int64.Map.find !known_addresses addr)
-    ~f:(fun lst -> (List.hd_exn lst).value)
-
-let find_exn_first_known_address addr =
-  lprintf "looking for first *%Ld\n" addr;
-  (List.hd_exn (Int64.Map.find_exn !known_addresses addr)).value
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
@@ -1012,6 +1051,44 @@ let typed_vars_to_varspec free_vars =
         String.Map.add acc ~key:vname
           ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
 
+let fixup_placeholder_ptrs_in_tterm tterm =
+  let replace_placeholder = function
+    | {v=Utility (Ptr_placeholder addr);
+       t=_} ->
+      lprintf "fixing placeholder for %Ld\n" addr;
+      find_first_known_address addr
+    | _ -> None
+  in
+  call_recursively_on_tterm replace_placeholder tterm
+
+let fixup_placeholder_ptrs vars =
+  List.map vars ~f:(fun {name;value} ->
+    {name;value=fixup_placeholder_ptrs_in_tterm value})
+
+let fixup_placeholder_ptrs_in_eq_cond {lhs;rhs} =
+  {lhs=fixup_placeholder_ptrs_in_tterm lhs;
+   rhs=fixup_placeholder_ptrs_in_tterm rhs}
+
+let fixup_placeholder_ptrs_in_hist_calls hist_calls =
+  let in_one_call {context;result} =
+    {context;result=
+               {args_post_conditions=List.map result.args_post_conditions
+                    ~f:fixup_placeholder_ptrs_in_eq_cond;
+                ret_val=fixup_placeholder_ptrs_in_tterm result.ret_val}}
+  in
+  List.map hist_calls ~f:in_one_call
+
+let fixup_placeholder_ptrs_in_tip_call tip_call =
+  let in_one_result {args_post_conditions;ret_val;post_statements} =
+    {args_post_conditions = List.map args_post_conditions
+         ~f:fixup_placeholder_ptrs_in_eq_cond;
+     ret_val = fixup_placeholder_ptrs_in_tterm ret_val;
+     post_statements = List.map post_statements
+         ~f:fixup_placeholder_ptrs_in_tterm}
+  in
+  {tip_call with results = List.map tip_call.results
+                     ~f:in_one_result}
+
 let build_ir fun_types fin preamble boundary_fun finishing_fun
   eventproc_iteration_begin eventproc_iteration_end =
   let ftype_of fun_name =
@@ -1043,6 +1120,10 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
   let free_vars = typed_vars_to_varspec free_vars in
+  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
+  let arguments = fixup_placeholder_ptrs arguments in
+  let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
+  let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing;
