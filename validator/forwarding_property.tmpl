@@ -1,3 +1,6 @@
-if (a_packet_sent) {
-  assert true == a_packet_received;
+if (a_packet_received &&
+    ((received_packet->packet_type & 0x00000010) ||
+     (received_packet->packet_type == 0 &&
+      received_packet->buf_addr->ether.ether_type == 0x0800))) {
+  assert true == a_packet_sent;
 }

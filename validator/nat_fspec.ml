@@ -803,13 +803,19 @@ let fun_types =
                          arg_types = [Ir.Uint8; Ir.Uint8; Ptr rte_mbuf_struct;];
                          extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
-                         lemmas_after = [fun _ -> "a_packet_received = true;\n"];};
+                         lemmas_after = [(fun _ -> "a_packet_received = true;\n");
+                                         (fun params -> "received_packet = " ^
+                                                        (List.nth_exn params.args 2) ^
+                                                        ";\n")];};
      "send_single_packet", {ret_type = Void;
                             arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
                                          Ptr lcore_conf_struct];
                             extra_ptr_types = ["user_buf_addr", user_buf_struct];
                             lemmas_before = [];
-                            lemmas_after = [fun _ -> "a_packet_sent = true;\n"];};
+                            lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
+                                            (fun params -> "sent_packet = " ^
+                                                           (List.nth_exn params.args 0) ^
+                                                           ";\n")];};
     ]
 
 let fixpoints =
