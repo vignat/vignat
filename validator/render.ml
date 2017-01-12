@@ -189,9 +189,16 @@ let apply_assignments assignments terms =
   List.fold assignments ~init:terms ~f:(fun terms {lhs;rhs} ->
       List.map terms ~f:(replace_term_in_tterm lhs.v rhs.v))
 
+let render_assumptions assumptions  =
+  String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
+      "//@ assume(" ^ (match t.v with
+      | Id x -> "0 != " ^ x
+      | Bop (Bit_and,_,_) -> "0 != " ^ (render_tterm t)
+      | _ -> (render_tterm t)) ^
+      ");")) ^ "\n"
+
 let render_input_assumptions terms =
-  String.concat ~sep:"\n" (List.map terms ~f:(fun term ->
-      "//@ assume(" ^ (render_tterm term) ^ ");"))
+  render_assumptions terms
 
 let ids_from_term term =
   String.Set.of_list
@@ -474,8 +481,7 @@ let render_tmps tmps =
           render_tterm tmp.value ^ ";")) ^ "\n"
 
 let render_context_assumptions assumptions  =
-  String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
-      "//@ assume(" ^ (render_tterm t) ^ ");")) ^ "\n"
+  render_assumptions assumptions
 
 let render_allocated_args args =
   String.concat ~sep:"\n"
