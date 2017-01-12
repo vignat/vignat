@@ -441,7 +441,11 @@ let render_tip_fun_call
   (* (render_equality_assumptions free_vars) ^ "\n" ^ *)
   (render_export_point export_point) ^
   (if render_assertions then
-     let dtree = build_decision_tree results in
+     let dtree = build_decision_tree
+         (List.sort ~cmp:(fun res1 res2 ->
+              (List.length res1.post_statements) -
+              (List.length res2.post_statements))
+         results) in
      render_post_assertions dtree context.ret_name context.ret_type hist_symbols
    else
      "")
