@@ -513,6 +513,10 @@ let rec get_sexp_value exp t =
     (*FIXME: and here, but really that is a bool expression, I know it*)
     (*TODO: check t is really Boolean here*)
     {v=Bop (And,(get_sexp_value lhs Boolean),(get_sexp_value rhs Boolean));t}
+  | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
+    when (String.equal f "And") ->
+    let ty = guess_type_l [lhs;rhs] t in
+    {v=Bop (And,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t=ty}
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom lhs; rhs;]
     when (String.equal f "Concat") && (String.equal lhs "0") ->
     get_sexp_value rhs t
