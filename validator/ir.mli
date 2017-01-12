@@ -1,5 +1,5 @@
 module Sexp = Core.Std.Sexp
-type bop = Eq | Le | Lt | Ge | Gt | Add | Sub | Mul | And
+type bop = Eq | Le | Lt | Ge | Gt | Add | Sub | Mul | And | Bit_and
 val __bop_of_sexp__ : Sexp.t -> bop
 val bop_of_sexp : Sexp.t -> bop
 val sexp_of_bop : bop -> Sexp.t

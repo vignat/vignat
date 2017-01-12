@@ -5,7 +5,7 @@ module Sexp = Core.Std.Sexp
 
 type bop = Eq | Le | Lt | Ge | Gt
          | Add | Sub | Mul
-         | And with sexp
+         | And | Bit_and with sexp
 
 
 type ttype = | Ptr of ttype
@@ -125,6 +125,7 @@ let render_bop = function
   | Sub -> "-"
   | Mul -> "*"
   | And -> "&&"
+  | Bit_and -> "&"
 
 let rec simplify_term term =
   match term with

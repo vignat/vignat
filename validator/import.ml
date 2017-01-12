@@ -515,8 +515,19 @@ let rec get_sexp_value exp t =
     {v=Bop (And,(get_sexp_value lhs Boolean),(get_sexp_value rhs Boolean));t}
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
     when (String.equal f "And") ->
-    let ty = guess_type_l [lhs;rhs] t in
-    {v=Bop (And,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t=ty}
+    begin
+      match rhs with
+      | Sexp.Atom n when is_int n ->
+        {v=Bop (Bit_and,(get_sexp_value lhs Uint32),(get_sexp_value rhs Uint32));t=Uint32}
+      | _ ->
+        let ty = guess_type_l [lhs;rhs] t in
+        lprintf "interesting And case{%s}: %s "
+          (ttype_to_str ty) (Sexp.to_string exp);
+        if ty = Boolean then
+          {v=Bop (And,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t=ty}
+        else
+          {v=Bop (Bit_and,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t=ty}
+    end
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom lhs; rhs;]
     when (String.equal f "Concat") && (String.equal lhs "0") ->
     get_sexp_value rhs t
@@ -994,8 +1005,16 @@ let extract_tip_calls ftype_of calls rets =
        {args_post_conditions=args_post_conditions2;
         ret_val=get_ret_val tip2;
         post_statements=convert_ctxt_list tip2.ret_context;}]
-    | _ -> failwith "More than two tip calls is not supported."
+    | _ ->
+      List.map calls ~f:(fun tip ->
+          {args_post_conditions = compose_args_post_conditions tip;
+           ret_val = get_ret_val tip;
+           post_statements = convert_ctxt_list tip.ret_context})
+      (* failwith ("More than two tip calls (" ^ *)
+      (*           (string_of_int (List.length calls)) ^ *)
+      (*           ") is not supported.") *)
   in
+  lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
 
 let extract_calls_info ftype_of tpref rets =
@@ -1011,13 +1030,17 @@ let collect_context pref =
       (convert_ctxt_list call.call_context) @
       (convert_ctxt_list call.ret_context)))) @
   (match pref.tip_calls with
-   | hd :: [] -> (convert_ctxt_list hd.call_context)
-   | hd1 :: hd2 :: [] ->
-     let call_context = convert_ctxt_list hd1.call_context in
-     assert (call_context = (convert_ctxt_list hd2.call_context));
-     call_context
    | [] -> failwith "There must be at least one tip call."
-   | _ -> failwith "More than two tip alternative tipcalls are not supported.")
+   | hd :: tail -> let call_context = convert_ctxt_list hd.call_context in
+     assert (List.for_all tail ~f:(fun tip ->
+         call_context = convert_ctxt_list tip.call_context));
+     call_context)
+   (* | hd :: [] -> (convert_ctxt_list hd.call_context) *)
+   (* | hd1 :: hd2 :: [] -> *)
+   (*   let call_context = convert_ctxt_list hd1.call_context in *)
+   (*   assert (call_context = (convert_ctxt_list hd2.call_context)); *)
+   (*   call_context *)
+   (* | _ -> failwith "More than two tip alternative tipcalls are not supported.") *)
 
 let strip_context call =
   (* TODO: why do we erase the return value? *)
