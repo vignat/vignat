@@ -804,7 +804,7 @@ let fun_types =
                          extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
-                                         (fun params -> "received_packet = " ^
+                                         (fun params -> "the_received_packet = " ^
                                                         (List.nth_exn params.args 2) ^
                                                         ";\n")];};
      "send_single_packet", {ret_type = Void;
@@ -888,7 +888,7 @@ struct
                   /*@ ensures true; @*/\n{\n\
                   struct lcore_conf *last_lcc;\n\
                   struct lcore_rx_queue *last_rq;\n\
-                 struct rte_mbuf* received_packet;\n\
+                 struct rte_mbuf* the_received_packet;\n\
                  bool a_packet_received = false;\n\
                  struct rte_mbuf* sent_packet;\n\
                  bool a_packet_sent = false;\n"
