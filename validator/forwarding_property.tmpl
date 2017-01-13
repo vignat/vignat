@@ -1,3 +1,10 @@
+assert dmappingp<int_k,ext_k,flw>(?final_map,_,_,_,_,_,_,_,_,_,_,_,_,_);
+assert double_chainp(?final_chain,_);
+
+flowtable initial_ft = abstract_function(initial_double_map,
+                                         initial_double_chain);
+flowtable final_ft = abstract_function(final_map, final_chain);
+   
 bit_and_zero(0x00000010);
 if (10 < now) {
 // consider only normal moments, remote from the start of the epoch
@@ -5,6 +12,10 @@ if (10 < now) {
       ((the_received_packet->packet_type & 0x00000010) ||
       (the_received_packet->packet_type == 0 &&
         the_received_packet->buf_addr->ether.ether_type == 0x08))) {
+
+    flowtable after_expiration_ft =
+      abstract_function(map_after_expiration, chain_after_expiration);
+
     // IPv4 packet
     if (the_received_packet->buf_addr->ipv4.next_proto_id == 6 ||
         the_received_packet->buf_addr->ipv4.next_proto_id == 17) {
@@ -17,7 +28,10 @@ if (10 < now) {
                                      the_received_packet->buf_addr->ipv4.src_addr,
                                      the_received_packet->port,
                                      the_received_packet->buf_addr->ipv4.next_proto_id);
-        if (dmap_has_k2_fp(map_after_expiration, external_flow_id)) {
+        contains_ext_k_abstract(map_after_expiration, chain_after_expiration,
+                                external_flow_id);
+        if (flowtable_contains_ext_flow_id(after_expiration_ft,
+                                           external_flow_id)) {
           // flow is present in the table
           assert true == a_packet_sent;
         } else {
@@ -32,17 +46,29 @@ if (10 < now) {
                                      the_received_packet->buf_addr->ipv4.dst_addr,
                                      the_received_packet->port,
                                      the_received_packet->buf_addr->ipv4.next_proto_id);
-        if (dmap_has_k1_fp(map_after_expiration, internal_flow_id)) {
+        contains_int_k_abstract(map_after_expiration, chain_after_expiration,
+                                internal_flow_id);
+        if (flowtable_contains_int_flow_id(after_expiration_ft,
+                                           internal_flow_id)) {
           // flow present in the table
           assert true == a_packet_sent;
         } else {
           // No flow in the table
-          if (dchain_out_of_space_fp(chain_after_expiration)) {
+          out_of_space_abstract(map_after_expiration, chain_after_expiration);
+          if (flowtable_out_of_space(after_expiration_ft)) {
             // Flowtable overflow
             assert false == a_packet_sent;
           } else {
             // The flow must have been inserted
             assert true == a_packet_sent;
+            //assert true == dmap_has_k1_fp(final_map, internal_flow_id);
+            //int_k some_int_flow_id;
+            //if (dmap_has_k1_fp(map_after_expiration, some_int_flow_id)) {
+            //  assert true == dmap_has_k1_fp(final_map, some_int_flow_id);
+            //} else if (some_in_flow_id != internal_flow_id) {
+            //  assert false == dmap_has_k1_fp(final_map, some_int_flow_id);
+            //}
+            //ext_k some_ext_flow_id;
           }
         }
       }
