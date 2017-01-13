@@ -23,6 +23,14 @@ let capture_map map_name ptr_num args tmp =
   "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
   ",_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args ptr_num) ^ ");\n"
 
+let capture_map_after map_name ptr_num args =
+  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (args.tmp_gen map_name) ^
+  ",_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args.args ptr_num) ^ ");\n"
+
+let capture_chain_after ch_name ptr_num args =
+  "//@ assert double_chainp(?" ^ (args.tmp_gen ch_name) ^ ", " ^
+  (List.nth_exn args.args ptr_num) ^ ");\n"
+
 let capture_map_ex map_name vk1 vk2 ptr_num args tmp =
   "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
   ",_,_,_,_,_,_,_,_,?" ^ (tmp vk1) ^ ",?" ^ (tmp vk2) ^
@@ -123,7 +131,9 @@ let fun_types =
                       arg_types = [];
                       extra_ptr_types = [];
                       lemmas_before = [];
-                      lemmas_after = [];};
+                      lemmas_after = [
+                        (fun params ->
+                        "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
      "start_time", {ret_type = Uint32;
                     arg_types = [];
                     extra_ptr_types = [];
@@ -293,6 +303,8 @@ let fun_types =
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";
                                   tx_l "open lcore_confp(_, last_lcc);";
+                                  tx_l "dmap<int_k,ext_k,flw> initial_double_map = map;";
+                                  tx_l "dchain initial_double_chain = chain;"
                                 ];};
      "dmap_get_b", {ret_type = Sint32;
                     arg_types = [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
@@ -634,6 +646,13 @@ let fun_types =
                            ");\n");
                         ];
                       lemmas_after = [
+                        capture_chain_after "ch_after_exp" 0;
+                        capture_map_after "map_after_exp" 1;
+                        (fun params ->
+                           "//@ dmap<int_k,ext_k,flw> map_after_expiration = " ^
+                           (params.tmp_gen "map_after_exp") ^";\n" ^
+                           "dchain chain_after_expiration = " ^
+                           (params.tmp_gen "ch_after_exp") ^ ";";);
                       ];};
      "dchain_allocate_new_index", {ret_type = Sint32;
                                    arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];

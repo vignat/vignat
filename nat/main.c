@@ -392,12 +392,14 @@ static void set_dst_port(struct rte_mbuf *m, uint16_t port) {
     }
 }
 
-static void simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf)
+static void simple_forward(struct rte_mbuf *m,
+                           uint8_t portid,
+                           struct lcore_conf *qconf,
+                           uint32_t now)
 {
   struct ether_hdr *eth_hdr;
   struct ipv4_hdr *ipv4_hdr;
   uint8_t dst_device;
-  uint32_t now = current_time();
 
   eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
@@ -531,12 +533,16 @@ static int
 main_loop(void* one_iteration)
 #ifdef KLEE_VERIFICATION
 {
-  void (*forward_packet)(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf) = one_iteration;
+  void (*forward_packet)(struct rte_mbuf *m,
+                         uint8_t portid,
+                         struct lcore_conf *qconf,
+                         uint32_t now) = one_iteration;
   int x = klee_int("loop_termination");
   unsigned lcore_id = rte_lcore_id();
   struct lcore_conf* qconf = array_lcc_begin_access(&lcore_conf, lcore_id);
   loop_iteration_begin(get_dmap_pp(), get_dchain_pp(), &lcore_conf,
                        lcore_id, qconf, starting_time, max_flows, start_port);
+  uint32_t now = current_time();
   while (klee_induce_invariants() & x) {
     loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                                &lcore_conf, lcore_id, qconf,
@@ -548,11 +554,11 @@ main_loop(void* one_iteration)
                                  MAX_PKT_BURST);
     if (0 < nb_rx) {
       received_packet(portid, queueid, pkts_burst[0]);
-      forward_packet(pkts_burst[0], portid, qconf);
+      forward_packet(pkts_burst[0], portid, qconf, now);
     }
     loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
                        &lcore_conf, lcore_id, qconf,
-                       current_time(), max_flows, start_port);
+                       now, max_flows, start_port);
   }
   array_lcc_end_access(&lcore_conf);
   return 0;

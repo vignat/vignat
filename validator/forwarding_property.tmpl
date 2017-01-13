@@ -1,17 +1,33 @@
 bit_and_zero(0x00000010);
-if (a_packet_received &&
-    ((the_received_packet->packet_type & 0x00000010) ||
-     (the_received_packet->packet_type == 0 &&
-      the_received_packet->buf_addr->ether.ether_type == 0x08))) {
-  // IP packet
-  if (the_received_packet->buf_addr->ipv4.next_proto_id == 6 ||
-      the_received_packet->buf_addr->ipv4.next_proto_id == 17) {
-    // TCP/UDP packet
-    if (the_received_packet->port == 1) {
-      // packet from the external network
-    } else {
-      // packet from the internal network
-      assert true == a_packet_sent;
+if (10 < now) {
+// consider only normal moments, remote from the start of the epoch
+  if (a_packet_received &&
+      ((the_received_packet->packet_type & 0x00000010) ||
+      (the_received_packet->packet_type == 0 &&
+        the_received_packet->buf_addr->ether.ether_type == 0x08))) {
+    // IP packet
+    if (the_received_packet->buf_addr->ipv4.next_proto_id == 6 ||
+        the_received_packet->buf_addr->ipv4.next_proto_id == 17) {
+      // TCP/UDP packet
+      if (the_received_packet->port == 1) {
+        // packet from the external network
+        // to be continued
+      } else {
+        // packet from the internal network
+        int_k internal_flow_id = ikc(the_received_packet->buf_addr->tcp.src_port,
+                                    the_received_packet->buf_addr->tcp.dst_port,
+                                    the_received_packet->buf_addr->ipv4.src_addr,
+                                    the_received_packet->buf_addr->ipv4.dst_addr,
+                                    the_received_packet->port,
+                                    the_received_packet->buf_addr->ipv4.next_proto_id);
+        if (dmap_has_k1_fp(map_after_expiration, internal_flow_id)) {
+          // flow present in the table
+          assert true == a_packet_sent;
+        } else {
+          // No flow in the table
+          assert true == a_packet_sent;
+        }
+      }
     }
   }
 }
