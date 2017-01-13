@@ -32,15 +32,10 @@ void received_packet(uint8_t portid, uint8_t queueid,
 //@ ensures true;
 
 /*@
-lemma void introduce_arrp_rq(void* ptr);
+lemma void bit_and_zero(int x)
 requires true;
-ensures arrp_rq(_, ptr);
-
-lemma void introduce_arrp_u16(void* ptr);
-requires true;
-ensures arrp_u16(_, ptr);
-
-lemma void introduce_arrp_bat(void* ptr);
-requires true;
-ensures arrp_bat(_, ptr);
+ensures 0 == (0&x);
+{
+  assume(false);//TODO
+}
 @*/

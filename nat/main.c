@@ -397,10 +397,11 @@ static void simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf
   struct ether_hdr *eth_hdr;
   struct ipv4_hdr *ipv4_hdr;
   uint8_t dst_device;
+  uint32_t now = current_time();
 
   eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 
-  expire_flows(current_time());
+  expire_flows(now);
 
   if (RTE_ETH_IS_IPV4_HDR(m->packet_type) ||
       (m->packet_type == 0 &&
@@ -430,7 +431,7 @@ static void simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf
         LOG( "for key: ");
         log_ext_key(&key);
         struct flow f;
-        int flow_exists = get_flow_by_ext_key(&key, current_time(), &f);
+        int flow_exists = get_flow_by_ext_key(&key, now, &f);
         if (flow_exists) {
           LOG( "found flow:");
           log_flow(&f);
@@ -457,21 +458,12 @@ static void simple_forward(struct rte_mbuf *m, uint8_t portid, struct lcore_conf
         LOG( "for key: ");
         log_int_key(&key);
         struct flow f;
-        int flow_exists = get_flow_by_int_key(&key, current_time(), &f);
+        int flow_exists = get_flow_by_int_key(&key, now, &f);
         if (!flow_exists) {
           LOG( "adding flow: ");
-          if (!allocate_flow(&key, current_time(), &f)) {
-            if (0 == expire_flows(current_time())) {
-              LOG("No space for the flow, dropping.");
-              rte_pktmbuf_free(m);
-              return;
-            } else {
-              // A second try, after we expired some flows.
-              if (!allocate_flow(&key, current_time(), &f)) {
-                rte_exit(EXIT_FAILURE, "Can not allocate flow, "
-                         "even after expiring some!\n");
-              }
-            }
+          if (!allocate_flow(&key, now, &f)) {
+            LOG("No space for the flow, dropping.");
+            return;
           }
         }
         LOG( "forwarding to: ");

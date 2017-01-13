@@ -1,6 +1,17 @@
+bit_and_zero(0x00000010);
 if (a_packet_received &&
     ((the_received_packet->packet_type & 0x00000010) ||
      (the_received_packet->packet_type == 0 &&
-      the_received_packet->buf_addr->ether.ether_type == 0x0800))) {
-  assert true == a_packet_sent;
+      the_received_packet->buf_addr->ether.ether_type == 0x08))) {
+  // IP packet
+  if (the_received_packet->buf_addr->ipv4.next_proto_id == 6 ||
+      the_received_packet->buf_addr->ipv4.next_proto_id == 17) {
+    // TCP/UDP packet
+    if (the_received_packet->port == 1) {
+      // packet from the external network
+    } else {
+      // packet from the internal network
+      assert true == a_packet_sent;
+    }
+  }
 }
