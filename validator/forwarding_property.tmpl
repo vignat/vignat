@@ -15,17 +15,23 @@ if (10 < now) {
       } else {
         // packet from the internal network
         int_k internal_flow_id = ikc(the_received_packet->buf_addr->tcp.src_port,
-                                    the_received_packet->buf_addr->tcp.dst_port,
-                                    the_received_packet->buf_addr->ipv4.src_addr,
-                                    the_received_packet->buf_addr->ipv4.dst_addr,
-                                    the_received_packet->port,
-                                    the_received_packet->buf_addr->ipv4.next_proto_id);
+                                     the_received_packet->buf_addr->tcp.dst_port,
+                                     the_received_packet->buf_addr->ipv4.src_addr,
+                                     the_received_packet->buf_addr->ipv4.dst_addr,
+                                     the_received_packet->port,
+                                     the_received_packet->buf_addr->ipv4.next_proto_id);
         if (dmap_has_k1_fp(map_after_expiration, internal_flow_id)) {
           // flow present in the table
           assert true == a_packet_sent;
         } else {
           // No flow in the table
-          assert true == a_packet_sent;
+          if (dchain_out_of_space_fp(chain_after_expiration)) {
+            // Flowtable overflow
+            assert false == a_packet_sent;
+          } else {
+            // The flow must have been inserted
+            assert true == a_packet_sent;
+          }
         }
       }
     }
