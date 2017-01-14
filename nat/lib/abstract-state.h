@@ -75,9 +75,49 @@ fixpoint bool flowtable_contains_ext_flow_id(flowtable ft, ext_k flow_id) {
   }
 }
 
+fixpoint flw flowtable_get_by_int_flow_id(flowtable ft, int_k flow_id) {
+  switch(ft) { case flowtable(size, entries):
+    return entry_flow(nth(index_of(flow_id, map(entry_ik, entries)), entries));
+  }
+}
+
+fixpoint flw flowtable_get_by_ext_flow_id(flowtable ft, ext_k flow_id) {
+  switch(ft) { case flowtable(size, entries):
+    return entry_flow(nth(index_of(flow_id, map(entry_ek, entries)), entries));
+  }
+}
+
 fixpoint bool flowtable_out_of_space(flowtable ft) {
   switch(ft) { case flowtable(size, entries):
     return size <= length(entries);
+  }
+}
+
+fixpoint list<t> remove_if<t>(fixpoint (t,bool) cond, list<t> l) {
+  switch(l) {
+    case nil: return nil;
+    case cons(h,t):
+      return cond(h)? t : cons(h, remove_if(cond, t));
+  }
+}
+
+fixpoint bool entry_matches_flow(flw f, entry e) {
+  return entry_flow(e) == f;
+}
+
+fixpoint flowtable flowtable_add_flow(flowtable table, flw flow, uint32_t time) {
+  switch(table) { case flowtable(size, entries):
+    return flowtable(size, cons(entry(flw_get_ik(flow),
+                                      flw_get_ek(flow),
+                                      flow,
+                                      time),
+                                entries));
+  }
+}
+
+fixpoint flowtable flowtable_remove_flow(flowtable table, flw flow) {
+  switch(table) { case flowtable(size, entries):
+    return flowtable(size, remove_if((entry_matches_flow)(flow), entries));
   }
 }
 @*/
@@ -105,6 +145,44 @@ lemma void out_of_space_abstract(dmap<int_k,ext_k,flw> m, dchain ch)
 requires true;
 ensures flowtable_out_of_space(abstract_function(m, ch)) ==
         dchain_out_of_space_fp(ch);
+{
+  assume(false);//TODO
+}
+
+lemma void add_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
+                             int index, uint32_t t)
+requires false == dchain_out_of_space_fp(ch) &*&
+         false == dchain_allocated_fp(ch, index);
+ensures flowtable_add_flow(abstract_function(m, ch), flow, t) ==
+        abstract_function(dmap_put_fp(m, index, flow, flw_get_ik, flw_get_ek),
+                          dchain_allocate_fp(ch, index, t));
+{
+  assume(false);//TODO
+}
+
+lemma void get_flow_by_int_abstract(dmap<int_k,ext_k,flw> m, dchain ch, int_k ik)
+requires true == dmap_has_k1_fp(m, ik);
+ensures dmap_get_val_fp(m, dmap_get_k1_fp(m, ik)) ==
+        flowtable_get_by_int_flow_id(abstract_function(m, ch), ik);
+{
+  assume(false);//TODO
+}
+
+lemma void get_flow_by_ext_abstract(dmap<int_k,ext_k,flw> m, dchain ch, ext_k ek)
+requires true == dmap_has_k2_fp(m, ek);
+ensures dmap_get_val_fp(m, dmap_get_k2_fp(m, ek)) ==
+        flowtable_get_by_ext_flow_id(abstract_function(m, ch), ek);
+{
+  assume(false);//TODO
+}
+
+lemma void rejuvenate_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
+                                    int index, uint32_t time)
+requires dmap_get_val_fp(m, index) == flow;
+ensures flowtable_add_flow(flowtable_remove_flow(abstract_function(m, ch),
+                                                 flow),
+                           flow, time) ==
+        abstract_function(m, dchain_rejuvenate_fp(ch, index, time));
 {
   assume(false);//TODO
 }

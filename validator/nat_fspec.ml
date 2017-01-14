@@ -482,6 +482,18 @@ let fun_types =
                            !last_device_id ^
                            ", 1, user_buf0_23)," ^
                        (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ "); @*/");
+                    (fun _ _ ->
+                       "/*@ flw the_inserted_flow = " ^
+                       " flwc(ikc(user_buf0_34, user_buf0_36,\
+                        user_buf0_26, user_buf0_30, " ^
+                       !last_device_id ^
+                       ", user_buf0_23),\n\
+                        ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                        1, user_buf0_23),\n\
+                        user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
+                        184789184, user_buf0_30, " ^
+                       !last_device_id ^
+                       ", 1, user_buf0_23);@*/");
                     (fun _ tmp ->
                       "/*@ {\n\
                        assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
@@ -678,6 +690,9 @@ let fun_types =
                                         last_time_for_index_alloc :=
                                           (List.nth_exn params.args 2);
                                         "");
+                                     (fun params ->
+                                        "int the_index_allocated = *" ^
+                                        (List.nth_exn params.args 1) ^ ";\n");
                                    ];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
                                  arg_types = [Ptr dchain_struct; Sint32; Uint32;];
@@ -707,7 +722,11 @@ let fun_types =
                                       ^ (List.nth_exn params.args 2) ^ ");\n\
                                        rejuvenate_preserves_index_range(ch," ^
                                       (List.nth_exn params.args 1) ^ ", " ^
-                                      (List.nth_exn params.args 2) ^ ");\n}@*/");];};
+                                      (List.nth_exn params.args 2) ^ ");\n}@*/");
+                                   (fun params ->
+                                      "int the_index_rejuvenated = " ^
+                                      (List.nth_exn params.args 1) ^ ";\n");
+                                 ];};
      "array_bat_init", {ret_type = Void;
                         arg_types = [Ptr arr_bat_struct;];
                         extra_ptr_types = [];

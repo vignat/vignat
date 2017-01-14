@@ -34,9 +34,23 @@ if (10 < now) {
                                            external_flow_id)) {
           // flow is present in the table
           assert true == a_packet_sent;
+          flw flow = flowtable_get_by_ext_flow_id(after_expiration_ft,
+                                                  external_flow_id);
+          get_flow_by_ext_abstract(map_after_expiration,
+                                   chain_after_expiration,
+                                   external_flow_id);
+          rejuvenate_flow_abstract(map_after_expiration,
+                                   chain_after_expiration,
+                                   flow, the_index_rejuvenated, now);
+          assert final_ft ==
+                   flowtable_add_flow(flowtable_remove_flow(after_expiration_ft,
+                                                            flow),
+                                      flow,
+                                      now);
         } else {
           // no flow in the table
           assert false == a_packet_sent;
+          assert final_ft == after_expiration_ft;
         }
       } else {
         // packet from the internal network
@@ -52,23 +66,34 @@ if (10 < now) {
                                            internal_flow_id)) {
           // flow present in the table
           assert true == a_packet_sent;
+          flw flow = flowtable_get_by_int_flow_id(after_expiration_ft,
+                                                  internal_flow_id);
+          get_flow_by_int_abstract(map_after_expiration,
+                                   chain_after_expiration,
+                                   internal_flow_id);
+          rejuvenate_flow_abstract(map_after_expiration,
+                                   chain_after_expiration,
+                                   flow, the_index_rejuvenated, now);
+          assert final_ft ==
+                   flowtable_add_flow(flowtable_remove_flow(after_expiration_ft,
+                                                            flow),
+                                      flow,
+                                      now);
         } else {
           // No flow in the table
           out_of_space_abstract(map_after_expiration, chain_after_expiration);
           if (flowtable_out_of_space(after_expiration_ft)) {
             // Flowtable overflow
             assert false == a_packet_sent;
+            assert final_ft == after_expiration_ft;
           } else {
             // The flow must have been inserted
             assert true == a_packet_sent;
-            //assert true == dmap_has_k1_fp(final_map, internal_flow_id);
-            //int_k some_int_flow_id;
-            //if (dmap_has_k1_fp(map_after_expiration, some_int_flow_id)) {
-            //  assert true == dmap_has_k1_fp(final_map, some_int_flow_id);
-            //} else if (some_in_flow_id != internal_flow_id) {
-            //  assert false == dmap_has_k1_fp(final_map, some_int_flow_id);
-            //}
-            //ext_k some_ext_flow_id;
+            add_flow_abstract(map_after_expiration, chain_after_expiration,
+                              the_inserted_flow, the_index_allocated, now);
+            assert final_ft == flowtable_add_flow(after_expiration_ft,
+                                                  the_inserted_flow,
+                                                  now);
           }
         }
       }
