@@ -120,6 +120,21 @@ fixpoint flowtable flowtable_remove_flow(flowtable table, flw flow) {
     return flowtable(size, remove_if((entry_matches_flow)(flow), entries));
   }
 }
+
+fixpoint list<entry> expire_entries(list<entry> entries, uint32_t time) {
+  switch(entries) {
+    case nil: return nil;
+    case cons(h,t): return time < entry_tstamp(h)           ?
+                           cons(h, expire_entries(t, time)) :
+                           expire_entries(t, time);
+  }
+}
+
+fixpoint flowtable flowtable_expire_flows(flowtable table, uint32_t time) {
+  switch(table) { case flowtable(size, entries):
+    return flowtable(size, expire_entries(entries, time));
+  }
+}
 @*/
 
 /*@
@@ -183,6 +198,18 @@ ensures flowtable_add_flow(flowtable_remove_flow(abstract_function(m, ch),
                                                  flow),
                            flow, time) ==
         abstract_function(m, dchain_rejuvenate_fp(ch, index, time));
+{
+  assume(false);//TODO
+}
+
+lemma void expire_flows_abstract(dmap<int_k,ext_k,flw> m,
+                                 dchain ch, uint32_t time)
+requires true;
+ensures flowtable_expire_flows(abstract_function(m, ch), time) ==
+        abstract_function(dmap_erase_all_fp
+                            (m, dchain_get_expired_indexes_fp(ch, time),
+                             flw_get_ik, flw_get_ek),
+                          dchain_expire_old_indexes_fp(ch, time));
 {
   assume(false);//TODO
 }

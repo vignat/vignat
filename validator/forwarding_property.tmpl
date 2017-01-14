@@ -16,6 +16,9 @@ if (10 < now) {
     flowtable after_expiration_ft =
       abstract_function(map_after_expiration, chain_after_expiration);
 
+    expire_flows_abstract(initial_double_map, initial_double_chain, now - 10);
+    assert after_expiration_ft == flowtable_expire_flows(initial_ft, now - 10);
+
     // IPv4 packet
     if (the_received_packet->buf_addr->ipv4.next_proto_id == 6 ||
         the_received_packet->buf_addr->ipv4.next_proto_id == 17) {
