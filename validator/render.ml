@@ -58,7 +58,7 @@ let rec render_assignment {lhs;rhs;} =
   | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
 
 let render_extra_pre_conditions context =
-  String.concat
+  String.concat ~sep:"\n"
     (List.map context.extra_pre_conditions ~f:(fun eq_cond ->
          (render_assignment eq_cond)))
 

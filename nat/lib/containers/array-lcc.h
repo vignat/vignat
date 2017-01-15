@@ -121,12 +121,14 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index);
 //@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
 /*@ ensures arrp_lcc_acc(lst, arr, index) &*&
             result == arrp_the_missing_cell_lcc(arr, index) &*&
-            lcore_confp(nth(index, lst), result);
+            lcore_confp(nth(index, lst), result) &*&
+            nth(index, lst) == lcore_confi(2);
   @*/
 
 void array_lcc_end_access(struct ArrayLcc *arr);
 /*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
-             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
+             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)) &*&
+             lc == lcore_confi(2); @*/
 /*@ ensures arrp_lcc(update(idx, lc, lst), arr) &*&
             length(update(idx, lc, lst)) == ARRAY_LCC_CAPACITY; @*/
 

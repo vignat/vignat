@@ -268,8 +268,11 @@ struct nested_field_descr user_buf_nested[] = {
    sizeof(uint8_t), "time_to_live"},
   {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, next_proto_id),
    sizeof(uint8_t), "next_proto_id"},
-  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, hdr_checksum),
-   sizeof(uint16_t), "hdr_checksum"},
+  /*
+    skip the checksum, as it is very hard to verify symbolically.
+    {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, hdr_checksum),
+    sizeof(uint16_t), "hdr_checksum"},
+  */
   {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, src_addr),
    sizeof(uint32_t), "src_addr"},
   {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, dst_addr),
@@ -289,8 +292,11 @@ struct nested_field_descr user_buf_nested[] = {
    sizeof(uint8_t), "tcp_flags"},
   {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, rx_win),
    sizeof(uint16_t), "rx_win"},
-  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, cksum),
-   sizeof(uint16_t), "cksum"},
+  /*
+    skip the checksum, as it is very hard to verify symbolically.
+    {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, cksum),
+    sizeof(uint16_t), "cksum"},
+  */
   {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, tcp_urp),
    sizeof(uint16_t), "tcp_urp"},
 };

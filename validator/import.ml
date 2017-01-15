@@ -550,6 +550,8 @@ let rec get_struct_val_value valu t =
     (* | Some name -> {v=Id name;t} *)
     (* | None -> <^^^ this was working a while ago, may be it should be
        left somewhere *)
+      lprintf "Destruct: %s; Need %d fields got %d fields.\n" strname
+        (List.length fields) (List.length valu.break_down);
       let fields = List.map2_exn valu.break_down fields
           ~f:(fun {fname;value;_} (name,t) ->
               assert(String.equal name fname);
@@ -613,10 +615,12 @@ let get_basic_vars ftype_of tpref =
       get_vars_from_struct_val ptee.after ptee_type before_vars
     in
     let get_extra_ptr_pointee_vars ptee ptee_type accumulator =
-      let before_vars =
-        get_vars_from_struct_val ptee.before ptee_type accumulator
-      in
-      get_vars_from_struct_val ptee.after ptee_type before_vars
+      match ptee with
+      | Opening x -> get_vars_from_struct_val x ptee_type accumulator
+      | Closing x -> get_vars_from_struct_val x ptee_type accumulator
+      | Changing (a,b) ->
+        get_vars_from_struct_val a ptee_type
+          (get_vars_from_struct_val b ptee_type accumulator)
     in
     let get_ret_pointee_vars ptee ptee_type accumulator =
       assert(ptee.before.full = None);
@@ -755,7 +759,18 @@ let allocate_extra_ptrs ftype_of tpref =
     List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
         let addr = value in
         let ptee_type = get_fun_extra_ptr_type ftype_of call.fun_name pname in
-        alloc_extra_ptr (pname ^ call.fun_name) addr ptee.before (get_struct_val_value ptee.before ptee_type))
+        match ptee with
+        | Opening _ ->
+          alloc_extra_ptr (pname ^ call.fun_name)
+            addr {full=None;break_down=[]} {v=Undef;t=ptee_type}
+        | Closing x ->
+          alloc_extra_ptr (pname ^ "_" ^ call.fun_name ^
+                           (Int64.to_string addr)) addr x
+            (get_struct_val_value x ptee_type)
+        | Changing (x,_) ->
+          alloc_extra_ptr (pname ^ "_" ^ call.fun_name ^
+                           (Int64.to_string addr)) addr x
+            (get_struct_val_value x ptee_type))
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_extra_ptrs)
 
@@ -875,6 +890,10 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
                     args;tmp_gen;is_tip})
 
+let deref_tterm {v;t} =
+  {v = simplify_term (Deref {v;t});
+   t = get_pointee t}
+
 let compose_args_post_conditions (call:Trace_prefix.call_node) =
   List.filter_map call.args ~f:(fun arg ->
       match arg.ptr with
@@ -891,12 +910,34 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
             (* Skip the two layer pointer.
                TODO: maybe be allow special case of Zeroptr here.*)
           | value ->
-            Some {lhs={v=simplify_term (Deref out_arg);
-                       t=get_pointee out_arg.t};
+            Some {lhs=deref_tterm out_arg;
                   rhs=value}
           end
         | None -> None (* The variable is not allocated,
                           because it is a 2-layer pointer.*))
+
+let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node) =
+  let gen_post_condition_of_struct_val (val_before : Ir.tterm) val_now =
+    match get_struct_val_value
+            val_now (get_pointee val_before.t) with
+    | {v=Int _;t=_} -> None
+    (* Skip the two layer pointer.
+       TODO: maybe be allow special case of Zeroptr here.*)
+    | value ->
+      Some {lhs=deref_tterm val_before;
+            rhs=value}
+  in
+  List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
+      let key = value in
+      match find_first_known_address key with
+      | Some extra_ptee ->
+        begin match ptee with
+          | Opening x -> gen_post_condition_of_struct_val extra_ptee x
+          | Closing _ -> None
+          | Changing (_,x) -> gen_post_condition_of_struct_val extra_ptee x
+        end
+      | None -> None (* The variable is not allocated,
+                        because it is a 2-layer pointer.*))
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
@@ -926,13 +967,39 @@ let find_last_known_whole_address_before_call addr call_id =
                  (max_el,max_id)))
 
 let take_extra_ptrs_into_account ptrs callid =
+  let gen_eq_by_struct_val (var_ptr : Ir.tterm) value_now =
+    match get_struct_val_value value_now (get_pointee var_ptr.t) with
+    | {v=Undef;t=_} -> None
+    | y -> Some {lhs=deref_tterm var_ptr;rhs=y}
+  in
+
   List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
       match find_last_known_whole_address_before_call value callid with
       | None -> None
       | Some (x,_) ->
-        match get_struct_val_value ptee.before (get_pointee x.t) with
-        | {v=Undef;t=_} -> None
-        | y -> Some {lhs={v=Deref x;t=y.t};rhs=y})
+        match ptee with
+        | Opening o -> gen_eq_by_struct_val x o
+        | Closing _ -> None
+        | Changing (o,_) -> gen_eq_by_struct_val x o)
+
+let take_arg_ptrs_into_account (args : Trace_prefix.arg list) callid =
+  List.filter_map args ~f:(fun arg ->
+      match arg.ptr with
+      | Nonptr -> None
+      | Funptr _ -> None
+      | Apathptr -> None
+      | Curioptr ptee -> begin (* TODO: why nececerily a *whole* address?
+                               See also take_extra_ptrs_into_account for the
+                               same issue.*)
+          let addr = Int64.of_string (Sexp.to_string arg.value) in
+          match find_last_known_whole_address_before_call addr callid with
+          | None -> None
+          | Some (x,_) ->
+            match get_struct_val_value ptee.before (get_pointee x.t) with
+            | {v=Undef;t=_} -> None
+            | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
+        end)
+
 
 let extract_common_call_context
     ~is_tip ftype_of call ret_spec args unique_postfix =
@@ -942,7 +1009,8 @@ let extract_common_call_context
   let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
   let application = simplify_term (Apply (call.fun_name,args)) in
   let extra_pre_conditions =
-    take_extra_ptrs_into_account call.extra_ptrs call.id
+    (take_extra_ptrs_into_account call.extra_ptrs call.id)@
+    (take_arg_ptrs_into_account call.args call.id)
   in
   let post_lemmas =
     compose_post_lemmas
@@ -957,6 +1025,9 @@ let extract_common_call_context
 let extract_hist_call ftype_of call rets =
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
+  let args_post_conditions = (compose_extra_ptrs_post_conditions call)@
+                             args_post_conditions
+  in
   let uniq = string_of_int call.id in
   match Int.Map.find rets call.id with
   | Some ret ->
@@ -1175,6 +1246,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
   let arguments = allocate_args ftype_of pref (name_gen "arg") in
+  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets in
@@ -1182,7 +1254,6 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
   let free_vars = typed_vars_to_varspec free_vars in
-  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
   let arguments = fixup_placeholder_ptrs arguments in
   let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
   let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
