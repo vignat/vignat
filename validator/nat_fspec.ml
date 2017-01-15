@@ -920,16 +920,15 @@ let fixpoints =
 module Iface : Fspec_api.Spec =
 struct
   let preamble = (In_channel.read_all "preamble.tmpl") ^
-                 "\
- void to_verify()\n\
+                 "void to_verify()\n\
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
                   struct lcore_conf *last_lcc;\n\
                   struct lcore_rx_queue *last_rq;\n\
-                 struct rte_mbuf* the_received_packet;\n\
-                 bool a_packet_received = false;\n\
-                 struct rte_mbuf* sent_packet;\n\
-                 bool a_packet_sent = false;\n"
+                  struct rte_mbuf* the_received_packet;\n\
+                  bool a_packet_received = false;\n\
+                  struct rte_mbuf* sent_packet;\n\
+                  bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"

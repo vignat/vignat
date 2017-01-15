@@ -10,7 +10,7 @@ if (10 < now) {
 // consider only normal moments, remote from the start of the epoch
   if (a_packet_received &&
       ((the_received_packet->packet_type & 0x00000010) ||
-      (the_received_packet->packet_type == 0 &&
+       (the_received_packet->packet_type == 0 &&
         the_received_packet->buf_addr->ether.ether_type == 0x08))) {
 
     flowtable after_expiration_ft =
@@ -50,6 +50,14 @@ if (10 < now) {
                                                             flow),
                                       flow,
                                       now);
+          assert ikc(sent_packet->buf_addr->tcp.dst_port,
+                     sent_packet->buf_addr->tcp.src_port,
+                     sent_packet->buf_addr->ipv4.dst_addr,
+                     sent_packet->buf_addr->ipv4.src_addr,
+                     sent_packet->port,
+                     sent_packet->buf_addr->ipv4.next_proto_id) ==
+                 flw_get_ik(flow);
+          //TODO: ensure other parts of the sent packet remain the same.
         } else {
           // no flow in the table
           assert false == a_packet_sent;
@@ -82,6 +90,7 @@ if (10 < now) {
                                                             flow),
                                       flow,
                                       now);
+          //TODO: ensure other parts of the sent packet remain the same.
         } else {
           // No flow in the table
           out_of_space_abstract(map_after_expiration, chain_after_expiration);
@@ -97,6 +106,7 @@ if (10 < now) {
             assert final_ft == flowtable_add_flow(after_expiration_ft,
                                                   the_inserted_flow,
                                                   now);
+            //TODO: ensure other parts of the sent packet remain the same.
           }
         }
       }
