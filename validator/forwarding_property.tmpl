@@ -6,8 +6,8 @@ flowtable initial_ft = abstract_function(initial_double_map,
 flowtable final_ft = abstract_function(final_map, final_chain);
    
 bit_and_zero(0x00000010);
-if (10 < now) {
-// consider only normal moments, remote from the start of the epoch
+if (10 < now) {// consider only normal moments, remote from the start of the epoch
+
   if (a_packet_received &&
       ((received_packet_type & 0x00000010) ||
        (received_packet_type == 0 &&
@@ -90,6 +90,13 @@ if (10 < now) {
                                                             flow),
                                       flow,
                                       now);
+          assert ekc(sent_packet.tcp.src_port,
+                     sent_packet.tcp.dst_port,
+                     sent_packet.ipv4.src_addr,
+                     sent_packet.ipv4.dst_addr,
+                     sent_on_port,
+                     sent_packet.ipv4.next_proto_id) ==
+                 flw_get_ek(flow);
           //TODO: ensure other parts of the sent packet remain the same.
         } else {
           // No flow in the table
@@ -106,6 +113,19 @@ if (10 < now) {
             assert final_ft == flowtable_add_flow(after_expiration_ft,
                                                   the_inserted_flow,
                                                   now);
+            ext_k external_flow_id = flw_get_ek(the_inserted_flow);
+            contains_ext_k_abstract(map_after_expiration,
+                                    chain_after_expiration,
+                                    external_flow_id);
+            assert false == flowtable_contains_ext_flow_id(after_expiration_ft,
+                                                           external_flow_id);
+            assert ekc(sent_packet.tcp.src_port,
+                       sent_packet.tcp.dst_port,
+                       sent_packet.ipv4.src_addr,
+                       sent_packet.ipv4.dst_addr,
+                       sent_on_port,
+                       sent_packet.ipv4.next_proto_id) ==
+                   external_flow_id;
             //TODO: ensure other parts of the sent packet remain the same.
           }
         }
