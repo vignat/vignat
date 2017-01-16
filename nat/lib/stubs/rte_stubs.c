@@ -37,8 +37,12 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
   if (receive_one) {
     struct rte_mbuf * in_package;
     klee_assert(!incoming_package_allocated);
-    klee_make_symbolic(&incoming_package, sizeof(struct rte_mbuf), "incoming_package0");
-    klee_make_symbolic(&user_buf, sizeof(struct user_buf), "user_buf0");
+    void* array = malloc(sizeof(struct rte_mbuf));
+    klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package0");
+    memcpy(&incoming_package, array, sizeof(struct rte_mbuf));
+    array = malloc(sizeof(struct user_buf));
+    klee_make_symbolic(array, sizeof(struct user_buf), "user_buf0");
+    memcpy(&user_buf, array, sizeof(struct user_buf));
     in_package = &incoming_package;
     incoming_package_allocated = 1;
     in_package->buf_addr = &user_buf;
