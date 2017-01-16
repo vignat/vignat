@@ -1,6 +1,24 @@
 assert dmappingp<int_k,ext_k,flw>(?final_map,_,_,_,_,_,_,_,_,_,_,_,_,_);
 assert double_chainp(?final_chain,_);
 
+#define UNRELEVANT_FIELDS_UNCHANGED(before,after)               \
+    after.ether.ether_type     == before.ether.ether_type &&      \
+    after.ipv4.version_ihl     == before.ipv4.version_ihl &&      \
+    after.ipv4.type_of_service == before.ipv4.type_of_service &&  \
+    after.ipv4.total_length    == before.ipv4.total_length &&     \
+    after.ipv4.packet_id       == before.ipv4.packet_id &&        \
+    after.ipv4.fragment_offset == before.ipv4.fragment_offset &&  \
+    after.ipv4.time_to_live    == before.ipv4.time_to_live &&     \
+    after.ipv4.next_proto_id   == before.ipv4.next_proto_id &&    \
+    /* after.tcp.sent_seq         == before.tcp.sent_seq &&
+       this one gets a weird formula for some reason
+     */                                                           \
+    after.tcp.recv_ack         == before.tcp.recv_ack &&          \
+    after.tcp.data_off         == before.tcp.data_off &&          \
+    after.tcp.tcp_flags        == before.tcp.tcp_flags &&         \
+    after.tcp.rx_win           == before.tcp.rx_win &&            \
+    after.tcp.tcp_urp          == before.tcp.tcp_urp
+
 flowtable initial_ft = abstract_function(initial_double_map,
                                          initial_double_chain);
 flowtable final_ft = abstract_function(final_map, final_chain);
@@ -57,6 +75,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                      sent_on_port,
                      sent_packet.ipv4.next_proto_id) ==
                  flw_get_ik(flow);
+          assert UNRELEVANT_FIELDS_UNCHANGED(the_received_packet, sent_packet);
           //TODO: ensure other parts of the sent packet remain the same.
         } else {
           // no flow in the table
@@ -97,6 +116,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                      sent_on_port,
                      sent_packet.ipv4.next_proto_id) ==
                  flw_get_ek(flow);
+          assert UNRELEVANT_FIELDS_UNCHANGED(the_received_packet, sent_packet);
           //TODO: ensure other parts of the sent packet remain the same.
         } else {
           // No flow in the table
@@ -126,6 +146,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                        sent_on_port,
                        sent_packet.ipv4.next_proto_id) ==
                    external_flow_id;
+            assert UNRELEVANT_FIELDS_UNCHANGED(the_received_packet, sent_packet);
             //TODO: ensure other parts of the sent packet remain the same.
           }
         }
