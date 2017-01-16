@@ -9,9 +9,9 @@ bit_and_zero(0x00000010);
 if (10 < now) {
 // consider only normal moments, remote from the start of the epoch
   if (a_packet_received &&
-      ((the_received_packet->packet_type & 0x00000010) ||
-       (the_received_packet->packet_type == 0 &&
-        the_received_packet->buf_addr->ether.ether_type == 0x08))) {
+      ((received_packet_type & 0x00000010) ||
+       (received_packet_type == 0 &&
+        the_received_packet.ether.ether_type == 0x08))) {
 
     flowtable after_expiration_ft =
       abstract_function(map_after_expiration, chain_after_expiration);
@@ -20,17 +20,17 @@ if (10 < now) {
     assert after_expiration_ft == flowtable_expire_flows(initial_ft, now - 10);
 
     // IPv4 packet
-    if (the_received_packet->buf_addr->ipv4.next_proto_id == 6 ||
-        the_received_packet->buf_addr->ipv4.next_proto_id == 17) {
+    if (the_received_packet.ipv4.next_proto_id == 6 ||
+        the_received_packet.ipv4.next_proto_id == 17) {
       // TCP/UDP packet
-      if (the_received_packet->port == 1) {
+      if (received_on_port == 1) {
         // packet from the external network
-        ext_k external_flow_id = ekc(the_received_packet->buf_addr->tcp.dst_port,
-                                     the_received_packet->buf_addr->tcp.src_port,
-                                     the_received_packet->buf_addr->ipv4.dst_addr,
-                                     the_received_packet->buf_addr->ipv4.src_addr,
-                                     the_received_packet->port,
-                                     the_received_packet->buf_addr->ipv4.next_proto_id);
+        ext_k external_flow_id = ekc(the_received_packet.tcp.dst_port,
+                                     the_received_packet.tcp.src_port,
+                                     the_received_packet.ipv4.dst_addr,
+                                     the_received_packet.ipv4.src_addr,
+                                     received_on_port,
+                                     the_received_packet.ipv4.next_proto_id);
         contains_ext_k_abstract(map_after_expiration, chain_after_expiration,
                                 external_flow_id);
         if (flowtable_contains_ext_flow_id(after_expiration_ft,
@@ -50,12 +50,12 @@ if (10 < now) {
                                                             flow),
                                       flow,
                                       now);
-          assert ikc(sent_packet->buf_addr->tcp.dst_port,
-                     sent_packet->buf_addr->tcp.src_port,
-                     sent_packet->buf_addr->ipv4.dst_addr,
-                     sent_packet->buf_addr->ipv4.src_addr,
-                     sent_packet->port,
-                     sent_packet->buf_addr->ipv4.next_proto_id) ==
+          assert ikc(sent_packet.tcp.dst_port,
+                     sent_packet.tcp.src_port,
+                     sent_packet.ipv4.dst_addr,
+                     sent_packet.ipv4.src_addr,
+                     sent_on_port,
+                     sent_packet.ipv4.next_proto_id) ==
                  flw_get_ik(flow);
           //TODO: ensure other parts of the sent packet remain the same.
         } else {
@@ -65,12 +65,12 @@ if (10 < now) {
         }
       } else {
         // packet from the internal network
-        int_k internal_flow_id = ikc(the_received_packet->buf_addr->tcp.src_port,
-                                     the_received_packet->buf_addr->tcp.dst_port,
-                                     the_received_packet->buf_addr->ipv4.src_addr,
-                                     the_received_packet->buf_addr->ipv4.dst_addr,
-                                     the_received_packet->port,
-                                     the_received_packet->buf_addr->ipv4.next_proto_id);
+        int_k internal_flow_id = ikc(the_received_packet.tcp.src_port,
+                                     the_received_packet.tcp.dst_port,
+                                     the_received_packet.ipv4.src_addr,
+                                     the_received_packet.ipv4.dst_addr,
+                                     received_on_port,
+                                     the_received_packet.ipv4.next_proto_id);
         contains_int_k_abstract(map_after_expiration, chain_after_expiration,
                                 internal_flow_id);
         if (flowtable_contains_int_flow_id(after_expiration_ft,

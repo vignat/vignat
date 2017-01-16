@@ -11,6 +11,7 @@ val tx_l : bytes -> 'a -> bytes
 val tx_bl : bytes -> 'a -> 'b -> bytes
 val on_rez_nonzero : bytes -> lemma_params -> bytes
 val on_rez_nz : (lemma_params -> bytes) -> lemma_params -> bytes
+val deep_copy : Ir.var_spec -> bytes
 type fun_spec = {
   ret_type : Ir.ttype;
   arg_types : Ir.ttype list;

@@ -127,6 +127,13 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "priv_size", Uint16;
                                 "timesync", Uint16] )
 
+let copy_user_buf var_name ptr =
+  deep_copy
+    {Ir.name=var_name;
+     Ir.value={v=Deref {v=Ir.Id ("((" ^ ptr ^ ")->buf_addr)");
+                        t=Ptr user_buf_struct};
+               t=user_buf_struct}}
+
 let fun_types =
   String.Map.of_alist_exn
     ["current_time", {ret_type = Uint32;
@@ -844,18 +851,34 @@ let fun_types =
                          extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
-                                         (fun params -> "the_received_packet = " ^
-                                                        (List.nth_exn params.args 2) ^
-                                                        ";\n")];};
+                                         (fun params ->
+                                            let recv_pkt =
+                                              (List.nth_exn params.args 2)
+                                            in
+                                            (copy_user_buf "the_received_packet"
+                                               recv_pkt) ^ "\n" ^
+                                            "received_on_port = (" ^
+                                            recv_pkt ^ ")->port;\n" ^
+                                            "received_packet_type = (" ^
+                                            recv_pkt ^ ")->packet_type;");
+                                           ];};
      "send_single_packet", {ret_type = Void;
                             arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
                                          Ptr lcore_conf_struct];
                             extra_ptr_types = ["user_buf_addr", user_buf_struct];
                             lemmas_before = [];
                             lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                                            (fun params -> "sent_packet = " ^
-                                                           (List.nth_exn params.args 0) ^
-                                                           ";\n")];};
+                                            (fun params ->
+                                               let sent_pkt =
+                                                 (List.nth_exn params.args 0)
+                                               in
+                                               (copy_user_buf "sent_packet"
+                                                  sent_pkt) ^ "\n" ^
+                                               "sent_on_port = " ^
+                                               (List.nth_exn params.args 1) ^
+                                               ";\n" ^
+                                               "sent_packet_type = (" ^
+                                               sent_pkt ^ ")->packet_type;");];};
     ]
 
 let fixpoints =
@@ -927,9 +950,13 @@ struct
                   /*@ ensures true; @*/\n{\n\
                   struct lcore_conf *last_lcc;\n\
                   struct lcore_rx_queue *last_rq;\n\
-                  struct rte_mbuf* the_received_packet;\n\
+                  uint8_t received_on_port;\n\
+                  uint32_t received_packet_type;\n\
+                  struct user_buf the_received_packet;\n\
                   bool a_packet_received = false;\n\
-                  struct rte_mbuf* sent_packet;\n\
+                  struct user_buf sent_packet;\n\
+                  uint8_t sent_on_port;\n\
+                  uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
