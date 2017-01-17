@@ -34,7 +34,6 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
     flowtable after_expiration_ft =
       abstract_function(map_after_expiration, chain_after_expiration);
 
-    expire_flows_abstract(initial_double_map, initial_double_chain, now - 10);
     assert after_expiration_ft == flowtable_expire_flows(initial_ft, now - 10);
 
     // IPv4 packet
@@ -49,20 +48,12 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                                      the_received_packet.ipv4.src_addr,
                                      received_on_port,
                                      the_received_packet.ipv4.next_proto_id);
-        contains_ext_k_abstract(map_after_expiration, chain_after_expiration,
-                                external_flow_id);
         if (flowtable_contains_ext_flow_id(after_expiration_ft,
                                            external_flow_id)) {
           // flow is present in the table
           assert true == a_packet_sent;
           flw flow = flowtable_get_by_ext_flow_id(after_expiration_ft,
                                                   external_flow_id);
-          get_flow_by_ext_abstract(map_after_expiration,
-                                   chain_after_expiration,
-                                   external_flow_id);
-          rejuvenate_flow_abstract(map_after_expiration,
-                                   chain_after_expiration,
-                                   flow, the_index_rejuvenated, now);
           assert final_ft ==
                    flowtable_add_flow(flowtable_remove_flow(after_expiration_ft,
                                                             flow),
@@ -90,20 +81,12 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                                      the_received_packet.ipv4.dst_addr,
                                      received_on_port,
                                      the_received_packet.ipv4.next_proto_id);
-        contains_int_k_abstract(map_after_expiration, chain_after_expiration,
-                                internal_flow_id);
         if (flowtable_contains_int_flow_id(after_expiration_ft,
                                            internal_flow_id)) {
           // flow present in the table
           assert true == a_packet_sent;
           flw flow = flowtable_get_by_int_flow_id(after_expiration_ft,
                                                   internal_flow_id);
-          get_flow_by_int_abstract(map_after_expiration,
-                                   chain_after_expiration,
-                                   internal_flow_id);
-          rejuvenate_flow_abstract(map_after_expiration,
-                                   chain_after_expiration,
-                                   flow, the_index_rejuvenated, now);
           assert final_ft ==
                    flowtable_add_flow(flowtable_remove_flow(after_expiration_ft,
                                                             flow),
@@ -120,7 +103,6 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
           //TODO: ensure other parts of the sent packet remain the same.
         } else {
           // No flow in the table
-          out_of_space_abstract(map_after_expiration, chain_after_expiration);
           if (flowtable_out_of_space(after_expiration_ft)) {
             // Flowtable overflow
             assert false == a_packet_sent;
@@ -128,15 +110,10 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
           } else {
             // The flow must have been inserted
             assert true == a_packet_sent;
-            add_flow_abstract(map_after_expiration, chain_after_expiration,
-                              the_inserted_flow, the_index_allocated, now);
             assert final_ft == flowtable_add_flow(after_expiration_ft,
                                                   the_inserted_flow,
                                                   now);
             ext_k external_flow_id = flw_get_ek(the_inserted_flow);
-            contains_ext_k_abstract(map_after_expiration,
-                                    chain_after_expiration,
-                                    external_flow_id);
             assert false == flowtable_contains_ext_flow_id(after_expiration_ft,
                                                            external_flow_id);
             assert ekc(sent_packet.tcp.src_port,

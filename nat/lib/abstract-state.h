@@ -1,6 +1,7 @@
 #include "containers/double-map.h"
 #include "containers/double-chain.h"
 #include "flow.h"
+#include "coherence.h"
 
 /*@
 
@@ -140,8 +141,9 @@ fixpoint flowtable flowtable_expire_flows(flowtable table, uint32_t time) {
 /*@
 lemma void contains_ext_k_abstract(dmap<int_k,ext_k,flw> m, dchain ch,
                                    ext_k ek)
-requires true;
-ensures flowtable_contains_ext_flow_id(abstract_function(m, ch), ek) ==
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        flowtable_contains_ext_flow_id(abstract_function(m, ch), ek) ==
         dmap_has_k2_fp(m, ek);
 {
   assume(false);//TODO
@@ -149,8 +151,9 @@ ensures flowtable_contains_ext_flow_id(abstract_function(m, ch), ek) ==
 
 lemma void contains_int_k_abstract(dmap<int_k,ext_k,flw> m, dchain ch,
                                    int_k ik)
-requires true;
-ensures flowtable_contains_int_flow_id(abstract_function(m, ch), ik) ==
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        flowtable_contains_int_flow_id(abstract_function(m, ch), ik) ==
         dmap_has_k1_fp(m, ik);
 {
   assume(false);//TODO
@@ -167,8 +170,10 @@ ensures flowtable_out_of_space(abstract_function(m, ch)) ==
 lemma void add_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
                              int index, uint32_t t)
 requires false == dchain_out_of_space_fp(ch) &*&
-         false == dchain_allocated_fp(ch, index);
-ensures flowtable_add_flow(abstract_function(m, ch), flow, t) ==
+         false == dchain_allocated_fp(ch, index) &*&
+         dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        flowtable_add_flow(abstract_function(m, ch), flow, t) ==
         abstract_function(dmap_put_fp(m, index, flow, flw_get_ik, flw_get_ek),
                           dchain_allocate_fp(ch, index, t));
 {
@@ -176,16 +181,20 @@ ensures flowtable_add_flow(abstract_function(m, ch), flow, t) ==
 }
 
 lemma void get_flow_by_int_abstract(dmap<int_k,ext_k,flw> m, dchain ch, int_k ik)
-requires true == dmap_has_k1_fp(m, ik);
-ensures dmap_get_val_fp(m, dmap_get_k1_fp(m, ik)) ==
+requires true == dmap_has_k1_fp(m, ik) &*&
+         dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        dmap_get_val_fp(m, dmap_get_k1_fp(m, ik)) ==
         flowtable_get_by_int_flow_id(abstract_function(m, ch), ik);
 {
   assume(false);//TODO
 }
 
 lemma void get_flow_by_ext_abstract(dmap<int_k,ext_k,flw> m, dchain ch, ext_k ek)
-requires true == dmap_has_k2_fp(m, ek);
-ensures dmap_get_val_fp(m, dmap_get_k2_fp(m, ek)) ==
+requires true == dmap_has_k2_fp(m, ek) &*&
+         dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        dmap_get_val_fp(m, dmap_get_k2_fp(m, ek)) ==
         flowtable_get_by_ext_flow_id(abstract_function(m, ch), ek);
 {
   assume(false);//TODO
@@ -193,8 +202,10 @@ ensures dmap_get_val_fp(m, dmap_get_k2_fp(m, ek)) ==
 
 lemma void rejuvenate_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
                                     int index, uint32_t time)
-requires dmap_get_val_fp(m, index) == flow;
-ensures flowtable_add_flow(flowtable_remove_flow(abstract_function(m, ch),
+requires dmap_get_val_fp(m, index) == flow &*&
+         dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        flowtable_add_flow(flowtable_remove_flow(abstract_function(m, ch),
                                                  flow),
                            flow, time) ==
         abstract_function(m, dchain_rejuvenate_fp(ch, index, time));
@@ -204,8 +215,9 @@ ensures flowtable_add_flow(flowtable_remove_flow(abstract_function(m, ch),
 
 lemma void expire_flows_abstract(dmap<int_k,ext_k,flw> m,
                                  dchain ch, uint32_t time)
-requires true;
-ensures flowtable_expire_flows(abstract_function(m, ch), time) ==
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        flowtable_expire_flows(abstract_function(m, ch), time) ==
         abstract_function(dmap_erase_all_fp
                             (m, dchain_get_expired_indexes_fp(ch, time),
                              flw_get_ik, flw_get_ek),
