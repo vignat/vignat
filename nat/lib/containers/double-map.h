@@ -228,6 +228,33 @@ struct DoubleMap;
           dmap_get_k2_fp<t1,t2,vt>(m, k2) < dmap_cap_fp(m) &*&
           true == dmap_index_used_fp(m, dmap_get_k2_fp(m, k2));
 
+  lemma void dmap_indexes_used_used_in_ma_mb<t1,t2,vt>
+                (list<pair<t1,int> > ma,
+                 list<pair<t2, int> > mb,
+                 list<option<vt> > vals);
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          true == forall(dmap_indexes_used_fp(dmap(ma, mb, vals)),
+                         (contains)(map(snd, ma))) &*&
+          true == forall(dmap_indexes_used_fp(dmap(ma, mb, vals)),
+                         (contains)(map(snd, mb)));
+
+  lemma void dmap_indices_no_dups<t1,t2,vt>(list<pair<t1,int> > ma,
+                                            list<pair<t2, int> > mb,
+                                            list<option<vt> > vals);
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          true == no_dups(map(snd, ma)) &*&
+          true == no_dups(map(snd, mb));
+
   lemma void dmap_erase_all_has_trans<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                 t1 k1, list<int> idx,
                                                 fixpoint (vt,t1) vk1,

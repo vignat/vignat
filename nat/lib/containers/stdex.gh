@@ -745,6 +745,27 @@ ensures append(a, b) != nil;
     }
   }
 
+fixpoint bool no_dups<t>(list<t> l) {
+  switch(l) {
+    case nil: return true;
+    case cons(h,t):
+      return (!mem(h,t)) &&
+             no_dups(t);
+  }
+}
+
+  lemma void subset_forall<t>(list<t> xs, list<t> ys, fixpoint (t,bool) prop)
+  requires true == subset(xs, ys) &*& true == forall(ys, prop);
+  ensures true == forall(xs, prop);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        forall_mem(h, ys, prop);
+        subset_forall(t, ys, prop);
+    }
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

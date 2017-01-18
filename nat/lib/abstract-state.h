@@ -138,17 +138,181 @@ fixpoint flowtable flowtable_expire_flows(flowtable table, uint32_t time) {
 }
 @*/
 
+
 /*@
+  lemma void dchain_allocated_mem_map(list<pair<int, uint32_t> > entries,
+                                      int index_range, int low, int high,
+                                      int index)
+  requires true;
+  ensures dchain_allocated_fp(dchain(entries, index_range, low, high), index) ==
+          mem(index, map(fst, entries));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t): switch(h) { case pair(ind,tstmp):
+        if (ind != index) dchain_allocated_mem_map(t, index_range, low,
+                                                   high, index);
+      }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void gen_entries_has_ik_ek_flow_by_index
+    (list<pair<int, uint32_t> > entries,
+     list<pair<int_k, int> > ikeys,
+     list<pair<ext_k, int> > ekeys,
+     list<option<flw> > vals,
+     int index)
+  requires true == mem(index, map(fst, entries));
+  ensures true == mem(alist_get_by_right(ekeys, index),
+                      map(entry_ek, gen_entries(entries, ikeys, ekeys, vals))) &*&
+          true == mem(alist_get_by_right(ikeys, index),
+                      map(entry_ik, gen_entries(entries, ikeys, ekeys, vals))) &*&
+          true == mem(get_some(nth(index, vals)),
+                      map(entry_flow, gen_entries(entries, ikeys, ekeys, vals)));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          if (ind != index) {
+            gen_entries_has_ik_ek_flow_by_index(t, ikeys, ekeys, vals, index);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void alist_get_by_right_map_get<kt>(list<pair<kt, int> > m,
+                                            kt k)
+  requires true == map_has_fp(m, k) &*&
+           true == no_dups(map(snd, m));
+  ensures k == alist_get_by_right(m, map_get_fp(m, k)) &*&
+          true == mem(map_get_fp(m, k), map(snd, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key != k) {
+            alist_get_by_right_map_get(t, k);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void map_has_mem<kt,vt>(list<pair<kt,vt> > m, kt k)
+  requires true;
+  ensures mem(k, map(fst, m)) == map_has_fp(m, k);
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key != k) map_has_mem(t, k);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void abscent_key_alist_wont_give<kt>(list<pair<kt, int> > m, kt k, int i)
+  requires false == mem(k, map(fst, m)) &*&
+           true == mem(i, map(snd, m));
+  ensures alist_get_by_right(m, i) != k;
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (i != ind) abscent_key_alist_wont_give(t, k, i);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void gen_entries_also_no_ek(list<pair<int, uint32_t> > entries,
+                                    list<pair<int_k, int> > ikeys,
+                                    list<pair<ext_k, int> > ekeys,
+                                    list<option<flw> > vals,
+                                    ext_k ek)
+  requires false == mem(ek, map(fst, ekeys)) &*&
+           true == forall(map(fst, entries), (contains)(map(snd, ekeys)));
+  ensures false == mem(ek, map(entry_ek,
+                               gen_entries(entries, ikeys, ekeys, vals)));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          abscent_key_alist_wont_give(ekeys, ek, ind);
+          gen_entries_also_no_ek(t, ikeys, ekeys, vals, ek);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+// Head lemma #
 lemma void contains_ext_k_abstract(dmap<int_k,ext_k,flw> m, dchain ch,
                                    ext_k ek)
-requires dmap_dchain_coherent(m, ch);
+requires dmap_dchain_coherent(m, ch) &*&
+         dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                   ?fvp, ?bvp, ?rof, ?vsz,
+                   ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
 ensures dmap_dchain_coherent(m, ch) &*&
+        dmappingp(m, kp1, kp2, hsh1, hsh2,
+                  fvp, bvp, rof, vsz,
+                  vk1, vk2, recp1, recp2, mp) &*&
         flowtable_contains_ext_flow_id(abstract_function(m, ch), ek) ==
         dmap_has_k2_fp(m, ek);
 {
-  assume(false);//TODO
+  if (dmap_has_k2_fp(m, ek)) {
+    int index = dmap_get_k2_fp(m, ek);
+    dmap_get_k2_limits(m, ek);
+    assert true == dmap_index_used_fp(m, index);
+    coherent_dmap_used_dchain_allocated(m, ch, index);
+    assert true == dchain_allocated_fp(ch, index);
+    switch(ch) { case dchain(entries, index_range, low, high):
+      switch(m) { case dmap(ikeys, ekeys, vals):
+        dchain_allocated_mem_map(entries, index_range, low, high, index);
+        assert true == mem(index, map(fst, entries));
+        gen_entries_has_ik_ek_flow_by_index(entries, ikeys, ekeys, vals, index);
+        dmap_indices_no_dups(ikeys, ekeys, vals);
+        alist_get_by_right_map_get(ekeys, ek);
+        assert ek == alist_get_by_right(ekeys, index);
+        assert true == mem(ek, map(entry_ek, gen_entries(entries, ikeys, ekeys, vals)));
+      }
+    }
+  } else {
+    switch(ch) { case dchain(entries, index_range, low, high):
+      switch(m) { case dmap(ikeys, ekeys, vals):
+        map_has_mem(ekeys, ek);
+        assert false == mem(ek, map(fst, ekeys));
+        dmap_indexes_used_used_in_ma_mb(ikeys, ekeys, vals);
+        coherent_same_indexes(m, ch);
+        assert dchain_indexes_fp(ch) == map(fst, entries);
+        subset_forall(map(fst, entries), dmap_indexes_used_fp(m),
+                      (contains)(map(snd, ekeys)));
+        gen_entries_also_no_ek(entries, ikeys, ekeys, vals, ek);
+      }
+    }
+  }
 }
+@*/
 
+/*@
 lemma void contains_int_k_abstract(dmap<int_k,ext_k,flw> m, dchain ch,
                                    int_k ik)
 requires dmap_dchain_coherent(m, ch);
@@ -158,13 +322,39 @@ ensures dmap_dchain_coherent(m, ch) &*&
 {
   assume(false);//TODO
 }
+@*/
 
+
+/*@
+  lemma void gen_entries_same_len(list<pair<int, uint32_t> > entries,
+                                  list<pair<int_k,int> > ikeys,
+                                  list<pair<ext_k,int> > ekeys,
+                                  list<option<flw> > vals)
+  requires true;
+  ensures length(entries) == length(gen_entries(entries, ikeys, ekeys, vals));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t): switch(h) { case pair(index, tstmp):
+        gen_entries_same_len(t, ikeys, ekeys, vals);
+      }
+    }
+  }
+  @*/
+
+
+/*@
+//Head lemma #
 lemma void out_of_space_abstract(dmap<int_k,ext_k,flw> m, dchain ch)
 requires true;
 ensures flowtable_out_of_space(abstract_function(m, ch)) ==
         dchain_out_of_space_fp(ch);
 {
-  assume(false);//TODO
+  switch(ch) { case dchain(entries, index_range, low, high):
+    switch(m) { case dmap(ikeys, ekeys, vals):
+      gen_entries_same_len(entries, ikeys, ekeys, vals);
+    }
+  }
 }
 
 lemma void add_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
