@@ -315,8 +315,14 @@ ensures dmap_dchain_coherent(m, ch) &*&
 /*@
 lemma void contains_int_k_abstract(dmap<int_k,ext_k,flw> m, dchain ch,
                                    int_k ik)
-requires dmap_dchain_coherent(m, ch);
+requires dmap_dchain_coherent(m, ch) &*&
+         dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                   ?fvp, ?bvp, ?rof, ?vsz,
+                   ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
 ensures dmap_dchain_coherent(m, ch) &*&
+        dmappingp(m, kp1, kp2, hsh1, hsh2,
+                  fvp, bvp, rof, vsz,
+                  vk1, vk2, recp1, recp2, mp) &*&
         flowtable_contains_int_flow_id(abstract_function(m, ch), ik) ==
         dmap_has_k1_fp(m, ik);
 {
@@ -372,8 +378,14 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 lemma void get_flow_by_int_abstract(dmap<int_k,ext_k,flw> m, dchain ch, int_k ik)
 requires true == dmap_has_k1_fp(m, ik) &*&
-         dmap_dchain_coherent(m, ch);
+         dmap_dchain_coherent(m, ch) &*&
+         dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                   ?fvp, ?bvp, ?rof, ?vsz,
+                   ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
 ensures dmap_dchain_coherent(m, ch) &*&
+        dmappingp(m, kp1, kp2, hsh1, hsh2,
+                  fvp, bvp, rof, vsz,
+                  vk1, vk2, recp1, recp2, mp) &*&
         dmap_get_val_fp(m, dmap_get_k1_fp(m, ik)) ==
         flowtable_get_by_int_flow_id(abstract_function(m, ch), ik);
 {
@@ -382,8 +394,14 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 lemma void get_flow_by_ext_abstract(dmap<int_k,ext_k,flw> m, dchain ch, ext_k ek)
 requires true == dmap_has_k2_fp(m, ek) &*&
-         dmap_dchain_coherent(m, ch);
+         dmap_dchain_coherent(m, ch) &*&
+         dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                   ?fvp, ?bvp, ?rof, ?vsz,
+                   ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
 ensures dmap_dchain_coherent(m, ch) &*&
+        dmappingp(m, kp1, kp2, hsh1, hsh2,
+                  fvp, bvp, rof, vsz,
+                  vk1, vk2, recp1, recp2, mp) &*&
         dmap_get_val_fp(m, dmap_get_k2_fp(m, ek)) ==
         flowtable_get_by_ext_flow_id(abstract_function(m, ch), ek);
 {

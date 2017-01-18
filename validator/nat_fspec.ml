@@ -535,8 +535,14 @@ let fun_types =
                       "/*@ {\n\
                        assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
                       ", ?ch);\n\
+                       ext_k ek = ekc(tmp1, user_buf0_36,\
+                       184789184, user_buf0_30,\
+                       1, user_buf0_23);\n\
                        coherent_dchain_non_out_of_space_map_nonfull(" ^
-                      (tmp "cur_map") ^ ", ch);\n} @*/");];
+                      (tmp "cur_map") ^ ", ch);\n" ^
+                      "contains_ext_k_abstract(" ^
+                      (tmp "cur_map") ^
+                      ", ch, ek);\n} @*/");];
                   lemmas_after = [
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
@@ -568,8 +574,9 @@ let fun_types =
                        int_k ik = ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, " ^
                        !last_device_id ^
-                       ", user_buf0_23);\n\\
-                       ext_k ek = ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                       ", user_buf0_23);\n\
+                        ext_k ek = ekc(tmp1, user_buf0_36,\
+                        184789184, user_buf0_30,\
                         1, user_buf0_23);\n\
                         flw the_flow_to_insert = flwc(ik, ek,\n\
                         user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
@@ -579,10 +586,7 @@ let fun_types =
                        "add_flow_abstract(" ^ (params.tmp_gen "cur_map") ^
                        ", cur_ch, the_flow_to_insert, " ^
                        (List.nth_exn params.args 2) ^ ", " ^
-                       !last_time_for_index_alloc ^ ");\n" ^
-                       "contains_ext_k_abstract(" ^
-                       (params.tmp_gen "cur_map") ^
-                       ", cur_ch, ek);\n\
+                       !last_time_for_index_alloc ^ ");\n\
                         coherent_put_allocated_preserves_coherent\n(" ^
                        (params.tmp_gen "cur_map") ^
                        ", cur_ch, ik , ek,\
