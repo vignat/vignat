@@ -531,10 +531,14 @@ let fun_types =
                         184789184, user_buf0_30, " ^
                        !last_device_id ^
                        ", 1, user_buf0_23);@*/");
-                    (fun _ tmp ->
+                    (fun args tmp ->
                       "/*@ {\n\
                        assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
                       ", ?ch);\n\
+                       int_k ik = ikc(user_buf0_34, user_buf0_36,\
+                        user_buf0_26, user_buf0_30, " ^
+                       !last_device_id ^
+                       ", user_buf0_23);\n\
                        ext_k ek = ekc(tmp1, user_buf0_36,\
                        184789184, user_buf0_30,\
                        1, user_buf0_23);\n\
@@ -542,7 +546,16 @@ let fun_types =
                       (tmp "cur_map") ^ ", ch);\n" ^
                       "contains_ext_k_abstract(" ^
                       (tmp "cur_map") ^
-                      ", ch, ek);\n} @*/");];
+                      ", ch, ek);\n" ^
+                      "flw the_flow_to_insert = flwc(ik, ek,\n\
+                       user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
+                       184789184, user_buf0_30, " ^
+                       !last_device_id ^
+                      ", 1, user_buf0_23);\n" ^
+                       "add_flow_abstract(" ^ (tmp "cur_map") ^
+                       ", ch, the_flow_to_insert, " ^
+                       (List.nth_exn args 2) ^ ", " ^
+                       !last_time_for_index_alloc ^ ");\n} @*/");];
                   lemmas_after = [
                     tx_l "open flw_p(_,_);";
                     tx_l "open int_k_p(_,_);";
@@ -583,19 +596,14 @@ let fun_types =
                         184789184, user_buf0_30, " ^
                        !last_device_id ^
                        ", 1, user_buf0_23);\n" ^
-                       "add_flow_abstract(" ^ (params.tmp_gen "cur_map") ^
-                       ", cur_ch, the_flow_to_insert, " ^
-                       (List.nth_exn params.args 2) ^ ", " ^
-                       !last_time_for_index_alloc ^ ");\n\
-                        coherent_put_allocated_preserves_coherent\n(" ^
-                       (params.tmp_gen "cur_map") ^
-                       ", cur_ch, ik , ek,\
-                        the_flow_to_insert,\
-                       " ^ (List.nth_exn params.args 2) ^ ", " ^
-                       !last_time_for_index_alloc ^
-                       ", " ^ (params.tmp_gen "vk1") ^ ", " ^
-                       (params.tmp_gen "vk2") ^ ");\
-                        }@*/");
+                      "coherent_put_allocated_preserves_coherent\n(" ^
+                      (params.tmp_gen "cur_map") ^
+                      ", cur_ch, ik , ek,\
+                       the_flow_to_insert,\
+                      " ^ (List.nth_exn params.args 2) ^ ", " ^
+                      !last_time_for_index_alloc ^
+                      ", " ^ (params.tmp_gen "vk1") ^ ", " ^
+                      (params.tmp_gen "vk2") ^ ");\n}@*/");
                   ];};
      "dmap_get_value", {ret_type = Void;
                         arg_types = [Ptr dmap_struct; Sint32; Ptr flw_struct;];

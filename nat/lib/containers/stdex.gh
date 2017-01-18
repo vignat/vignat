@@ -766,6 +766,21 @@ fixpoint bool no_dups<t>(list<t> l) {
     }
   }
 
+
+fixpoint bool ge(int x, int y) { return x <= y; }
+
+fixpoint bool lt(int x, int y) { return y < x; }
+
+  lemma void ge_le_ge(list<int> l, int i, int x)
+  requires x <= i &*& true == forall(l, (ge)(i));
+  ensures true == forall(l, (ge)(x));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        ge_le_ge(t, i, x);
+    }
+  }
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

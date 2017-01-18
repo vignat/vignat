@@ -108,11 +108,12 @@ fixpoint bool entry_matches_flow(flw f, entry e) {
 
 fixpoint flowtable flowtable_add_flow(flowtable table, flw flow, uint32_t time) {
   switch(table) { case flowtable(size, entries):
-    return flowtable(size, cons(entry(flw_get_ik(flow),
-                                      flw_get_ek(flow),
-                                      flow,
-                                      time),
-                                entries));
+    return flowtable(size, append(entries,
+                                  cons(entry(flw_get_ik(flow),
+                                             flw_get_ek(flow),
+                                             flow,
+                                             time),
+                                       nil)));
   }
 }
 
@@ -362,18 +363,127 @@ ensures flowtable_out_of_space(abstract_function(m, ch)) ==
     }
   }
 }
+@*/
 
+/*@
+  lemma void gen_entries_add_flow(list<pair<int, uint32_t> > entries,
+                                  list<pair<int_k,int> > ikeys,
+                                  list<pair<ext_k,int> > ekeys,
+                                  list<option<flw> > vals,
+                                  int index,
+                                  flw flow,
+                                  uint32_t time)
+  requires false == exists(entries, (same_index)(index))&*&
+           false == map_has_fp(ikeys, flw_get_ik(flow)) &*&
+           false == map_has_fp(ekeys, flw_get_ek(flow)) &*&
+           false == mem(index, map(snd, ikeys)) &*&
+           false == mem(index, map(snd, ekeys)) &*&
+           nth(index, vals) == none &*&
+           0 <= index &*& index < length(vals) &*&
+           true == forall(map(fst, entries), (ge)(0)) &*&
+           true == forall(map(fst, entries), (lt)(length(vals)));
+  ensures append(gen_entries(entries, ikeys, ekeys, vals),
+                 cons(entry(flw_get_ik(flow),
+                            flw_get_ek(flow),
+                            flow, time),
+                      nil)) ==
+          gen_entries(append(entries, cons(pair(index, time), nil)),
+                      map_put_fp(ikeys, flw_get_ik(flow), index),
+                      map_put_fp(ekeys, flw_get_ek(flow), index),
+                      update(index, some(flow), vals));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          gen_entries_add_flow(t, ikeys, ekeys, vals, index, flow, time);
+          assert alist_get_by_right(ikeys, ind) ==
+                 alist_get_by_right(map_put_fp(ikeys, flw_get_ik(flow), index),
+                                    ind);
+          assert get_some(nth(ind, vals)) == get_some(nth(ind, update(index, some(flow), vals)));
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void index_used_nonnone<t1,t2,vt>(list<pair<t1, int> > ikeys,
+                                          list<pair<t2, int> > ekeys,
+                                          list<option<vt> > vals,
+                                          int index)
+  requires 0 <= index &*& index < length(vals);
+  ensures dmap_index_used_fp(dmap(ikeys, ekeys, vals), index) ==
+          (nth(index, vals) != none);
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        if (0 < index) index_used_nonnone(ikeys, ekeys, t, index - 1);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void nonempty_indexes_bounds<vt>(list<option<vt> > lst, int start)
+  requires true;
+  ensures true == forall(nonempty_indexes_fp(lst, start), (ge)(start)) &*&
+          true == forall(nonempty_indexes_fp(lst, start), (lt)(start + length(lst)));
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+          case some(x):
+        }
+        nonempty_indexes_bounds(t, start + 1);
+        ge_le_ge(nonempty_indexes_fp(t, start+1), start + 1, start);
+    }
+  }
+  @*/
+
+
+/*@
+//Head lemma #
 lemma void add_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
                              int index, uint32_t t)
 requires false == dchain_out_of_space_fp(ch) &*&
          false == dchain_allocated_fp(ch, index) &*&
-         dmap_dchain_coherent(m, ch);
+         dmap_dchain_coherent(m, ch) &*&
+         false == dmap_has_k1_fp(m, flw_get_ik(flow)) &*&
+         false == dmap_has_k2_fp(m, flw_get_ek(flow)) &*&
+         0 <= index &*& index < dchain_index_range_fp(ch) &*&
+         dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                   ?fvp, ?bvp, ?rof, ?vsz,
+                   ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
 ensures dmap_dchain_coherent(m, ch) &*&
+        dmappingp(m, kp1, kp2, hsh1, hsh2,
+                  fvp, bvp, rof, vsz,
+                  vk1, vk2, recp1, recp2, mp) &*&
         flowtable_add_flow(abstract_function(m, ch), flow, t) ==
         abstract_function(dmap_put_fp(m, index, flow, flw_get_ik, flw_get_ek),
                           dchain_allocate_fp(ch, index, t));
 {
-  assume(false);//TODO
+  switch(ch) { case dchain(entries, index_range, low, high):
+    switch(m) { case dmap(ikeys, ekeys, vals):
+      if (dmap_index_used_fp(m, index)) {
+        coherent_dmap_used_dchain_allocated(m, ch, index);
+        assert false;
+      }
+      coherent_same_cap(m, ch);
+      index_used_nonnone(ikeys, ekeys, vals, index);
+      dmap_nonnone_index_in_ma_mb(ikeys, ekeys, vals, index);
+      nonempty_indexes_bounds(vals, 0);
+      assert true == forall(dmap_indexes_used_fp(m), (ge)(0));
+      assert true == forall(dmap_indexes_used_fp(m), (lt)(length(vals)));
+      coherent_same_indexes(m, ch);
+      subset_forall(map(fst, entries), dmap_indexes_used_fp(m), (ge)(0));
+      subset_forall(map(fst, entries), dmap_indexes_used_fp(m),
+                    (lt)(length(vals)));
+      gen_entries_add_flow(entries, ikeys, ekeys, vals,index, flow, t);
+    }
+  }
 }
 
 lemma void get_flow_by_int_abstract(dmap<int_k,ext_k,flw> m, dchain ch, int_k ik)

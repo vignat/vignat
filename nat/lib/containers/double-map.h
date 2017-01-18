@@ -419,6 +419,22 @@ struct DoubleMap;
   lemma void dmap_size_of_indexes_used<t1,t2,vt>(dmap<t1,t2,vt> m);
   requires true;
   ensures dmap_size_fp(m) == length(dmap_indexes_used_fp(m));
+
+  lemma void dmap_nonnone_index_in_ma_mb<t1,t2,vt>(list<pair<t1, int> > ma,
+                                                   list<pair<t2, int> > mb,
+                                                   list<option<vt> > vals,
+                                                   int index);
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp) &*&
+           0 <= index &*& index < length(vals);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          (mem(index, map(snd, ma)) ==
+           (nth(index, vals) != none)) &*&
+          (mem(index, map(snd, mb)) ==
+           (nth(index, vals) != none));
   @*/
 
 /*@ predicate dmap_key_val_types<K1,K2,V>(K1 k1, K2 k2, V v) = true;

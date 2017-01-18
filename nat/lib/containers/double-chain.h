@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 //@ #include <listex.gh>
+//@ #include "stdex.gh"
 
 struct DoubleChain;
 /* Makes sure the allocator structur fits into memory, and particularly into
@@ -310,7 +311,6 @@ struct DoubleChain;
   ensures double_chainp(ch, chain) &*&
           dchain_high_fp(dchain_expire_old_indexes_fp(ch, time)) <=
           dchain_high_fp(ch);
-
   @*/
 
 /**
