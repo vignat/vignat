@@ -1827,3 +1827,54 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
     close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
   }
   @*/
+
+
+/*@
+  lemma void map_has_to_mem<kt>(list<pair<kt, int> > m, kt k)
+  requires true;
+  ensures map_has_fp(m, k) == mem(k, map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key != k) map_has_to_mem(t, k);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void no_dup_keys_to_no_dups<kt>(list<pair<kt, int> > m)
+  requires true;
+  ensures no_dup_keys(m) == no_dups(map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          no_dup_keys_to_no_dups(t);
+          map_has_to_mem(t, key);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_no_dup_keys<kt>(list<pair<kt, int> > m)
+  requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
+                   ?cap, ?bbs, ?kps, ?khs, ?vals);
+  ensures mapping(m, addrs, kp, rp, hsh,
+                  cap, bbs, kps, khs, vals) &*&
+          true == no_dups(map(fst, m));
+  {
+    open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    open hmapping(kp, hsh, cap, ?busybits, ?lkps, khs, ?hm);
+    assert pred_mapping(lkps, ?lbbs, kp, ?ks);
+    map_opt_no_dups(ks, m);
+    close hmapping(kp, hsh, cap, busybits, lkps, khs, hm);
+    close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    no_dup_keys_to_no_dups(m);
+  }
+  @*/

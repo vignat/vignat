@@ -2594,7 +2594,7 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
 
 
 /*@
-  lemma void insync_no_dup_keys<t1,t2,vt>(list<option<vt> > vals,
+  lemma void insync_no_dup_indexes_ma_mb<t1,t2,vt>(list<option<vt> > vals,
                                           list<pair<t1, int> > m1,
                                           list<pair<t2, int> > m2,
                                           fixpoint (vt, t1) vk1,
@@ -2611,13 +2611,13 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
       case cons(h,t):
         switch(h) {
           case none:
-            insync_no_dup_keys(t, m1, m2, vk1, vk2, start_index + 1);
+            insync_no_dup_indexes_ma_mb(t, m1, m2, vk1, vk2, start_index + 1);
             ge_prev(map(snd, m1), start_index);
             ge_prev(map(snd, m2), start_index);
           case some(v):
-            insync_no_dup_keys(t, map_erase_fp(m1, vk1(v)),
-                               map_erase_fp(m2, vk2(v)),
-                               vk1, vk2, start_index + 1);
+            insync_no_dup_indexes_ma_mb(t, map_erase_fp(m1, vk1(v)),
+                                        map_erase_fp(m2, vk2(v)),
+                                        vk1, vk2, start_index + 1);
             less_than_boundary_nonmem(map(snd, map_erase_fp(m1, vk1(v))),
                                       start_index + 1, start_index);
             less_than_boundary_nonmem(map(snd, map_erase_fp(m2, vk2(v))),
@@ -2649,7 +2649,7 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
   {
     open dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
                    fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
-    insync_no_dup_keys(vals, ma, mb, vk1, vk2, 0);
+    insync_no_dup_indexes_ma_mb(vals, ma, mb, vk1, vk2, 0);
     close dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
                     fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
   }
@@ -2805,7 +2805,7 @@ lemma void insync_nonemptyindexes_mem_ma_mb<t1,t2,vt>(list<option<vt> > vals,
         switch(h) {
           case none:
             if (start_index == index) {
-              insync_no_dup_keys(t, m1, m2, vk1, vk2, start_index + 1);
+              insync_no_dup_indexes_ma_mb(t, m1, m2, vk1, vk2, start_index + 1);
               less_than_boundary_nonmem(map(snd, m1), start_index + 1, index);
               less_than_boundary_nonmem(map(snd, m2), start_index + 1, index);
               assert false == mem(index, map(snd, m1));
@@ -2818,10 +2818,10 @@ lemma void insync_nonemptyindexes_mem_ma_mb<t1,t2,vt>(list<option<vt> > vals,
               map_has_the_value(m1, vk1(v));
               map_has_the_value(m2, vk2(v));
             } else {
-              insync_no_dup_keys(vals, m1, m2, vk1, vk2, start_index);
-              insync_no_dup_keys(t, map_erase_fp(m1, vk1(v)),
-                                 map_erase_fp(m2, vk2(v)),
-                                 vk1, vk2, start_index + 1);
+              insync_no_dup_indexes_ma_mb(vals, m1, m2, vk1, vk2, start_index);
+              insync_no_dup_indexes_ma_mb(t, map_erase_fp(m1, vk1(v)),
+                                          map_erase_fp(m2, vk2(v)),
+                                          vk1, vk2, start_index + 1);
               insync_nonnone_index_in_ma_mb(t, map_erase_fp(m1, vk1(v)),
                                             map_erase_fp(m2, vk2(v)), vk1, vk2,
                                             index, start_index + 1);
@@ -2861,6 +2861,28 @@ lemma void insync_nonemptyindexes_mem_ma_mb<t1,t2,vt>(list<option<vt> > vals,
     open dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
                    fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
     insync_nonnone_index_in_ma_mb(vals, ma, mb, vk1, vk2, index, 0);
+    close dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
+  }
+  @*/
+
+/*@
+  lemma void dmap_no_dup_keys<t1,t2,vt>(list<pair<t1,int> > ma,
+                                        list<pair<t2, int> > mb,
+                                        list<option<vt> > vals)
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          true == no_dups(map(fst, ma)) &*&
+          true == no_dups(map(fst, mb));
+  {
+    open dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                   fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
+    map_no_dup_keys(ma);
+    map_no_dup_keys(mb);
     close dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
                     fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
   }

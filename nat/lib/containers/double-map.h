@@ -255,6 +255,18 @@ struct DoubleMap;
           true == no_dups(map(snd, ma)) &*&
           true == no_dups(map(snd, mb));
 
+  lemma void dmap_no_dup_keys<t1,t2,vt>(list<pair<t1,int> > ma,
+                                        list<pair<t2, int> > mb,
+                                        list<option<vt> > vals);
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          true == no_dups(map(fst, ma)) &*&
+          true == no_dups(map(fst, mb));
+
   lemma void dmap_erase_all_has_trans<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                 t1 k1, list<int> idx,
                                                 fixpoint (vt,t1) vk1,
