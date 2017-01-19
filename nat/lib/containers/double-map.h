@@ -243,6 +243,13 @@ struct DoubleMap;
           true == forall(dmap_indexes_used_fp(dmap(ma, mb, vals)),
                          (contains)(map(snd, mb)));
 
+  lemma void dmap_all_used_indexes_used<t1,t2,vt>(list<pair<t1,int> > ma,
+                                                  list<pair<t2, int> > mb,
+                                                  list<option<vt> > vals);
+  requires true;
+  ensures true == forall(dmap_indexes_used_fp(dmap(ma, mb, vals)),
+                         (dmap_index_used_fp)(dmap(ma, mb, vals)));
+
   lemma void dmap_indices_no_dups<t1,t2,vt>(list<pair<t1,int> > ma,
                                             list<pair<t2, int> > mb,
                                             list<option<vt> > vals);
@@ -266,6 +273,17 @@ struct DoubleMap;
                     vk1, vk2, recp1, recp2, mp) &*&
           true == no_dups(map(fst, ma)) &*&
           true == no_dups(map(fst, mb));
+
+  lemma void dmap_no_dup_vals<t1,t2,vt>(list<pair<t1,int> > ma,
+                                        list<pair<t2, int> > mb,
+                                        list<option<vt> > vals);
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          true == opt_no_dups(vals);
 
   lemma void dmap_erase_all_has_trans<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                 t1 k1, list<int> idx,
@@ -427,6 +445,12 @@ struct DoubleMap;
   lemma void dmap_index_used_inbounds<t1,t2,vt>(dmap<t1,t2,vt> m, int idx);
   requires true == dmap_index_used_fp(m, idx);
   ensures 0 <= idx &*& idx < dmap_cap_fp(m);
+
+  lemma void nonempty_indexes_bounds<vt>(list<option<vt> > lst, int start);
+  requires true;
+  ensures true == forall(nonempty_indexes_fp(lst, start), (ge)(start)) &*&
+          true == forall(nonempty_indexes_fp(lst, start),
+                         (lt)(start + length(lst)));
 
   lemma void dmap_size_of_indexes_used<t1,t2,vt>(dmap<t1,t2,vt> m);
   requires true;

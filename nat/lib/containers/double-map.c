@@ -2887,3 +2887,195 @@ lemma void insync_nonemptyindexes_mem_ma_mb<t1,t2,vt>(list<option<vt> > vals,
                     fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
   }
   @*/
+
+/*@
+  lemma void mem_unerase<kt>(list<pair<kt, int> > m, kt k1, kt k2)
+  requires true == mem(k1, map(fst, map_erase_fp(m, k2)));
+  ensures true == mem(k1, map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key == k2) {
+          } else {
+            if (key != k1)
+              mem_unerase(t, k1, k2);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void no_no_dups_unerase<kt>(list<pair<kt, int> > m, kt k)
+  requires false == no_dups(map(fst, map_erase_fp(m, k)));
+  ensures false == no_dups(map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (mem(key, map(fst, map_erase_fp(t, k)))) {
+            mem_unerase(t, key, k);
+          } else {
+            if (key != k)
+              no_no_dups_unerase(t, k);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void insync_has_val_has_key<t1,t2,vt>(list<option<vt> > vals,
+                                              list<pair<t1, int> > m1,
+                                              list<pair<t2, int> > m2,
+                                              fixpoint (vt, t1) vk1,
+                                              fixpoint (vt, t2) vk2,
+                                              int start_index,
+                                              vt v)
+  requires true == mem(some(v), vals) &*&
+           true == insync_fp(vals, m1, m2, vk1, vk2, start_index);
+  ensures true == mem(vk1(v), map(fst, m1));
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+            insync_has_val_has_key(t, m1, m2, vk1, vk2, start_index + 1, v);
+          case some(x):
+            if (x == v) {
+              map_has_to_mem(m1, vk1(v));
+            } else {
+              insync_has_val_has_key(t, map_erase_fp(m1, vk1(x)),
+                                     map_erase_fp(m2, vk2(x)),
+                                     vk1, vk2, start_index + 1, v);
+              mem_unerase(m1, vk1(v), vk1(x));
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void mem_erase_to_dup<kt>(list<pair<kt, int> > m, kt k)
+  requires true == mem(k, map(fst, map_erase_fp(m, k)));
+  ensures false == no_dups(map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key, ind):
+          if (key == k) {
+          } else {
+            mem_erase_to_dup(t, k);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void insync_find_dup_key<t1,t2,vt>(list<option<vt> > vals,
+                                           list<pair<t1, int> > m1,
+                                           list<pair<t2, int> > m2,
+                                           fixpoint (vt, t1) vk1,
+                                           fixpoint (vt, t2) vk2,
+                                           int start_index)
+  requires true == insync_fp(vals, m1, m2, vk1, vk2, start_index) &*&
+           false == opt_no_dups(vals);
+  ensures false == no_dups(map(fst, m1));
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+            insync_find_dup_key(t, m1, m2, vk1, vk2, start_index + 1);
+          case some(v):
+            if (mem(some(v), t)) {
+              insync_has_val_has_key(t, map_erase_fp(m1, vk1(v)),
+                                     map_erase_fp(m2, vk2(v)),
+                                     vk1, vk2, start_index + 1, v);
+              assert true == mem(vk1(v), map(fst, map_erase_fp(m1, vk1(v))));
+              mem_erase_to_dup(m1, vk1(v));
+            } else {
+              insync_find_dup_key(t, map_erase_fp(m1, vk1(v)),
+                                  map_erase_fp(m2, vk2(v)),
+                                  vk1, vk2, start_index + 1);
+              no_no_dups_unerase(m1, vk1(v));
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_no_dup_vals<t1,t2,vt>(list<pair<t1,int> > ma,
+                                        list<pair<t2, int> > mb,
+                                        list<option<vt> > vals)
+  requires dmappingp(dmap(ma, mb, vals), ?kp1, ?kp2, ?hsh1, ?hsh2,
+                     ?fvp, ?bvp, ?rof, ?vsz,
+                     ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz,
+                    vk1, vk2, recp1, recp2, mp) &*&
+          true == opt_no_dups(vals);
+  {
+    open dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                   fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
+    if (!opt_no_dups(vals)) {
+      insync_find_dup_key(vals, ma, mb, vk1, vk2, 0);
+      map_no_dup_keys(ma);
+    }
+    close dmappingp(dmap(ma, mb, vals), kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
+  }
+  @*/
+
+/*@
+  lemma void nonempty_indexes_bounds<vt>(list<option<vt> > lst, int start)
+  requires true;
+  ensures true == forall(nonempty_indexes_fp(lst, start), (ge)(start)) &*&
+          true == forall(nonempty_indexes_fp(lst, start), (lt)(start + length(lst)));
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+          case some(x):
+        }
+        nonempty_indexes_bounds(t, start + 1);
+        ge_le_ge(nonempty_indexes_fp(t, start+1), start + 1, start);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_all_used_indexes_used<t1,t2,vt>(list<pair<t1,int> > ma,
+                                                  list<pair<t2,int> > mb,
+                                                  list<option<vt> > vals)
+  requires true;
+  ensures true == forall(dmap_indexes_used_fp(dmap(ma, mb, vals)),
+                         (dmap_index_used_fp)(dmap(ma, mb, vals)));
+  {
+    list<int> used_indices = dmap_indexes_used_fp(dmap(ma, mb, vals));
+    nonempty_indexes_bounds(vals, 0);
+    for (int i = length(used_indices); 0 < i; --i)
+      invariant true == forall(drop(i, used_indices),
+                               (dmap_index_used_fp)(dmap(ma, mb, vals))) &*&
+                0 <= i &*& i <= length(used_indices);
+      decreases i;
+    {
+      forall_nth(used_indices, (ge)(0), i - 1);
+      forall_nth(used_indices, (lt)(length(vals)), i - 1);
+      dmap_indexes_contain_index_used(dmap(ma, mb, vals),
+                                      nth(i-1, used_indices));
+      drop_cons(used_indices, i - 1);
+    }
+  }
+@*/

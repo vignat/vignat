@@ -1553,19 +1553,6 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   @*/
 
 /*@
-  lemma void drop_cons<t>(list<t> l, int n)
-  requires 0 <= n &*& n < length(l);
-  ensures drop(n, l) == cons(nth(n, l), drop(n+1, l));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (0 < n) drop_cons(t, n-1);
-    }
-  }
-  @*/
-
-/*@
   lemma void mem_remove_drop<t>(list<t> l, int i, t x, t y)
   requires false == mem(y, remove(x, l)) &*& 0 <= i;
   ensures false == mem(y, remove(x, drop(i, l)));

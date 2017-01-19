@@ -207,23 +207,6 @@ fixpoint flowtable flowtable_expire_flows(flowtable table, uint32_t time) {
   }
   @*/
 
-
-/*@
-  lemma void map_has_mem<kt,vt>(list<pair<kt,vt> > m, kt k)
-  requires true;
-  ensures mem(k, map(fst, m)) == map_has_fp(m, k);
-  {
-    switch(m) {
-      case nil:
-      case cons(h,t):
-        switch(h) { case pair(key,ind):
-          if (key != k) map_has_mem(t, k);
-        }
-    }
-  }
-  @*/
-
-
 /*@
   lemma void abscent_key_alist_wont_give<kt>(list<pair<kt, int> > m, kt k, int i)
   requires false == mem(k, map(fst, m)) &*&
@@ -299,7 +282,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   } else {
     switch(ch) { case dchain(entries, index_range, low, high):
       switch(m) { case dmap(ikeys, ekeys, vals):
-        map_has_mem(ekeys, ek);
+        map_has_to_mem(ekeys, ek);
         assert false == mem(ek, map(fst, ekeys));
         dmap_indexes_used_used_in_ma_mb(ikeys, ekeys, vals);
         coherent_same_indexes(m, ch);
@@ -351,7 +334,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-//Head lemma #
+// Head lemma #
 lemma void out_of_space_abstract(dmap<int_k,ext_k,flw> m, dchain ch)
 requires true;
 ensures flowtable_out_of_space(abstract_function(m, ch)) ==
@@ -425,27 +408,7 @@ ensures flowtable_out_of_space(abstract_function(m, ch)) ==
 
 
 /*@
-  lemma void nonempty_indexes_bounds<vt>(list<option<vt> > lst, int start)
-  requires true;
-  ensures true == forall(nonempty_indexes_fp(lst, start), (ge)(start)) &*&
-          true == forall(nonempty_indexes_fp(lst, start), (lt)(start + length(lst)));
-  {
-    switch(lst) {
-      case nil:
-      case cons(h,t):
-        switch(h) {
-          case none:
-          case some(x):
-        }
-        nonempty_indexes_bounds(t, start + 1);
-        ge_le_ge(nonempty_indexes_fp(t, start+1), start + 1, start);
-    }
-  }
-  @*/
-
-
-/*@
-//Head lemma #
+// Head lemma #
 lemma void add_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
                              int index, uint32_t t)
 requires false == dchain_out_of_space_fp(ch) &*&
@@ -537,7 +500,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
           if (key == k) {
             if (ind != i) {
               map_has_get_by_right(t, k, i);
-              map_has_mem(t, k);
+              map_has_to_mem(t, k);
             }
           } else {
             map_no_dup_keys_alist_get_same(t, k, i);
@@ -583,7 +546,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-//Head lemma #
+// Head lemma #
 lemma void get_flow_by_int_abstract(dmap<int_k,ext_k,flw> m, dchain ch, int_k ik)
 requires true == dmap_has_k1_fp(m, ik) &*&
          dmap_dchain_coherent(m, ch) &*&
@@ -610,6 +573,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   }
 }
 
+// Head lemma #
 lemma void get_flow_by_ext_abstract(dmap<int_k,ext_k,flw> m, dchain ch, ext_k ek)
 requires true == dmap_has_k2_fp(m, ek) &*&
          dmap_dchain_coherent(m, ch) &*&
@@ -625,18 +589,203 @@ ensures dmap_dchain_coherent(m, ch) &*&
 {
   assume(false);//TODO
 }
+@*/
 
+/*@
+  lemma void found_an_opt_dup<kt>(list<option<kt> > vals, int i1, int i2, kt x)
+  requires 0 <= i1 &*& i1 < length(vals) &*&
+           0 <= i2 &*& i2 < length(vals) &*&
+           i1 < i2 &*&
+           nth(i1, vals) == some(x) &*& nth(i2, vals) == some(x);
+  ensures false == opt_no_dups(vals);
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        if (i1 == 0) {
+        }  else {
+          found_an_opt_dup(t, i1 - 1, i2 - 1, x);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void gen_entries_add_flow_light(list<pair<int, uint32_t> > entries,
+                                        list<pair<int_k,int> > ikeys,
+                                        list<pair<ext_k,int> > ekeys,
+                                        list<option<flw> > vals,
+                                        int index,
+                                        uint32_t time,
+                                        flw flow)
+  requires nth(index, vals) == some(flow) &*&
+           0 <= index &*& index < length(vals) &*&
+           alist_get_by_right(ikeys, index) == flw_get_ik(flow) &*&
+           alist_get_by_right(ekeys, index) == flw_get_ek(flow);
+  ensures gen_entries(append(entries, cons(pair(index, time), nil)),
+                      ikeys, ekeys, vals) ==
+          append(gen_entries(entries, ikeys, ekeys, vals),
+                 cons(entry(flw_get_ik(flow),
+                            flw_get_ek(flow),
+                            flow,
+                            time),
+                      nil));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          gen_entries_add_flow_light(t, ikeys, ekeys, vals, index, time, flow);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void gen_entries_rejuvenate(list<pair<int, uint32_t> > entries,
+                                    list<pair<int_k,int> > ikeys,
+                                    list<pair<ext_k,int> > ekeys,
+                                    list<option<flw> > vals,
+                                    int index,
+                                    uint32_t time,
+                                    flw flow)
+  requires nth(index, vals) == some(flow) &*&
+           true == mem(index, map(fst, entries)) &*&
+           0 <= index &*& index < length(vals) &*&
+           alist_get_by_right(ikeys, index) == flw_get_ik(flow) &*&
+           alist_get_by_right(ekeys, index) == flw_get_ek(flow) &*&
+           true == opt_no_dups(vals) &*&
+           true == forall(map(fst, entries), (ge)(0)) &*&
+           true == forall(map(fst, entries), (lt)(length(vals))) &*&
+           true == forall(map(fst, entries),
+                          (dmap_index_used_fp)(dmap(ikeys, ekeys, vals)));
+  ensures gen_entries(append(remove_by_index_fp(entries, index),
+                             cons(pair(index, time), nil)),
+                      ikeys, ekeys, vals) ==
+          append(remove_if((entry_matches_flow)(flow),
+                           gen_entries(entries, ikeys, ekeys, vals)),
+                 cons(entry(flw_get_ik(flow),
+                            flw_get_ek(flow),
+                            flow,
+                            time),
+                      nil));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          if (ind == index) {
+            gen_entries_add_flow_light(t, ikeys, ekeys, vals,
+                                       index, time, flow);
+          } else {
+            if (nth(ind, vals) == some(flow)) {
+              if (ind < index) {
+                found_an_opt_dup(vals, ind, index, flow);
+              } else {
+                found_an_opt_dup(vals, index, ind, flow);
+              }
+              assert(false);
+            }
+            assert nth(ind, vals) != some(flow);
+            assert nth(ind, vals) != none;
+            switch(nth(ind, vals)) {
+              case none:
+              case some(aaaa):
+            }
+            assert get_some(nth(ind, vals)) != flow;
+            gen_entries_rejuvenate(t, ikeys, ekeys, vals, index, time, flow);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void get_some_to_some_val<vt>(list<option<vt> > vals, int index, vt v)
+  requires 0 <= index &*& index < length(vals) &*&
+           nth(index, vals) != none &*&
+           get_some(nth(index, vals)) == v;
+  ensures nth(index, vals) == some(v);
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        if (index == 0) { switch(h) {
+          case none:
+          case some(x):
+        }} else {
+          get_some_to_some_val(t, index - 1, v);
+        }
+    }
+  }
+  @*/
+
+/*@
+// Head lemma #
 lemma void rejuvenate_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
                                     int index, uint32_t time)
 requires dmap_get_val_fp(m, index) == flow &*&
-         dmap_dchain_coherent(m, ch);
+         true == dmap_index_used_fp(m, index) &*&
+         dmap_dchain_coherent(m, ch) &*&
+         dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                   ?fvp, ?bvp, ?rof, ?vsz,
+                   flw_get_ik, flw_get_ek, ?recp1, ?recp2, ?mp);
 ensures dmap_dchain_coherent(m, ch) &*&
+        dmappingp(m, kp1, kp2, hsh1, hsh2,
+                  fvp, bvp, rof, vsz,
+                  flw_get_ik, flw_get_ek, recp1, recp2, mp) &*&
         flowtable_add_flow(flowtable_remove_flow(abstract_function(m, ch),
                                                  flow),
                            flow, time) ==
         abstract_function(m, dchain_rejuvenate_fp(ch, index, time));
 {
-  assume(false);//TODO
+  switch(ch) { case dchain(entries, index_range, low, high):
+    switch(m) { case dmap(ikeys, ekeys, vals):
+      dmap_no_dup_keys(ikeys, ekeys, vals);
+      get_some_to_some_val(vals, index, flow);
+      coherent_dmap_used_dchain_allocated(m, ch, index);
+      dchain_allocated_mem_map(entries, index_range, low, high, index);
+      if (alist_get_by_right(ikeys, index) != flw_get_ik(flow)) {
+        int_k alt_ik = alist_get_by_right(ikeys, index);
+        dmap_indexes_used_used_in_ma_mb(ikeys, ekeys, vals);
+        dmap_indexes_contain_index_used(m, index);
+        forall_mem(index, dmap_indexes_used_fp(m), (contains)(map(snd, ikeys)));
+        map_has_get_by_right(ikeys, alt_ik, index);
+        map_no_dup_keys_alist_get_same(ikeys, alt_ik, index);
+        assert dmap_get_k1_fp(m, alt_ik) == index;
+        dmap_get_by_k1_invertible(m, alt_ik);
+        assert flw_get_ik(dmap_get_val_fp(m, index)) == alt_ik;
+        assert alt_ik != flw_get_ik(flow);
+        assert dmap_get_val_fp(m, index) != flow;
+      }
+      if (alist_get_by_right(ekeys, index) != flw_get_ek(flow)) {
+        ext_k alt_ek = alist_get_by_right(ekeys, index);
+        dmap_indexes_used_used_in_ma_mb(ikeys, ekeys, vals);
+        dmap_indexes_contain_index_used(m, index);
+        forall_mem(index, dmap_indexes_used_fp(m), (contains)(map(snd, ekeys)));
+        map_has_get_by_right(ekeys, alt_ek, index);
+        map_no_dup_keys_alist_get_same(ekeys, alt_ek, index);
+        assert dmap_get_k2_fp(m, alt_ek) == index;
+        dmap_get_by_k2_invertible(m, alt_ek);
+        assert flw_get_ek(dmap_get_val_fp(m, index)) == alt_ek;
+        assert alt_ek != flw_get_ek(flow);
+        assert dmap_get_val_fp(m, index) != flow;
+      }
+      assert alist_get_by_right(ikeys, index) == flw_get_ik(flow);
+      dmap_no_dup_vals(ikeys, ekeys, vals);
+      nonempty_indexes_bounds(vals, 0);
+      coherent_same_indexes(m, ch);
+      subset_forall(map(fst, entries), dmap_indexes_used_fp(m), (ge)(0));
+      subset_forall(map(fst, entries), dmap_indexes_used_fp(m),
+                    (lt)(length(vals)));
+
+      dmap_all_used_indexes_used(ikeys, ekeys, vals);
+      assert true == forall(nonempty_indexes_fp(vals, 0), (dmap_index_used_fp)(m));
+      subset_forall(map(fst, entries), dmap_indexes_used_fp(m),
+                    (dmap_index_used_fp)(m));
+      gen_entries_rejuvenate(entries, ikeys, ekeys, vals, index, time, flow);
+    }
+  }
 }
 
 lemma void expire_flows_abstract(dmap<int_k,ext_k,flw> m,

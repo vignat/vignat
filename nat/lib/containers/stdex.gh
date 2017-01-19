@@ -329,6 +329,17 @@ ensures drop(n+1, lst) == tail(drop(n, lst));
   }
 }
 
+lemma void drop_cons<t>(list<t> lst, int n)
+requires 0 <= n &*& n < length(lst);
+ensures drop(n, lst) == cons(nth(n, lst), drop(n+1, lst));
+{
+  switch(lst) {
+    case nil:
+    case cons(h,t):
+      if (n != 0) drop_cons(t, n - 1);
+  }
+}
+
   lemma void reverse_cons<t>(t head, list<t> tail)
   requires true;
   ensures reverse(cons(head, tail)) == append(reverse(tail), cons(head, nil));
