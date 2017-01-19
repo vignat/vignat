@@ -91,14 +91,6 @@ int loop(int k, int capacity)
                (head(bbs) == 0 ? ks == cons(none, kst) :
                  ([0.5]pred(head(pts), ?ksh) &*& ks == cons(some(ksh), kst))));
 
-  fixpoint bool opt_no_dups<t>(list<option<t> > l) {
-    switch(l) {
-      case nil: return true;
-      case cons(h,t):
-        return opt_no_dups(t) && (h == none || !(mem(h, t)));
-    }
-  }
-
   fixpoint bool hash_list<kt>(list<option<kt> > vals,
                              list<int> hashes,
                              fixpoint (kt, int) hash) {
@@ -1324,7 +1316,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                                                     list<pair<kt,vt> > m,
                                                     int i, kt k, vt v)
   requires key_vals(ks, vals, m) &*&
-           nth(i, ks) == none &*& 0 <= i &*&
+           nth(i, ks) == none &*& 0 <= i &*& i < length(ks) &*&
            false == mem(some(k), ks);
   ensures key_vals(update(i, some(k), ks), update(i, v, vals),
                    map_put_fp(m, k, v));
@@ -1409,6 +1401,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
   }
   //@ open hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
   //@ assert pred_mapping(kps, ?bbs, kp, ?ks);
+  //@ pred_mapping_same_len(bbs, ks);
   //@ put_keeps_pred_mapping(kps, bbs, kp, ks, index, keyp, k);
   //@ hmap_exists_iff_map_has(hm, m, k);
   //@ put_preserves_opt_no_dups(ks, index, k);
@@ -1435,7 +1428,8 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                                                  predicate (void*;kt) keyp,
                                                  list<option<kt> > ks,
                                                  int i)
-  requires pred_mapping(kps, bbs, keyp, ks) &*& 0 <= i &*& nth(i, ks) == some(?k);
+  requires pred_mapping(kps, bbs, keyp, ks) &*& 0 <= i &*& i < length(ks) &*&
+           nth(i, ks) == some(?k);
   ensures pred_mapping(kps, update(i, 0, bbs), keyp, update(i, none, ks)) &*&
           [0.5]keyp(nth(i, kps), k);
   {

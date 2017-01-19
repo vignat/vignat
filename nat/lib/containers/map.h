@@ -82,6 +82,11 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
           true == no_dups(map(fst, m));
   @*/
 
+/*@
+  lemma void map_has_to_mem<kt>(list<pair<kt, int> > m, kt k);
+  requires true;
+  ensures map_has_fp(m, k) == mem(k, map(fst, m));
+  @*/
 
 /*@
   predicate map_key_type<kt>(kt k) = true;

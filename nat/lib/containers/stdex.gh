@@ -781,6 +781,15 @@ fixpoint bool lt(int x, int y) { return y < x; }
         ge_le_ge(t, i, x);
     }
   }
+
+  fixpoint bool opt_no_dups<t>(list<option<t> > l) {
+    switch(l) {
+      case nil: return true;
+      case cons(h,t):
+        return opt_no_dups(t) && (h == none || !(mem(h, t)));
+    }
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)
