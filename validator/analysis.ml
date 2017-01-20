@@ -33,7 +33,7 @@ let expand_fixpoints_in_tterm
       end
     | _ -> None
   in
-  call_recursively_on_tterm impl tterm
+  call_recursively_on_term impl tterm
 
 let expand_fixpoints fixpoints sttmts =
   List.map sttmts ~f:(expand_fixpoints_in_tterm fixpoints)
@@ -59,7 +59,7 @@ let canonicalize_in_place statements =
   List.map statements ~f:canonicalize1
 
 let remove_double_negation sttmt =
-  sttmt |> call_recursively_on_tterm (fun term ->
+  sttmt |> call_recursively_on_term (fun term ->
       match term with
       | Not {v=Not tt;t=_} -> Some tt.v
       | _ -> None)
@@ -86,7 +86,7 @@ let expand_struct_eqs sttmts =
   List.join (List.map sttmts ~f:expand_struct_eq)
 
 let reduce_struct_idxes sttmt =
-  sttmt |> call_recursively_on_tterm (function
+  sttmt |> call_recursively_on_term (function
       | Str_idx ({v=Struct(_,fields);t=_}, field) ->
         Some (List.find_exn fields ~f:(fun {name;value=_} ->
           name = field)).value.v

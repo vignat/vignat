@@ -1,0 +1,139 @@
+assert dmappingp<int_k,ext_k,flw>(?final_map,_,_,_,_,_,_,_,_,_,_,_,_,_);
+assert double_chainp(?final_chain,_);
+
+#define UNRELEVANT_FIELDS_UNCHANGED(before,after)               \
+    after.ether.ether_type     == before.ether.ether_type &&      \
+    after.ipv4.version_ihl     == before.ipv4.version_ihl &&      \
+    after.ipv4.type_of_service == before.ipv4.type_of_service &&  \
+    after.ipv4.total_length    == before.ipv4.total_length &&     \
+    after.ipv4.packet_id       == before.ipv4.packet_id &&        \
+    after.ipv4.fragment_offset == before.ipv4.fragment_offset &&  \
+    after.ipv4.time_to_live    == before.ipv4.time_to_live &&     \
+    after.ipv4.next_proto_id   == before.ipv4.next_proto_id &&    \
+    /* after.tcp.sent_seq         == before.tcp.sent_seq &&
+       this one gets a weird formula for some reason
+     */                                                           \
+    after.tcp.recv_ack         == before.tcp.recv_ack &&          \
+    after.tcp.data_off         == before.tcp.data_off &&          \
+    after.tcp.tcp_flags        == before.tcp.tcp_flags &&         \
+    after.tcp.rx_win           == before.tcp.rx_win &&            \
+    after.tcp.tcp_urp          == before.tcp.tcp_urp
+
+flowtable initial_ft = abstract_function(initial_double_map,
+                                         initial_double_chain);
+flowtable final_ft = abstract_function(final_map, final_chain);
+   
+bit_and_zero(0x00000010);
+if (10 < now) {// consider only normal moments, remote from the start of the epoch
+
+  if (a_packet_received &&
+      ((received_packet_type & 0x00000010) ||
+       (received_packet_type == 0 &&
+        the_received_packet.ether.ether_type == 0x08))) {
+
+    flowtable after_expiration_ft =
+      abstract_function(map_after_expiration, chain_after_expiration);
+
+    assert after_expiration_ft == flowtable_expire_flows(initial_ft, now - 10);
+
+    // IPv4 packet
+    if (the_received_packet.ipv4.next_proto_id == 6 ||
+        the_received_packet.ipv4.next_proto_id == 17) {
+      // TCP/UDP packet
+      if (received_on_port == 1) {
+        // packet from the external network
+        ext_k external_flow_id = ekc(the_received_packet.tcp.dst_port,
+                                     the_received_packet.tcp.src_port,
+                                     the_received_packet.ipv4.dst_addr,
+                                     the_received_packet.ipv4.src_addr,
+                                     received_on_port,
+                                     the_received_packet.ipv4.next_proto_id);
+        if (flowtable_contains_ext_flow_id(after_expiration_ft,
+                                           external_flow_id)) {
+          // flow is present in the table
+          assert true == a_packet_sent;
+          flw flow = flowtable_get_by_ext_flow_id(after_expiration_ft,
+                                                  external_flow_id);
+          assert final_ft ==
+                   flowtable_add_flow(flowtable_remove_flow(after_expiration_ft,
+                                                            flow),
+                                      flow,
+                                      now);
+          assert ikc(sent_packet.tcp.dst_port,
+                     sent_packet.tcp.src_port,
+                     sent_packet.ipv4.dst_addr,
+                     sent_packet.ipv4.src_addr,
+                     sent_on_port,
+                     sent_packet.ipv4.next_proto_id) ==
+                 flw_get_ik(flow);
+          assert UNRELEVANT_FIELDS_UNCHANGED(the_received_packet, sent_packet);
+          //TODO: ensure other parts of the sent packet remain the same.
+        } else {
+          // no flow in the table
+          assert false == a_packet_sent;
+          assert final_ft == after_expiration_ft;
+        }
+      } else {
+        // packet from the internal network
+        int_k internal_flow_id = ikc(the_received_packet.tcp.src_port,
+                                     the_received_packet.tcp.dst_port,
+                                     the_received_packet.ipv4.src_addr,
+                                     the_received_packet.ipv4.dst_addr,
+                                     received_on_port,
+                                     the_received_packet.ipv4.next_proto_id);
+        if (flowtable_contains_int_flow_id(after_expiration_ft,
+                                           internal_flow_id)) {
+          // flow present in the table
+          assert true == a_packet_sent;
+          flw flow = flowtable_get_by_int_flow_id(after_expiration_ft,
+                                                  internal_flow_id);
+          assert final_ft ==
+                   flowtable_add_flow(flowtable_remove_flow(after_expiration_ft,
+                                                            flow),
+                                      flow,
+                                      now);
+          assert ekc(sent_packet.tcp.src_port,
+                     sent_packet.tcp.dst_port,
+                     sent_packet.ipv4.src_addr,
+                     sent_packet.ipv4.dst_addr,
+                     sent_on_port,
+                     sent_packet.ipv4.next_proto_id) ==
+                 flw_get_ek(flow);
+          assert UNRELEVANT_FIELDS_UNCHANGED(the_received_packet, sent_packet);
+          //TODO: ensure other parts of the sent packet remain the same.
+        } else {
+          // No flow in the table
+          if (flowtable_out_of_space(after_expiration_ft)) {
+            // Flowtable overflow
+            assert false == a_packet_sent;
+            assert final_ft == after_expiration_ft;
+          } else {
+            // The flow must have been inserted
+            assert true == a_packet_sent;
+            assert final_ft == flowtable_add_flow(after_expiration_ft,
+                                                  the_inserted_flow,
+                                                  now);
+            ext_k external_flow_id = flw_get_ek(the_inserted_flow);
+            assert false == flowtable_contains_ext_flow_id(after_expiration_ft,
+                                                           external_flow_id);
+            assert ekc(sent_packet.tcp.src_port,
+                       sent_packet.tcp.dst_port,
+                       sent_packet.ipv4.src_addr,
+                       sent_packet.ipv4.dst_addr,
+                       sent_on_port,
+                       sent_packet.ipv4.next_proto_id) ==
+                   external_flow_id;
+            assert UNRELEVANT_FIELDS_UNCHANGED(the_received_packet, sent_packet);
+            //TODO: ensure other parts of the sent packet remain the same.
+          }
+        }
+      }
+    } else {
+      // Non TCP or UDP packet
+      assert false == a_packet_sent;
+    }
+  } else {
+    // Non IPv4 packet
+    assert false == a_packet_sent;
+  }
+}

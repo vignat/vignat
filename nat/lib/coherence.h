@@ -20,6 +20,13 @@ requires dmap_dchain_coherent(m, ch) &*& dmap_index_used_fp(m, idx) == true;
 ensures dmap_dchain_coherent(m, ch) &*&
         dchain_allocated_fp(ch, idx) == true;
 
+lemma void coherent_same_indexes<t1,t2,vt>
+             (dmap<t1,t2,vt> m, dchain ch);
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        true == subset(dchain_indexes_fp(ch), dmap_indexes_used_fp(m)) &*&
+        true == subset(dmap_indexes_used_fp(m), dchain_indexes_fp(ch));
+
 lemma void rejuvenate_preserves_coherent<t1,t2,vt>
              (dmap<t1,t2,vt> m, dchain ch,
               int index, uint32_t time);

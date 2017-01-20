@@ -1553,19 +1553,6 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   @*/
 
 /*@
-  lemma void drop_cons<t>(list<t> l, int n)
-  requires 0 <= n &*& n < length(l);
-  ensures drop(n, l) == cons(nth(n, l), drop(n+1, l));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (0 < n) drop_cons(t, n-1);
-    }
-  }
-  @*/
-
-/*@
   lemma void mem_remove_drop<t>(list<t> l, int i, t x, t y)
   requires false == mem(y, remove(x, l)) &*& 0 <= i;
   ensures false == mem(y, remove(x, drop(i, l)));
@@ -1626,6 +1613,23 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     dchaini_alist_distinct(chi);
     close double_chainp(ch, chain);
     close dchain_nodups(ch);
+  }
+  @*/
+
+/*@
+  lemma void dchain_distinct_indexes(dchain ch)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          true == distinct(dchain_indexes_fp(ch));
+  {
+    open double_chainp(ch, chain);
+    assert dchainip(?chi, ?cells);
+    assert uints(_, _, ?tstamps);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      indexes_is_dci_alist(alist, tstamps, dchaini_alist_fp(chi));
+    }
+    dchaini_alist_distinct(chi);
+    close double_chainp(ch, chain);
   }
   @*/
 

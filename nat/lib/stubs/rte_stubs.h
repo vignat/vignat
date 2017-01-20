@@ -805,6 +805,13 @@ rte_get_closest_next_lcore(unsigned i, int skip_master, int wrap)
     return i;
 }
 
+
+struct user_buf {
+  //uint8_t some_data[100];
+  struct ether_hdr ether;
+  struct ipv4_hdr ipv4;
+  struct tcp_hdr tcp;
+};
 // Below goes gutted rte functions.
 
 
