@@ -936,6 +936,11 @@ let fun_types =
                                                ";\n" ^
                                                "sent_packet_type = (" ^
                                                sent_pkt ^ ")->packet_type;");];};
+     "rte_pktmbuf_free", {ret_type = Void;
+                          arg_types = [Ptr rte_mbuf_struct;];
+                          extra_ptr_types = [];
+                          lemmas_before = [];
+                          lemmas_after = [];}
     ]
 
 let fixpoints =

@@ -35,6 +35,10 @@ void received_packet(uint8_t portid, uint8_t queueid,
 //@ requires true;
 //@ ensures a_packet(mbuf);
 
+void rte_pktmbuf_free(struct rte_mbuf *mbuf);
+//@ requires a_packet(mbuf);
+//@ ensures true;
+
 /*@
 lemma void bit_and_zero(int x)
 requires true;

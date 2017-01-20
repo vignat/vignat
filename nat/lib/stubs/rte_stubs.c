@@ -8,7 +8,9 @@ uint16_t rte_eth_tx_burst(uint8_t port, uint16_t queueid, struct rte_mbuf **tx_p
 }
 
 void rte_pktmbuf_free(struct rte_mbuf *mbufp){
-    return;
+  klee_trace_ret();
+  klee_trace_param_just_ptr(mbufp, sizeof(*mbufp), "mbufp");
+  return;
 }
 
 uint64_t rte_get_tsc_hz(){
