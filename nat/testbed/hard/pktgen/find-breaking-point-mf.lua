@@ -6,18 +6,17 @@ package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 require "Pktgen";
 
 -- define packet sizes to test
--- local pkt_sizes		= { 64, 128, 256, 512, 1024, 1280, 1518 };
 local pkt_sizes		= { 64 };
 
-local flows_nums = { 50000, 55000, 58000, 59000, 60000, 61000 };
+-- local flows_nums = { 65536 }
+local flows_nums = { 1000, 10000, 20000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 60500, 61000, 61500, 62000, 62500, 63000, 63500, 64000, 64500, 65000, 65536 };
 
 -- Time in seconds to transmit for
 local duration		= 40000;
---local confirmDuration	= 80000;
 local pauseTime		= 2000;
 
 -- the part to start from
-local strtprt_int = 1000;
+local strtprt_int = 0;
 
 
 local num_bin_steps = 7;
@@ -40,7 +39,7 @@ local initialRate	= 50 ;
 
 local function setupTraffic(numFlows)
 	local portStart = tostring(strtprt_int);
-	local portEnd = tostring(strtprt_int + numFlows);
+	local portEnd = tostring(strtprt_int + (numFlows - 1)); -- beware of overflows!
 	pktgen.set_ipaddr(sendport, "dst", dstip);
 	pktgen.set_ipaddr(sendport, "src", srcip..netmask);
 	pktgen.set_mac(sendport, sendport_dst_mac);
@@ -89,7 +88,7 @@ local function runTrial(numFlows, pkt_size, rate, duration, count)
 	pktgen.set(sendport, "size", pkt_size);
 
 	pktgen.start(sendport);
-	print("R trial " .. count .. ". % rt: " .. rate .. " nflws: " .. numFlows .. ". pkts: " .. pkt_size .. ". Dur (mS):" .. duration);
+	print("#" .. count .. ", |pkt|=" .. pkt_size .. ", rate=" .. rate .. ", #flows=" .. numFlows .. ", duration=" .. duration .. "ms");
 	pktgen.delay(duration);
 	pktgen.stop(sendport);
 	
@@ -102,9 +101,7 @@ local function runTrial(numFlows, pkt_size, rate, duration, count)
 	num_rx = statRx.ipackets;
 	num_dropped = (num_tx - num_rx)/num_tx;
 
-	print("Tx: " .. num_tx .. ". Rx: " .. num_rx .. ". Drop: " .. num_dropped .. ".");
-	--file:write(numFlows .. " " .. pkt_size .. " " .. rate .. " "
-	--        .. num_tx .. " " .. num_rx .. " " .. duration .. "\n");
+	print("TX=" .. num_tx .. " / RX=" .. num_rx .. " -> Drop: " .. num_dropped);
 	pktgen.delay(pauseTime);
 
 	return num_dropped, num_tx;
@@ -120,26 +117,41 @@ local function runThroughputTest(numFlows, pkt_size)
 	abs_min_rate = 1;
 	max_rate = abs_max_rate;
 	min_rate = abs_min_rate;
-	trial_rate = initialRate;
-	tot_count = 1;
+	tot_count = 0;
 
-	for count=1, num_bin_steps, 1
-	do		
+	-- Start with 100% then with 1%, the most common cases, to speed things up
+	trial_rate = 100
+	num_dropped, num_tx = runTrial(numFlows, pkt_size, trial_rate, duration, tot_count);
+	if num_dropped >= 0.01
+	then
+		tot_count = tot_count + 1
+		trial_rate = 1
 		num_dropped, num_tx = runTrial(numFlows, pkt_size, trial_rate, duration, tot_count);
-		tot_count = tot_count + 1;
 		if num_dropped < 0.01
 		then
-			min_rate = trial_rate;
-		else
-			max_rate = trial_rate;
+			trial_rate = initialRate;
+			for count=1, num_bin_steps, 1
+			do
+				num_dropped, num_tx = runTrial(numFlows, pkt_size, trial_rate, duration, tot_count);
+				tot_count = tot_count + 1;
+				if num_dropped < 0.01
+				then
+					min_rate = trial_rate;
+				else
+					max_rate = trial_rate;
+				end
+				trial_rate = min_rate + ((max_rate - min_rate)/2);
+			end
 		end
-		trial_rate = min_rate + ((max_rate - min_rate)/2);
 	end
-	file:write(numFlows .. " " .. pkt_size .. " " .. trial_rate .. " " .. num_tx .. "\n");
+	num_tx_per_sec = math.floor(num_tx / (duration / 1000));
+	file:write(numFlows .. " " .. pkt_size .. " " .. trial_rate .. " " .. num_tx .. " " .. num_tx_per_sec .. "\n");
 end
 
 function main()
 	file = io.open("multi-flows.txt", "w");
+	file:write("#flows pkt_size rate #pkt #pkt/sec\n");
+
 	runTrial(10000, 64, 1, 10000, "heatup");
 	for _,numFlows in pairs(flows_nums)
 	do

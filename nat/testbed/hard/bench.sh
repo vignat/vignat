@@ -34,9 +34,9 @@ if [ -z $2 ]; then
 fi
 
 
-# HACK: The NAT isn't yet verified with 3 interfaces
+# HACK: VigNAT isn't yet verified with 3 interfaces
 #       Thus it has to be patched to support it
-if [ $1 != "netfilter" ] && [ $2 = "rr" ]; then
+if [ $1 != "netfilter" ] && [ $2 = "rr" ] && [ -f $1/main.c ]; then
     sed -i -- "s~//{2, 0, 0}~{2, 0, 0}~g" $1/main.c
 fi
 
@@ -86,7 +86,7 @@ else
     # Run the app in the background
     # The arguments are not always necessary, but they'll be ignored if unneeded
     (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$1" \
-        "--expire 10 --max-flows 61000 --starting-port 1025" \
+        "--expire 10 --max-flows 65536 --starting-port 0" \
         0<&- &>"$LOG_FILE") &
 
     # Wait for it to have started
@@ -125,7 +125,7 @@ esac
 
 
 # HACK: See above HACK
-if [ $1 != "netfilter" ] && [ $2 = "rr" ]; then
+if [ $1 != "netfilter" ] && [ $2 = "rr" ] && [ -f $1/main.c ]; then
     sed -i -- "s~{2, 0, 0}~//{2, 0, 0}~g" $1/main.c
 fi
 
