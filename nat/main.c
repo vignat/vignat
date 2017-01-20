@@ -571,7 +571,7 @@ main_loop(void* one_iteration)
 }
 #else//KLEE_VERIFICATION
 {
-  void (*forward_packet)(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf) = one_iteration;
+  void (*forward_packet)(struct rte_mbuf *m, uint8_t portid, struct lcore_conf *qconf, uint32_t now) = one_iteration;
   uint64_t prev_tsc = 0;
   unsigned lcore_id = rte_lcore_id();
   struct lcore_conf* qconf = array_lcc_begin_access(&lcore_conf, lcore_id);
@@ -617,6 +617,7 @@ main_loop(void* one_iteration)
         array_rq_begin_access(&qconf->rx_queue_list, i);
       portid = rx_queue->port_id;
       queueid = rx_queue->queue_id;
+      uint32_t now = current_time();
       array_rq_end_access(&qconf->rx_queue_list);
       nb_rx = rte_eth_rx_burst(portid, queueid, pkts_burst,
                                MAX_PKT_BURST);
@@ -632,12 +633,12 @@ main_loop(void* one_iteration)
         for (j = 0; j < (nb_rx - PREFETCH_OFFSET); j++) {
           rte_prefetch0(rte_pktmbuf_mtod
                         (pkts_burst[j + PREFETCH_OFFSET], void *));
-          forward_packet(pkts_burst[j], portid, qconf);
+          forward_packet(pkts_burst[j], portid, qconf, now);
         }
 
         /* Forward remaining prefetched packets */
         for (; j < nb_rx; j++) {
-          forward_packet(pkts_burst[j], portid, qconf);
+          forward_packet(pkts_burst[j], portid, qconf, now);
         }
       }
     }
