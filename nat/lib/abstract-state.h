@@ -645,7 +645,45 @@ ensures dmap_dchain_coherent(m, ch) &*&
     }
   }
 }
+@*/
 
+
+/*@
+  lemma void gen_entries_get_flow_ext(list<pair<int, uint32_t> > entries,
+                                      list<pair<int_k,int> > ikeys,
+                                      list<pair<ext_k,int> > ekeys,
+                                      list<option<flw> > vals,
+                                      ext_k ek)
+  requires true == dmap_has_k2_fp(dmap(ikeys, ekeys, vals), ek) &*&
+           true == no_dups(map(fst, ekeys)) &*&
+           true == forall(map(fst, entries),
+                          (contains)(map(snd, ekeys))) &*&
+           true == mem(ek, map(entry_ek,
+                               gen_entries(entries, ikeys, ekeys, vals)));
+  ensures entry_flow(nth(index_of(ek,
+                                  map(entry_ek,
+                                      gen_entries(entries, ikeys, ekeys, vals))),
+                         gen_entries(entries, ikeys, ekeys, vals))) ==
+          dmap_get_val_fp(dmap(ikeys, ekeys, vals),
+                          dmap_get_k2_fp(dmap(ikeys, ekeys, vals), ek));
+  {
+    switch(entries) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tsmpt):
+          if (alist_get_by_right(ekeys, ind) == ek) {
+            assert index_of(ek, map(entry_ek, gen_entries(entries, ikeys, ekeys, vals))) == 0;
+            map_no_dup_keys_alist_get_same(ekeys, ek, ind);
+            assert dmap_get_k2_fp(dmap(ikeys, ekeys, vals), ek) == ind;
+          } else {
+            gen_entries_get_flow_ext(t, ikeys, ekeys, vals, ek);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
 // Head lemma #
 lemma void get_flow_by_ext_abstract(dmap<int_k,ext_k,flw> m, dchain ch, ext_k ek)
 requires true == dmap_has_k2_fp(m, ek) &*&
@@ -660,7 +698,17 @@ ensures dmap_dchain_coherent(m, ch) &*&
         dmap_get_val_fp(m, dmap_get_k2_fp(m, ek)) ==
         flowtable_get_by_ext_flow_id(abstract_function(m, ch), ek);
 {
-  assume(false);//TODO
+  contains_ext_k_abstract(m, ch, ek);
+  switch(ch) { case dchain(entries, index_range, low, high):
+    switch(m) { case dmap(ikeys, ekeys, vals):
+      dmap_no_dup_keys(ikeys, ekeys, vals);
+      dmap_indexes_used_used_in_ma_mb(ikeys, ekeys, vals);
+      coherent_same_indexes(m, ch);
+      subset_forall(map(fst, entries), dmap_indexes_used_fp(m),
+                    (contains)(map(snd, ekeys)));
+      gen_entries_get_flow_ext(entries, ikeys, ekeys, vals, ek);
+    }
+  }
 }
 @*/
 
