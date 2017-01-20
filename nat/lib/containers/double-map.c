@@ -69,28 +69,14 @@ struct DoubleMap {
          };
      };
 
+
   fixpoint bool insync_fp<t1,t2,vt>(list<option<vt> > vals,
                                     list<pair<t1,int> > m1,
                                     list<pair<t2,int> > m2,
                                     fixpoint (vt,t1) vk1,
                                     fixpoint (vt,t2) vk2,
                                     int start_index) {
-    switch(vals) {
-      case nil: return m1 == empty_map_fp<t1,int>() &&
-                       m2 == empty_map_fp<t2,int>();
-      case cons(h,t):
-        return switch(h) {
-          case none: return insync_fp(t, m1, m2, vk1, vk2, start_index + 1);
-          case some(v):
-            return map_has_fp(m1, vk1(v)) &&
-                   map_get_fp(m1, vk1(v)) == start_index &&
-                   map_has_fp(m2, vk2(v)) &&
-                   map_get_fp(m2, vk2(v)) == start_index &&
-                   insync_fp(t, map_erase_fp(m1, vk1(v)),
-                             map_erase_fp(m2, vk2(v)),
-                             vk1, vk2, start_index+1);
-        };
-    }
+    return dmap_self_consistent_fp(vals, m1, m2, vk1, vk2, start_index);
   }
 
   fixpoint bool no_extra_ptrs<t>(list<pair<t,void*> > addrs,
@@ -2380,12 +2366,12 @@ int dmap_size/*@ <K1,K2,V> @*/(struct DoubleMap* map)
 
 /*@
   lemma void insync_get_by_k2_invertible<t1,t2,vt>(list<option<vt> > vals,
-                                                    list<pair<t1,int> > m1,
-                                                    list<pair<t2,int> > m2,
-                                                    fixpoint (vt,t1) vk1,
-                                                    fixpoint (vt,t2) vk2,
-                                                    t2 k2,
-                                                    int start_index)
+                                                   list<pair<t1,int> > m1,
+                                                   list<pair<t2,int> > m2,
+                                                   fixpoint (vt,t1) vk1,
+                                                   fixpoint (vt,t2) vk2,
+                                                   t2 k2,
+                                                   int start_index)
   requires true == insync_fp(vals, m1, m2, vk1, vk2, start_index) &*&
            true == all_keys_differ(vals, vk1, vk2) &*&
            true == map_has_fp(m2, k2);
@@ -3079,3 +3065,205 @@ lemma void insync_nonemptyindexes_mem_ma_mb<t1,t2,vt>(list<option<vt> > vals,
     }
   }
 @*/
+
+/*@
+  lemma void non_mem_erase<kt>(list<pair<kt, int> > m, kt k1, kt k2)
+  requires false == mem(k1, map(fst,m));
+  ensures false == mem(k1, map(fst,map_erase_fp(m, k2)));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key != k2) non_mem_erase(t, k1, k2);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void map_erase_still_no_dup_keys<kt>(list<pair<kt, int> > m, kt k)
+  requires true == no_dups(map(fst,m));
+  ensures true == no_dups(map(fst,map_erase_fp(m, k)));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key != k) {
+            map_erase_still_no_dup_keys(t, k);
+            non_mem_erase(t, key, k);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void self_consistent_mem_keys<t1,t2,vt>(list<option<vt> > vals,
+                                                list<pair<t1, int> > m1,
+                                                list<pair<t2, int> > m2,
+                                                fixpoint (vt,t1) vk1,
+                                                fixpoint (vt,t2) vk2,
+                                                int start_index,
+                                                int index)
+  requires true == dmap_self_consistent_fp(vals, m1, m2, vk1, vk2,
+                                           start_index) &*&
+           0 <= index - start_index &*&
+           index - start_index < length(vals) &*&
+           nth(index - start_index, vals) == some(?val);
+  ensures true == mem(vk1(val), map(fst, m1)) &*&
+          true == mem(vk2(val), map(fst, m2));
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+            self_consistent_mem_keys(t, m1, m2, vk1, vk2,
+                                     start_index + 1, index);
+          case some(v):
+            if (index == start_index) {
+              map_has_to_mem(m1, vk1(val));
+              map_has_to_mem(m2, vk2(val));
+            } else {
+              self_consistent_mem_keys(t, map_erase_fp(m1, vk1(v)),
+                                       map_erase_fp(m2, vk2(v)),
+                                       vk1, vk2,
+                                       start_index + 1,
+                                       index);
+              mem_unerase(m1, vk1(val), vk1(v));
+              mem_unerase(m2, vk2(val), vk2(v));
+            }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void no_dups_consistent_these_keys_differ<t1,t2,vt>
+               (list<option<vt> > vals,
+                list<pair<t1, int> > m1,
+                list<pair<t2, int> > m2,
+                fixpoint (vt,t1) vk1,
+                fixpoint (vt,t2) vk2,
+                int start_index,
+                int index)
+  requires true == dmap_self_consistent_fp(vals, m1, m2,
+                                           vk1, vk2, start_index) &*&
+           true == no_dups(map(fst, m1)) &*&
+           true == no_dups(map(fst, m2)) &*&
+           0 < index - start_index &*&
+           index - start_index < length(vals) &*&
+           nth(index - start_index, vals) == some(?v) &*&
+           nth(0, vals) == some(?value);
+  ensures vk1(v) != vk1(value) &*&
+          vk2(v) != vk2(value);
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+          case some(xxx):
+            assert xxx == value;
+            self_consistent_mem_keys(t, map_erase_fp(m1, vk1(value)),
+                                     map_erase_fp(m2, vk2(value)),
+                                     vk1, vk2, start_index + 1, index);
+            if (vk1(v) == vk1(value)) {
+              mem_erase_to_dup(m1, vk1(v));
+              assert false;
+            }
+            if (vk2(v) == vk2(value)) {
+              mem_erase_to_dup(m2, vk2(v));
+              assert false;
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_sconsist_indexes_right_hlp<t1,t2,vt>(list<option<vt> > vals,
+                                                       list<pair<t1, int> > m1,
+                                                       list<pair<t2, int> > m2,
+                                                       fixpoint (vt,t1) vk1,
+                                                       fixpoint (vt,t2) vk2,
+                                                       int start_index,
+                                                       int index)
+  requires true == dmap_self_consistent_fp(vals, m1, m2,
+                                           vk1, vk2, start_index) &*&
+           0 <= index - start_index &*&
+           index - start_index < length(vals) &*&
+           nth(index - start_index, vals) == some(?v) &*&
+           true == no_dups(map(fst, m1)) &*&
+           true == no_dups(map(fst, m2));
+  ensures map_get_fp(m1, vk1(v)) == index &*&
+          map_get_fp(m2, vk2(v)) == index;
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+            assert index != start_index;
+            dmap_sconsist_indexes_right_hlp(t, m1, m2,
+                                            vk1, vk2, start_index + 1,
+                                            index);
+          case some(value):
+            if (index == start_index) {
+            } else {
+              map_erase_still_no_dup_keys(m1, vk1(value));
+              map_erase_still_no_dup_keys(m2, vk2(value));
+              dmap_sconsist_indexes_right_hlp(t, map_erase_fp(m1, vk1(value)),
+                                              map_erase_fp(m2, vk2(value)),
+                                              vk1, vk2, start_index + 1,
+                                              index);
+              no_dups_consistent_these_keys_differ
+                (vals, m1, m2, vk1, vk2, start_index, index);
+              map_erase_get_unrelevant(m1, vk1(value), vk1(v));
+              map_erase_get_unrelevant(m2, vk2(value), vk2(v));
+            }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_consistent_right_indexes<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                     fixpoint (vt,t1) vk1,
+                                                     fixpoint (vt,t2) vk2,
+                                                     int index)
+  requires true == dmap_self_consistent_integral_fp(m, vk1, vk2) &*&
+           true == dmap_index_used_fp(m, index) &*&
+           0 <= index &*& index < dmap_cap_fp(m);
+  ensures dmap_get_k1_fp(m, vk1(dmap_get_val_fp(m, index))) == index &*&
+          dmap_get_k2_fp(m, vk2(dmap_get_val_fp(m, index))) == index;
+  {
+    switch(m) { case dmap(m1, m2, vals):
+      dmap_sconsist_indexes_right_hlp(vals, m1, m2, vk1, vk2, 0, index);
+    }
+  }
+  @*/
+
+/*@
+  lemma void dmap_pred_self_consistent<t1,t2,vt>(dmap<t1,t2,vt> m)
+  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                               ?fvp, ?bvp, ?rof, ?vsz,
+                               ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2, fvp,
+                              bvp, rof, vsz, vk1, vk2, recp1, recp2, mp) &*&
+          true == dmap_self_consistent_integral_fp(m, vk1, vk2);
+  {
+    open dmappingp(m, kp1, kp2, hsh1, hsh2,
+                   fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
+    switch(m) { case dmap(m1, m2, vals):
+      map_no_dup_keys(m1);
+      map_no_dup_keys(m2);
+    }
+    close dmappingp(m, kp1, kp2, hsh1, hsh2,
+                    fvp, bvp, rof, vsz, vk1, vk2, recp1, recp2, mp);
+  }
+  @*/

@@ -195,6 +195,58 @@ struct DoubleMap;
     return length(dmap_indexes_used_fp(m));
   }
 
+  fixpoint bool dmap_self_consistent_fp<t1,t2,vt>(list<option<vt> > vals,
+                                                  list<pair<t1,int> > m1,
+                                                  list<pair<t2,int> > m2,
+                                                  fixpoint (vt,t1) vk1,
+                                                  fixpoint (vt,t2) vk2,
+                                                  int start_index) {
+    switch(vals) {
+      case nil: return m1 == empty_map_fp<t1,int>() &&
+                       m2 == empty_map_fp<t2,int>();
+      case cons(h,t):
+        return switch(h) {
+          case none: return dmap_self_consistent_fp(t, m1, m2, vk1, vk2,
+                                                    start_index + 1);
+          case some(v):
+            return map_has_fp(m1, vk1(v)) &&
+                   map_get_fp(m1, vk1(v)) == start_index &&
+                   map_has_fp(m2, vk2(v)) &&
+                   map_get_fp(m2, vk2(v)) == start_index &&
+                   dmap_self_consistent_fp(t, map_erase_fp(m1, vk1(v)),
+                                           map_erase_fp(m2, vk2(v)),
+                                           vk1, vk2, start_index+1);
+        };
+    }
+  }
+
+  fixpoint bool dmap_self_consistent_integral_fp<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                           fixpoint (vt,t1) vk1,
+                                                           fixpoint (vt,t2) vk2) {
+    switch(m) { case dmap(m1, m2, vals):
+      return dmap_self_consistent_fp(vals, m1, m2, vk1, vk2, 0) &&
+             true == no_dups(map(fst, m1)) &&
+             true == no_dups(map(fst, m2));
+    }
+  }
+
+  lemma void dmap_consistent_right_indexes<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                     fixpoint (vt,t1) vk1,
+                                                     fixpoint (vt,t2) vk2,
+                                                     int index);
+  requires true == dmap_self_consistent_integral_fp(m, vk1, vk2) &*&
+           true == dmap_index_used_fp(m, index) &*&
+           0 <= index &*& index < dmap_cap_fp(m);
+  ensures dmap_get_k1_fp(m, vk1(dmap_get_val_fp(m, index))) == index &*&
+          dmap_get_k2_fp(m, vk2(dmap_get_val_fp(m, index))) == index;
+
+  lemma void dmap_pred_self_consistent<t1,t2,vt>(dmap<t1,t2,vt> m);
+  requires dmappingp<t1,t2,vt>(m, ?kp1, ?kp2, ?hsh1, ?hsh2,
+                               ?fvp, ?bvp, ?rof, ?vsz,
+                               ?vk1, ?vk2, ?recp1, ?recp2, ?mp);
+  ensures dmappingp<t1,t2,vt>(m, kp1, kp2, hsh1, hsh2, fvp,
+                              bvp, rof, vsz, vk1, vk2, recp1, recp2, mp) &*&
+          true == dmap_self_consistent_integral_fp(m, vk1, vk2);
 
   lemma void dmap_indexes_contain_index_used<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                        int idx);

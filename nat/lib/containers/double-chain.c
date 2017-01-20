@@ -1617,6 +1617,23 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   @*/
 
 /*@
+  lemma void dchain_distinct_indexes(dchain ch)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          true == distinct(dchain_indexes_fp(ch));
+  {
+    open double_chainp(ch, chain);
+    assert dchainip(?chi, ?cells);
+    assert uints(_, _, ?tstamps);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      indexes_is_dci_alist(alist, tstamps, dchaini_alist_fp(chi));
+    }
+    dchaini_alist_distinct(chi);
+    close double_chainp(ch, chain);
+  }
+  @*/
+
+/*@
   lemma void destroy_dchain_nodups(dchain ch)
   requires dchain_nodups(ch);
   ensures true;
