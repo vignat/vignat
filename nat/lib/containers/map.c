@@ -5066,7 +5066,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                     list<pair<kt,vt> > m,
                                                     int i, kt k, vt v)
   requires key_vals(ks, vals, m) &*&
-           nth(i, ks) == none &*& 0 <= i &*&
+           0 <= i &*& i < length(ks) &*& nth(i, ks) == none &*&
            false == mem(some(k), ks);
   ensures key_vals(update(i, some(k), ks), update(i, v, vals),
                    map_put_fp(m, k, v));
@@ -8176,7 +8176,8 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                  predicate (void*;kt) keyp,
                                                  list<option<kt> > ks,
                                                  int i)
-  requires pred_mapping(kps, bbs, keyp, ks) &*& 0 <= i &*& nth(i, ks) == some(?k);
+  requires pred_mapping(kps, bbs, keyp, ks) &*&
+           0 <= i &*& i < length(ks) &*& nth(i, ks) == some(?k);
   ensures pred_mapping(kps, update(i, 0, bbs), keyp, update(i, none, ks)) &*&
           [0.5]keyp(nth(i, kps), k);
   {
