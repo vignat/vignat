@@ -1,0 +1,142 @@
+* parameters
+These are external configuration parameters of the NAPT box
+- ~CAPACITY~ -- maximum number of flows that a NAPT can forward simultaneously (keeping flow-specific information for each of them).
+- ~T_EXP~ -- expiration time. Iff an active flow does not receive a new packet for ~T_EXP~ contiguous time units, the flow becomes inactive.
+- ~EXT_ADDR~ – the externally visible address of the NAPT box. All the connections going through NAPT will be seen from the external network as originating from this address.
+* NAPT abstract state
+This defines the abstract representation of the NAPT state. 
+Our NAPT abstraction refers to an /internal host/ that is an endpoint on the internal (private) network connecting through the NAPT box to an /external host/ that is on the external (public) network.
+We focus here only on TCP and UDP, leaving out ICMP for simplicity.
+#+BEGIN_SRC haskell
+Endpoint := tuple<addr, port> -- IP address of a host and TCP/UDP port number
+
+Flow_id := tuple<int_ep     : Endpoint, -- internal host endpoint identity
+                 ext_ep     : Endpoint, -- external host endpoint identity
+                 protocol   : TCP/UDP>
+
+Flow_entry := tuple<int_flow_id : Flow_id, -- flow id, as seen in the private network
+                    ext_flow_id : Flow_id> -- flow id, as seen in the public network
+              with invariant:
+                   int_flow_id.ext_ep == ext_flow_id.ext_ep and
+                   int_flow_id.protocol == ext_flow_id.protocol
+
+Flow_table := set<flow_entry : Flow_entry,
+                  timestamp>
+              with invariant:
+                   flow_entry.int_flow_id is unique across set, and
+                   flow_entry.ext_flow_id is unique across set
+
+Packet := tuple<flow_id   : Flow_id,
+                interface : private/public,
+                payload>
+
+Network := tuple<incast_packet : Packet, -- packet waiting in the receive buffer 
+                 outcast_packet : Packet> -- last forwarded packet 
+
+state := tuple<flow_table : Flow_table,
+               network    : Network>
+#+END_SRC
+
+* rules
+The rules are in the form: "precondition" -> "postcondition".
+"Precondition" is all the abstract state properties that determine the NAPT state change on a packet arrival.
+"Postcondition" is the NAPT's response to that event: abstract state transformation (i.e., new flow in the table) and the reaction visible from the outside (i.e., outgoing packets).
+First we define the building blocks for both preconditions and postconditions, and then define the rules themselves.
+** definitions
+This section defines necessary terminology for specifying essential NAPT behavior cases.
+*** precondition elements
+These are the things that determine NAPT's behavior on every event (on every packet that comes in).
+  - =the flow table not full=: size(~flow_table~) < ~CAPACITY~
+  - =packet P arrives=: ~network.incast_packet~ contains ~P~
+  - =packet P is internal=: ~P~.interface == internal 
+  - =packet P is external=: ~P~.interface == external 
+  
+#+BEGIN_SRC haskell
+-- Find a flow corresponding to the packet P (if none found, then we say F(P) doesn't exist)
+F(P) := switch(P.interface)
+          case internal: find Flow_entry X in flow_table
+                         such that X.int_flow_id = P.flow_id
+          case external: find Flow_entry X in flow_table
+                         such that X.ext_flow_id = P.flow_id
+#+END_SRC
+
+*** postcondition elements
+This section defines possible transformations of the state that the NAPT may perform.
+We divide the postconditions into three categories (~t~ refers to the time when a packet arrives and is processed):
+
+**** expiration
+#+BEGIN_SRC haskell
+Expire(flow_table, time) := maximum subset of flow_table, with time < timestamp + T_EXP
+#+END_SRC
+- /some flows are expired/: ~flow_table~' = Expire(~flow_table~, ~t~)
+
+**** flow management (add new flows to the table)
+- /flow F is refreshed/: ~flow_table~' = replace(~F~ with ~rejuvenated_flow~ in ~flow_table~), where ~rejuvenated_flow~ has the same flow entry with ~timestamp~ = ~t~
+- /flow allocated for P/:
+#+BEGIN_SRC haskell
+ flow_table' = flow_table ++ new_flow, where
+    new_flow.int_flow_id = P.flow_id, and
+    not(new_flow.ext_flow_id exists), and
+    new_flow.timestamp = t
+#+END_SRC
+
+**** packet forwarding (transmit or drop packets)
+- /P is forwarded/: ~network.outcast_packet~ = ~P~
+- /P is accepted/: ~network.incast_packet~ = nil
+
+** rules
+Note: "A => B" means "B follows A".
+#+BEGIN_SRC haskell
+-- All NAPT scenarios follow the same general script:
+Packet P arrives at time t =>
+  P is accepted =>
+  {expiration (t)} =>
+  {flow-management (t)} =>
+  {forwarding}
+
+{expiration}:
+some flows are expired
+
+{flow-management}:
+P is internal -> F(P) exists      -> flow F(P) is refreshed
+                 not(F(P) exists) -> flow table is not full -> flow allocated for P
+P is external -> F(P) exists      -> flow F(P) is refreshed
+
+{forwarding}:
+P is internal -> F(P) exists -> packet P is forwarded
+P is external -> F(P) exists -> packet P is forwarded
+#+END_SRC
+
+* implementation specific state
+Our NAPT keeps its dynamic state in two data structures: Double_ Map and Allocator. We use Double_ Map to keep ~Flow_entry~'s accessible by both ~Ext_flow_id~ and ~Int_flow_id~. VeriFast proof lifts their physical representation into the following logical (intermediate) abstraction (note, we use list for containers, because VeriFast lacks built-in set or map):
+#+BEGIN_SRC haskell 
+allocator = list<index, timestamp>
+            index'es are unique
+double_map = list<ext_flow_id : Flow_id,
+                  int_flow_id : Flow_id,
+                  flow_entry  : Flow_entry,
+                  index>
+             each flow_entry <=> (ext_flow_id + int_flow_id)
+             each ext_flow_id is unique
+             each int_flow_id is unique
+             each index is present in the allocator
+
+-- These are DPDK-specific functions that connect the NAT box with the network.
+rte_eth_rx_burst polls network cards for incast packets
+rte_eth_tx_burst hands packets over to a network card
+#+END_SRC
+
+* abstraction function
+This section defines an abstraction function that transforms the implementation state into the abstract state.
+#+BEGIN_SRC haskell 
+Abstraction(double_map, allocator, time,
+            rte_eth_rx_burst returns {incast},
+            rte_eth_tx_burst is called with {outcast}) :=
+  flow_table = 
+    forall (index, timestamp) in allocator
+      such that (time < timestamp + T_EXP) 
+      find (ext_flow_id, int_flow_id, flow_entry, index) in double_map
+      collect (flow_entry, timestamp)
+  network = (incast_packet = {incast}, outcast_packet = {outcast})
+  state = (flow_table, network)
+#+END_SRC

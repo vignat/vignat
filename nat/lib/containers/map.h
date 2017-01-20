@@ -1,6 +1,8 @@
 #ifndef _MAP_H_INCLUDED_
 #define _MAP_H_INCLUDED_
 
+//@ #include "stdex.gh"
+
 typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, void* k2);
 //@ requires [?fr1]keyp(k1, ?kk1) &*& [?fr2]keyp(k2, ?kk2);
 //@ ensures [fr1]keyp(k1, kk1) &*& [fr2]keyp(k2, kk2) &*& (0 == result ? (kk1 != kk2) : (kk1 == kk2));
@@ -68,6 +70,22 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
   ensures true == rp(k, map_get_fp(m, k)) &*&
           mapping(m, addrs, kp, rp, hsh,
                   cap, bbs, kps, khs, vals);
+  @*/
+
+
+/*@
+  lemma void map_no_dup_keys<kt>(list<pair<kt, int> > m);
+  requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
+                   ?cap, ?bbs, ?kps, ?khs, ?vals);
+  ensures mapping(m, addrs, kp, rp, hsh,
+                  cap, bbs, kps, khs, vals) &*&
+          true == no_dups(map(fst, m));
+  @*/
+
+/*@
+  lemma void map_has_to_mem<kt>(list<pair<kt, int> > m, kt k);
+  requires true;
+  ensures map_has_fp(m, k) == mem(k, map(fst, m));
   @*/
 
 /*@

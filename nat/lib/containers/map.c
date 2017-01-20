@@ -91,14 +91,6 @@ int loop(int k, int capacity)
                (head(bbs) == 0 ? ks == cons(none, kst) :
                  ([0.5]pred(head(pts), ?ksh) &*& ks == cons(some(ksh), kst))));
 
-  fixpoint bool no_dups<t>(list<option<t> > l) {
-    switch(l) {
-      case nil: return true;
-      case cons(h,t):
-        return no_dups(t) && (h == none || !(mem(h, t)));
-    }
-  }
-
   fixpoint bool hash_list<kt>(list<option<kt> > vals,
                              list<int> hashes,
                              fixpoint (kt, int) hash) {
@@ -122,7 +114,7 @@ int loop(int k, int capacity)
             ints(busybits, capacity, ?bbs) &*&
             ints(k_hashes, capacity, ?khs) &*&
             pred_mapping(kps, bbs, keyp, ?ks) &*&
-            true == no_dups(ks) &*&
+            true == opt_no_dups(ks) &*&
             true == hash_list(ks, khs, hash) &*&
             m == hmap(ks, khs);
 @*/
@@ -250,8 +242,8 @@ int loop(int k, int capacity)
                              drop(n, ks));
   }
 
-  lemma void no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
-  requires true == no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
+  lemma void opt_no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
+  requires true == opt_no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
            0 <= m &*& m < length(ks) &*&
            nth(n, ks) == some(k) &*& nth(m, ks) == some(k);
   ensures n == m;
@@ -266,13 +258,13 @@ int loop(int k, int capacity)
         } else {
           assert(0<n);
           assert(0<m);
-          no_dups_same(t, k, n-1, m-1);
+          opt_no_dups_same(t, k, n-1, m-1);
         }
     }
   }
 
   lemma void ks_find_this_key<kt>(list<option<kt> > ks, int i, kt k)
-  requires nth(i, ks) == some(k) &*& true == no_dups(ks) &*&
+  requires nth(i, ks) == some(k) &*& true == opt_no_dups(ks) &*&
            0 <= i &*& i < length(ks);
   ensures index_of(some(k), ks) == i;
   {
@@ -280,7 +272,7 @@ int loop(int k, int capacity)
       case nil: return;
       case cons(h,t):
         if (h == some(k)) {
-          no_dups_same(ks, k, i, 0);
+          opt_no_dups_same(ks, k, i, 0);
           assert(i == 0);
           return;
         } else {
@@ -290,7 +282,7 @@ int loop(int k, int capacity)
   }
 
   lemma void hmap_find_this_key<kt>(hmap<kt> m, int i, kt k)
-  requires nth(i, hmap_ks_fp(m)) == some(k) &*& true == no_dups(hmap_ks_fp(m)) &*&
+  requires nth(i, hmap_ks_fp(m)) == some(k) &*& true == opt_no_dups(hmap_ks_fp(m)) &*&
            0 <= i &*& i < length(hmap_ks_fp(m));
   ensures hmap_find_key_fp(m, k) == i;
   {
@@ -668,14 +660,14 @@ int find_empty/*@ <kt> @*/(int* busybits, int start, int capacity)
     }
   }
 
-  lemma void confirm_no_dups_on_nones<kt>(nat len)
+  lemma void confirm_opt_no_dups_on_nones<kt>(nat len)
   requires true;
-  ensures true == no_dups(none_list_fp(len));
+  ensures true == opt_no_dups(none_list_fp(len));
   {
     switch(len) {
       case zero:
         return;
-      case succ(l): confirm_no_dups_on_nones(l);
+      case succ(l): confirm_opt_no_dups_on_nones(l);
     }
   }
 
@@ -820,7 +812,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   //@ assert(drop(i,bbs) == nil);
   //@ open(ints(busybits + i, capacity - i, drop(i,bbs)));
   //@ produce_pred_mapping<kt>(khlist, keyp, kplist);
-  //@ confirm_no_dups_on_nones<kt>(nat_of_int(capacity));
+  //@ confirm_opt_no_dups_on_nones<kt>(nat_of_int(capacity));
   //@ confirm_hash_list_for_nones(khlist, hash);
   //@ assert pointers(keyps, capacity, ?kps);
   //@ close hmapping<kt>(keyp, hash, capacity, busybits, kps, khs, empty_hmap_fp<kt>(capacity, khlist));
@@ -952,7 +944,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   @*/
 
 /*@
-  lemma void remove_unique_no_dups<kt,vt>(list<pair<kt,vt> > m,
+  lemma void remove_unique_opt_no_dups<kt,vt>(list<pair<kt,vt> > m,
                                           pair<kt,vt> kv)
   requires false == map_has_fp(remove(kv, m), fst(kv));
   ensures no_dup_keys(m) == no_dup_keys(remove(kv, m));
@@ -963,7 +955,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
         if (h == kv) {
           assert(remove(kv, m) == t);
         } else {
-          remove_unique_no_dups(t, kv);
+          remove_unique_opt_no_dups(t, kv);
           assert(remove(kv, m) == cons(h, remove(kv, t)));
           assert(m == cons(h,t));
           if (no_dup_keys(remove(kv,m))) {
@@ -1005,8 +997,8 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
     close key_vals(ks, va, m);
   }
 
-  lemma void map_no_dups<kt,vt>(list<option<kt> > ks, list<pair<kt,vt> > m)
-  requires key_vals(ks, ?val_arr, m) &*& true == no_dups(ks);
+  lemma void map_opt_no_dups<kt,vt>(list<option<kt> > ks, list<pair<kt,vt> > m)
+  requires key_vals(ks, ?val_arr, m) &*& true == opt_no_dups(ks);
   ensures key_vals(ks, val_arr, m) &*& true == no_dup_keys(m);
   {
     open key_vals(ks, val_arr, m);
@@ -1015,12 +1007,12 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
         break;
       case cons(h,t):
         if (h == none) {
-          map_no_dups(t, m);
+          map_opt_no_dups(t, m);
         } else {
-          map_no_dups(t, remove(pair(get_some(h), head(val_arr)), m));
+          map_opt_no_dups(t, remove(pair(get_some(h), head(val_arr)), m));
           hmap2map_no_key(t, remove(pair(get_some(h), head(val_arr)), m),
                           get_some(h));
-          remove_unique_no_dups(m, pair(get_some(h), head(val_arr)));
+          remove_unique_opt_no_dups(m, pair(get_some(h), head(val_arr)));
         }
     }
     close key_vals(ks, val_arr, m);
@@ -1042,7 +1034,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
     }
   }
 
-  lemma void map_no_dups_returns_the_key<kt,vt>(list<pair<kt, vt> > m,
+  lemma void map_opt_no_dups_returns_the_key<kt,vt>(list<pair<kt, vt> > m,
                                                 pair<kt, vt> kv)
   requires true == mem(kv, m) &*& true == no_dup_keys(m);
   ensures map_get_fp(m, fst(kv)) == snd(kv);
@@ -1057,7 +1049,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
           if (fst(h) == fst(kv)) {
           }
           assert(fst(h) != fst(kv));
-          map_no_dups_returns_the_key(t, kv);
+          map_opt_no_dups_returns_the_key(t, kv);
         }
     }
   }
@@ -1067,7 +1059,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   lemma void ks_find_returns_the_key<kt,vt>(list<option<kt> > ks,
                                             list<vt> val_arr,
                                             list<pair<kt, vt> > m, kt k)
-  requires key_vals(ks, val_arr, m) &*& true == no_dups(ks) &*&
+  requires key_vals(ks, val_arr, m) &*& true == opt_no_dups(ks) &*&
            true == mem(some(k), ks);
   ensures key_vals(ks, val_arr, m) &*&
           nth(index_of(some(k), ks), val_arr) == map_get_fp(m, k);
@@ -1077,7 +1069,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
         open key_vals(ks, val_arr, m);
         close key_vals(ks, val_arr, m);
       case cons(h,t):
-        map_no_dups(ks, m);
+        map_opt_no_dups(ks, m);
         open key_vals(ks, val_arr, m);
         if (h == some(k)) {
           nth_0_head(val_arr);
@@ -1085,7 +1077,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
           assert(nth(0, val_arr) == head(val_arr));
           assert(nth(index_of(some(k), ks), val_arr) == head(val_arr));
           assert(true == mem(pair(k,head(val_arr)), m));
-          map_no_dups_returns_the_key(m, pair(k, head(val_arr)));
+          map_opt_no_dups_returns_the_key(m, pair(k, head(val_arr)));
           assert(map_get_fp(m, k) == head(val_arr));
         } else if (h == none) {
           ks_find_returns_the_key(t, tail(val_arr), m, k);
@@ -1115,7 +1107,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                               list<vt> val_arr,
                                               list<pair<kt, vt> > m, kt k)
   requires key_vals(hmap_ks_fp(hm), val_arr, m) &*&
-           true == no_dups(hmap_ks_fp(hm)) &*&
+           true == opt_no_dups(hmap_ks_fp(hm)) &*&
            true == hmap_exists_key_fp(hm, k);
   ensures key_vals(hmap_ks_fp(hm), val_arr, m) &*&
           nth(hmap_find_key_fp(hm, k), val_arr) == map_get_fp(m, k);
@@ -1251,16 +1243,16 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
   @*/
 
 /*@
-  lemma void put_preserves_no_dups<kt>(list<option<kt> > ks, int i, kt k)
-  requires false == mem(some(k), ks) &*& true == no_dups(ks);
-  ensures true == no_dups(update(i, some(k), ks));
+  lemma void put_preserves_opt_no_dups<kt>(list<option<kt> > ks, int i, kt k)
+  requires false == mem(some(k), ks) &*& true == opt_no_dups(ks);
+  ensures true == opt_no_dups(update(i, some(k), ks));
   {
     switch(ks) {
       case nil: break;
       case cons(h,t):
         if (i == 0) {
         } else {
-          put_preserves_no_dups(t, i-1, k);
+          put_preserves_opt_no_dups(t, i-1, k);
           if (h == none) {
           } else {
             assert(false == mem(h, t));
@@ -1324,7 +1316,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                                                     list<pair<kt,vt> > m,
                                                     int i, kt k, vt v)
   requires key_vals(ks, vals, m) &*&
-           nth(i, ks) == none &*& 0 <= i &*&
+           nth(i, ks) == none &*& 0 <= i &*& i < length(ks) &*&
            false == mem(some(k), ks);
   ensures key_vals(update(i, some(k), ks), update(i, v, vals),
                    map_put_fp(m, k, v));
@@ -1409,9 +1401,10 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
   }
   //@ open hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hm);
   //@ assert pred_mapping(kps, ?bbs, kp, ?ks);
+  //@ pred_mapping_same_len(bbs, ks);
   //@ put_keeps_pred_mapping(kps, bbs, kp, ks, index, keyp, k);
   //@ hmap_exists_iff_map_has(hm, m, k);
-  //@ put_preserves_no_dups(ks, index, k);
+  //@ put_preserves_opt_no_dups(ks, index, k);
   //@ assert(hm == hmap(ks, ?khs));
   //@ assert(ints(values, capacity, ?vals));
   //@ hmap_coherent_hash_update(ks, khs, hsh, index, k, hash);
@@ -1435,7 +1428,8 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                                                  predicate (void*;kt) keyp,
                                                  list<option<kt> > ks,
                                                  int i)
-  requires pred_mapping(kps, bbs, keyp, ks) &*& 0 <= i &*& nth(i, ks) == some(?k);
+  requires pred_mapping(kps, bbs, keyp, ks) &*& 0 <= i &*& i < length(ks) &*&
+           nth(i, ks) == some(?k);
   ensures pred_mapping(kps, update(i, 0, bbs), keyp, update(i, none, ks)) &*&
           [0.5]keyp(nth(i, kps), k);
   {
@@ -1470,16 +1464,16 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
     }
   }
 
-  lemma void hmap_rem_preserves_no_dups<kt>(list<option<kt> > ks, int i)
-  requires true == no_dups(ks) &*& 0 <= i;
-  ensures true == no_dups(update(i, none, ks));
+  lemma void hmap_rem_preserves_opt_no_dups<kt>(list<option<kt> > ks, int i)
+  requires true == opt_no_dups(ks) &*& 0 <= i;
+  ensures true == opt_no_dups(update(i, none, ks));
   {
     switch(ks) {
      case nil: return;
      case cons(h,t):
        if (i == 0) {
        } else {
-         hmap_rem_preserves_no_dups(t, i-1);
+         hmap_rem_preserves_opt_no_dups(t, i-1);
          if (h == none){
          } else {
            assert(false == mem(h, t));
@@ -1540,7 +1534,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
     }
   }
 
-  lemma void map_no_dups_has_that_pair<kt,vt>(pair<kt,vt> mh,
+  lemma void map_opt_no_dups_has_that_pair<kt,vt>(pair<kt,vt> mh,
                                               list<pair<kt,vt> > mt,
                                               kt k, vt v)
   requires true == no_dup_keys(cons(mh,mt)) &*&
@@ -1563,7 +1557,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
       case nil: break;
       case cons(h,t):
         if (fst(h) == k) {
-          map_no_dups_has_that_pair(h, t, k, v);
+          map_opt_no_dups_has_that_pair(h, t, k, v);
           assert(h == pair(k,v));
         } else {
           map_erase_that_key(t, k, v);
@@ -1612,7 +1606,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                                               list<pair<kt,vt> > m,
                                               int i, kt k)
   requires key_vals(ks, ?vals, m) &*& nth(i, ks) == some(k) &*&
-           true == no_dup_keys(m) &*& true == no_dups(ks) &*&
+           true == no_dup_keys(m) &*& true == opt_no_dups(ks) &*&
            0 <= i &*& i < length(ks);
   ensures key_vals(update(i, none, ks), vals, map_erase_fp(m, k));
   {
@@ -1635,7 +1629,7 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
           } else {
             hmap2map_no_key(t, remove(pair(get_some(h), head(vals)), m),
                             get_some(h));
-            remove_unique_no_dups(m, pair(get_some(h), head(vals)));
+            remove_unique_opt_no_dups(m, pair(get_some(h), head(vals)));
             ks_rem_map_erase_coherent(t, remove(pair(get_some(h),
                                                      head(vals)), m),
                                       i-1, k);
@@ -1662,12 +1656,12 @@ int map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* values,
                                                 int i, kt k)
   requires key_vals(hmap_ks_fp(hm), ?vals, m) &*&
            nth(i, hmap_ks_fp(hm)) == some(k) &*&
-           true == no_dups(hmap_ks_fp(hm)) &*&
+           true == opt_no_dups(hmap_ks_fp(hm)) &*&
            0 <= i &*& i < length(hmap_ks_fp(hm));
   ensures key_vals(hmap_ks_fp(hmap_rem_key_fp(hm, i)),
                    vals, map_erase_fp(m, k));
   {
-     map_no_dups(hmap_ks_fp(hm), m);
+     map_opt_no_dups(hmap_ks_fp(hm), m);
      hmap_ks_hmap_rm(hm, i);
      ks_rem_map_erase_coherent(hmap_ks_fp(hm), m, i, k);
   }
@@ -1719,7 +1713,7 @@ int map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, void* keyp
   //@ hmap_find_returns_the_key(hm, kps, addrs, k);
   //@ mem_nth_index_of(some(k), ks);
   //@ hmap_rem_preserves_pred_mapping(kps, bbs, kp, ks, index);
-  //@ hmap_rem_preserves_no_dups(ks, index);
+  //@ hmap_rem_preserves_opt_no_dups(ks, index);
   //@ hmap_rem_preserves_hash_list(ks, khs, hsh, index);
   //@ close hmapping(kp, hsh, capacity, busybits, kps, k_hashes, hmap_rem_key_fp(hm, index));
   //@ map_erase_preserves_rec_props(m, recp, k);
@@ -1791,7 +1785,7 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
                   pointers(keyps, capacity, kps) &*&
                   ints(k_hashes, capacity, khs) &*&
                   pred_mapping(kps, bbs, kp, ks) &*&
-                  true == no_dups(ks) &*&
+                  true == opt_no_dups(ks) &*&
                   true == hash_list(ks, khs, hsh) &*&
                   hm == hmap(ks, khs) &*&
                   count(take(i, bbs), nonzero) == s &*&
@@ -1825,5 +1819,56 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
     open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
     map_extract_recp(m, k, rp);
     close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+  }
+  @*/
+
+
+/*@
+  lemma void map_has_to_mem<kt>(list<pair<kt, int> > m, kt k)
+  requires true;
+  ensures map_has_fp(m, k) == mem(k, map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          if (key != k) map_has_to_mem(t, k);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void no_dup_keys_to_no_dups<kt>(list<pair<kt, int> > m)
+  requires true;
+  ensures no_dup_keys(m) == no_dups(map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          no_dup_keys_to_no_dups(t);
+          map_has_to_mem(t, key);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_no_dup_keys<kt>(list<pair<kt, int> > m)
+  requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
+                   ?cap, ?bbs, ?kps, ?khs, ?vals);
+  ensures mapping(m, addrs, kp, rp, hsh,
+                  cap, bbs, kps, khs, vals) &*&
+          true == no_dups(map(fst, m));
+  {
+    open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    open hmapping(kp, hsh, cap, ?busybits, ?lkps, khs, ?hm);
+    assert pred_mapping(lkps, ?lbbs, kp, ?ks);
+    map_opt_no_dups(ks, m);
+    close hmapping(kp, hsh, cap, busybits, lkps, khs, hm);
+    close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, vals);
+    no_dup_keys_to_no_dups(m);
   }
   @*/

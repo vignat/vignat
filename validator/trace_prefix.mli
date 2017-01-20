@@ -14,6 +14,13 @@ type ptee = { before : struct_val; after : struct_val; }
 val __ptee_of_sexp__ : expr -> ptee
 val ptee_of_sexp : expr -> ptee
 val sexp_of_ptee : ptee -> expr
+type ex_ptee =
+    Opening of struct_val
+  | Closing of struct_val
+  | Changing of (struct_val * struct_val)
+val __ex_ptee_of_sexp__ : expr -> ex_ptee
+val ex_ptee_of_sexp : expr -> ex_ptee
+val sexp_of_ex_ptee : ex_ptee -> expr
 type pointer = Nonptr | Funptr of bytes | Apathptr | Curioptr of ptee
 val __pointer_of_sexp__ : expr -> pointer
 val pointer_of_sexp : expr -> pointer
@@ -22,7 +29,7 @@ type arg = { aname : bytes; value : expr; ptr : pointer; }
 val __arg_of_sexp__ : expr -> arg
 val arg_of_sexp : expr -> arg
 val sexp_of_arg : arg -> expr
-type extra_ptr = { pname : bytes; value : int64; ptee : ptee; }
+type extra_ptr = { pname : bytes; value : int64; ptee : ex_ptee; }
 val __extra_ptr_of_sexp__ : expr -> extra_ptr
 val extra_ptr_of_sexp : expr -> extra_ptr
 val sexp_of_extra_ptr : extra_ptr -> expr

@@ -11,7 +11,8 @@
               case nil: return len == 0;
               case cons(h,t):
                 return lcore_confp(h, lcp) &*&
-                       lcore_conf_arrp(lcp+1,len-1,t);
+                       lcore_conf_arrp(lcp+1,len-1,t) &*&
+                       h == lcore_confi(2);
             };
 
   predicate arrp_lcc(list<lcore_confi> data, struct ArrayLcc *arr) =
@@ -38,7 +39,7 @@
 
 static void lcore_conf_condition(struct lcore_conf *cell)
 //@ requires chars((void*)cell, sizeof(struct lcore_conf), _);
-//@ ensures lcore_confp(_, cell);
+//@ ensures lcore_confp(lcore_confi(2), cell);
 {
   //@ close_struct(cell);
 #ifdef KLEE_VERIFICATION
@@ -47,7 +48,7 @@ static void lcore_conf_condition(struct lcore_conf *cell)
   klee_assume(0 <= cell->n_rx_queue);
   klee_assume(cell->n_rx_queue < MAX_RX_QUEUE_PER_LCORE);
 #else//KLEE_VERIFICATION
-  cell->n_rx_queue = 0;
+  cell->n_rx_queue = 2;
 #endif//KLEE_VERIFICATION
   array_rq_init(&cell->rx_queue_list);
   array_u16_init(&cell->tx_queue_id);
@@ -138,7 +139,8 @@ void array_lcc_end_access(struct ArrayLcc *arr)
 /*@
   lemma void append_to_arr(ARRAY_LCC_EL_TYPE* arr, ARRAY_LCC_EL_TYPE* el)
   requires lcore_conf_arrp(arr, ?len, ?lst) &*& lcore_confp(?v, el) &*&
-           el == (arr + len) &*& len == length(lst);
+           el == (arr + len) &*& len == length(lst) &*&
+           v == lcore_confi(2);
   ensures lcore_conf_arrp(arr, len+1, append(lst, cons(v, nil)));
   {
     close ptrs_eq(el, len, arr);
@@ -211,7 +213,8 @@ void array_lcc_init(struct ArrayLcc *arr_out)
   requires lcore_conf_arrp(arr, ?len, ?lst) &*& 0 <= idx &*& idx < len;
   ensures lcore_conf_arrp(arr, idx, take(idx, lst)) &*&
           lcore_confp(nth(idx, lst), arr + idx) &*&
-          lcore_conf_arrp(arr+idx+1, len - idx - 1, drop(idx+1,lst));
+          lcore_conf_arrp(arr+idx+1, len - idx - 1, drop(idx+1,lst)) &*&
+          nth(idx, lst) == lcore_confi(2);
   {
     open lcore_conf_arrp(arr, len, lst);
     switch(lst) {
@@ -232,7 +235,8 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
 //@ requires arrp_lcc(?lst, arr) &*& 0 <= index &*& index < ARRAY_LCC_CAPACITY;
 /*@ ensures arrp_lcc_acc(lst, arr, index) &*&
             result == arrp_the_missing_cell_lcc(arr, index) &*&
-            lcore_confp(nth(index, lst), result);
+            lcore_confp(nth(index, lst), result) &*&
+            nth(index, lst) == lcore_confi(2);
   @*/
 {
   //@ open arrp_lcc(lst, arr);
@@ -250,7 +254,8 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
            lcore_confp(nth(idx, lst), arr + idx) &*&
            lcore_conf_arrp(arr+idx+1, length(lst) - idx - 1,
                            drop(idx+1,lst)) &*&
-           0 <= idx &*& idx < length(lst);
+           0 <= idx &*& idx < length(lst) &*&
+           nth(idx, lst) == lcore_confi(2);
   ensures lcore_conf_arrp(arr, length(lst), lst);
   {
     open lcore_conf_arrp(arr, idx, take(idx, lst));
@@ -268,7 +273,8 @@ ARRAY_LCC_EL_TYPE *array_lcc_begin_access(struct ArrayLcc *arr, int index)
 
 void array_lcc_end_access(struct ArrayLcc *arr)
 /*@ requires arrp_lcc_acc(?lst, arr, ?idx) &*&
-             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)); @*/
+             lcore_confp(?lc, arrp_the_missing_cell_lcc(arr, idx)) &*&
+             lc == lcore_confi(2); @*/
 /*@ ensures arrp_lcc(update(idx, lc, lst), arr) &*&
             length(update(idx, lc, lst)) == ARRAY_LCC_CAPACITY; @*/
 {
@@ -289,7 +295,7 @@ void array_lcc_end_access(struct ArrayLcc *arr)
            arrp_u16(_, &p->tx_queue_id) &*&
            arrp_bat(_, &p->tx_mbufs) &*&
            struct_lcore_conf_padding(p);
-  ensures lcore_confp(_, p);
+  ensures lcore_confp(lcore_confi(nrq), p);
   {
     close lcore_confp(lcore_confi(nrq), p);
   }

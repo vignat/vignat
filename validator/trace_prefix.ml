@@ -9,6 +9,11 @@ and struct_val = {full: expr option; break_down: field list;} with sexp
 
 type ptee = {before: struct_val; after: struct_val;} with sexp
 
+type ex_ptee = Opening of struct_val
+             | Closing of struct_val
+             | Changing of (struct_val*struct_val)
+with sexp
+
 type pointer =
   | Nonptr
   | Funptr of string
@@ -18,7 +23,7 @@ with sexp
 
 type arg = {aname: string; value: expr; ptr: pointer;} with sexp
 
-type extra_ptr = {pname: string; value: int64; ptee: ptee;} with sexp
+type extra_ptr = {pname: string; value: int64; ptee: ex_ptee;} with sexp
 
 type ret = {value: expr; ptr: pointer;} with sexp
 

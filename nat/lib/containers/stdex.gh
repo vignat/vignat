@@ -51,6 +51,17 @@ ensures nth(length(lst), append(lst, cons(x, nil))) == x;
     }
 }
 
+lemma void append_take_nth_to_take<T>(list<T> lst, int n)
+requires 0 <= n &*& n < length(lst);
+ensures take(n + 1, lst) == append(take(n, lst), cons(nth(n, lst), nil));
+{
+  switch(lst) {
+    case nil:
+    case cons(h,t):
+      if (0 != n) append_take_nth_to_take(t, n - 1);
+  }
+}
+
 lemma void nth_less_append_cons<T>(int n, list<T> lst, T x)
 requires 0 <= n &*& n < length(lst);
 ensures nth(n, append(lst, cons(x, nil))) == nth(n, lst);
@@ -326,6 +337,17 @@ ensures drop(n+1, lst) == tail(drop(n, lst));
       } else {
         tail_drop(t, n-1);
       }
+  }
+}
+
+lemma void drop_cons<t>(list<t> lst, int n)
+requires 0 <= n &*& n < length(lst);
+ensures drop(n, lst) == cons(nth(n, lst), drop(n+1, lst));
+{
+  switch(lst) {
+    case nil:
+    case cons(h,t):
+      if (n != 0) drop_cons(t, n - 1);
   }
 }
 
@@ -742,6 +764,63 @@ ensures append(a, b) != nil;
       case cons(h,t):
         if (n == 1) return;
         else head_take(n-1, t);
+    }
+  }
+
+fixpoint bool no_dups<t>(list<t> l) {
+  switch(l) {
+    case nil: return true;
+    case cons(h,t):
+      return (!mem(h,t)) &&
+             no_dups(t);
+  }
+}
+
+  lemma void subset_forall<t>(list<t> xs, list<t> ys, fixpoint (t,bool) prop)
+  requires true == subset(xs, ys) &*& true == forall(ys, prop);
+  ensures true == forall(xs, prop);
+  {
+    switch(xs) {
+      case nil: return;
+      case cons(h,t):
+        forall_mem(h, ys, prop);
+        subset_forall(t, ys, prop);
+    }
+  }
+
+
+fixpoint bool ge(int x, int y) { return x <= y; }
+
+fixpoint bool lt(int x, int y) { return y < x; }
+
+  lemma void ge_le_ge(list<int> l, int i, int x)
+  requires x <= i &*& true == forall(l, (ge)(i));
+  ensures true == forall(l, (ge)(x));
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        ge_le_ge(t, i, x);
+    }
+  }
+
+  fixpoint bool opt_no_dups<t>(list<option<t> > l) {
+    switch(l) {
+      case nil: return true;
+      case cons(h,t):
+        return opt_no_dups(t) && (h == none || !(mem(h, t)));
+    }
+  }
+
+  lemma void subset_map<t1,t2>(fixpoint (t1,t2) f, list<t1> l1, list<t1> l2)
+  requires true == subset(l1, l2);
+  ensures true == subset(map(f, l1), map(f, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        subset_map(f, t, l2);
+        mem_map(h, l2, f);
     }
   }
 

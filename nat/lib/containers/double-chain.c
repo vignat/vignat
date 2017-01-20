@@ -26,16 +26,6 @@ struct DoubleChain {
     }
   }
 
-  fixpoint bool bnd_sorted_fp(list<uint32_t> times,
-                              uint32_t low, uint32_t high) {
-    switch(times) {
-      case nil: return true;
-      case cons(h,t):
-        return low <= h && h <= high &&
-               bnd_sorted_fp(t, h, high);
-    }
-  }
-
   predicate double_chainp(dchain ch,
                           struct DoubleChain* cp) =
       switch(ch) { case dchain(alist, index_range, low, high):
@@ -1087,6 +1077,16 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     open dchain_is_sortedp(ch);
   }
   @*/
+/*@
+  lemma void double_chain_alist_is_sorted(dchain ch)
+  requires double_chainp(ch, ?cp);
+  ensures double_chainp(ch, cp) &*&
+          true == dchain_sorted_fp(ch);
+  {
+    open double_chainp(ch, cp);
+    close double_chainp(ch, cp);
+  }
+  @*/
 
 /*@
   lemma void expire_n_plus_one(dchain ch, uint32_t time, int n)
@@ -1553,19 +1553,6 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   @*/
 
 /*@
-  lemma void drop_cons<t>(list<t> l, int n)
-  requires 0 <= n &*& n < length(l);
-  ensures drop(n, l) == cons(nth(n, l), drop(n+1, l));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (0 < n) drop_cons(t, n-1);
-    }
-  }
-  @*/
-
-/*@
   lemma void mem_remove_drop<t>(list<t> l, int i, t x, t y)
   requires false == mem(y, remove(x, l)) &*& 0 <= i;
   ensures false == mem(y, remove(x, drop(i, l)));
@@ -1626,6 +1613,23 @@ int dchain_expire_one_index(struct DoubleChain* chain,
     dchaini_alist_distinct(chi);
     close double_chainp(ch, chain);
     close dchain_nodups(ch);
+  }
+  @*/
+
+/*@
+  lemma void dchain_distinct_indexes(dchain ch)
+  requires double_chainp(ch, ?chain);
+  ensures double_chainp(ch, chain) &*&
+          true == distinct(dchain_indexes_fp(ch));
+  {
+    open double_chainp(ch, chain);
+    assert dchainip(?chi, ?cells);
+    assert uints(_, _, ?tstamps);
+    switch(ch) { case dchain(alist, ir, lo, hi):
+      indexes_is_dci_alist(alist, tstamps, dchaini_alist_fp(chi));
+    }
+    dchaini_alist_distinct(chi);
+    close double_chainp(ch, chain);
   }
   @*/
 

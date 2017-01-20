@@ -9,6 +9,20 @@
 
 /*@
 
+lemma void coherent_same_indexes<t1,t2,vt>
+             (dmap<t1,t2,vt> m, dchain ch)
+requires dmap_dchain_coherent(m, ch);
+ensures dmap_dchain_coherent(m, ch) &*&
+        true == subset(dchain_indexes_fp(ch), dmap_indexes_used_fp(m)) &*&
+        true == subset(dmap_indexes_used_fp(m), dchain_indexes_fp(ch));
+{
+  open dmap_dchain_coherent(m, ch);
+  close dmap_dchain_coherent(m, ch);
+}
+@*/
+
+/*@
+
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len)
 requires 0 <= len;
 ensures dmap_dchain_coherent<t1,t2,vt>
