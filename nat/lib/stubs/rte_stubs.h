@@ -805,10 +805,6 @@ rte_get_closest_next_lcore(unsigned i, int skip_master, int wrap)
     return i;
 }
 
-typedef struct s__m128i {
-    uint64_t least;
-    uint64_t most;
-} __m128i;
 
 struct user_buf {
   //uint8_t some_data[100];
