@@ -812,6 +812,18 @@ fixpoint bool lt(int x, int y) { return y < x; }
     }
   }
 
+  lemma void subset_map<t1,t2>(fixpoint (t1,t2) f, list<t1> l1, list<t1> l2)
+  requires true == subset(l1, l2);
+  ensures true == subset(map(f, l1), map(f, l2));
+  {
+    switch(l1) {
+      case nil:
+      case cons(h,t):
+        subset_map(f, t, l2);
+        mem_map(h, l2, f);
+    }
+  }
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

@@ -150,6 +150,23 @@ struct DoubleChain;
     }
   }
 
+  fixpoint bool bnd_sorted_fp(list<uint32_t> times,
+                              uint32_t low, uint32_t high) {
+    switch(times) {
+      case nil: return true;
+      case cons(h,t):
+        return low <= h && h <= high &&
+               bnd_sorted_fp(t, h, high);
+    }
+  }
+
+  fixpoint bool dchain_sorted_fp(dchain ch) {
+    switch(ch) { case dchain(alist, index_range, low, high):
+      return bnd_sorted_fp(map(snd, alist), low, high);
+    }
+  }
+
+
   lemma void expire_old_dchain_nonfull(struct DoubleChain* chain, dchain ch,
                                        uint32_t time);
   requires double_chainp(ch, chain) &*&
@@ -181,6 +198,11 @@ struct DoubleChain;
   lemma void double_chainp_to_sorted(dchain ch);
   requires double_chainp(ch, ?cp);
   ensures double_chainp(ch, cp) &*& dchain_is_sortedp(ch);
+
+  lemma void double_chain_alist_is_sorted(dchain ch);
+  requires double_chainp(ch, ?cp);
+  ensures double_chainp(ch, cp) &*&
+          true == dchain_sorted_fp(ch);
 
   lemma void destroy_dchain_is_sortedp(dchain ch);
   requires dchain_is_sortedp(ch);

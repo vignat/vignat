@@ -1136,14 +1136,228 @@ ensures dmap_dchain_coherent(m, ch) &*&
   }
   @*/
 
+
+/*@
+  lemma void remove_by_index_dec_len(list<pair<int, uint32_t> > alist, int i)
+  requires true;
+  ensures length(alist) <= 1 + length(remove_by_index_fp(alist, i));
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          if (ind != i) remove_by_index_dec_len(t, i);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void fold_remove_by_index_dec_len(list<pair<int, uint32_t> > alist,
+                                          list<int> indices)
+  requires true;
+  ensures length(alist) <=
+          length(indices) + length(fold_left(alist, remove_by_index_fp, indices));
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        remove_by_index_dec_len(alist, h);
+        fold_remove_by_index_dec_len(remove_by_index_fp(alist, h), t);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void expired_indexes_sublen(list<pair<int, uint32_t> > alist,
+                                    uint32_t time)
+  requires true;
+  ensures length(get_expired_indexes_fp(time, alist)) <= length(alist);
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          expired_indexes_sublen(t, time);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void sorted_head_non_expired_no_expired(int ind,
+                                                uint32_t tstmp,
+                                                list<pair<int, uint32_t> > tl,
+                                                uint32_t time,
+                                                uint32_t low, uint32_t high)
+  requires time <= tstmp &*&
+           true == bnd_sorted_fp(map(snd, cons(pair(ind,tstmp),tl)), low, high);
+  ensures get_expired_indexes_fp(time, cons(pair(ind,tstmp),tl)) == nil;
+  {
+    switch(tl) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key0,tstmp0):
+          sorted_head_non_expired_no_expired(key0, tstmp0, t,
+                                             time, tstmp, high);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void expired_indexes_just_take_first(list<pair<int, uint32_t> > alist,
+                                             uint32_t time,
+                                             uint32_t low, uint32_t high)
+  requires true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures get_expired_indexes_fp(time, alist) ==
+          take(length(get_expired_indexes_fp(time, alist)), map(fst, alist));
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+          if (tstmp < time) {
+            expired_indexes_just_take_first(t, time, tstmp, high);
+          } else {
+            sorted_head_non_expired_no_expired
+              (ind, tstmp, t, time, low, high);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void remove_by_first_index_is_tail(list<pair<int, uint32_t> > lst)
+  requires true;
+  ensures remove_by_index_fp(lst, head(map(fst, lst))) == tail(lst);
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind,tstmp):
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void nth_map_head_map_drop<t1,t2>(list<t1> lst, int i,
+                                          fixpoint (t1,t2) f)
+  requires true;
+  ensures nth(i, map(f, lst)) == head(map(f, drop(i, lst)));
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        if (i != 0)
+          nth_map_head_map_drop(t, i - 1, f);
+    }
+  }
+  @*/
+
+/*@
+  lemma void sorted_remove_by_indexes_is_drop(list<pair<int, uint32_t> > alist,
+                                              uint32_t time, int n,
+                                              uint32_t low, uint32_t high)
+  requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
+           true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures fold_left(alist, remove_by_index_fp,
+                    take(n, get_expired_indexes_fp(time, alist))) ==
+          drop(n, alist);
+  {
+    int i = 0;
+    list<int> re_indices = get_expired_indexes_fp(time, alist);
+    for (; i < n; ++i)
+      invariant 0 <= i &*& i <= n &*& n < length(re_indices) &*&
+                fold_left(alist, remove_by_index_fp,
+                          take(i, re_indices)) ==
+                drop(i, alist);
+      decreases n - i;
+    {
+      fold_left_append(alist, remove_by_index_fp,
+                       take(i, re_indices),
+                       cons(nth(i, re_indices), nil));
+      expired_indexes_sublen(alist, time);
+      expired_indexes_just_take_first(alist, time, low, high);
+      map_preserves_length(fst, alist);
+      nth_take(i, length(get_expired_indexes_fp(time, alist)), map(fst, alist));
+      assert nth(i, re_indices) == nth(i, map(fst, alist));
+      nth_map_head_map_drop(alist, i, fst);
+      assert nth(i, map(fst, alist)) == head(map(fst, drop(i, alist)));
+      remove_by_first_index_is_tail(drop(i, alist));
+      tail_drop(alist, i);
+      append_take_nth_to_take(re_indices, i);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void drop_too_few_still_expired(list<pair<int, uint32_t> > alist,
+                                        uint32_t time, int n,
+                                        uint32_t low, uint32_t high)
+  requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
+           true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures n < length(alist) &*& snd(nth(n, alist)) < time;
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind, tstmp):
+          if (time <= tstmp) {
+            sorted_head_non_expired_no_expired(ind, tstmp, t, time, low, high);
+            assert length(get_expired_indexes_fp(time, alist)) == 0;
+          }
+          assert tstmp < time;
+          if (0 < n) {
+            drop_too_few_still_expired(t, time, n - 1, tstmp, high);
+          }
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void alist_expire_some_still_olds_left(list<pair<int, uint32_t> > alist,
+                                               uint32_t time, int n,
+                                               uint32_t low, uint32_t high)
+  requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
+           true == bnd_sorted_fp(map(snd, alist), low, high);
+  ensures snd(head(fold_left(alist, remove_by_index_fp,
+                             take(n, get_expired_indexes_fp(time, alist))))) <
+          time;
+  {
+    sorted_remove_by_indexes_is_drop(alist, time, n, low, high);
+    expired_indexes_sublen(alist, time);
+    drop_cons(alist, n);
+    assert head(drop(n, alist)) == nth(n, alist);
+    drop_too_few_still_expired(alist, time, n, low, high);
+  }
+  @*/
+
 /*@
   lemma void dchain_expire_some_still_olds_left(dchain ch,
                                                 uint32_t time, int count)
-  requires count < length(dchain_get_expired_indexes_fp(ch, time));
+  requires 0 <= count &*&
+           count < length(dchain_get_expired_indexes_fp(ch, time)) &*&
+           true == dchain_sorted_fp(ch);
   ensures false == dchain_is_empty_fp(expire_n_indexes(ch, time, count)) &*&
           dchain_get_oldest_time_fp(expire_n_indexes(ch, time, count)) < time;
   {
-    assume(false);//TODO
+
+    switch(ch) { case dchain(alist, index_range, low, high):
+      fold_remove_by_index_dec_len(alist,
+                                    take(count, get_expired_indexes_fp(time,
+                                                                      alist)));
+      take_effect_on_len(get_expired_indexes_fp(time, alist), count);
+      expired_indexes_sublen(alist, time);
+      alist_expire_some_still_olds_left(alist, time, count, low, high);
+    }
   }
   @*/
 
@@ -1167,6 +1381,84 @@ ensures dmap_dchain_coherent(m, ch) &*&
   }
   @*/
 
+/*@
+  lemma void alist_remove_other_same_mem(list<pair<int, uint32_t> > alist,
+                                         int i1,
+                                         uint32_t tstmp,
+                                         int i2)
+  requires i1 != i2;
+  ensures mem(pair(i1,tstmp), alist) == mem(pair(i1,tstmp),
+                                            remove_by_index_fp(alist, i2));
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(ind, time):
+          if (h != pair(i1,tstmp)) {
+            if (ind != i2) {
+              alist_remove_other_same_mem(t, i1, tstmp, i2);
+            }
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void alist_remove_one_subset(list<pair<int, uint32_t> > alist, int idx)
+  requires true;
+  ensures true == subset(remove_by_index_fp(alist, idx), alist);
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(i,tstmp):
+          if (i != idx) {
+            alist_remove_one_subset(t, idx);
+            add_extra_preserves_subset(remove_by_index_fp(t, idx), t, h);
+            assert true == subset(remove_by_index_fp(t, idx), alist);
+            assert true == subset(remove_by_index_fp(alist, idx), alist);
+            alist_remove_other_same_mem(t, i, tstmp, idx);
+          } else {
+            subset_refl(t);
+            add_extra_preserves_subset(t, t, h);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void alist_remove_many_subset(list<pair<int, uint32_t> > alist,
+                                      list<int> indices)
+  requires true;
+  ensures true == subset(fold_left(alist, remove_by_index_fp, indices),
+                         alist);
+  {
+    switch(indices) {
+      case nil: subset_refl(alist);
+      case cons(h,t):
+        alist_remove_one_subset(alist, h);
+        alist_remove_many_subset(remove_by_index_fp(alist, h), t);
+        subset_trans(fold_left(alist, remove_by_index_fp, indices),
+                     remove_by_index_fp(alist, h),
+                     alist);
+    }
+  }
+  @*/
+
+/*@
+  lemma void alist_indices_remove_subset(list<pair<int, uint32_t> > alist,
+                                         list<int> indices)
+  requires true;
+  ensures true == subset(map(fst, fold_left(alist,
+                                            remove_by_index_fp, indices)),
+                         map(fst, alist));
+  {
+    alist_remove_many_subset(alist, indices);
+    subset_map(fst, fold_left(alist, remove_by_index_fp, indices), alist);
+  }
+  @*/
 
 /*@
   lemma void dchain_indexes_expire_n_subset(dchain ch, uint32_t time, int n)
@@ -1174,7 +1466,10 @@ ensures dmap_dchain_coherent(m, ch) &*&
   ensures true == subset(dchain_indexes_fp(expire_n_indexes(ch, time, n)),
                          dchain_indexes_fp(ch));
   {
-    assume(false);//TODO 
+    switch(ch) { case dchain(alist, index_range, low, high):
+      alist_indices_remove_subset(alist,
+                                  take(n, get_expired_indexes_fp(time, alist)));
+    }
   }
   @*/
 
@@ -1214,7 +1509,6 @@ ensures dmap_dchain_coherent(m, ch) &*&
   }
   @*/
 
-
 /*@
   lemma void dchain_expire_n_still_distinct(dchain ch, uint32_t time, int n)
   requires true == distinct(dchain_indexes_fp(ch)) &*&
@@ -1244,7 +1538,6 @@ ensures dmap_dchain_coherent(m, ch) &*&
   }
   @*/
 
-
 /*@
   lemma void oldest_index_is_mem_of_indices(dchain ch)
   requires false == dchain_is_empty_fp(ch);
@@ -1261,13 +1554,242 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
+  fixpoint list<option<vt> > erase_vals_fp<vt>(list<option<vt> > vals,
+                                               list<int> indices) {
+    switch(indices) {
+      case nil: return vals;
+      case cons(h,t):
+        return update(h, none, erase_vals_fp(vals, t));
+    }
+  }
+
+  fixpoint bool vals_use_ind_fp<vt>(list<option<vt> > vals, int i) {
+    return 0 <= i && i < length(vals) && nth(i, vals) != none;
+  }
+  @*/
+
+/*@
+  lemma void dmap_used_as_vals_use<t1,t2,vt>(list<pair<t1, int> > m1,
+                                             list<pair<t2, int> > m2,
+                                             list<option<vt> > vals,
+                                             int i)
+  requires true;
+  ensures dmap_index_used_fp(dmap(m1, m2, vals), i) == vals_use_ind_fp(vals, i);
+  {
+    switch(vals) {
+      case nil:
+      case cons(h,t):
+        switch(h) {
+          case none:
+          case some(v):
+        }
+        if (i != 0) dmap_used_as_vals_use(m1, m2, t, i - 1);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void dmap_used_as_vals_use_forall<t1,t2,vt>(list<pair<t1, int> > m1,
+                                                    list<pair<t2, int> > m2,
+                                                    list<option<vt> > vals,
+                                                    list<int> indices)
+  requires true;
+  ensures forall(indices, (dmap_index_used_fp)(dmap(m1, m2, vals))) ==
+          forall(indices, (vals_use_ind_fp)(vals));
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        dmap_used_as_vals_use(m1, m2, vals, h);
+        dmap_used_as_vals_use_forall(m1, m2, vals, t);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void dmap_erase_erase_vals<t1,t2,vt>(list<pair<t1, int> > m1,
+                                             list<pair<t2, int> > m2,
+                                             list<option<vt> > vals,
+                                             list<int> indices,
+                                             fixpoint (vt,t1) vk1,
+                                             fixpoint (vt,t2) vk2)
+  requires true;
+  ensures dmap_erase_all_fp(dmap(m1, m2, vals), indices, vk1, vk2) ==
+          dmap(?nm1, ?nm2, ?nvals) &*&
+          nvals == erase_vals_fp(vals, indices);
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        dmap_erase_erase_vals(m1, m2, vals, t, vk1, vk2);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void dmap_erase_used_as_in_erase_vals<t1,t2,vt>(list<pair<t1, int> > m1,
+                                                        list<pair<t2, int> > m2,
+                                                        list<option<vt> > vals,
+                                                        list<int> indices,
+                                                        fixpoint (vt,t1) vk1,
+                                                        fixpoint(vt,t2) vk2,
+                                                        int n)
+  requires true;
+  ensures dmap_index_used_fp(dmap_erase_all_fp(dmap(m1, m2, vals),
+                                               indices, vk1, vk2), n) ==
+          vals_use_ind_fp(erase_vals_fp(vals, indices), n);
+  {
+    dmap_erase_erase_vals(m1, m2, vals, indices, vk1, vk2);
+  }
+  @*/
+
+
+/*@
+  lemma void dmap_erase_used_as_in_erase_vals_many<t1,t2,vt>
+                (list<pair<t1, int> > m1,
+                 list<pair<t2, int> > m2,
+                 list<option<vt> > vals,
+                 list<int> er_indices,
+                 fixpoint (vt,t1) vk1,
+                 fixpoint(vt,t2) vk2,
+                 list<int> indices)
+  requires true;
+  ensures forall(indices, (dmap_index_used_fp)
+                            (dmap_erase_all_fp(dmap(m1, m2, vals),
+                                               er_indices, vk1, vk2))) ==
+          forall(indices, (vals_use_ind_fp)(erase_vals_fp(vals, er_indices)));
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        dmap_erase_used_as_in_erase_vals(m1, m2, vals, er_indices, vk1, vk2, h);
+        dmap_erase_used_as_in_erase_vals_many(m1, m2, vals, er_indices,
+                                              vk1, vk2, t);
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void take_too_many<t>(list<t> l, int n)
+  requires length(l) <= n;
+  ensures take(n, l) == l;
+  {
+    switch(l) {
+      case nil:
+      case cons(h,t):
+        take_too_many(t, n - 1);
+    }
+  }
+  @*/
+
+/*@
+  lemma void remove_by_index_map_remove(list<pair<int, uint32_t> > alist,
+                                        int idx)
+  requires true;
+  ensures map(fst, remove_by_index_fp(alist, idx)) ==
+          remove(idx, map(fst, alist));
+  {
+    switch(alist) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(i,tstmp):
+          if (i != idx)
+            remove_by_index_map_remove(t, idx);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void vals_remove_unrelevant_still_use_all<vt>(list<int> indices,
+                                                      list<option<vt> > vals,
+                                                      int i)
+  requires false == mem(i, indices) &*&
+           true == forall(indices, (vals_use_ind_fp)(vals));
+  ensures true == forall(indices, (vals_use_ind_fp)(update(i, none, vals)));
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        nth_update_unrelevant(h, i, none, vals);
+        vals_remove_unrelevant_still_use_all(t, vals, i);
+    }
+  }
+  @*/
+
+/*@
+  lemma void vals_remove_unrelevant_same_use<vt>(list<option<vt> > vals,
+                                                 int i, int j)
+  requires i != j;
+  ensures vals_use_ind_fp(update(i, none, vals), j) ==
+          vals_use_ind_fp(vals, j);
+  {
+    nth_update_unrelevant(j, i, none, vals);
+  }
+  @*/
+
+
+/*@
+  lemma void vals_use_remove_one_ind<vt>(list<int> indices,
+                                         list<option<vt> > vals,
+                                         int i)
+  requires true == forall(indices, (vals_use_ind_fp)(vals)) &*&
+           true == distinct(indices);
+  ensures true == forall(remove(i, indices),
+                         (vals_use_ind_fp)(update(i, none, vals)));
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        if (h == i) {
+          vals_remove_unrelevant_still_use_all(t, vals, i);
+        } else {
+          vals_use_remove_one_ind(t, vals, i);
+          vals_remove_unrelevant_same_use(vals, i, h);
+          assert vals_use_ind_fp(update(i, none, vals), h) ==
+                 vals_use_ind_fp(vals, h);
+        }
+    }
+  }
+  @*/
+
+
+/*@
+  lemma void vals_move_erase_to_the_back<vt>(list<option<vt> > vals,
+                                             list<int> indices,
+                                             int i)
+  requires true;
+  ensures update(i, none, erase_vals_fp(vals, indices)) ==
+          erase_vals_fp(vals, append(indices, cons(i, nil)));
+  {
+    switch(indices) {
+      case nil:
+      case cons(h,t):
+        vals_move_erase_to_the_back(vals, t, i);
+        if (i == h) {}
+        else {
+          update_update(erase_vals_fp(vals, t), h, none, i, none);
+        }
+    }
+  }
+  @*/
+
+
+/*@
   lemma void indices_used_expire_some<t1,t2,vt>(dchain ch,
                                                 dmap<t1,t2,vt> m,
                                                 uint32_t time,
                                                 fixpoint (vt,t1) vk1,
                                                 fixpoint (vt,t2) vk2,
                                                 int n)
-  requires true == forall(dchain_indexes_fp(ch), (dmap_index_used_fp)(m));
+  requires true == forall(dchain_indexes_fp(ch), (dmap_index_used_fp)(m)) &*&
+           0 <= n &*&
+           true == distinct(dchain_indexes_fp(ch));
   ensures true == forall(dchain_indexes_fp(expire_n_indexes(ch, time, n)),
                          (dmap_index_used_fp)
                             (dmap_erase_all_fp
@@ -1275,22 +1797,64 @@ ensures dmap_dchain_coherent(m, ch) &*&
                                              (ch, time)),
                                 vk1, vk2)));
   {
-    assume(false);//TODO 
-  }
-  @*/
+    switch(ch) { case dchain(entries, index_range, low, high):
+      switch(m) { case dmap(ikeys, ekeys, vals):
+        dmap_used_as_vals_use_forall(ikeys, ekeys, vals, dchain_indexes_fp(ch));
+        int i = 0;
+        list<int> er_indices = get_expired_indexes_fp(time, entries);
+        for (; i < n; ++i)
+          invariant 0 <= i &*& i <= n &*&
+                    true == distinct
+                              (map(fst,
+                                   fold_left
+                                     (entries, remove_by_index_fp,
+                                      take(i, er_indices)))) &*&
+                    true == forall(map(fst, fold_left
+                                              (entries, remove_by_index_fp,
+                                               take(i, er_indices))),
+                                   (vals_use_ind_fp)
+                                     (erase_vals_fp
+                                       (vals, take(i, er_indices))));
+          decreases n - i;
+        {
+          if (length(er_indices) <= i) {
+            take_too_many(er_indices, i);
+            take_too_many(er_indices, i+1);
+          } else {
+            append_take_nth_to_take(er_indices, i);
+            fold_left_append(entries, remove_by_index_fp, take(i, er_indices),
+                             cons(nth(i, er_indices), nil));
+            assert fold_left(entries, remove_by_index_fp,
+                             take(i + 1, er_indices)) ==
+                   remove_by_index_fp(fold_left(entries, remove_by_index_fp,
+                                                take(i, er_indices)),
+                                      nth(i, er_indices));
+            remove_by_index_map_remove(fold_left(entries, remove_by_index_fp,
+                                                 take(i, er_indices)),
+                                       nth(i, er_indices));
+            assert map(fst, fold_left(entries, remove_by_index_fp,
+                                      take(i + 1, er_indices))) ==
+                   remove(nth(i, er_indices),
+                          map(fst, fold_left(entries, remove_by_index_fp,
+                                                       take(i, er_indices))));
+            vals_use_remove_one_ind(map(fst, fold_left(entries, remove_by_index_fp,
+                                                       take(i, er_indices))),
+                                    erase_vals_fp(vals, take(i, er_indices)),
+                                    nth(i, er_indices));
+            vals_move_erase_to_the_back(vals, take(i, er_indices), nth(i, er_indices));
+            distinct_remove(nth(i, er_indices),
+                            map(fst, fold_left(entries, remove_by_index_fp,
+                                                          take(i, er_indices))));
 
-
-/*@
-  lemma void dmap_erase_self_consistent<t1,t2,vt>(dmap<t1,t2,vt> m,
-                                                  int index,
-                                                  fixpoint (vt,t1) vk1,
-                                                  fixpoint (vt,t2) vk2)
-  requires true == dmap_self_consistent_integral_fp(m, vk1, vk2) &*&
-           true == dmap_index_used_fp(m, index);
-  ensures true == dmap_self_consistent_integral_fp
-                    (dmap_erase_fp(m, index, vk1, vk2), vk1, vk2);
-  {
-    assume(false);//TODO 
+          }
+        }
+        dmap_erase_used_as_in_erase_vals_many(ikeys, ekeys, vals,
+                                              take(n, dchain_get_expired_indexes_fp
+                                                        (ch, time)),
+                                              vk1, vk2,
+                                              dchain_indexes_fp(expire_n_indexes(ch, time, n)));
+      }
+    }
   }
   @*/
 
@@ -1301,6 +1865,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   requires dmap_dchain_coherent(m, ch) &*&
            dchain_is_sortedp(ch) &*&
            0 <= count &*&
+           true == dchain_sorted_fp(ch) &*&
            count < length(dchain_get_expired_indexes_fp(ch, time)) &*&
            true == forall(dchain_indexes_fp(ch), (dmap_index_used_fp)(m)) &*&
            true == forall(dchain_indexes_fp(ch), (ge)(0)) &*&
@@ -1460,7 +2025,8 @@ ensures dmap_dchain_coherent(m, ch) &*&
                            length(dchain_get_expired_indexes_fp(ch, time))) ==
           dchain_expire_old_indexes_fp(ch, time);
   {
-    assume(false);//TODO
+    switch(ch) { case dchain(alist, index_range, low, high):
+    }
   }
   @*/
 
@@ -1499,6 +2065,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   subset_forall(dchain_indexes_fp(ch), dmap_indexes_used_fp(m),
                 (dmap_index_used_fp)(m));
   dchain_distinct_indexes(ch);
+  double_chain_alist_is_sorted(ch);
   dmap_pred_self_consistent(m);
   int count = 0;
   for (; count < length(exp_indices); ++count)
@@ -1509,6 +2076,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
               true == forall(dchain_indexes_fp(ch), (ge)(0)) &*&
               true == forall(dchain_indexes_fp(ch), (lt)(dmap_cap_fp(m))) &*&
               true == distinct(dchain_indexes_fp(ch)) &*&
+              true == dchain_sorted_fp(ch) &*&
               true == dmap_self_consistent_integral_fp
                         (dmap_erase_all_fp
                            (m, take(count,

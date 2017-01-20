@@ -26,16 +26,6 @@ struct DoubleChain {
     }
   }
 
-  fixpoint bool bnd_sorted_fp(list<uint32_t> times,
-                              uint32_t low, uint32_t high) {
-    switch(times) {
-      case nil: return true;
-      case cons(h,t):
-        return low <= h && h <= high &&
-               bnd_sorted_fp(t, h, high);
-    }
-  }
-
   predicate double_chainp(dchain ch,
                           struct DoubleChain* cp) =
       switch(ch) { case dchain(alist, index_range, low, high):
@@ -1085,6 +1075,16 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   ensures true;
   {
     open dchain_is_sortedp(ch);
+  }
+  @*/
+/*@
+  lemma void double_chain_alist_is_sorted(dchain ch)
+  requires double_chainp(ch, ?cp);
+  ensures double_chainp(ch, cp) &*&
+          true == dchain_sorted_fp(ch);
+  {
+    open double_chainp(ch, cp);
+    close double_chainp(ch, cp);
   }
   @*/
 

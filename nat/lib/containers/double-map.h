@@ -337,6 +337,15 @@ struct DoubleMap;
                     vk1, vk2, recp1, recp2, mp) &*&
           true == opt_no_dups(vals);
 
+  lemma void dmap_erase_self_consistent<t1,t2,vt>(dmap<t1,t2,vt> m,
+                                                  int index,
+                                                  fixpoint (vt,t1) vk1,
+                                                  fixpoint (vt,t2) vk2);
+  requires true == dmap_self_consistent_integral_fp(m, vk1, vk2) &*&
+           true == dmap_index_used_fp(m, index);
+  ensures true == dmap_self_consistent_integral_fp
+                    (dmap_erase_fp(m, index, vk1, vk2), vk1, vk2);
+
   lemma void dmap_erase_all_has_trans<t1,t2,vt>(dmap<t1,t2,vt> m,
                                                 t1 k1, list<int> idx,
                                                 fixpoint (vt,t1) vk1,
