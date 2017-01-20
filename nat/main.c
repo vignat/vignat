@@ -471,6 +471,7 @@ static void simple_forward(struct rte_mbuf *m,
           LOG( "adding flow: ");
           if (!allocate_flow(&key, now, &f)) {
             LOG("No space for the flow, dropping.");
+            rte_pktmbuf_free(m);
             return;
           }
         }
