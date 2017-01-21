@@ -80,7 +80,7 @@ nat_config_init(struct nat_config* config, int argc, char** argv)
 				break;
 
 			case 't':
-		  		config->expiration_time = nat_config_parse_int(optarg, "exp-time", 10, '\0');
+				config->expiration_time = nat_config_parse_int(optarg, "exp-time", 10, '\0');
 				if (config->expiration_time == 0) {
 					PARSE_ERROR("Expiration time must be strictly positive.\n");
 				}
