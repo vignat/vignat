@@ -2,6 +2,8 @@
 #include <string.h>
 #include <limits.h>
 
+#include "include_ignored_by_verifast.h"
+
 #include "flow.h"
 #include "ignore.h"
 

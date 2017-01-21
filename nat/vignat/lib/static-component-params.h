@@ -1,6 +1,8 @@
 #ifndef _STATIC_COMPONENT_PARAMS_H_INCLUDE_
 #define _STATIC_COMPONENT_PARAMS_H_INCLUDE_
 
+#include "include_ignored_by_verifast.h"
+
 #include <stdint.h>
 
 #ifdef KLEE_VERIFICATION

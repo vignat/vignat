@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "include_ignored_by_verifast.h"
+
 #include "map.h"
 #include "lib/ignore.h"
 
