@@ -7,6 +7,8 @@
 #ifndef RTE_STUBS_H
 #define RTE_STUBS_H
 
+#define IPV4_HDR_IHL_MASK 0x0f
+
 #define TAILQ_ENTRY(type)                                               \
     struct {                                                            \
         struct type *tqe_next;  /* next element */                      \

@@ -1,8 +1,8 @@
+#include <stdbool.h>
 #include <string.h>
 #include <limits.h>
 
 #include "flow.h"
-#include "include_ignored_by_verifast.h"
 #include "ignore.h"
 
 #ifdef KLEE_VERIFICATION

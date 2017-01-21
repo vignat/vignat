@@ -4,7 +4,6 @@
 #include "lib/containers/double-chain.h"
 #include "lib/containers/double-map.h"
 #include "lib/flow.h"
-#include "lib/containers/array-lcc.h"
 
 //@ #include "lib/predicates.gh"
 
@@ -24,8 +23,7 @@ fixpoint bool nat_ext_fp(int start_port, ext_k ek, int index) {
 
 
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
-                                struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                                struct lcore_conf* cur_lcc,
+                                unsigned int lcore_id,
                                 uint32_t time, int max_flows, int start_port) =
           dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, int_hash, ext_hash,
                                      flw_p, flow_p, flow_keys_offsets_fp,
@@ -33,10 +31,7 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
                                      nat_int_fp, (nat_ext_fp)(start_port), mp) &*&
           double_chainp(?ch, chp) &*&
           dmap_dchain_coherent(m, ch) &*&
-          arrp_lcc_acc(_, arr_lcc, lcore_id) &*&
-          cur_lcc == arrp_the_missing_cell_lcc(arr_lcc, lcore_id) &*&
           lcore_id == 0 &*& //<-- We are verifying for a single core.
-          some_lcore_confp(cur_lcc) &*&
           last_time(time) &*&
           dchain_high_fp(ch) <= time &*&
           dmap_cap_fp(m) == max_flows &*&
@@ -44,62 +39,50 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
 @*/
 
 void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
-                                struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                                struct lcore_conf* cur_lcc,
+                                unsigned int lcore_id,
                                 uint32_t time, int max_flows, int start_port);
 
 void loop_iteration_assertions(struct DoubleMap** m, struct DoubleChain** ch,
-                               struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                               struct lcore_conf* cur_lcc,
+                               unsigned int lcore_id,
                                uint32_t time, int max_flows, int start_port);
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
-                            struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                            struct lcore_conf* cur_lcc,
+                            unsigned int lcore_id,
                             uint32_t time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
-             evproc_loop_invariant(mp, chp, arr_lcc, lcore_id, cur_lcc,
+             evproc_loop_invariant(mp, chp, lcore_id,
                                    time, max_flows, start_port); @*/
-/*@ ensures *m |-> mp &*& *ch |-> chp &*&
-            chars(arr_lcc->data,
-                  (sizeof(ARRAY_LCC_EL_TYPE) * ARRAY_LCC_CAPACITY), _); @*/
+/*@ ensures *m |-> mp &*& *ch |-> chp @*/
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
-                            struct ArrayLcc* arr_lcc, unsigned int* lcore_id,
-                            struct lcore_conf* cur_lcc,
+                            unsigned int* lcore_id,
                             uint32_t *time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              *lcore_id |-> _ &*&
-             *time |-> _ &*&
-             chars(arr_lcc->data,
-                   (sizeof(ARRAY_LCC_EL_TYPE) * ARRAY_LCC_CAPACITY), _); @*/
+             *time |-> _ @*/
 /*@ ensures *m |-> mp &*& *ch |-> chp &*&
             *lcore_id |-> ?lcid &*&
             *time |-> ?t &*&
-            evproc_loop_invariant(mp, chp, arr_lcc, lcid, cur_lcc,
+            evproc_loop_invariant(mp, chp, lcid,
                                   t, max_flows, start_port); @*/
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
-                          struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                          struct lcore_conf* cur_lcc,
+                          unsigned int lcore_id,
                           uint32_t time, int max_flows, int start_port);
 
 void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
-                        struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                        struct lcore_conf* cur_lcc,
+                        unsigned int lcore_id,
                         uint32_t time, int max_flows, int start_port);
 
 void loop_enumeration_begin(struct DoubleMap** m, struct DoubleChain** ch,
-                            struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                            struct lcore_conf* cur_lcc,
+                            unsigned int lcore_id,
                             uint32_t time, int max_flows, int start_port,
                             int cnt);
 //@ requires true;
 //@ ensures true;
 
 void loop_enumeration_end(struct DoubleMap** m, struct DoubleChain** ch,
-                          struct ArrayLcc* arr_lcc, unsigned int lcore_id,
-                          struct lcore_conf* cur_lcc,
+                          unsigned int lcore_id,
                           uint32_t time, int max_flows, int start_port);
 //@ requires true;
 //@ ensures true;

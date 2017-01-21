@@ -3,24 +3,16 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <rte_log.h>
 
 #include "containers/double-map.h"
 #include "flowtable.h"
+
+#include "../../nat_log.h"
 
 #ifdef KLEE_VERIFICATION
 #  include "stubs/containers/double-map-stub-control.h"
 #  include "stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
-
-#if (defined KLEE_VERIFICATION) || (defined NOLOG)
-#  define LOG(...)
-#  define LOG_ADD(...)
-#else //KLEE_VERIFICATION || NOLOG
-#  define RTE_LOGTYPE_NAT RTE_LOGTYPE_USER1
-#  define LOG(...) RTE_LOG(INFO, NAT, __VA_ARGS__)
-#  define LOG_ADD(...) printf(__VA_ARGS__)
-#endif //KLEE_VERIFICATION || NOLOG
 
 struct DoubleMap *flow_map;
 
@@ -33,13 +25,13 @@ struct DoubleMap *get_flow_table(void) {
 }
 
 int get_flow_int(struct int_key* key, int* index) {
-    LOG("look up for internal key key = \n");
+    NAT_DEBUG("look up for internal key key = ");
     log_int_key(key);
     return dmap_get_a(flow_map, key, index);
 }
 
 int get_flow_ext(struct ext_key* key, int* index) {
-    LOG("look up for external key key = \n");
+    NAT_DEBUG("look up for external key key = ");
     log_ext_key(key);
     return dmap_get_b(flow_map, key, index);
 }
@@ -66,7 +58,7 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
 
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
 int add_flow(struct flow *f, int index) {
-    LOG("add_flow (f = \n");
+    NAT_DEBUG("add_flow (f = ");
     log_flow(f);
     struct int_key* new_int_key = &f->ik;
     struct ext_key* new_ext_key = &f->ek;
