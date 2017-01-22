@@ -229,7 +229,7 @@ let fun_types =
                                 ((nat_ext_fp)(start_port));"];
                        lemmas_after = [
                          tx_l "empty_dmap_cap\
-                               <int_k,ext_k,flw>(1024);";];};
+                               <int_k,ext_k,flw>(65536);";];};
      "dmap_set_entry_condition", {ret_type = Void;
                                   arg_types = [Ptr (Ctm "entry_condition")];
                                   extra_ptr_types = [];
@@ -242,26 +242,20 @@ let fun_types =
                          lemmas_after = [
                            on_rez_nonzero
                                "empty_dmap_dchain_coherent\
-                                <int_k,ext_k,flw>(1024);";
-                           tx_l "index_range_of_empty(1024, 0);";];};
+                                <int_k,ext_k,flw>(65536);";
+                           tx_l "index_range_of_empty(65536, 0);";];};
      "loop_invariant_consume", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
-                                             Ptr arr_lcc_struct;
                                              Uint32;
-                                             Ptr lcore_conf_struct;
                                              Uint32;
                                              Sint32;
                                              Sint32];
                                 extra_ptr_types = [];
                                 lemmas_before = [
-                                  tx_bl "close lcore_confp(_, last_lcc);";
-                                  (fun args _ ->
-                                     "/*@ close some_lcore_confp(" ^
-                                     List.nth_exn args 4 ^ "); @*/");
                                   (fun args _ ->
                                      "//@ assume(start_port == " ^
-                                     List.nth_exn args 7 ^");");
+                                     List.nth_exn args 5 ^");");
                                   (fun args _ ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
@@ -269,17 +263,13 @@ let fun_types =
                                      List.nth_exn args 2 ^ ", " ^
                                      List.nth_exn args 3 ^ ", " ^
                                      List.nth_exn args 4 ^ ", " ^
-                                     List.nth_exn args 5 ^ ", " ^
-                                     List.nth_exn args 6 ^ ", " ^
-                                     List.nth_exn args 7 ^ "); @*/");
+                                     List.nth_exn args 5 ^ "); @*/");
                                 ];
                                 lemmas_after = [];};
      "loop_invariant_produce", {ret_type = Void;
                                 arg_types = [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
-                                             Ptr arr_lcc_struct;
                                              Ptr Uint32;
-                                             Ptr lcore_conf_struct;
                                              Ptr Uint32;
                                              Sint32;
                                              Sint32];
@@ -292,26 +282,17 @@ let fun_types =
                                      the_array_lcc_is_local := false;
                                      "");
                                   (fun params ->
-                                     "last_lcc = " ^
-                                     List.nth_exn params.args 4 ^ ";\n");
-                                  (fun params ->
                                      "/*@ open evproc_loop_invariant(?mp, \
-                                      ?chp, " ^
+                                      ?chp, *" ^
                                      List.nth_exn params.args 2 ^ ", *" ^
                                      List.nth_exn params.args 3 ^ ", " ^
-                                     List.nth_exn params.args 4 ^ ", *" ^
-                                     List.nth_exn params.args 5 ^ ", " ^
-                                     List.nth_exn params.args 6 ^ ", " ^
-                                     List.nth_exn params.args 7 ^");@*/");
+                                     List.nth_exn params.args 4 ^ ", " ^
+                                     List.nth_exn params.args 5 ^ ");@*/");
                                   (fun params ->
                                      "//@ assume(" ^
-                                     List.nth_exn params.args 7 ^ " == start_port);");
-                                  (fun params ->
-                                     "/*@ open some_lcore_confp(" ^
-                                     List.nth_exn params.args 4 ^ "); @*/");
+                                     List.nth_exn params.args 5 ^ " == start_port);");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";
-                                  tx_l "open lcore_confp(_, last_lcc);";
                                   tx_l "dmap<int_k,ext_k,flw> initial_double_map = map;";
                                   tx_l "dchain initial_double_chain = chain;"
                                 ];};
@@ -455,15 +436,15 @@ let fun_types =
                            !last_device_id ^
                            ", user_buf0_23));@*/");
                     (fun args _ -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ek, ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                    ".ek, ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
                      1, user_buf0_23));@*/");
                     (fun args _ -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
                     ", flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26, user_buf0_30,\
                      " ^
                            !last_device_id ^
-                           ", user_buf0_23), ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
-                     1, user_buf0_23), user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\
-                     184789184, user_buf0_30, " ^
+                           ", user_buf0_23), ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
+                     1, user_buf0_23), user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\
+                     external_ip, user_buf0_30, " ^
                            !last_device_id ^
                            ", 1, user_buf0_23));@*/");
                     (fun args tmp ->
@@ -471,8 +452,8 @@ let fun_types =
                         assert dmap_dchain_coherent(" ^
                          (tmp "cur_map") ^
                        ", ?cur_ch);\n\
-                        ext_k ek = ekc(tmp1, user_buf0_36,\
-                        184789184, user_buf0_30, 1, user_buf0_23);\n\
+                        ext_k ek = ekc(new_index_2_0, user_buf0_36,\
+                        external_ip, user_buf0_30, 1, user_buf0_23);\n\
                         if (dmap_has_k2_fp(" ^ (tmp "cur_map") ^
                        ", ek)) {\n\
                         int index = dmap_get_k2_fp(" ^ (tmp "cur_map") ^
@@ -512,10 +493,10 @@ let fun_types =
                         user_buf0_26, user_buf0_30, " ^
                            !last_device_id ^
                            ", user_buf0_23),\n\
-                        ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                        ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
                         1, user_buf0_23),\n\
-                        user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, " ^
+                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
+                        external_ip, user_buf0_30, " ^
                            !last_device_id ^
                            ", 1, user_buf0_23)," ^
                        (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ "); @*/");
@@ -525,10 +506,10 @@ let fun_types =
                         user_buf0_26, user_buf0_30, " ^
                        !last_device_id ^
                        ", user_buf0_23),\n\
-                        ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                        ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
                         1, user_buf0_23),\n\
-                        user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, " ^
+                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
+                        external_ip, user_buf0_30, " ^
                        !last_device_id ^
                        ", 1, user_buf0_23);@*/");
                     (fun args tmp ->
@@ -539,8 +520,8 @@ let fun_types =
                         user_buf0_26, user_buf0_30, " ^
                        !last_device_id ^
                        ", user_buf0_23);\n\
-                       ext_k ek = ekc(tmp1, user_buf0_36,\
-                       184789184, user_buf0_30,\
+                       ext_k ek = ekc(new_index_2_0, user_buf0_36,\
+                       external_ip, user_buf0_30,\
                        1, user_buf0_23);\n\
                        coherent_dchain_non_out_of_space_map_nonfull(" ^
                       (tmp "cur_map") ^ ", ch);\n" ^
@@ -548,8 +529,8 @@ let fun_types =
                       (tmp "cur_map") ^
                       ", ch, ek);\n" ^
                       "flw the_flow_to_insert = flwc(ik, ek,\n\
-                       user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                       184789184, user_buf0_30, " ^
+                       user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
+                       external_ip, user_buf0_30, " ^
                        !last_device_id ^
                       ", 1, user_buf0_23);\n" ^
                        "add_flow_abstract(" ^ (tmp "cur_map") ^
@@ -570,10 +551,10 @@ let fun_types =
                         user_buf0_26, user_buf0_30, " ^
                        !last_device_id ^
                            ", user_buf0_23),\n\
-                        ekc(tmp1, user_buf0_36, 184789184, user_buf0_30,\
+                        ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
                         1, user_buf0_23),\n\
-                        user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, " ^
+                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
+                        external_ip, user_buf0_30, " ^
                            !last_device_id ^
                            ", 1, user_buf0_23),\n" ^
                        (params.tmp_gen "vk1") ^ ", " ^
@@ -588,12 +569,12 @@ let fun_types =
                         user_buf0_26, user_buf0_30, " ^
                        !last_device_id ^
                        ", user_buf0_23);\n\
-                        ext_k ek = ekc(tmp1, user_buf0_36,\
-                        184789184, user_buf0_30,\
+                        ext_k ek = ekc(new_index_2_0, user_buf0_36,\
+                        external_ip, user_buf0_30,\
                         1, user_buf0_23);\n\
                         flw the_flow_to_insert = flwc(ik, ek,\n\
-                        user_buf0_34, tmp1, user_buf0_36, user_buf0_26,\n\
-                        184789184, user_buf0_30, " ^
+                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
+                        external_ip, user_buf0_30, " ^
                        !last_device_id ^
                        ", 1, user_buf0_23);\n" ^
                       "coherent_put_allocated_preserves_coherent\n(" ^
@@ -904,13 +885,13 @@ let fun_types =
                           lemmas_before = [];
                           lemmas_after = [];};
      "received_packet", {ret_type = Void;
-                         arg_types = [Ir.Uint8; Ir.Uint8; Ptr rte_mbuf_struct;];
+                         arg_types = [Ir.Uint8; Ptr rte_mbuf_struct;];
                          extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
                                             let recv_pkt =
-                                              (List.nth_exn params.args 2)
+                                              (List.nth_exn params.args 1)
                                             in
                                             (copy_user_buf "the_received_packet"
                                                recv_pkt) ^ "\n" ^
@@ -919,9 +900,8 @@ let fun_types =
                                             "received_packet_type = (" ^
                                             recv_pkt ^ ")->packet_type;");
                                            ];};
-     "send_single_packet", {ret_type = Void;
-                            arg_types = [Ptr rte_mbuf_struct; Ir.Uint8;
-                                         Ptr lcore_conf_struct];
+     "send_single_packet", {ret_type = Ir.Sint32;
+                            arg_types = [Ptr rte_mbuf_struct; Ir.Uint8];
                             extra_ptr_types = ["user_buf_addr", user_buf_struct];
                             lemmas_before = [];
                             lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
@@ -1010,6 +990,7 @@ struct
                  "void to_verify()\n\
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
+                  uint32_t external_ip = 2880154539;\n\
                   struct lcore_conf *last_lcc;\n\
                   struct lcore_rx_queue *last_rq;\n\
                   uint8_t received_on_port;\n\

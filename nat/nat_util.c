@@ -2,12 +2,16 @@
 
 #include <netinet/in.h>
 
-#include <rte_byteorder.h>
-#include <rte_ether.h>
-#include <rte_ip.h>
-#include <rte_mbuf.h>
-#include <rte_tcp.h>
-#include <rte_udp.h>
+#ifdef KLEE_VERIFICATION
+#  include "lib/stubs/rte_stubs.h"
+#else//KLEE_VERIFICATION
+#  include <rte_byteorder.h>
+#  include <rte_ether.h>
+#  include <rte_ip.h>
+#  include <rte_mbuf.h>
+#  include <rte_tcp.h>
+#  include <rte_udp.h>
+#endif//KLEE_VERIFICATION
 
 #include "nat_util.h"
 

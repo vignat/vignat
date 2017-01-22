@@ -1,6 +1,6 @@
 #include <inttypes.h>
 
-#if KLEE_VERIFICATION
+#ifdef KLEE_VERIFICATION
 	#include <klee/klee.h>
 	#include "lib/stubs/rte_stubs.h"
 #else

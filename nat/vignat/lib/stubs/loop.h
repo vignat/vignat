@@ -52,14 +52,14 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              evproc_loop_invariant(mp, chp, lcore_id,
                                    time, max_flows, start_port); @*/
-/*@ ensures *m |-> mp &*& *ch |-> chp @*/
+/*@ ensures *m |-> mp &*& *ch |-> chp; @*/
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
                             unsigned int* lcore_id,
                             uint32_t *time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              *lcore_id |-> _ &*&
-             *time |-> _ @*/
+             *time |-> _; @*/
 /*@ ensures *m |-> mp &*& *ch |-> chp &*&
             *lcore_id |-> ?lcid &*&
             *time |-> ?t &*&

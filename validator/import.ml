@@ -461,6 +461,9 @@ let rec get_sexp_value exp t =
       get_sexp_value src t
     else
       {v=Cast (t, allocate_tmp (get_sexp_value src Sint32));t}
+  | Sexp.List [Sexp.Atom f; Sexp.Atom offset; src;]
+    when (String.equal f "Extract") && (String.equal offset "0") ->
+    get_sexp_value src Boolean
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; arg]
     when (String.equal f "SExt") && (String.equal w "w64") ->
     get_sexp_value arg t (*TODO: make sure this ignorance is ok *)
