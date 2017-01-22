@@ -50,6 +50,7 @@ int allocate_flow(struct int_key *k, uint32_t time, struct flow* out) {
     int alloc_rez = dchain_allocate_new_index(chain, &index, time);
     if (0 == alloc_rez) return 0; //Out of resources.
     uint16_t port = starting_port + index;
+    //klee_assert(k->int_device_id != ext_device_id);
     struct flow new_flow = {
         .int_src_port = k->int_src_port,
         .ext_src_port = port,

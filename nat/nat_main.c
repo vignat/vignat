@@ -183,12 +183,12 @@ lcore_main(struct nat_config* config)
 #else //KLEE_VERIFICATION
 	while (1) {
 		for (uint8_t device = 0; device < nb_devices; device++) {
-#endif //KLEE_VERIFICATION
-
-      uint32_t now = current_time();
 			if ((config->devices_mask & (1 << device)) == 0) {
 				continue;
 			}
+
+#endif //KLEE_VERIFICATION
+      uint32_t now = current_time();
 
 			struct rte_mbuf* buf[1];
 			uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);

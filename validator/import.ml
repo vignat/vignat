@@ -293,7 +293,7 @@ let make_name_alist_from_var_decls (lst: typed_var list) =
 
 let get_vars_from_plain_val v type_guess known_vars =
   (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
-  let decls = get_var_decls_of_sexp v type_guess known_vars in
+  let decls = get_var_decls_of_sexp (expand_shorted_sexp v) type_guess known_vars in
   map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
 
 let type_guess_of_ttype t = match t with
@@ -325,7 +325,7 @@ let rec get_vars_from_struct_val v (ty:ttype) (known_vars:typed_var String.Map.t
           get_vars_from_struct_val v.value t acc)
   | ty -> match v.full with
     | Some v ->
-      get_vars_from_plain_val (expand_shorted_sexp v) (type_guess_of_ttype ty) known_vars
+      get_vars_from_plain_val v (type_guess_of_ttype ty) known_vars
     | None -> known_vars
 
 let name_gen prefix = object
@@ -669,7 +669,9 @@ let get_basic_vars ftype_of tpref =
     let add_vars_from_ctxt vars ctxt =
       map_set_n_update_alist vars
         (make_name_alist_from_var_decls
-           (get_var_decls_of_sexp ctxt {s=Noidea;w=Sure W1;precise=Boolean} vars)) in
+           (get_var_decls_of_sexp
+              (expand_shorted_sexp ctxt)
+              {s=Noidea;w=Sure W1;precise=Boolean} vars)) in
     let call_ctxt_vars =
       List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
     let ret_ctxt_vars =

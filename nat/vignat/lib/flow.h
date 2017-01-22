@@ -200,6 +200,7 @@ int flow_consistency(void* key_a, void* key_b,
     fp->int_device_id |-> ?idid &*&
     fp->ext_device_id |-> ?edid &*&
     fp->protocol |-> ?prtc &*&
+    idid != edid &*&
     f == flwc(ikc(isp, dp, isip, dip, idid, prtc),
               ekc(esp, dp, esip, dip, edid, prtc),
               isp, esp, dp, isip, esip, dip, idid, edid, prtc);
@@ -217,6 +218,7 @@ int flow_consistency(void* key_a, void* key_b,
     fp->int_device_id |-> ?idid &*&
     fp->ext_device_id |-> ?edid &*&
     fp->protocol |-> ?prtc &*&
+    idid != edid &*&
     ik == ikc(isp, dp, isip, dip, idid, prtc) &*&
     ek == ekc(esp, dp, esip, dip, edid, prtc) &*&
     f == flwc(ik, ek, isp, esp, dp, isip, esip, dip, idid, edid, prtc);
