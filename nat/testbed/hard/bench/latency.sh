@@ -22,7 +22,7 @@ fi
 RESULT_FILE=$1
 
 rm -f $RESULT_FILE
-echo "#flows req/s one-way-lat" > $RESULT_FILE
+echo "#flows req/s lat_mean(microseconds) lat_stdev" > $RESULT_FILE
 
 echo "[bench] Launching pktgen..."
 . ~/scripts/pktgen/run-in-background.sh
@@ -43,12 +43,21 @@ for k in $(seq 1 $REPEAT); do
 		. ~/scripts/pktgen/send-command.sh ~/cmd.lua
 
 		sleep $FLOW_HEATUP
-		ncons=$(netperf -H $SERVER_HOST -P 0 -t UDP_RR -l $DURATION -- -H "$SERVER_IP" | head -n 1 | awk '{print $6}')
+		# -H $SERVER_HOST: use the server's real name as a side channel for comm with the netperf server
+		#                  (i.e. go through the normal network to avoid interference)
+		# -t TCP_RR: measure time to do req-resp on TCP, conn setup not included
+		# -P 0: don't display the banner or the labels, only results
+		# -j: Enable latency statistics
+		# -l $DURATION: do testing for $DURATION seconds
+		# --
+		# -H $SERVER_IP: use the server's IP to do the testing itself
+		# -O ...: Select output columns
+		#         THROUGHPUT = reqs/s, latency is in microseconds
+		stats=$(netperf -H $SERVER_HOST -t TCP_RR -P 0 -j -l $DURATION -- \
+				-H "$SERVER_IP" -O THROUGHPUT,MEAN_LATENCY,STDDEV_LATENCY | head -n 1)
 
-                # lat = 1/(req/s); one-way lat = lat/2; in milliseconds, *1000
-                lat=`bc -l <<< "scale=3; (1000 / $ncons) / 2"`
-		echo "[bench] begin:$BEGIN_PORT end:$END_PORT flows:$nflws req/s:$ncons lat:$lat"
-		echo $nflws $ncons $lat >> $RESULT_FILE
+		echo "[bench] flows:$nflws (req/s, lat, stdev_lat):($stats)"
+		echo "$nflws $stats" >> $RESULT_FILE
 
 		echo 'pktgen.stop("0")' > ~/cmd.lua
 		. ~/scripts/pktgen/send-command.sh ~/cmd.lua
