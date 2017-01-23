@@ -9,9 +9,9 @@
 
 . ~/scripts/config.sh
 
-FLOW_HEATUP=20
-EXPIRATION_TIME=20
-DURATION=10
+FLOW_HEATUP=10
+EXPIRATION_TIME=10
+DURATION=30
 REPEAT=1
 
 if [ -z $1 ]; then
@@ -29,14 +29,14 @@ echo "[bench] Launching pktgen..."
 sleep 10
 
 echo "[bench] Heating up tables..."
-ncons=$(netperf -H $SERVER_HOST -P 0 -t UDP_RR -l $DURATION -- -H "$SERVER_IP" | head -n 1 | awk '{print $6}')
+ncons=$(netperf -H $SERVER_HOST -P 0 -t TCP_RR -l $DURATION -- -H "$SERVER_IP" | head -n 1 | awk '{print $6}')
 echo "[bench] Heatup reqs/s: $ncons"
 
 echo "[bench] Testing begins..."
 for k in $(seq 1 $REPEAT); do
 	# maximum is 65535 to ensure no connection ever comes from port 0 on the NAT exterior,
 	# which freaks out a lot of software.
-	for nflws in 1000 10000 20000 30000 35000 40000 45000 50000 55000 60000 61000; do
+	for nflws in 1000 10000 20000 30000 40000 50000 55000 60000 62000 63000 63500 64000 64500 65000 65535; do
 		# NOTE: nflws is 1-based while ports are 0-based
 		echo "pktgen.dst_port(\"0\", \"max\", $((nflws - 1)))" > ~/cmd.lua
 		echo 'pktgen.start("0")' >> ~/cmd.lua
