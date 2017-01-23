@@ -86,7 +86,7 @@ else
     # Run the app in the background
     # The arguments are not always necessary, but they'll be ignored if unneeded
     (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$1" \
-        "--expire 10 --max-flows 65536 --starting-port 0" \
+        "--expire 10 --max-flows 61000 --starting-port 1" \
         0<&- &>"$LOG_FILE") &
 
     # Wait for it to have started

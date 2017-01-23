@@ -4,22 +4,7 @@ package.path = package.path ..";?.lua;test/?.lua;app/?.lua;../?.lua"
 
 require "Pktgen";
 
--- define packet sizes to test
--- local pkt_sizes		= { 64, 128, 256, 512, 1024, 1280, 1518 };
-local pkt_sizes		= { 64};--, 128};
-
-local flows_nums = {1, 7500, 20000}; --{ 1, 100, 1000, 7500, 20000, 30000 };
-
--- Time in seconds to transmit for
-local duration		= 40000;
---local confirmDuration	= 80000;
-local pauseTime		= 2000;
-
-local strtprt_int = 1000;
-
-
-local num_reg_steps = 10;
-local num_bin_steps = 5;
+local strtprt_int = 0;
 
 local srcUDPPort = "1234";
 
@@ -31,23 +16,16 @@ local dstip		= "192.168.200.10";
 local srcip		= "192.168.2.10";
 local netmask		= "/24";
 
---local recvport_dst_mac = "00:1E:67:92:29:6C"
 local sendport_dst_mac = "00:1E:67:92:29:6C"
-
-local initialRate	= 50 ;
 
 local function setupTraffic(numFlows)
 	local portStart = tostring(strtprt_int);
-	local portEnd = tostring(strtprt_int + numFlows);
+	local portEnd = tostring(strtprt_int + (numFlows - 1));
 	pktgen.set_ipaddr(sendport, "dst", dstip);
 	pktgen.set_ipaddr(sendport, "src", srcip..netmask);
 	pktgen.set_mac(sendport, sendport_dst_mac);
 
-	--pktgen.set_ipaddr(recvport, "dst", srcip);
-	--pktgen.set_ipaddr(recvport, "src", dstip..netmask);
-	--pktgen.set_mac(recvport, recvport_dst_mac);
-
-	pktgen.set_proto("all", "tcp");
+	pktgen.set_proto("all", "udp");
 	-- set Pktgen to send continuous stream of traffic
 	pktgen.set(sendport, "count", 0);
 
