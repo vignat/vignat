@@ -67,9 +67,14 @@ int int_key_hash(void* key)
 //@ ensures [f]int_k_p(key, k) &*& result == int_hash(k);
 {
   struct int_key* ik = key;
-  uint32_t int_src_port = ik->int_src_port;
-  uint32_t hash = int_src_port ^ ik->dst_port ^ ik->int_src_ip ^
-                  ik->dst_ip ^ ik->int_device_id ^ ik->protocol;
+uint32_t hash = 17;
+hash = hash * 31 + ik->int_src_port;
+hash = hash * 31 + ik->dst_port;
+hash = hash * 31 + ik->int_src_ip;
+hash = hash * 31 + ik->dst_ip;
+hash = hash * 31 + ik->int_device_id;
+hash = hash * 31 + ik->protocol;
+
   return ovf_cast(hash);
 }
 
@@ -78,9 +83,13 @@ int ext_key_hash(void* key)
 //@ ensures [f]ext_k_p(key, k) &*& result == ext_hash(k);
 {
   struct ext_key* ek = key;
-  uint32_t ext_src_port = ek->ext_src_port;
-  uint32_t hash = ext_src_port ^ ek->dst_port ^ ek->ext_src_ip ^
-                  ek->dst_ip ^ ek->ext_device_id ^ ek->protocol;
+uint32_t hash = 17;
+hash = hash * 31 + ek->ext_src_port;
+hash = hash * 31 + ek->dst_port;
+hash = hash * 31 + ek->ext_src_ip;
+hash = hash * 31 + ek->dst_ip;
+hash = hash * 31 + ek->ext_device_id;
+hash = hash * 31 + ek->protocol;
   return ovf_cast(hash);
 }
 
