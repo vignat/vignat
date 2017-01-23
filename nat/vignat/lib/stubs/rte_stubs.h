@@ -826,6 +826,8 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid, struct rte_mbuf** pkt
 void rte_prefetch0(const volatile void *p);
 int rte_lcore_is_enabled(unsigned lcore_id);
 unsigned rte_lcore_to_socket_id(unsigned lcore_id);
+unsigned rte_socket_id(void);
+unsigned rte_eth_dev_socket_id(uint8_t device);
 void rte_eth_link_get_nowait(uint8_t portid, struct rte_eth_link* link);
 void rte_delay_ms(unsigned ms);
 int rte_eal_init(int argc, char ** argv);

@@ -34,12 +34,6 @@ let render_post_assumptions post_statements =
                                   (render_tterm t) ^
                                   ");@*/")))
 
-let render_tip_post_sttmts {args_post_conditions;
-                            ret_val=_;post_statements} =
-  ""
-(* (render_post_assumptions post_statements) ^ "\n" ^ *)
-(* (render_args_post_conditions ~is_assert:true args_post_conditions) *)
-
 let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   match ret_name with
   | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
@@ -247,26 +241,51 @@ let expand_conjunctions terms =
   in
   List.join (List.map terms ~f:expand_tterm)
 
+let bubble_equalities tterms =
+  List.sort tterms ~cmp:(fun t1 t2 ->
+      match (t1.v,t2.v) with
+      | (Bop (Eq,_,_), Bop (Eq,_,_)) -> 0
+      | (Bop (Eq,_,_), _) -> -1
+      | (_, Bop(Eq,_,_)) -> 1
+      | (_,_) -> 0)
+
 let guess_support_assignments constraints symbs =
+  (* printf "symbols:\n"; *)
+  (* Set.iter symbs ~f:(fun name -> printf "%s\n" name;); *)
   let (assignments,_) =
-    List.fold constraints ~init:([],symbs) ~f:(fun (assignments,symbs) tterm ->
+    List.fold (bubble_equalities constraints) ~init:([],symbs) ~f:(fun (assignments,symbs) tterm ->
+        (* printf "considering %s\n" (render_tterm tterm); *)
         match tterm.v with
         | Bop (Eq, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
+          (* printf "match 1st\n"; *)
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | Bop (Eq, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
+          (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
+          if (String.equal x "reset_arr18_52") then
+              ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
+          else
+              ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | _ -> (assignments, symbs))
   in
   assignments
 
+let ids_from_varspecs_map vars =
+  List.fold (Map.data vars) ~init:String.Set.empty ~f:(fun acc var ->
+      String.Set.add acc var.name)
+
+let simplify_assignments assignments =
+  List.fold assignments ~init:assignments ~f:(fun acc assignment ->
+      List.map acc ~f:(fun {lhs;rhs} ->
+          {lhs;rhs = replace_term_in_tterm
+                   assignment.lhs.v assignment.rhs.v rhs}))
 
 let render_output_check
     ret_val ret_name ret_type model_constraints
-    hist_symbs args_post_conditions
+    hist_symbs args_post_conditions cmplxs
   =
   let (input_constraints,output_constraints) =
     split_constraints model_constraints hist_symbs
@@ -280,11 +299,15 @@ let render_output_check
   in
   let output_constraints = expand_conjunctions output_constraints in
   let output_symbs = ids_from_eq_conditions assignments in
-  let unalloc_symbs = String.Set.diff
+  let cmplx_symbs = ids_from_varspecs_map cmplxs in
+  let unalloc_symbs =
+    String.Set.diff
       (String.Set.diff
-         (ids_from_terms output_constraints)
-         output_symbs)
-      hist_symbs
+         (String.Set.diff
+            (ids_from_terms output_constraints)
+            output_symbs)
+         hist_symbs)
+      cmplx_symbs
   in
   let support_assignments =
     guess_support_assignments output_constraints unalloc_symbs
@@ -293,15 +316,25 @@ let render_output_check
   let (concrete_assignments,
        symbolic_var_assignments) = split_assignments assignments
   in
+  let symbolic_var_assignments =
+    simplify_assignments symbolic_var_assignments
+  in
+  (* printf "substitution schema:\n"; *)
+  (* List.iter symbolic_var_assignments ~f:(fun {lhs;rhs} -> *)
+  (*     printf "%s = %s\n" (render_tterm lhs) (render_tterm rhs)); *)
   let upd_model_constraints =
     apply_assignments symbolic_var_assignments output_constraints
   in
   "// Output check\n" ^
+  "// Input assumptions\n" ^
   (render_input_assumptions input_constraints) ^ "\n" ^
+  "// Support assignments of unbinded symbols\n" ^
   (* VV For the "if (...)" condition, which involves
      VV the original value (non-renamed)*)
   (render_some_assignments_as_assumptions symbolic_var_assignments) ^ "\n" ^
+  "// Concrete equalities: \n" ^
   (render_concrete_assignments_as_assertions concrete_assignments) ^ "\n" ^
+  "// Model constraints: \n" ^
   (String.concat ~sep:"\n"
      (List.map upd_model_constraints ~f:(fun constr ->
           "/*@ assert(" ^ (render_tterm constr) ^ "); @*/")))
@@ -388,19 +421,19 @@ let rec build_decision_tree results =
       Alternative_by_ret ((hd1.ret_val, build_decision_tree results_pro1),
                           (hd2.ret_val, build_decision_tree results_pro2))
 
-let rec render_post_assertions dtree ret_name ret_type hist_symbs =
+let rec render_post_assertions dtree ret_name ret_type hist_symbs cmplxs =
   match dtree with
   | Single_result res ->
     (render_output_check
        res.ret_val ret_name ret_type
        res.post_statements hist_symbs
-       res.args_post_conditions) ^ "\n"
+       res.args_post_conditions cmplxs) ^ "\n"
   | Alternative_by_constraint ((sttmt1,dtree1),
                                (sttmt2,dtree2)) ->
     "if (" ^ (render_tterm sttmt1) ^ ") {\n" ^
-    (render_post_assertions dtree1 ret_name ret_type hist_symbs) ^
+    (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
     "} else {\n" ^
-    (render_post_assertions dtree2 ret_name ret_type hist_symbs) ^
+    (render_post_assertions dtree2 ret_name ret_type hist_symbs cmplxs) ^
     "}\n"
   | Alternative_by_ret ((ret1,dtree1),(ret2,dtree2)) ->
     let rname = match ret_name with
@@ -412,9 +445,9 @@ let rec render_post_assertions dtree ret_name ret_type hist_symbs =
                           " must be present.")
     in
     "if (" ^ rname ^ " == " ^ (render_tterm ret1) ^ ") {\n" ^
-    (render_post_assertions dtree1 ret_name ret_type hist_symbs) ^
+    (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
     "} else {\n " ^
-    (render_post_assertions dtree2 ret_name ret_type hist_symbs) ^
+    (render_post_assertions dtree2 ret_name ret_type hist_symbs cmplxs) ^
     "}"
 
 let render_export_point name =
@@ -435,7 +468,10 @@ let render_equality_assumptions args =
                 ^ (render_tterm arg.value) ^ ");"))
 
 let render_tip_fun_call
-    {context;results} export_point free_vars hist_symbols ~render_assertions =
+    {context;results}
+    export_point free_vars hist_symbols
+    ~render_assertions
+    cmplxs =
   (render_fcall_with_lemmas context) ^
   (* "// The legibility of these assignments is ensured by analysis.ml\n" ^ *)
   (* (render_equality_assumptions free_vars) ^ "\n" ^ *)
@@ -446,7 +482,8 @@ let render_tip_fun_call
               (List.length res1.post_statements) -
               (List.length res2.post_statements))
          results) in
-     render_post_assertions dtree context.ret_name context.ret_type hist_symbols
+     render_post_assertions
+       dtree context.ret_name context.ret_type hist_symbols cmplxs
    else
      "")
 
@@ -543,7 +580,8 @@ let render_ir ir fout ~render_assertions =
                                         ir.tip_call ir.export_point
                                         ir.free_vars
                                         hist_symbols
-                                        ~render_assertions);
+                                        ~render_assertions
+                                        ir.cmplxs);
       Out_channel.output_string cout (render_final ir.finishing
                                         ~catch_leaks:render_assertions);
       Out_channel.output_string cout "}\n")

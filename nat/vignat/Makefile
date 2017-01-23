@@ -25,17 +25,18 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 verify:
 	clang -DKLEE_VERIFICATION \
 		-I . -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
-		nat_forward_vignat.c nat_main_stub.c ../nat_config.c nat_util_stub.c \
+		lib/stubs/rte_stubs.c ../nat_config.c ../nat_util.c \
+		../nat_util.c nat_util_stub.c \
 		lib/stubs/my-time-stub.c \
-		lib/stubs/rte_stubs.c \
 		lib/flowtable.c lib/flowmanager.c lib/flow.c lib/flow-log.c \
 		lib/stubs/loop-stub.c lib/stubs/containers/double-chain-stub.c lib/stubs/expirator-stub.c lib/stubs/containers/double-map-stub.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
+		../nat_config.c nat_forward_vignat.c  ../nat_main.c\
 		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc \
-		nat_forward_vignat.bc nat_main_stub.bc nat_config.bc nat_util_stub.bc \
+		rte_stubs.bc nat_forward_vignat.bc \
+		nat_main.bc nat_util.bc nat_config.bc \
 		my-time-stub.bc \
-		rte_stubs.bc \
 		flowtable.bc flowmanager.bc flow.bc flow-log.bc \
 		loop-stub.bc double-chain-stub.bc expirator-stub.bc double-map-stub.bc \
 		cmdline_parse*addr.bc
@@ -47,6 +48,6 @@ verifast:
 	verifast -I . -allow_assume -shared \
 		lib/assumptions_stubs.c \
 		lib/containers/double-chain-impl.c lib/containers/double-chain.c lib/containers/map.c lib/containers/double-map.c \
- 		lib/containers/batcher.c lib/coherence.c lib/expirator.c \
+		lib/containers/batcher.c lib/coherence.c lib/expirator.c \
 		lib/containers/array-bat-verifast.c lib/containers/array-rq-verifast.c lib/containers/array-u16-verifast.c lib/containers/array-lcc-verifast.c \
 		abstract-state-verify-lemmas.c

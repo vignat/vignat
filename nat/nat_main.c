@@ -4,18 +4,27 @@
 #include <linux/limits.h>
 #include <sys/types.h>
 
-#include <rte_common.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_launch.h>
-#include <rte_lcore.h>
-#include <rte_mbuf.h>
+#ifdef KLEE_VERIFICATION
+#  include <klee/klee.h>
+#  include "lib/stubs/rte_stubs.h"
+#  include "lib/flowmanager.h"
+#  include "lib/stubs/loop.h"
+#  include "lib/stubs/my-time-stub-control.h"
+#else//KLEE_VERIFICATION
+#  include <rte_common.h>
+#  include <rte_eal.h>
+#  include <rte_ethdev.h>
+#  include <rte_launch.h>
+#  include <rte_lcore.h>
+#  include <rte_mbuf.h>
+#endif//KLEE_VERIFICATION
 
 #include "nat_config.h"
 #include "nat_forward.h"
 #include "nat_log.h"
 #include "nat_time.h"
 #include "nat_util.h"
+#include <string.h>
 
 
 // --- Static config ---
@@ -144,7 +153,8 @@ nat_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 
 // --- Per-core work ---
 
-static __attribute__((noreturn)) void
+//static __attribute__((noreturn))
+void
 lcore_main(struct nat_config* config)
 {
 	uint8_t nb_devices = rte_eth_dev_count();
@@ -160,17 +170,30 @@ lcore_main(struct nat_config* config)
 	NAT_INFO("Core %u forwarding packets.", rte_lcore_id());
 
 	// Run until the application is killed
+#ifdef KLEE_VERIFICATION
+	uint32_t starting_time = start_time();
+	unsigned lcore_id = rte_lcore_id(); // TODO do we need that?
+
+	int x = klee_int("loop_termination");
+	loop_iteration_begin(get_dmap_pp(), get_dchain_pp(), lcore_id, starting_time, config->max_flows, config->start_port);
+  while (klee_induce_invariants() & x) {
+    uint8_t device = klee_range(0, nb_devices, "device");
+    {
+      loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(), lcore_id, starting_time, config->max_flows, config->start_port);
+#else //KLEE_VERIFICATION
 	while (1) {
 		for (uint8_t device = 0; device < nb_devices; device++) {
 			if ((config->devices_mask & (1 << device)) == 0) {
 				continue;
 			}
 
+#endif //KLEE_VERIFICATION
+      uint32_t now = current_time();
+
 			struct rte_mbuf* buf[1];
 			uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
 
 			if (actual_rx_len != 0) {
-				uint32_t now = current_time();
 				uint8_t dst_device = nat_core_process(config, device, buf[0], now);
 
 				if (dst_device == device) {
@@ -190,6 +213,9 @@ lcore_main(struct nat_config* config)
 //			if (likely(bufs_len != 0)) {
 //				nat_core_process(config, core_id, device, bufs, bufs_len);
 //			}
+#ifdef KLEE_VERIFICATION
+      loop_iteration_end(get_dmap_pp(), get_dchain_pp(), lcore_id, now, config->max_flows, config->start_port);
+#endif//KLEE_VERIFICATION
 		}
 	}
 }

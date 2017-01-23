@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include "lib/expirator.h"
-#include "lib/my-time.h"
+#include "../nat_time.h"
 #include "lib/stubs/my-time-stub-control.h"
 #include "lib/containers/double-map.h"
 #include "lib/containers/double-chain.h"
@@ -25,12 +25,11 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 //@ predicate a_packet(struct rte_mbuf *mbuf);
 
-void send_single_packet(struct rte_mbuf *m, uint8_t port,
-                        struct lcore_conf *qconf);
+int send_single_packet(struct rte_mbuf *m, uint8_t port);
 //@ requires a_packet(m);
-//@ ensures true;
+//@ ensures result != 0 ? true : a_packet(m);
 
-void received_packet(uint8_t portid, uint8_t queueid,
+void received_packet(uint8_t portid,
                      struct rte_mbuf *mbuf);
 //@ requires true;
 //@ ensures a_packet(mbuf);
