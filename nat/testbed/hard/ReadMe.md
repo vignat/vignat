@@ -37,7 +37,7 @@ The script outputs a `.results` file with the results. When testing a VigNAT-lik
 ## Configuring benchmarks
 
 The following files contain benchmark parameters:
-- `bench/latency.sh` contains the numbers of flows in the two-way latency benchmarks;
+- `bench/latency.sh` contains the numbers of flows in the two-way latency benchmarks, and some waiting related to the expiration time;
 - `pktgen/provision-rr.lua` contains the other parameters for the two-way latency benchmarks;
 - `pktgen/find-breaking-point-mf.lua` contains all parameters for the throughput benchmarks;
 - `bench.sh` contains the parameters passed to the VigNAT-like apps: expiration time, max flows, and starting port.
