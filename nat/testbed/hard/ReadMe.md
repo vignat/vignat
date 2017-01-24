@@ -44,6 +44,8 @@ The following files contain benchmark parameters:
 
 *NOTE*: To benchmark an app using DPDK's `rte_table_hash`, such as the provided DPDK non-verified NAT, the max flows must be changed to a power of 2.
 
+*NOTE*: Do not set the starting port to 0, as many servers do not like this at all, including Netperf's server which is used for measurements.
+
 ## Internals
 
 - `config.sh` contains the configuration values; all other scripts begin by sourcing it.
