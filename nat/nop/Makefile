@@ -11,11 +11,6 @@ CFLAGS += -O3
 CFLAGS += -I..
 CFLAGS += -std=gnu99
 
-# batch size, if available
-ifdef NAT_BATCH_SIZE
-CFLAGS += -DBATCH_SIZE=$(NAT_BATCH_SIZE)
-endif
-
 # disable warnings triggered by DPDK
 CFLAGS += -Wno-implicit-function-declaration
 CFLAGS += -Wno-nested-externs
