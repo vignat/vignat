@@ -32,6 +32,7 @@ struct DoubleMap {
 
   int n_vals;
   int capacity;
+  int keys_capacity;
 };
 
 /*@
@@ -141,21 +142,23 @@ struct DoubleMap {
           ?addrsa, ?addrsb, vk1, vk2, right_offsets,
           ?capacity, ?val_arr) &*&
     malloc_block(values, val_size*capacity) &*&
-    mp->bbs_a |-> ?bbs_a &*& malloc_block_ints(bbs_a, capacity) &*&
-    mp->kps_a |-> ?kps_a &*& malloc_block_pointers(kps_a, capacity) &*&
-    mp->khs_a |-> ?khs_a &*& malloc_block_ints(khs_a, capacity) &*&
-    mp->inds_a |-> ?inds_a &*& malloc_block_ints(inds_a, capacity) &*&
-    mapping(?ma, addrsa, keyp1, recp1, hsh1, capacity,
+    mp->keys_capacity |-> ?keys_capacity &*&
+    keys_capacity < CAPACITY_UPPER_LIMIT &*&
+    mp->bbs_a |-> ?bbs_a &*& malloc_block_ints(bbs_a, keys_capacity) &*&
+    mp->kps_a |-> ?kps_a &*& malloc_block_pointers(kps_a, keys_capacity) &*&
+    mp->khs_a |-> ?khs_a &*& malloc_block_ints(khs_a, keys_capacity) &*&
+    mp->inds_a |-> ?inds_a &*& malloc_block_ints(inds_a, keys_capacity) &*&
+    mapping(?ma, addrsa, keyp1, recp1, hsh1, keys_capacity,
             bbs_a, kps_a, khs_a, inds_a) &*&
     mp->eq_a |-> ?eq_a &*&
     [_]is_map_keys_equality<t1>(eq_a, keyp1) &*&
     mp->hsh_a |-> ?hsh_a &*&
     [_]is_map_key_hash<t1>(hsh_a, keyp1, hsh1) &*&
-    mp->bbs_b |-> ?bbs_b &*& malloc_block_ints(bbs_b, capacity) &*&
-    mp->kps_b |-> ?kps_b &*& malloc_block_pointers(kps_b, capacity) &*&
-    mp->khs_b |-> ?khs_b &*& malloc_block_ints(khs_b, capacity) &*&
-    mp->inds_b |-> ?inds_b &*& malloc_block_ints(inds_b, capacity) &*&
-    mapping(?mb, addrsb, keyp2, recp2, hsh2, capacity,
+    mp->bbs_b |-> ?bbs_b &*& malloc_block_ints(bbs_b, keys_capacity) &*&
+    mp->kps_b |-> ?kps_b &*& malloc_block_pointers(kps_b, keys_capacity) &*&
+    mp->khs_b |-> ?khs_b &*& malloc_block_ints(khs_b, keys_capacity) &*&
+    mp->inds_b |-> ?inds_b &*& malloc_block_ints(inds_b, keys_capacity) &*&
+    mapping(?mb, addrsb, keyp2, recp2, hsh2, keys_capacity,
             bbs_b, kps_b, khs_b, inds_b) &*&
     mp->eq_b |-> ?eq_b &*&
     [_]is_map_keys_equality<t2>(eq_b, keyp2) &*&
@@ -169,7 +172,7 @@ struct DoubleMap {
                          right_offsets, vk1, vk2) &*&
     mp->capacity |-> capacity &*&
     mp->n_vals |-> map_size_fp(ma) &*&
-    0 <= capacity &*& capacity < 70000 &*&
+    0 <= capacity &*& capacity < keys_capacity &*&
     values + val_size*capacity <= (void*)UINTPTR_MAX &*&
     true == insync_fp(val_arr, ma, mb, vk1, vk2, 0) &*&
     true == no_extra_ptrs(addrsa, ma) &*&
@@ -281,7 +284,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              dmap_record_property2<K2>(?recp2) &*&
              *map_out |-> ?old_map_out &*&
              0 < value_size &*& value_size < 4096 &*&
-             0 < capacity &*& capacity < 70000; @*/
+             0 < capacity &*& capacity < CAPACITY_UPPER_LIMIT; @*/
 /*@ ensures result == 0 ?
             (*map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&
@@ -299,7 +302,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   if (map_alloc == NULL) return 0;
   *map_out = (struct DoubleMap*) map_alloc;
 
-  //@ mul_bounds(value_size, 4096, capacity, 70000);
+  //@ mul_bounds(value_size, 4096, capacity, CAPACITY_UPPER_LIMIT);
   uint8_t* vals_alloc = malloc(value_size*capacity);
   if (vals_alloc == NULL) {
     free(map_alloc);
