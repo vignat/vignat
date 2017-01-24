@@ -18,6 +18,8 @@ Create an SSH key on the NAT and add its public key to the tester and server, as
 
 Edit the `config.sh` file to set the machines' names and addresses.
 
+**[NOTE: For now, you must also edit `pktgen/provision-rr.lua` and `pktgen/find-breaking-point-mf.lua` to set the machine addresses. Sorry!]**
+
 ## Running benchmarks
 
 Benchmarks are run from the NAT machine.
