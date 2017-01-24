@@ -155,7 +155,7 @@ let fun_types =
                           Sint32; Ptr (Ctm "uq_value_copy");
                           Ptr (Ctm "uq_value_destr");
                           Ptr (Ctm "dmap_extract_keys"); Ptr (Ctm "dmap_pack_keys");
-                          Sint32;
+                          Sint32; Sint32;
                           Ptr (Ptr dmap_struct)];
                        extra_ptr_types = [];
                        lemmas_before = [
