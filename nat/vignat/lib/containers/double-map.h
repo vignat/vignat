@@ -6,6 +6,8 @@
 //@ #include <nat.gh>
 //@ #include "stdex.gh"
 
+#define CAPACITY_UPPER_LIMIT 140000
+
 /*
   This implementation expects keys to be the part of the value. The keys
   are extracted with dmap_extract_keys function and are put back with
@@ -569,6 +571,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
                   dmap_extract_keys* dexk,
                   dmap_pack_keys* dpk,
                   int capacity,
+                  int keys_capacity,
                   struct DoubleMap** map_out);
 /*@ requires dmap_key_val_types<K1,K2,V>(_, _, _) &*&
              [_]is_map_keys_equality<K1>(eq_a, ?keyp1) &*&
@@ -584,7 +587,8 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              dmap_record_property2<K2>(?recp2) &*&
              *map_out |-> ?old_map_out &*&
              0 < value_size &*& value_size < 4096 &*&
-             0 < capacity &*& capacity < 70000; @*/
+             0 < capacity &*& capacity < keys_capacity &*&
+             keys_capacity < CAPACITY_UPPER_LIMIT; @*/
 /*@ ensures result == 0 ?
             (*map_out |-> old_map_out) :
             (*map_out |-> ?mapp &*&
