@@ -75,9 +75,12 @@ nat_flows_by_time_refresh(void)
 void
 nat_core_init(struct nat_config* config)
 {
+  int power = 1;
+  while(power < config->max_flows)
+    power*=2;
 	nat_map_set_fns(&nat_flow_id_hash, &nat_flow_id_eq);
-	flows_from_inside = nat_map_create(config->max_flows);
-	flows_from_outside = nat_map_create(config->max_flows);
+	flows_from_inside = nat_map_create(power);
+	flows_from_outside = nat_map_create(power);
 
 	// uint32_t for the port as max_flows is 1-based and thus may be 2^16.
 	for (uint32_t port = 0; port < config->max_flows; port++) {
