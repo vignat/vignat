@@ -101,7 +101,7 @@ bind_nics_to_igb_uio()
 	  if  /sbin/lsmod  | grep -q igb_uio ; then
 		    PCI_PATH=$1
                     echo "Binding PCI device: $PCI_PATH ..."
-		    sudo ${RTE_SDK}/tools/dpdk-devbind.py -b igb_uio $PCI_PATH && echo "OK"
+		    sudo ${RTE_SDK}/tools/dpdk-devbind.py -b $DPDK_NIC_DRIVER $PCI_PATH && echo "OK"
 	  else
 		    echo "# Please load the 'igb_uio' kernel module before querying or "
 		    echo "# adjusting NIC device bindings"
