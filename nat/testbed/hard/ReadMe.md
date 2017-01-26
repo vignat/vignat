@@ -42,7 +42,7 @@ The following files contain benchmark parameters:
 - `pktgen/find-breaking-point-mf.lua` contains all parameters for the throughput benchmarks;
 - `bench.sh` contains the parameters passed to the VigNAT-like apps: expiration time, max flows, and starting port.
 
-*NOTE*: To benchmark an app using DPDK's `rte_table_hash`, such as the provided DPDK non-verified NAT, the max flows must be changed to a power of 2.
+*NOTE*: The provided DPDK non-verified NAT automatically rounds the max flows up to a power of 2, as required by DPDK's hash table.
 
 *NOTE*: Do not set the starting port to 0, as many servers do not like this at all, including Netperf's server which is used for measurements.
 
