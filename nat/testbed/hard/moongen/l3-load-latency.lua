@@ -22,6 +22,7 @@ function configure(parser)
 	parser:option("-r --rate", "Transmit rate in Mbit/s."):default(10000):convert(tonumber)
 	parser:option("-f --flows", "Number of flows (randomized source IP)."):default(4):convert(tonumber)
 	parser:option("-s --size", "Packet size."):default(60):convert(tonumber)
+	parser:option("-h --heatup", "Heatup time before beginning of latency measurement"):default(2):convert(tonumber)
 	parser:option("-t --timeout", "Time to run the test"):default(0):convert(tonumber)
 end
 
@@ -35,7 +36,7 @@ function master(args)
 		txDev:getTxQueue(0):setRate(args.rate - (args.size + 4) * 8 / 1000)
 	end
 	mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, args.flows)
-	mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, args.flows)
+	mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, args.flows, args.heatup)
 	if (args.timeout < 1) then
 		mg.waitForTasks()
 	else
@@ -94,14 +95,14 @@ function loadSlave(queue, rxDev, size, flows)
 	fileRxCtr:finalize()
 end
 
-function timerSlave(txQueue, rxQueue, size, flows)
+function timerSlave(txQueue, rxQueue, size, flows, heatup)
 	if size < 84 then
 		log:warn("Packet size %d is smaller than minimum timestamp size 84. Timestamped packets will be larger than load packets.", size)
 		size = 84
 	end
 	local timestamper = ts:newUdpTimestamper(txQueue, rxQueue)
 	local hist = hist:new()
-	mg.sleepMillis(1000) -- ensure that the load task is running
+	mg.sleepMillis(heatup) -- ensure that the load task is running
 	local counter = 0
 	local rateLimit = timer:new(0.001)
 	local baseIP = parseIPAddress(SRC_IP_BASE)
