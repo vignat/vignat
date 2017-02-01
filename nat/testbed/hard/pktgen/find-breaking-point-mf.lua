@@ -27,12 +27,12 @@ local recvport		= "0";
 local sendport		= "1";
 
 -- ip addresses to use
-local dstip		= "192.168.2.10";
-local srcip		= "192.168.3.5";
+local dstip		= "192.168.4.10";
+local srcip		= "192.168.6.5";
 local netmask		= "/24";
 
-local recvport_dst_mac = "00:1E:67:92:29:6C"
-local sendport_dst_mac = "00:1E:67:92:29:6D"
+local recvport_dst_mac = "90:e2:ba:55:14:10"
+local sendport_dst_mac = "90:e2:ba:55:14:11"
 
 local initialRate	= 50 ;
 
@@ -151,7 +151,7 @@ function main()
 	file = io.open("multi-flows.txt", "w");
 	file:write("#flows pkt_size rate #pkt #pkt/sec\n");
 
-	runTrial(10000, 64, 1, 10000, "heatup");
+	runTrial(10000, 64, 1, 100000, "heatup");
 	for _,numFlows in pairs(flows_nums)
 	do
 		setupTraffic(numFlows);
