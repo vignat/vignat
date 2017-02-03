@@ -96,7 +96,7 @@ int allocate_flowtables(uint8_t nb_ports, int max_flows) {
                          flow_extract_keys,
                          flow_pack_keys,
                          max_flows,
-                         2*max_flows,
+                         max_flows,
                          &flow_map);
 }
 
