@@ -10,6 +10,11 @@
 #     Known names: "netfilter".
 #     Otherwise, a folder name containing a DPDK NAT-like app, e.g. "~/vnds/nat"
 # $2: The scenario, one of the following:
+#     "mg-1p": Measure throughput: find the rate at which the middlebox
+#              starts loosing 1% of packets.
+#     "mg-existing-flows-latency": Measure the forwarding latency for existing
+#                                  flows.
+#     "mg-new-flows-latency": Measure the forwarding latency for new flows.
 #     "loopback": Measure throughput.
 #                 Tester and middlebox are connected together in a loop,
 #                 using 2 interfaces on each, in different subnets; server is ignored.
@@ -50,13 +55,29 @@ fi
 # Initialize the network;
 # to do that, we need to know which scenario we use, and whether we'll run a DPDK app or not.
 NETWORK_SCENARIO=$2
-if [ $2 = "1p" ]; then
-    NETWORK_SCENARIO="loopback"
-fi
+case $2 in
+    "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"mg-new-flows-latency")
+        NETWORK_SCENARIO="loopback"
+        ;;
+    "passthrough")
+        NETWORK_SCENARIO="passthrough"
+        ;;
+    "rr")
+        NETWORK_SCENARIO="rr"
+        ;;
+    *)
+        echo "unknown scenario $2" 1>&2
+        exit 10
+esac
+
 NETWORK_APP="dpdk"
 if [ $1 = "netfilter" ]; then
     NETWORK_APP="netfilter"
+elif [ ! -d $1 ]; then
+    echo "Unknown middlebox app: $1" 1>&2
+    exit 10
 fi
+
 . ./init-network.sh $NETWORK_SCENARIO $NETWORK_APP
 
 
@@ -78,15 +99,31 @@ if [ "$1" = "netfilter" ]; then
 else
     echo "[bench] Launching $1..."
 
+    EXPIRATION_TIME=60
+
     case $2 in
-        "1p"|"loopback") SIMPLE_SCENARIO="loopback";;
-        "rr"|"passthrough") SIMPLE_SCENARIO="rr";;
+        "mg-new-flows-latency")
+            SIMPLE_SCENARIO="loopback"
+            EXPIRATION_TIME=10
+            ;;
+        "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency")
+            SIMPLE_SCENARIO="loopback"
+            EXPIRATION_TIME=60
+            ;;
+        "rr"|"passthrough")
+            SIMPLE_SCENARIO="rr"
+            EXPIRATION_TIME=60
+            ;;
+        *)
+            echo "Unknown scenario $2" 1>&2
+            exit 10
+            ;;
     esac
 
     # Run the app in the background
     # The arguments are not always necessary, but they'll be ignored if unneeded
     (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$1" \
-        "--expire 10 --max-flows 65535 --starting-port 1" \
+        "--expire $EXPIRATION_TIME --max-flows 65535 --starting-port 1" \
         0<&- &>"$LOG_FILE") &
 
     # Wait for it to have started
@@ -96,14 +133,29 @@ fi
 
 # Then, run the benchmark depending on the scenario
 case $2 in
+    "mg-1p")
+        LUA_SCRIPT="l3-load-find-1p.lua"
+        echo "[bench] Benchmarking throughput..."
+        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 3000 -u 60 -t 20 1 0"
+    ;;
+    "mg-existing-flows-latency")
+        LUA_SCRIPT="l3-latency-light.lua"
+        echo "[bench] Benchmarking throughput..."
+        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 20 -u 60 -t 20 1 0"
+    ;;
+    "mg-new-flows-latency")
+        LUA_SCRIPT="l3-latency-new-flows.lua"
+        echo "[bench] Benchmarking throughput..."
+        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 20 -u 60 -t 20 1 0"
+    ;;
     "loopback"|"1p")
-        LUA_SCRIPT="regular-with-bin-mf"
+        LUA_SCRIPT="regular-with-bin-mf.lua"
         if [ $2 = "1p" ]; then
-            LUA_SCRIPT="find-breaking-point-mf"
+            LUA_SCRIPT="find-breaking-point-mf.lua"
         fi
 
         echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "bash ~/scripts/pktgen/run.sh ~/scripts/pktgen/$LUA_SCRIPT.lua"
+        ssh $TESTER_HOST "bash ~/scripts/pktgen/run.sh ~/scripts/pktgen/$LUA_SCRIPT"
         scp $TESTER_HOST:pktgen/multi-flows.txt "./$RESULTS_FILE"
         ssh $TESTER_HOST "rm pktgen/multi-flows.txt"
         ;;
