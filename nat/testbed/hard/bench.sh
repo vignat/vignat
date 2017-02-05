@@ -137,16 +137,22 @@ case $2 in
         LUA_SCRIPT="l3-load-find-1p.lua"
         echo "[bench] Benchmarking throughput..."
         ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 3000 -u 60 -t 20 1 0"
+        scp $TESTER_HOST:mf-find-mg-1p.txt "./$RESULTS_FILE"
+        ssh $TESTER_HOST "sudo rm mf-find-mg-1p.txt"
     ;;
     "mg-existing-flows-latency")
         LUA_SCRIPT="l3-latency-light.lua"
         echo "[bench] Benchmarking throughput..."
         ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 20 -u 60 -t 20 1 0"
+        scp $TESTER_HOST:mf-lat.txt "./$RESULTS_FILE"
+        ssh $TESTER_HOST "sudo rm mf-lat.txt"
     ;;
     "mg-new-flows-latency")
         LUA_SCRIPT="l3-latency-new-flows.lua"
         echo "[bench] Benchmarking throughput..."
         ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 20 -u 60 -t 20 1 0"
+        scp $TESTER_HOST:mf-lat.txt "./$RESULTS_FILE"
+        ssh $TESTER_HOST "sudo rm mf-lat.txt"
     ;;
     "loopback"|"1p")
         LUA_SCRIPT="regular-with-bin-mf.lua"
