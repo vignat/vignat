@@ -6,11 +6,11 @@ all_data <- data.frame(V1=integer(), V2=integer(),
                        V5=integer(),
                        middlebox=character())
 
-netfilter <- read.table("nf-thru-lat.txt")
+netfilter <- read.table("netfilter-mf-find-mg-1p.txt")
 netfilter["middlebox"] <- "NetFilter"
-vignat <- read.table("vignat-thru-lat.txt")
+vignat <- read.table("vignat-mf-find-mg-1p.txt")
 vignat["middlebox"] <- "VigNAT"
-nop <- read.table("nop-thru-lat.txt")
+nop <- read.table("nop-mf-find-mg-1p.txt")
 nop["middlebox"] <- "NOP"
 unverified <- read.table("unverified-thru-lat.txt")
 unverified["middlebox"] <- "DPDK-unverified"
@@ -22,12 +22,12 @@ all_data <- rbind(all_data, unverified)
 
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
-p <- ggplot(all_data, aes(x=V1/1000, y=V3,
+p <- ggplot(all_data, aes(x=V1/1000, y=V4/1e6,
                           group=middlebox,
                           color=middlebox,
                           shape=middlebox)) +
      geom_line(size=1) +
-     labs(title="Loopback throughput, 64B packets, input: 15 Mpkts/s") +
+     labs(title="Loopback throughput, 64B packets") +
      xlab("# concurrent flows (K)") +
      ylab(bquote("Throughput Mpkt/s")) +
      theme_bw() +
