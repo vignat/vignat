@@ -1,5 +1,5 @@
 module Sexp = Core.Std.Sexp
-type bop = Eq | Le | Lt | Ge | Gt | Add | Sub | Mul | And
+type bop = Eq | Le | Lt | Ge | Gt | Add | Sub | Mul | And | Bit_and
 val __bop_of_sexp__ : Sexp.t -> bop
 val bop_of_sexp : Sexp.t -> bop
 val sexp_of_bop : bop -> Sexp.t
@@ -7,6 +7,7 @@ type ttype =
     Ptr of ttype
   | Sint32
   | Sint8
+  | Uint64
   | Uint32
   | Uint16
   | Uint8
@@ -21,6 +22,10 @@ type ttype =
 val __ttype_of_sexp__ : Sexp.t -> ttype
 val ttype_of_sexp : Sexp.t -> ttype
 val sexp_of_ttype : ttype -> Sexp.t
+type term_util = Ptr_placeholder of int64
+val __term_util_of_sexp__ : Sexp.t -> term_util
+val term_util_of_sexp : Sexp.t -> term_util
+val sexp_of_term_util : term_util -> Sexp.t
 type term =
     Bop of bop * tterm * tterm
   | Apply of bytes * tterm list
@@ -36,6 +41,7 @@ type term =
   | Cast of ttype * tterm
   | Zeroptr
   | Undef
+  | Utility of term_util
 and tterm = { v : term; t : ttype; }
 and var_spec = { name : bytes; value : tterm; }
 val __term_of_sexp__ : Sexp.t -> term
@@ -99,6 +105,8 @@ type ir = {
   tip_call : tip_call;
   export_point : bytes;
   finishing : bool;
+  complete_event_loop_iteration : bool;
+  semantic_checks : bytes;
 }
 val __ir_of_sexp__ : Sexp.t -> ir
 val ir_of_sexp : Sexp.t -> ir
@@ -106,13 +114,16 @@ val sexp_of_ir : ir -> Sexp.t
 val strip_outside_parens : bytes -> bytes
 val render_bop : bop -> bytes
 val simplify_term : term -> term
+val render_utility : term_util -> bytes
 val render_tterm : tterm -> bytes
 val render_term : term -> bytes
+val term_utility_eq : term_util -> term_util -> bool
 val term_eq : term -> term -> bool
+val call_recursively_on_tterm : (tterm -> tterm option) -> tterm -> tterm
+val call_recursively_on_term : (term -> term option) -> tterm -> tterm
 val replace_term_in_term : term -> term -> term -> term
 val replace_term_in_tterm : term -> term -> tterm -> tterm
 val replace_term_in_tterms : term -> term -> tterm list -> tterm list
-val call_recursively_on_tterm : (term -> term option) -> tterm -> tterm
 val collect_nodes : (tterm -> 'a option) -> tterm -> 'a list
 val term_contains_term : term -> term -> bool
 val tterm_contains_term : tterm -> term -> bool

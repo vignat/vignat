@@ -1,4 +1,5 @@
 *.log
+*.results
 *.pdf
 ~*
 *~
@@ -13,6 +14,9 @@ fullpage.sty
 *.glob
 *.cache
 *.bc
+*.o
+*.d
+*.cmd
 bench/bench
 bench/data.c
 bench/operations.c
@@ -21,9 +25,15 @@ bench/stats.sh
 bench/export.csv
 bench/rexport.tmpl
 bench/perfplot.png
-nat/build
+build/
 TAGS
 .vagrant
 validator/_build
-nat/klee-*
+klee-*/
+klee-last
 /nat/testbed/analysis/*
+*.csv
+nat/testbed/hard/util/plot/*.txt
+/nat/testbed/hard/util/plot/.RData
+nat/testbed/hard/util/plot/*.png
+/nat/testbed/hard/util/plot/.Rhistory

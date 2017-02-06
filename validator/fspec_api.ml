@@ -19,7 +19,25 @@ let on_rez_nonzero str = (fun params ->
 let on_rez_nz f = (fun params ->
     "/*@ if(" ^ params.ret_name ^ "!=0) " ^ (f params) ^ " @*/")
 
+let rec render_deep_assignment {lhs;rhs} =
+  match rhs.t with
+  | Str (name,fields) ->
+    String.concat ~sep: "\n"
+      (List.map fields
+         ~f:(fun (name,t) ->
+             render_deep_assignment {lhs={v=Str_idx (lhs, name);t};
+                                     rhs={v=Str_idx (rhs, name);t}}))
+  | Unknown -> "";
+  | _ -> (render_tterm lhs) ^ " = " ^
+         (render_tterm rhs) ^ ";"
+
+let deep_copy (var : var_spec) =
+  (render_deep_assignment {lhs={v=Id var.name;t=var.value.t};
+                             rhs=var.value}) ^
+  "\n"
+
 type fun_spec = {ret_type: ttype; arg_types: ttype list;
+                 extra_ptr_types: (string * ttype) list;
                  lemmas_before: blemma list; lemmas_after: lemma list;}
 
 module type Spec =
@@ -29,6 +47,9 @@ sig
   val fixpoints : Ir.tterm Core.Std.String.Map.t
   val boundary_fun : string
   val finishing_fun : string
+  val eventproc_iteration_begin : string
+  val eventproc_iteration_end : string
+  val user_check_for_complete_iteration : string
 end
 
 let spec : (module Spec) option ref = ref None

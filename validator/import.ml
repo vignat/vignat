@@ -45,6 +45,18 @@ let infer_type_sign f =
   else Noidea
 
 let expand_shorted_sexp sexp =
+  let rec remove_defs exp =
+    let rec do_list lst =
+      match lst with
+      | Sexp.Atom v :: tl when String.is_suffix v ~suffix:":" ->
+        do_list tl
+      | hd :: tl -> (remove_defs hd) :: (do_list tl)
+      | [] -> []
+    in
+    match exp with
+    | Sexp.List lst -> Sexp.List (do_list lst)
+    | Sexp.Atom _ -> exp
+  in
   let rec get_defs sexp =
     let merge_defs d1 d2 =
       String.Map.merge d1 d2
@@ -60,25 +72,13 @@ let expand_shorted_sexp sexp =
       | Sexp.Atom v :: def :: tl when String.is_suffix v ~suffix:":" ->
         merge_defs (get_defs def) (String.Map.add (do_list tl)
                                      ~key:(String.prefix v ((String.length v) - 1))
-                                     ~data:def)
+                                     ~data:(remove_defs def))
       | hd :: tl -> merge_defs (get_defs hd) (do_list tl)
       | [] -> String.Map.empty
     in
     match sexp with
     | Sexp.List lst -> do_list lst
     | Sexp.Atom _ -> String.Map.empty
-  in
-  let rec remove_defs exp =
-    let rec do_list lst =
-      match lst with
-      | Sexp.Atom v :: tl when String.is_suffix v ~suffix:":" ->
-        do_list tl
-      | hd :: tl -> (remove_defs hd) :: (do_list tl)
-      | [] -> []
-    in
-    match exp with
-    | Sexp.List lst -> Sexp.List (do_list lst)
-    | Sexp.Atom _ -> exp
   in
   let rec expand_exp exp vars =
     match exp with
@@ -95,19 +95,47 @@ let expand_shorted_sexp sexp =
       | None -> (exp,false)
   in
   let expand_map map defs =
-    String.Map.map map ~f:(fun el ->
-        let (new_el, _) = expand_exp el defs in new_el)
+    let new_map_expanded = List.map (Map.to_alist map) ~f:(fun (name,el) -> (name, expand_exp el defs)) in
+    let changed =
+      List.exists (List.map new_map_expanded ~f:(Fn.compose snd snd)) ~f:Fn.id
+    in
+    let new_map =
+      String.Map.of_alist_exn (List.map new_map_expanded
+                                 ~f:(fun (name,(new_el,changed)) -> (name,new_el)))
+    in
+    (new_map,changed)
   in
-  let map_non_expandable map defs =
-    not (List.exists (String.Map.data map) ~f:(fun el -> (snd (expand_exp el defs))))
+  let rec cross_expand_defs_fixp defs =
+    let (new_defs, expanded) = expand_map defs defs in
+    if expanded then cross_expand_defs_fixp new_defs
+    else defs
+  in
+  let map_expandable map defs =
+    List.exists (String.Map.data map) ~f:(fun el -> (snd (expand_exp el defs)))
   in
   let defs = get_defs sexp in
-  let defs = expand_map defs defs in
-  assert(map_non_expandable defs defs);
+  let defs = cross_expand_defs_fixp defs in
+  if (map_expandable defs defs) then begin
+    lprintf "failed expansion on sexp: \n%s\n" (Sexp.to_string sexp);
+    lprintf "defs: ";
+    Map.iter (get_defs sexp) ~f:(fun ~key ~data ->
+        lprintf "%s ::: %s\n" key (Sexp.to_string data));
+    lprintf "expanded defs: ";
+    Map.iter defs ~f:(fun ~key ~data ->
+        lprintf "%s ::: %s\n" key (Sexp.to_string data));
+    failwith ("incomplete map expansion for " ^ (Sexp.to_string sexp));
+  end;
   (fst (expand_exp (remove_defs sexp) defs))
 
 let get_fun_arg_type ftype_of fun_name arg_num =
   List.nth_exn (ftype_of fun_name).arg_types arg_num
+
+let get_fun_extra_ptr_type ftype_of fun_name exptr_name =
+  match List.Assoc.find (ftype_of fun_name).extra_ptr_types
+          ~equal:String.equal exptr_name with
+  | Some t -> t
+  | None -> failwith ("Could not find extra_ptr " ^ exptr_name ^
+                      " type for function " ^ fun_name)
 
 let get_fun_ret_type ftype_of fun_name = (ftype_of fun_name).ret_type
 
@@ -244,7 +272,9 @@ let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.M
         match tl with
         | [tl] -> get_var_decls_of_sexp
                     tl {s=(Sure Unsgn);w=Noidea;precise=Unknown} known_vars
-        | _ -> failwith "ZExt may have only one argument (besides w..)."
+        | _ ->
+          lprintf "ZExt may have only one argument: %s\n" (Sexp.to_string exp);
+          failwith "ZExt may have only one argument (besides w..)."
       else
         let si = choose_guess (infer_type_sign f) s in
         (List.join (List.map tl ~f:(fun e ->
@@ -263,7 +293,7 @@ let make_name_alist_from_var_decls (lst: typed_var list) =
 
 let get_vars_from_plain_val v type_guess known_vars =
   (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
-  let decls = get_var_decls_of_sexp v type_guess known_vars in
+  let decls = get_var_decls_of_sexp (expand_shorted_sexp v) type_guess known_vars in
   map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
 
 let type_guess_of_ttype t = match t with
@@ -368,15 +398,34 @@ let rec is_bool_expr exp =
   | _ -> false
 
 (* TODO: elaborate. *)
-let guess_type _ = Unknown
+let guess_type exp t =
+  lprintf "guessing for %s, know %s\n" (Sexp.to_string exp) (ttype_to_str t);
+  match t with
+  | Uunknown -> begin match exp with
+      | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
+        when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
+      | _ -> t
+    end
+  | _ -> t
 
-let rec guess_type_l exps =
+
+let rec guess_type_l exps t =
   match exps with
-  | hd :: tl -> begin match guess_type hd with
-      | Unknown -> guess_type_l tl
+  | hd :: tl -> begin match guess_type hd t with
+      | Unknown -> guess_type_l tl t
       | s -> s
     end
   | [] -> Unknown
+
+let find_first_known_address addr =
+  lprintf "looking for first *%Ld\n" addr;
+  Option.map (Int64.Map.find !known_addresses addr)
+    ~f:(fun lst -> (List.hd_exn lst).value)
+
+let find_first_known_address_or_dummy addr =
+  match find_first_known_address addr with
+  | Some tt -> tt
+  | None -> {v=Utility (Ptr_placeholder addr); t=Unknown}
 
 let rec get_sexp_value exp t =
   let exp = expand_shorted_sexp exp in
@@ -385,7 +434,7 @@ let rec get_sexp_value exp t =
   | Sexp.Atom v ->
     begin
       let t = match t with
-        |Unknown|Sunknown|Uunknown -> guess_type exp
+        |Unknown|Sunknown|Uunknown -> guess_type exp t
         |_ -> t
       in
       match t with
@@ -394,7 +443,14 @@ let rec get_sexp_value exp t =
         if String.equal v "true" then {v=Bool true;t=Boolean}
         else if String.equal v "false" then {v=Bool false;t=Boolean}
         (*FIXME: deduce the true integer type for the value: *)
-        else if is_int v then {v=Int (int_of_string v);t}
+        else if is_int v then
+          let addr = (Int64.of_int (int_of_string v)) in
+          if addr = 0L then {v=Int 0; t}
+          else
+            match t with
+            | Ptr x ->
+              find_first_known_address_or_dummy addr
+            | _ -> {v=Int (int_of_string v);t}
         else {v=Id v;t}
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
@@ -405,6 +461,9 @@ let rec get_sexp_value exp t =
       get_sexp_value src t
     else
       {v=Cast (t, allocate_tmp (get_sexp_value src Sint32));t}
+  | Sexp.List [Sexp.Atom f; Sexp.Atom offset; src;]
+    when (String.equal f "Extract") && (String.equal offset "0") ->
+    get_sexp_value src Boolean
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; arg]
     when (String.equal f "SExt") && (String.equal w "w64") ->
     get_sexp_value arg t (*TODO: make sure this ignorance is ok *)
@@ -445,7 +504,7 @@ let rec get_sexp_value exp t =
     {v=Bop (Lt,(get_sexp_value lhs Uunknown),(get_sexp_value rhs Uunknown));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
-    let ty = guess_type_l [lhs;rhs] in
+    let ty = guess_type_l [lhs;rhs] Unknown in
     {v=Bop (Eq,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t}
   | Sexp.List [Sexp.Atom f; _; e]
     when String.equal f "ZExt" ->
@@ -457,13 +516,33 @@ let rec get_sexp_value exp t =
     (*FIXME: and here, but really that is a bool expression, I know it*)
     (*TODO: check t is really Boolean here*)
     {v=Bop (And,(get_sexp_value lhs Boolean),(get_sexp_value rhs Boolean));t}
+  | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
+    when (String.equal f "And") ->
+    begin
+      match rhs with
+      | Sexp.Atom n when is_int n ->
+        {v=Bop (Bit_and,(get_sexp_value lhs Uint32),(get_sexp_value rhs Uint32));t=Uint32}
+      | _ ->
+        let ty = guess_type_l [lhs;rhs] t in
+        lprintf "interesting And case{%s}: %s "
+          (ttype_to_str ty) (Sexp.to_string exp);
+        if ty = Boolean then
+          {v=Bop (And,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t=ty}
+        else
+          {v=Bop (Bit_and,(get_sexp_value lhs ty),(get_sexp_value rhs ty));t=ty}
+    end
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom lhs; rhs;]
     when (String.equal f "Concat") && (String.equal lhs "0") ->
     get_sexp_value rhs t
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> {v=Id name;t}
-      | None -> make_cmplx_val exp t
+      | None ->
+        let t = match t with
+          |Unknown|Sunknown|Uunknown -> guess_type exp t
+          |_ -> t
+        in
+        make_cmplx_val exp t
     end
 
 let rec get_struct_val_value valu t =
@@ -474,6 +553,8 @@ let rec get_struct_val_value valu t =
     (* | Some name -> {v=Id name;t} *)
     (* | None -> <^^^ this was working a while ago, may be it should be
        left somewhere *)
+      lprintf "Destruct: %s; Need %d fields got %d fields.\n" strname
+        (List.length fields) (List.length valu.break_down);
       let fields = List.map2_exn valu.break_down fields
           ~f:(fun {fname;value;_} (name,t) ->
               assert(String.equal name fname);
@@ -536,6 +617,14 @@ let get_basic_vars ftype_of tpref =
       in
       get_vars_from_struct_val ptee.after ptee_type before_vars
     in
+    let get_extra_ptr_pointee_vars ptee ptee_type accumulator =
+      match ptee with
+      | Opening x -> get_vars_from_struct_val x ptee_type accumulator
+      | Closing x -> get_vars_from_struct_val x ptee_type accumulator
+      | Changing (a,b) ->
+        get_vars_from_struct_val a ptee_type
+          (get_vars_from_struct_val b ptee_type accumulator)
+    in
     let get_ret_pointee_vars ptee ptee_type accumulator =
       assert(ptee.before.full = None);
       assert(ptee.before.break_down = []);
@@ -565,16 +654,24 @@ let get_basic_vars ftype_of tpref =
             let arg_type = get_fun_arg_type ftype_of call.fun_name i in
             complex_value_vars arg.value arg.ptr arg_type false acc)
     in
+    let extra_ptr_vars = List.fold call.extra_ptrs ~init:arg_vars
+        ~f:(fun acc {pname;value;ptee} ->
+            let ptee_type =
+              get_fun_extra_ptr_type ftype_of call.fun_name pname in
+          get_extra_ptr_pointee_vars ptee ptee_type acc)
+    in
     let ret_vars = match call.ret with
       | Some ret ->
         complex_value_vars
           ret.value ret.ptr
-          (get_fun_ret_type ftype_of call.fun_name) true arg_vars
-      | None -> arg_vars in
+          (get_fun_ret_type ftype_of call.fun_name) true extra_ptr_vars
+      | None -> extra_ptr_vars in
     let add_vars_from_ctxt vars ctxt =
       map_set_n_update_alist vars
         (make_name_alist_from_var_decls
-           (get_var_decls_of_sexp ctxt {s=Noidea;w=Sure W1;precise=Boolean} vars)) in
+           (get_var_decls_of_sexp
+              (expand_shorted_sexp ctxt)
+              {s=Noidea;w=Sure W1;precise=Boolean} vars)) in
     let call_ctxt_vars =
       List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
     let ret_ctxt_vars =
@@ -647,6 +744,41 @@ let allocate_rets ftype_of tpref =
           let ret = Int.Map.find_exn rets call.id in
           Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"})
 
+let allocate_extra_ptrs ftype_of tpref =
+  let alloc_call_extra_ptrs call =
+    let alloc_extra_ptr p_name addr str_value tterm =
+      lprintf "looking for *%Ld\n" addr;
+      match Int64.Map.find !known_addresses addr with
+      | Some spec -> known_addresses :=
+          Int64.Map.add !known_addresses
+            ~key:addr ~data:(List.map spec ~f:(fun spec ->
+                {spec with value=update_tterm spec.value tterm}));
+        None
+      | None ->
+        add_to_known_addresses
+          {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
+          str_value.break_down
+          addr call.id 0;
+        Some {name=p_name;value=tterm}
+    in
+    List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
+        let addr = value in
+        let ptee_type = get_fun_extra_ptr_type ftype_of call.fun_name pname in
+        match ptee with
+        | Opening _ ->
+          alloc_extra_ptr (pname ^ call.fun_name)
+            addr {full=None;break_down=[]} {v=Undef;t=ptee_type}
+        | Closing x ->
+          alloc_extra_ptr (pname ^ "_" ^ call.fun_name ^
+                           (Int64.to_string addr)) addr x
+            (get_struct_val_value x ptee_type)
+        | Changing (x,_) ->
+          alloc_extra_ptr (pname ^ "_" ^ call.fun_name ^
+                           (Int64.to_string addr)) addr x
+            (get_struct_val_value x ptee_type))
+  in
+  List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_extra_ptrs)
+
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
     let alloc_arg addr str_value tterm =
@@ -711,15 +843,6 @@ let allocate_args ftype_of tpref arg_name_gen =
 let compose_fcall_preamble ftype_of call args tmp_gen =
   (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
 
-let find_first_known_address addr =
-  lprintf "looking for first *%Ld\n" addr;
-  Option.map (Int64.Map.find !known_addresses addr)
-    ~f:(fun lst -> (List.hd_exn lst).value)
-
-let find_exn_first_known_address addr =
-  lprintf "looking for first *%Ld\n" addr;
-  (List.hd_exn (Int64.Map.find_exn !known_addresses addr)).value
-
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
     let arg_var = find_first_known_address
@@ -772,6 +895,10 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
                     args;tmp_gen;is_tip})
 
+let deref_tterm {v;t} =
+  {v = simplify_term (Deref {v;t});
+   t = get_pointee t}
+
 let compose_args_post_conditions (call:Trace_prefix.call_node) =
   List.filter_map call.args ~f:(fun arg ->
       match arg.ptr with
@@ -788,12 +915,34 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
             (* Skip the two layer pointer.
                TODO: maybe be allow special case of Zeroptr here.*)
           | value ->
-            Some {lhs={v=simplify_term (Deref out_arg);
-                       t=get_pointee out_arg.t};
+            Some {lhs=deref_tterm out_arg;
                   rhs=value}
           end
         | None -> None (* The variable is not allocated,
                           because it is a 2-layer pointer.*))
+
+let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node) =
+  let gen_post_condition_of_struct_val (val_before : Ir.tterm) val_now =
+    match get_struct_val_value
+            val_now (get_pointee val_before.t) with
+    | {v=Int _;t=_} -> None
+    (* Skip the two layer pointer.
+       TODO: maybe be allow special case of Zeroptr here.*)
+    | value ->
+      Some {lhs=deref_tterm val_before;
+            rhs=value}
+  in
+  List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
+      let key = value in
+      match find_first_known_address key with
+      | Some extra_ptee ->
+        begin match ptee with
+          | Opening x -> gen_post_condition_of_struct_val extra_ptee x
+          | Closing _ -> None
+          | Changing (_,x) -> gen_post_condition_of_struct_val extra_ptee x
+        end
+      | None -> None (* The variable is not allocated,
+                        because it is a 2-layer pointer.*))
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
@@ -823,13 +972,39 @@ let find_last_known_whole_address_before_call addr call_id =
                  (max_el,max_id)))
 
 let take_extra_ptrs_into_account ptrs callid =
+  let gen_eq_by_struct_val (var_ptr : Ir.tterm) value_now =
+    match get_struct_val_value value_now (get_pointee var_ptr.t) with
+    | {v=Undef;t=_} -> None
+    | y -> Some {lhs=deref_tterm var_ptr;rhs=y}
+  in
+
   List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
       match find_last_known_whole_address_before_call value callid with
       | None -> None
       | Some (x,_) ->
-        match get_struct_val_value ptee.before (get_pointee x.t) with
-        | {v=Undef;t=_} -> None
-        | y -> Some {lhs={v=Deref x;t=y.t};rhs=y})
+        match ptee with
+        | Opening o -> gen_eq_by_struct_val x o
+        | Closing _ -> None
+        | Changing (o,_) -> gen_eq_by_struct_val x o)
+
+let take_arg_ptrs_into_account (args : Trace_prefix.arg list) callid =
+  List.filter_map args ~f:(fun arg ->
+      match arg.ptr with
+      | Nonptr -> None
+      | Funptr _ -> None
+      | Apathptr -> None
+      | Curioptr ptee -> begin (* TODO: why nececerily a *whole* address?
+                               See also take_extra_ptrs_into_account for the
+                               same issue.*)
+          let addr = Int64.of_string (Sexp.to_string arg.value) in
+          match find_last_known_whole_address_before_call addr callid with
+          | None -> None
+          | Some (x,_) ->
+            match get_struct_val_value ptee.before (get_pointee x.t) with
+            | {v=Undef;t=_} -> None
+            | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
+        end)
+
 
 let extract_common_call_context
     ~is_tip ftype_of call ret_spec args unique_postfix =
@@ -839,7 +1014,8 @@ let extract_common_call_context
   let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
   let application = simplify_term (Apply (call.fun_name,args)) in
   let extra_pre_conditions =
-    take_extra_ptrs_into_account call.extra_ptrs call.id
+    (take_extra_ptrs_into_account call.extra_ptrs call.id)@
+    (take_arg_ptrs_into_account call.args call.id)
   in
   let post_lemmas =
     compose_post_lemmas
@@ -854,6 +1030,9 @@ let extract_common_call_context
 let extract_hist_call ftype_of call rets =
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
+  let args_post_conditions = (compose_extra_ptrs_post_conditions call)@
+                             args_post_conditions
+  in
   let uniq = string_of_int call.id in
   match Int.Map.find rets call.id with
   | Some ret ->
@@ -902,8 +1081,16 @@ let extract_tip_calls ftype_of calls rets =
        {args_post_conditions=args_post_conditions2;
         ret_val=get_ret_val tip2;
         post_statements=convert_ctxt_list tip2.ret_context;}]
-    | _ -> failwith "More than two tip calls is not supported."
+    | _ ->
+      List.map calls ~f:(fun tip ->
+          {args_post_conditions = compose_args_post_conditions tip;
+           ret_val = get_ret_val tip;
+           post_statements = convert_ctxt_list tip.ret_context})
+      (* failwith ("More than two tip calls (" ^ *)
+      (*           (string_of_int (List.length calls)) ^ *)
+      (*           ") is not supported.") *)
   in
+  lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
 
 let extract_calls_info ftype_of tpref rets =
@@ -919,38 +1106,49 @@ let collect_context pref =
       (convert_ctxt_list call.call_context) @
       (convert_ctxt_list call.ret_context)))) @
   (match pref.tip_calls with
-   | hd :: [] -> (convert_ctxt_list hd.call_context)
-   | hd1 :: hd2 :: [] ->
-     let call_context = convert_ctxt_list hd1.call_context in
-     assert (call_context = (convert_ctxt_list hd2.call_context));
-     call_context
    | [] -> failwith "There must be at least one tip call."
-   | _ -> failwith "More than two tip alternative tipcalls are not supported.")
+   | hd :: tail -> let call_context = convert_ctxt_list hd.call_context in
+     assert (List.for_all tail ~f:(fun tip ->
+         call_context = convert_ctxt_list tip.call_context));
+     call_context)
+   (* | hd :: [] -> (convert_ctxt_list hd.call_context) *)
+   (* | hd1 :: hd2 :: [] -> *)
+   (*   let call_context = convert_ctxt_list hd1.call_context in *)
+   (*   assert (call_context = (convert_ctxt_list hd2.call_context)); *)
+   (*   call_context *)
+   (* | _ -> failwith "More than two tip alternative tipcalls are not supported.") *)
 
 let strip_context call =
   (* TODO: why do we erase the return value? *)
   {call with ret = None; call_context = []; ret_context = [];}
 
-let get_relevant_segment pref boundary_fun =
-  let rec last_relevant_seg hist candidat =
+(* Returns the segment and whether it is a part of an iteration or not*)
+let get_relevant_segment pref boundary_fun eventproc_iteration_begin =
+  let rec last_relevant_seg hist candidate =
     match hist with
     | c :: rest ->
-      if (String.equal c.fun_name boundary_fun) then
+      if (String.equal c.fun_name eventproc_iteration_begin) then
+        let (seg,_) = last_relevant_seg rest hist in
+        (seg, true)
+      else if (String.equal c.fun_name boundary_fun) then
         last_relevant_seg rest hist
       else
-        last_relevant_seg rest candidat
-    | [] -> candidat
+        last_relevant_seg rest candidate
+    | [] -> (candidate, false)
   in
   match pref.tip_calls with
   | [] -> failwith "must have at least one tip call."
   | hd :: _ ->
-    if (String.equal hd.fun_name boundary_fun) then
-      {history=[]; tip_calls = List.map pref.tip_calls ~f:strip_context}
+    if (String.equal hd.fun_name boundary_fun) ||
+       (String.equal hd.fun_name eventproc_iteration_begin) then
+      ({history=[]; tip_calls = List.map pref.tip_calls ~f:strip_context},
+       false)
     else
       match last_relevant_seg pref.history [] with
-      | bnd :: rest ->
-        {history = strip_context bnd :: rest; tip_calls = pref.tip_calls}
-      | [] -> pref
+      | (bnd :: rest, inside_iteration) ->
+        ({history = strip_context bnd :: rest; tip_calls = pref.tip_calls},
+         inside_iteration)
+      | ([], _) -> (pref, false)
 
 let is_the_last_function_finishing pref finishing_fun =
   String.equal (List.hd_exn pref.tip_calls).fun_name finishing_fun
@@ -991,22 +1189,69 @@ let typed_vars_to_varspec free_vars =
         String.Map.add acc ~key:vname
           ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
 
-let build_ir fun_types fin preamble boundary_fun finishing_fun =
+let fixup_placeholder_ptrs_in_tterm tterm =
+  let replace_placeholder = function
+    | {v=Utility (Ptr_placeholder addr);
+       t=_} ->
+      lprintf "fixing placeholder for %Ld\n" addr;
+      find_first_known_address addr
+    | _ -> None
+  in
+  call_recursively_on_tterm replace_placeholder tterm
+
+let fixup_placeholder_ptrs vars =
+  List.map vars ~f:(fun {name;value} ->
+    {name;value=fixup_placeholder_ptrs_in_tterm value})
+
+let fixup_placeholder_ptrs_in_eq_cond {lhs;rhs} =
+  {lhs=fixup_placeholder_ptrs_in_tterm lhs;
+   rhs=fixup_placeholder_ptrs_in_tterm rhs}
+
+let fixup_placeholder_ptrs_in_hist_calls hist_calls =
+  let in_one_call {context;result} =
+    {context;result=
+               {args_post_conditions=List.map result.args_post_conditions
+                    ~f:fixup_placeholder_ptrs_in_eq_cond;
+                ret_val=fixup_placeholder_ptrs_in_tterm result.ret_val}}
+  in
+  List.map hist_calls ~f:in_one_call
+
+let fixup_placeholder_ptrs_in_tip_call tip_call =
+  let in_one_result {args_post_conditions;ret_val;post_statements} =
+    {args_post_conditions = List.map args_post_conditions
+         ~f:fixup_placeholder_ptrs_in_eq_cond;
+     ret_val = fixup_placeholder_ptrs_in_tterm ret_val;
+     post_statements = List.map post_statements
+         ~f:fixup_placeholder_ptrs_in_tterm}
+  in
+  {tip_call with results = List.map tip_call.results
+                     ~f:in_one_result}
+
+let build_ir fun_types fin preamble boundary_fun finishing_fun
+  eventproc_iteration_begin eventproc_iteration_end =
   let ftype_of fun_name =
     match String.Map.find fun_types fun_name with
     | Some spec -> spec
     | None -> failwith ("unknown function " ^ fun_name)
   in
-  let pref = get_relevant_segment
+  let (pref,inside_iteration) = get_relevant_segment
       (Trace_prefix.trace_prefix_of_sexp (Sexp.load_sexp fin))
-      boundary_fun
+      boundary_fun eventproc_iteration_begin
   in
+  lprintf "inside_iteration: %s\n" (if inside_iteration then "true" else "false");
   let pref = distribute_ids pref in
-  let finishing = is_the_last_function_finishing pref finishing_fun in
+  let finishing_iteration =
+    is_the_last_function_finishing pref eventproc_iteration_end
+  in
+  let finishing =
+    (is_the_last_function_finishing pref finishing_fun) ||
+    finishing_iteration
+  in
   let preamble = preamble in
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
   let arguments = allocate_args ftype_of pref (name_gen "arg") in
+  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets in
@@ -1014,6 +1259,11 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun =
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
   let free_vars = typed_vars_to_varspec free_vars in
+  let arguments = fixup_placeholder_ptrs arguments in
+  let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
+  let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
-   export_point;finishing}
+   export_point;finishing;
+   complete_event_loop_iteration = inside_iteration && finishing_iteration;
+   semantic_checks=""}

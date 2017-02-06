@@ -14,7 +14,7 @@ int main() {
           packets[end].port != 9)
         queue_len += 1;
     }
-    if (0 < queue_len) {
+    if (0 < queue_len && can_send_packet()) {
       send_packet(&packets[begin]);
       begin = (begin + 1)%CAP;
     }
