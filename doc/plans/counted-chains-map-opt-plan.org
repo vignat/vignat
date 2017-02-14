@@ -249,3 +249,10 @@ should also be compatible with the one Martin is implementing.
     CLOCK: [2016-11-01 Die 13:07]--[2016-11-01 Die 13:08] =>  0:01
     :END:
 ** certify the double map modifications
+   Done, time not counted, probably amounts to < 1h
+** refactor proof
+*** split into modules
+    :LOGBOOK:
+    CLOCK: [2017-02-14 Die 14:32]
+    :END:
+   
