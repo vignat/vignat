@@ -79,7 +79,26 @@ ensures int_of_nat(x) < int_of_nat(lim);
   }
 }
 
+fixpoint bool nat_ge(int x, nat y) { return x <= int_of_nat(y); }
+
 fixpoint bool nat_lt(int x, nat y) { return int_of_nat(y) < x; }
+
+fixpoint t3 sup<t1,t2,t3>(fixpoint (t2,t3) f1, fixpoint (t1,t2) f2, t1 x) {
+  return f1(f2(x));
+}
+
+lemma void forall_sup_map<t1,t2>(list<t1> l,
+                                 fixpoint (t2,bool) f1,
+                                 fixpoint (t1,t2) f2)
+requires true;
+ensures forall(l, (sup)(f1, f2)) == forall(map(f2, l), f1);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      forall_sup_map(t, f1, f2);
+  }
+}
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19

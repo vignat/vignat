@@ -253,7 +253,7 @@ should also be compatible with the one Martin is implementing.
 ** refactor proof
 *** split into modules
     :LOGBOOK:
-    CLOCK: [2017-02-14 Die 19:18]
+    CLOCK: [2017-02-14 Die 19:18]--[2017-02-14 Die 21:34] =>  2:16
     CLOCK: [2017-02-14 Die 14:32]--[2017-02-14 Die 14:54] =>  0:22
     :END:
    
