@@ -150,6 +150,7 @@ struct DoubleMap {
     mp->kps_a |-> ?kps_a &*& malloc_block_pointers(kps_a, keys_capacity) &*&
     mp->khs_a |-> ?khs_a &*& malloc_block_ints(khs_a, keys_capacity) &*&
     mp->inds_a |-> ?inds_a &*& malloc_block_ints(inds_a, keys_capacity) &*&
+    mp->chns_a |-> ?chns_a &*& malloc_block_ints(chns_a, keys_capacity) &*&
     mapping(?ma, addrsa, keyp1, recp1, hsh1, keys_capacity,
             bbs_a, kps_a, khs_a, chns_a, inds_a) &*&
     mp->eq_a |-> ?eq_a &*&
@@ -160,6 +161,7 @@ struct DoubleMap {
     mp->kps_b |-> ?kps_b &*& malloc_block_pointers(kps_b, keys_capacity) &*&
     mp->khs_b |-> ?khs_b &*& malloc_block_ints(khs_b, keys_capacity) &*&
     mp->inds_b |-> ?inds_b &*& malloc_block_ints(inds_b, keys_capacity) &*&
+    mp->chns_b |-> ?chns_b &*& malloc_block_ints(chns_b, keys_capacity) &*&
     mapping(?mb, addrsb, keyp2, recp2, hsh2, keys_capacity,
             bbs_b, kps_b, khs_b, chns_b, inds_b) &*&
     mp->eq_b |-> ?eq_b &*&
@@ -174,7 +176,7 @@ struct DoubleMap {
                          right_offsets, vk1, vk2) &*&
     mp->capacity |-> capacity &*&
     mp->n_vals |-> map_size_fp(ma) &*&
-    0 <= capacity &*& capacity < keys_capacity &*&
+    0 <= capacity &*& capacity <= keys_capacity &*&
     values + val_size*capacity <= (void*)UINTPTR_MAX &*&
     true == insync_fp(val_arr, ma, mb, vk1, vk2, 0) &*&
     true == no_extra_ptrs(addrsa, ma) &*&
@@ -287,7 +289,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              dmap_record_property2<K2>(?recp2) &*&
              *map_out |-> ?old_map_out &*&
              0 < value_size &*& value_size < 4096 &*&
-             0 < capacity &*& capacity < keys_capacity &*&
+             0 < capacity &*& capacity <= keys_capacity &*&
              keys_capacity < CAPACITY_UPPER_LIMIT; @*/
 /*@ ensures result == 0 ?
             (*map_out |-> old_map_out) :

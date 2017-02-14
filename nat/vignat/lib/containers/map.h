@@ -77,9 +77,9 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
 /*@
   lemma void map_no_dup_keys<kt>(list<pair<kt, int> > m);
   requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
-                   ?cap, ?bbs, ?kps, ?khs, ?vals);
+                   ?cap, ?bbs, ?kps, ?khs, ?chns, ?vals);
   ensures mapping(m, addrs, kp, rp, hsh,
-                  cap, bbs, kps, khs, vals) &*&
+                  cap, bbs, kps, khs, chns, vals) &*&
           true == no_dups(map(fst, m));
   @*/
 

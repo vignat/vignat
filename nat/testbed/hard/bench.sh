@@ -29,7 +29,7 @@
 #           a.k.a. request/response
 
 MIDDLEBOX=$1
-SCENARIO=$SCENARIO
+SCENARIO=$2
 
 if [ -z $MIDDLEBOX ]; then
     echo "[bench] No app specified" 1>&2
@@ -179,7 +179,7 @@ case $SCENARIO in
         ;;
 
     *)
-        echo "[bench] Unknown scenario: $MIDDLEBOX" 1>&2
+        echo "[bench] Unknown scenario: $SCENARIO" 1>&2
         exit 10
         ;;
 esac

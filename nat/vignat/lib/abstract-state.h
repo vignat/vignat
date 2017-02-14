@@ -1456,7 +1456,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
                          map(fst, alist));
   {
     alist_remove_many_subset(alist, indices);
-    subset_map(fst, fold_left(alist, remove_by_index_fp, indices), alist);
+    subset_map(fold_left(alist, remove_by_index_fp, indices), alist, fst);
   }
   @*/
 

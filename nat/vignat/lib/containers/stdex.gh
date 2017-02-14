@@ -1304,18 +1304,6 @@ fixpoint bool no_dups<t>(list<t> l) {
   }
 }
 
-  lemma void subset_forall<t>(list<t> xs, list<t> ys, fixpoint (t,bool) prop)
-  requires true == subset(xs, ys) &*& true == forall(ys, prop);
-  ensures true == forall(xs, prop);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        forall_mem(h, ys, prop);
-        subset_forall(t, ys, prop);
-    }
-  }
-
 
 fixpoint bool ge(int x, int y) { return x <= y; }
 
@@ -1337,18 +1325,6 @@ fixpoint bool lt(int x, int y) { return y < x; }
       case nil: return true;
       case cons(h,t):
         return opt_no_dups(t) && (h == none || !(mem(h, t)));
-    }
-  }
-
-  lemma void subset_map<t1,t2>(fixpoint (t1,t2) f, list<t1> l1, list<t1> l2)
-  requires true == subset(l1, l2);
-  ensures true == subset(map(f, l1), map(f, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        subset_map(f, t, l2);
-        mem_map(h, l2, f);
     }
   }
 

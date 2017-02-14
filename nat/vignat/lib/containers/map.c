@@ -567,14 +567,6 @@ int loop(int k, int capacity)
              ([0.5]pred(pth, ?kh) &*& ks == cons(some(kh), kt)));
     };
 
-  fixpoint bool no_dups<t>(list<option<t> > l) {
-    switch(l) {
-      case nil: return true;
-      case cons(h,t):
-        return no_dups(t) && (h == none || !(mem(h, t)));
-    }
-  }
-
   fixpoint bool hash_list<kt>(list<option<kt> > vals,
                              list<int> hashes,
                              fixpoint (kt, int) hash) {
@@ -598,7 +590,7 @@ int loop(int k, int capacity)
             ints(busybits, capacity, ?bbs) &*&
             ints(k_hashes, capacity, ?khs) &*&
             pred_mapping(kps, bbs, keyp, ?ks) &*&
-            true == no_dups(ks) &*&
+            true == opt_no_dups(ks) &*&
             true == hash_list(ks, khs, hash) &*&
             m == hmap(ks, khs);
 @*/
@@ -630,8 +622,8 @@ int loop(int k, int capacity)
   }
 
   lemma void hmap_rem_preserves_no_dups<kt>(list<option<kt> > ks, int i)
-  requires true == no_dups(ks) &*& 0 <= i;
-  ensures true == no_dups(update(i, none, ks));
+  requires true == opt_no_dups(ks) &*& 0 <= i;
+  ensures true == opt_no_dups(update(i, none, ks));
   {
     switch(ks) {
      case nil: return;
@@ -1244,7 +1236,7 @@ int loop(int k, int capacity)
   }
 
   lemma void no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
-  requires true == no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
+  requires true == opt_no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
            0 <= m &*& m < length(ks) &*&
            nth(n, ks) == some(k) &*& nth(m, ks) == some(k);
   ensures n == m;
@@ -1265,7 +1257,7 @@ int loop(int k, int capacity)
   }
 
   lemma void ks_find_this_key<kt>(list<option<kt> > ks, int i, kt k)
-  requires nth(i, ks) == some(k) &*& true == no_dups(ks) &*&
+  requires nth(i, ks) == some(k) &*& true == opt_no_dups(ks) &*&
            0 <= i &*& i < length(ks);
   ensures index_of(some(k), ks) == i;
   {
@@ -1283,7 +1275,7 @@ int loop(int k, int capacity)
   }
 
   lemma void hmap_find_this_key<kt>(hmap<kt> m, int i, kt k)
-  requires nth(i, hmap_ks_fp(m)) == some(k) &*& true == no_dups(hmap_ks_fp(m)) &*&
+  requires nth(i, hmap_ks_fp(m)) == some(k) &*& true == opt_no_dups(hmap_ks_fp(m)) &*&
            0 <= i &*& i < length(hmap_ks_fp(m));
   ensures hmap_find_key_fp(m, k) == i;
   {
@@ -3108,8 +3100,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void keys_contain_keys_nodups<kt>(list<option<kt> > ks1, list<option<kt> > ks2)
-  requires true == keys_contain_keys(ks1, ks2) &*& true == no_dups(ks2);
-  ensures true == no_dups(ks1);
+  requires true == keys_contain_keys(ks1, ks2) &*& true == opt_no_dups(ks2);
+  ensures true == opt_no_dups(ks1);
   {
     assume(false);//TODO 10m
   }
@@ -3123,7 +3115,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            //true == distinct(map(snd, acc)) &*& should follow from buckets_ok
            true == buckets_ok_rec(acc, buckets, bound);
            //true == forall(acc, (upper_limit)(length(buckets)));  also
-  ensures false == no_dups(buckets_get_keys_rec_fp(acc, buckets));
+  ensures false == opt_no_dups(buckets_get_keys_rec_fp(acc, buckets));
   {
     switch(buckets) {
       case nil:
@@ -3166,7 +3158,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                 assert true == mem(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
                 list<option<kt> > kss = buckets_get_keys_rec_fp(acc, buckets);
                 assert kss == cons(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
-                assert false == no_dups(buckets_get_keys_rec_fp(acc, buckets));
+                assert false == opt_no_dups(buckets_get_keys_rec_fp(acc, buckets));
                 return;
               } else {
                 assume( false == distinct(map(fst, advance_acc(acc_atb_bnd))));//TODO
@@ -3183,12 +3175,12 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           advance_acc_lower_limit(acc_atb_bnd, length(buckets));
           assert true == forall(advance_acc(acc_atb_bnd), (upper_limit)(length(t)));
           dups_in_acc_dups_in_keys(advance_acc(acc_atb_bnd), t, bound);
-          assert false == no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t));
-          if (no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb), t))) {
+          assert false == opt_no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t));
+          if (opt_no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb), t))) {
             keys_contain_keys_nodups(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t),
                                      buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
           }
-          assert false == no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
+          assert false == opt_no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
         }
     }
   }
@@ -3202,7 +3194,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            true == distinct(map(snd, acc)) &*&
            true == buckets_ok_rec(acc, buckets, bound);
   ensures false == distinct(map(fst, get_wraparound(acc, buckets))) ||
-          false == no_dups(buckets_get_keys_rec_fp(acc, buckets));
+          false == opt_no_dups(buckets_get_keys_rec_fp(acc, buckets));
   {
     switch(buckets) {
       case nil:
@@ -3225,7 +3217,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                       (advance_acc(acc_atb), t)));//TODO
                 assert true == mem(some(k), buckets_get_keys_rec_fp
                                               (advance_acc(acc_atb), t));
-                assert false == no_dups(buckets_get_keys_rec_fp(acc, buckets));
+                assert false == opt_no_dups(buckets_get_keys_rec_fp(acc, buckets));
                 return;
               } else {
                 assume(false == distinct(map(fst, advance_acc(acc_atb))));//TODO
@@ -3248,7 +3240,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                  list<option<kt> > keys,
                                                  kt k, int bound)
   requires true == mem(some(k), keys) &*&
-           true == no_dups(keys) &*&
+           true == opt_no_dups(keys) &*&
            true == buckets_ok_rec(acc, buckets, bound) &*&
            true == distinct(map(fst, acc)) &*&
            keys == buckets_get_keys_rec_fp(acc, buckets) &*&
@@ -3337,7 +3329,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                              list<option<kt> > keys,
                                              kt k)
   requires true == mem(some(k), keys) &*&
-           true == no_dups(keys) &*&
+           true == opt_no_dups(keys) &*&
            keys == buckets_get_keys_rec_fp(acc, buckets) &*&
            true == forall(acc, (not_this_key_pair_fp)(k));
   ensures buckets_get_keys_rec_fp(acc, buckets_remove_key_fp(buckets, k)) ==
@@ -3351,7 +3343,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void buckets_rm_key_get_keys<kt>(list<bucket<kt> > buckets,
                                          kt k)
   requires true == mem(some(k), buckets_get_keys_fp(buckets)) &*&
-           true == no_dups(buckets_get_keys_fp(buckets)) &*&
+           true == opt_no_dups(buckets_get_keys_fp(buckets)) &*&
            true == buckets_ok(buckets);
   ensures buckets_get_keys_fp(buckets_remove_key_fp(buckets, k)) ==
           update(index_of(some(k), buckets_get_keys_fp(buckets)),
@@ -4264,7 +4256,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
 
   lemma void confirm_no_dups_on_nones<kt>(nat len)
   requires true;
-  ensures true == no_dups(none_list_fp(len));
+  ensures true == opt_no_dups(none_list_fp(len));
   {
     switch(len) {
       case zero:
@@ -4748,7 +4740,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   }
 
   lemma void map_no_dups<kt,vt>(list<option<kt> > ks, list<pair<kt,vt> > m)
-  requires key_vals(ks, ?val_arr, m) &*& true == no_dups(ks);
+  requires key_vals(ks, ?val_arr, m) &*& true == opt_no_dups(ks);
   ensures key_vals(ks, val_arr, m) &*& true == no_dup_keys(m);
   {
     open key_vals(ks, val_arr, m);
@@ -4809,7 +4801,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   lemma void ks_find_returns_the_key<kt,vt>(list<option<kt> > ks,
                                             list<vt> val_arr,
                                             list<pair<kt, vt> > m, kt k)
-  requires key_vals(ks, val_arr, m) &*& true == no_dups(ks) &*&
+  requires key_vals(ks, val_arr, m) &*& true == opt_no_dups(ks) &*&
            true == mem(some(k), ks);
   ensures key_vals(ks, val_arr, m) &*&
           nth(index_of(some(k), ks), val_arr) == map_get_fp(m, k);
@@ -4857,7 +4849,7 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                               list<vt> val_arr,
                                               list<pair<kt, vt> > m, kt k)
   requires key_vals(hmap_ks_fp(hm), val_arr, m) &*&
-           true == no_dups(hmap_ks_fp(hm)) &*&
+           true == opt_no_dups(hmap_ks_fp(hm)) &*&
            true == hmap_exists_key_fp(hm, k);
   ensures key_vals(hmap_ks_fp(hm), val_arr, m) &*&
           nth(hmap_find_key_fp(hm, k), val_arr) == map_get_fp(m, k);
@@ -4994,8 +4986,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void put_preserves_no_dups<kt>(list<option<kt> > ks, int i, kt k)
-  requires false == mem(some(k), ks) &*& true == no_dups(ks);
-  ensures true == no_dups(update(i, some(k), ks));
+  requires false == mem(some(k), ks) &*& true == opt_no_dups(ks);
+  ensures true == opt_no_dups(update(i, some(k), ks));
   {
     switch(ks) {
       case nil: break;
@@ -8301,7 +8293,7 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                               list<pair<kt,vt> > m,
                                               int i, kt k)
   requires key_vals(ks, ?vals, m) &*& nth(i, ks) == some(k) &*&
-           true == no_dup_keys(m) &*& true == no_dups(ks) &*&
+           true == no_dup_keys(m) &*& true == opt_no_dups(ks) &*&
            0 <= i &*& i < length(ks);
   ensures key_vals(update(i, none, ks), vals, map_erase_fp(m, k));
   {
@@ -8351,7 +8343,7 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                                 int i, kt k)
   requires key_vals(hmap_ks_fp(hm), ?vals, m) &*&
            nth(i, hmap_ks_fp(hm)) == some(k) &*&
-           true == no_dups(hmap_ks_fp(hm)) &*&
+           true == opt_no_dups(hmap_ks_fp(hm)) &*&
            0 <= i &*& i < length(hmap_ks_fp(hm));
   ensures key_vals(hmap_ks_fp(hmap_rem_key_fp(hm, i)),
                    vals, map_erase_fp(m, k));
@@ -8468,7 +8460,7 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
                   pointers(keyps, capacity, kps) &*&
                   ints(k_hashes, capacity, khs) &*&
                   pred_mapping(kps, bbs, kp, ks) &*&
-                  true == no_dups(ks) &*&
+                  true == opt_no_dups(ks) &*&
                   true == hash_list(ks, khs, hsh) &*&
                   hm == hmap(ks, khs) &*&
                   count(take(i, bbs), nonzero) == s &*&
@@ -8502,5 +8494,55 @@ int map_size/*@ <kt> @*/(int* busybits, int capacity)
     open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, chns, vals);
     map_extract_recp(m, k, rp);
     close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, chns, vals);
+  }
+  @*/
+
+/*@
+  lemma void map_has_to_mem<kt>(list<pair<kt, int> > m, kt k)
+  requires true;
+  ensures map_has_fp(m, k) == mem(k, map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,value):
+          if (key != k) map_has_to_mem(t, k);
+        }
+    }
+  
+  }
+  @*/
+
+/*@
+  lemma void no_dup_keys_to_no_dups<kt>(list<pair<kt, int> > m)
+  requires true;
+  ensures no_dup_keys(m) == no_dups(map(fst, m));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,ind):
+          no_dup_keys_to_no_dups(t);
+          map_has_to_mem(t, key);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_no_dup_keys<kt>(list<pair<kt, int> > m)
+  requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
+                   ?cap, ?bbs, ?kps, ?khs, ?chns, ?vals);
+  ensures mapping(m, addrs, kp, rp, hsh,
+                  cap, bbs, kps, khs, chns, vals) &*&
+          true == no_dups(map(fst, m));
+  {
+    open mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, chns, vals);
+    open hmapping(kp, hsh, cap, ?busybits, ?lkps, khs, ?hm);
+    assert pred_mapping(lkps, ?lbbs, kp, ?ks);
+    map_no_dups(ks, m);
+    close hmapping(kp, hsh, cap, busybits, lkps, khs, hm);
+    close mapping(m, addrs, kp, rp, hsh, cap, bbs, kps, khs, chns, vals);
+    no_dup_keys_to_no_dups(m);
   }
   @*/
