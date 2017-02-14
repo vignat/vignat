@@ -1,0 +1,43 @@
+#ifndef MAP_GH
+#define MAP_GH
+
+#include <listex.gh>
+#include "listexex.gh"
+
+lemma void nonmem_map_append_filter<t1,t2>(fixpoint (t1,t2) f1,
+                                           fixpoint (t1,bool) f2,
+                                           list<t1> l,
+                                           list<t1> l2,
+                                           t1 el)
+requires false == mem(f1(el), map(f1, append(l, l2)));
+ensures false == mem(f1(el), map(f1, append(l, filter(f2, l2))));
+{
+  switch(l) {
+    case nil:
+      nonmem_map_filter(f1, f2, l2, el);
+    case cons(h,t):
+      nonmem_map_append_filter(f1, f2, t, l2, el);
+  }
+}
+
+lemma void distinct_map_append_filter<t1,t2>(fixpoint (t1,t2) f1,
+                                             fixpoint (t1,bool) f2,
+                                             list<t1> l1,
+                                             list<t1> l2)
+requires true == distinct(map(f1, append(l1, l2)));
+ensures true == distinct(map(f1, append(l1, filter(f2, l2))));
+{
+  switch(l1) {
+    case nil:
+      distinct_map_filter(f1, f2, l2);
+    case cons(h,t):
+      distinct_map_append_filter(f1, f2, t, l2);
+      assert true == distinct(map(f1, append(t, filter(f2, l2))));
+      assert false == mem(f1(h), map(f1, append(t, l2)));
+      nonmem_map_append_filter(f1, f2, t, l2, h);
+      assert false == mem(f1(h), map(f1, append(t, filter(f2, l2))));
+  }
+}
+
+
+#endif//MAP_GH

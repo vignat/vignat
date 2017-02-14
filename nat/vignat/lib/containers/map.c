@@ -11,6 +11,8 @@
 //@ #include "stdex.gh"
 //@ #include "nth_prop.gh"
 //@ #include "modulo.gh"
+//@ #include "map.gh"
+//@ #include "natlist.gh"
 
 /*@
   inductive bucket<kt> = bucket(list<pair<kt, nat> >);
@@ -118,8 +120,6 @@
   fixpoint bool buckets_ok<kt>(list<bucket<kt> > buckets) {
     return buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
   }
-
-  fixpoint bool nonneg(int x) { return 0 <= x; }
 
   fixpoint list<int> buckets_get_chns_rec_fp<kt>(list<pair<kt, nat> > acc,
                                                  list<bucket<kt> > buckets) {
@@ -1485,54 +1485,6 @@ int loop(int k, int capacity)
   @*/
 
 /*@
-  lemma void byLoopNthPropEqNthPropUpTo<t>(nat n, list<t> lst, fixpoint (t,bool) prop, int capacity)
-  requires int_of_nat(n) <= capacity;
-  ensures up_to(n, (byLoopNthProp)(lst, prop, capacity, 0)) == up_to(n, (nthProp)(lst, prop));
-  {
-    switch(n) {
-      case zero:
-      case succ(nn):
-        loop_bijection(int_of_nat(nn), capacity);
-        byLoopNthPropEqNthPropUpTo(nn, lst, prop, capacity);
-    }
-  }//took 3m
-  @*/
-
-/*@
-  lemma void upToByLoopNthPropShift1<t>(nat n, t hd, list<t> tl,
-                                        fixpoint (t,bool) prop,
-                                        int capacity, int start)
-  requires true == up_to(n, (byLoopNthProp)(cons(hd,tl), prop,
-                                            capacity, start)) &*&
-           int_of_nat(n) + start <= capacity &*&
-           0 < start;
-  ensures true == up_to(n, (byLoopNthProp)(tl, prop, capacity, start - 1));
-  {
-    switch(n) {
-      case zero:
-      case succ(m):
-        loop_bijection(start + int_of_nat(m), capacity);
-        loop_bijection(start + int_of_nat(m) - 1, capacity);
-        upToByLoopNthPropShift1(m, hd, tl, prop, capacity, start);
-    }
-  } //took 10m
-  @*/
-
-/*@
-  lemma void upToNthPropShift1<t>(nat n, t hd, list<t> tl, fixpoint (t,bool) prop)
-  requires true;
-  ensures up_to(succ(n), (nthProp)(cons(hd, tl), prop)) ==
-          (prop(hd) && up_to(n, (nthProp)(tl, prop)));
-  {
-    switch(n) {
-      case zero:
-      case succ(m):
-        upToNthPropShift1(m, hd, tl, prop);
-    }
-  }//took 2m
-  @*/
-
-/*@
   lemma void bucket_has_then_acc_has_key<kt>(bucket<kt> b, list<pair<kt, nat> > acc, kt k)
   requires true == bucket_has_key_fp(k, b);
   ensures true == mem(k, map(fst, acc_at_this_bucket(acc, b)));
@@ -1982,7 +1934,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void buckets_get_chns_rec_nonneg<kt>(list<pair<kt, nat> > acc,
                                              list<bucket<kt> > buckets)
   requires true;
-  ensures true == forall(buckets_get_chns_rec_fp(acc, buckets), nonneg);
+  ensures true == forall(buckets_get_chns_rec_fp(acc, buckets), (ge)(0));
   {
     switch(buckets) {
       case nil:
@@ -1993,7 +1945,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
   lemma void buckets_get_chns_nonneg<kt>(list<bucket<kt> > buckets)
   requires true;
-  ensures true == forall(buckets_get_chns_fp(buckets), nonneg);
+  ensures true == forall(buckets_get_chns_fp(buckets), (ge)(0));
   {
     buckets_get_chns_rec_nonneg(get_wraparound(nil, buckets), buckets);
   }
@@ -2002,10 +1954,10 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void add_part_chn_rec_still_nonneg(int start, int len,
                                            list<int> chn_cnts)
-  requires true == forall(chn_cnts, nonneg);
+  requires true == forall(chn_cnts, (ge)(0));
   ensures true == forall(add_partial_chain_rec_fp(chn_cnts,
                                                   start, len),
-                         nonneg);
+                         (ge)(0));
   {
     switch(chn_cnts) {
       case nil:
@@ -2021,8 +1973,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 /*@
   lemma void add_partial_chain_rec_nonneg(int start, int len, list<int> chn_cnts)
-  requires true == forall(chn_cnts, nonneg);
-  ensures true == forall(add_partial_chain_rec_fp(chn_cnts, start, len), nonneg);
+  requires true == forall(chn_cnts, (ge)(0));
+  ensures true == forall(add_partial_chain_rec_fp(chn_cnts, start, len), (ge)(0));
   {
     switch(chn_cnts) {
       case nil:
@@ -2038,8 +1990,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
 
   lemma void add_partial_chain_nonneg(int i, int len, list<int> chn_cnts)
-  requires true == forall(chn_cnts, nonneg);
-  ensures true == forall(add_partial_chain_fp(i, len, chn_cnts), nonneg);
+  requires true == forall(chn_cnts, (ge)(0));
+  ensures true == forall(add_partial_chain_fp(i, len, chn_cnts), (ge)(0));
   {
     if (length(chn_cnts) < len + i) {
       add_partial_chain_rec_nonneg(i, len, chn_cnts);
@@ -2073,7 +2025,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 /*@
   lemma void add_part_chn_gt0_rec(int i, int len, list<int> chn_cnts)
   requires len != 0 &*& 0 <= i &*& i < length(chn_cnts) &*&
-           true == forall(chn_cnts, nonneg);
+           true == forall(chn_cnts, (ge)(0));
   ensures 0 < nth(i, add_partial_chain_rec_fp(chn_cnts, i, len));
   {
     switch(chn_cnts) {
@@ -2091,7 +2043,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   requires 0 <= i &*& i < length(chn_cnts) &*&
            0 <= start &*& start <= i &*&
            0 < nth(i, chn_cnts) &*&
-           true == forall(chn_cnts, nonneg);
+           true == forall(chn_cnts, (ge)(0));
   ensures 0 < nth(i, add_partial_chain_rec_fp(chn_cnts, start, len));
   {
     switch(chn_cnts) {
@@ -2112,7 +2064,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   lemma void add_part_chn_gt0(int i, int len, list<int> chn_cnts)
   requires 0 <= i &*& i < length(chn_cnts) &*&
            0 < len &*&
-           true == forall(chn_cnts, nonneg);
+           true == forall(chn_cnts, (ge)(0));
   ensures 0 < nth(i, add_partial_chain_fp(i, len, chn_cnts));
   {
     if (length(chn_cnts) < len + i) {
@@ -2628,39 +2580,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void inc_modulo_loop_hlp(int a, int quotient, int capacity)
-  requires 0 <= a &*& 0 < capacity &*&
-           0 <= a - quotient * capacity &*&
-           a - quotient * capacity < capacity;
-  ensures loop_fp(loop_fp(a, capacity) + 1, capacity) ==
-          loop_fp(a + 1, capacity);
-  {
-    int b = a - quotient * capacity;
-    loop_injection_n(b, capacity, quotient);
-    loop_bijection(b, capacity);
-    if (b + 1 < capacity) {
-      loop_injection_n(b + 1, capacity, quotient);
-    } else {
-      assert capacity <= b + 1;
-      loop_injection_n(b + 1, capacity, quotient);
-      loop_injection(0, capacity);
-      loop_bijection(0, capacity);
-
-    }
-  }
-
-  lemma void inc_modulo_loop(int a, int capacity)
-  requires 0 <= a &*& 0 < capacity;
-  ensures loop_fp(loop_fp(a, capacity) + 1, capacity) ==
-          loop_fp(a + 1, capacity);
-  {
-    int quotient = a / capacity;
-    div_rem(a, capacity);
-    inc_modulo_loop_hlp(a, a/capacity, capacity);
-  }//took 30m
-  @*/
-
-/*@
   lemma void buckets_chain_end_rec<kt>(list<pair<kt, nat> > acc,
                                        list<bucket<kt> > buckets,
                                        kt k, int start, int i,
@@ -2726,45 +2645,7 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     add_part_chn_zero_len
       (buckets_get_chns_fp(buckets_remove_key_fp(buckets, k)),
        loop_fp(start + i, capacity));
-  } //took 25m, undone: VF issue 68.
-  @*/
-
-/*@
-  lemma void nonmem_map_append_filter<t1,t2>(fixpoint (t1,t2) f1,
-                                             fixpoint (t1,bool) f2,
-                                             list<t1> l,
-                                             list<t1> l2,
-                                             t1 el)
-  requires false == mem(f1(el), map(f1, append(l, l2)));
-  ensures false == mem(f1(el), map(f1, append(l, filter(f2, l2))));
-  {
-    switch(l) {
-      case nil:
-        nonmem_map_filter(f1, f2, l2, el);
-      case cons(h,t):
-        nonmem_map_append_filter(f1, f2, t, l2, el);
-    }
-  }
-
-  lemma void distinct_map_append_filter<t1,t2>(fixpoint (t1,t2) f1,
-                                               fixpoint (t1,bool) f2,
-                                               list<t1> l1,
-                                               list<t1> l2)
-  requires true == distinct(map(f1, append(l1, l2)));
-  ensures true == distinct(map(f1, append(l1, filter(f2, l2))));
-  {
-    switch(l1) {
-      case nil:
-        distinct_map_filter(f1, f2, l2);
-      case cons(h,t):
-        distinct_map_append_filter(f1, f2, t, l2);
-        assert true == distinct(map(f1, append(t, filter(f2, l2))));
-        assert false == mem(f1(h), map(f1, append(t, l2)));
-        nonmem_map_append_filter(f1, f2, t, l2, h);
-        assert false == mem(f1(h), map(f1, append(t, filter(f2, l2))));
-    }
-  }
-
+  } //took 25m, TODO: VF issue 68.
   @*/
 
 /*@
@@ -2916,18 +2797,6 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void filter_acc_at_this_b_idemp<kt>(list<pair<kt, nat> > acc,
-                                            list<pair<kt, nat> > chns,
-                                            fixpoint (pair<kt, nat>, bool) f)
-  requires true;
-  ensures filter(f, acc_at_this_bucket(acc, bucket(chns))) ==
-          acc_at_this_bucket(filter(f, acc), bucket(filter(f, chns)));
-  {
-    filter_append_idemp(acc, chns, f);
-  }
-  @*/
-
-/*@
   lemma void remkey_advance_acc_idemp<kt>(list<pair<kt, nat> > acc,
                                           kt k)
   requires true;
@@ -2966,7 +2835,8 @@ int find_key/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           bucket<kt> new_h = bucket(new_chains);
           get_wraparound_removed_key(advance_acc(acc_at_this_bucket(acc, h)),
                                      t, k);
-          filter_acc_at_this_b_idemp(acc, chains, (not_this_key_pair_fp)(k));
+
+          filter_append_idemp(acc, chains, (not_this_key_pair_fp)(k));
           remkey_advance_acc_idemp(acc_at_this_bucket(acc, h), k);
         }
     }
@@ -3700,114 +3570,20 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
   }//took 5m
   @*/
 
+
 /*@
-  fixpoint bool less_than(int lim, nat x) { return int_of_nat(x) < lim; }
-
-  lemma void upper_bound_less_than<kt>(list<pair<kt, nat> > acc, int lim)
-  requires true;
-  ensures forall(acc, (upper_limit)(lim)) ==
-          forall(get_just_tails(acc), (less_than)(lim));
-  {
-    switch(acc) {
-      case nil:
-      case cons(h,t):
-        upper_bound_less_than(t, lim);
-    }
+lemma void upper_bound_nat_lt<kt>(list<pair<kt, nat> > acc, int lim)
+requires true;
+ensures forall(acc, (upper_limit)(lim)) ==
+        forall(get_just_tails(acc), (nat_lt)(lim));
+{
+  switch(acc) {
+  case nil:
+  case cons(h,t):
+    upper_bound_nat_lt(t, lim);
   }
-
-  lemma void less_and_not_eq_lesser(nat x, nat lim)
-  requires int_of_nat(x) < int_of_nat(succ(lim)) &*&
-           x != lim;
-  ensures int_of_nat(x) < int_of_nat(lim);
-  {
-    switch(x) {
-      case zero:
-        switch(lim) {
-          case zero:
-          case succ(ln):
-        }
-      case succ(xn):
-        switch(lim) {
-          case zero:
-          case succ(ln):
-            less_and_not_eq_lesser(xn,ln);
-        }
-    }
-  }
-
-  lemma void less_than_not_eq_upper_lesser(list<nat> tails, nat lim)
-  requires true == forall(tails, (less_than)(int_of_nat(succ(lim)))) &*&
-           false == mem(lim, tails);
-  ensures true == forall(tails, (less_than)(int_of_nat(lim)));
-  {
-    switch(tails) {
-      case nil:
-      case cons(h,t):
-        assert int_of_nat(h) < int_of_nat(succ(lim));
-        assert h != lim;
-        less_and_not_eq_lesser(h, lim);
-        assert int_of_nat(h) < int_of_nat(lim);
-        less_than_not_eq_upper_lesser(t, lim);
-    }
-  }
-
-  lemma void less_than_remove_big(list<nat> tails, nat lim)
-  requires true == forall(tails, (less_than)(int_of_nat(succ(lim)))) &*&
-           true == distinct(tails);
-  ensures true == forall(remove(lim, tails), (less_than)(int_of_nat(lim)));
-  {
-    switch(tails) {
-      case nil:
-      case cons(h,t):
-        if (h == lim) {
-          assert false == mem(lim, t);
-          assert true == forall(t, (less_than)(int_of_nat(succ(lim))));
-          less_than_not_eq_upper_lesser(t, lim);
-          assert true == forall(t, (less_than)(int_of_nat(lim)));
-        } else {
-          less_than_remove_big(t, lim);
-          less_and_not_eq_lesser(h, lim);
-        }
-    }
-  }
-
-  lemma void less_than_distinct_few_rec(list<nat> tails, nat lim)
-  requires true == forall(tails, (less_than)(int_of_nat(lim))) &*&
-           true == distinct(tails);
-  ensures length(tails) <= int_of_nat(lim);
-  {
-    switch(lim) {
-      case zero:
-        switch(tails) {
-          case nil:
-          case cons(h,t):
-            assert int_of_nat(h) < 0;
-            assert false;
-        };
-      case succ(n):
-        if (mem(n, tails)) {
-          assert length(remove(n, tails)) + 1 == length(tails);
-        } else {
-          assert length(remove(n, tails)) == length(tails);
-        }
-        less_than_remove_big(tails, n);
-        distinct_remove(n, tails);
-        less_than_distinct_few_rec(remove(n, tails), n);
-    }
-  }
-
-  lemma void less_than_distinct_few(list<nat> tails, int lim)
-  requires true == forall(tails, (less_than)(lim)) &*&
-           true == distinct(tails) &*&
-           0 <= lim;
-  ensures length(tails) <= lim;
-  {
-    assert true == forall(tails, (less_than)(lim));
-    assert lim == int_of_nat(nat_of_int(lim));
-    assert true == forall(tails, (less_than)(int_of_nat(nat_of_int(lim))));
-    less_than_distinct_few_rec(tails, nat_of_int(lim));
-  }
-  @*/
+}
+@*/
 
 
 /*@
@@ -3836,11 +3612,11 @@ int find_key_remove_chain/*@ <kt> @*/(int* busybits, void** keyps,
           map_preserves_length(snd, advance_acc(acc_atb));
           assert length(advance_acc(acc_atb)) == length(tails);
           assert true == forall(advance_acc(acc_atb), (upper_limit)(bound - 1));
-          upper_bound_less_than(advance_acc(acc_atb), bound - 1);
-          assert true == forall(tails, (less_than)(bound - 1));
+          upper_bound_nat_lt(advance_acc(acc_atb), bound - 1);
+          assert true == forall(tails, (nat_lt)(bound - 1));
           advance_acc_still_distinct(acc_atb);
           assert true == distinct(tails);
-          less_than_distinct_few(tails, bound - 1);
+          nat_lt_distinct_few(tails, bound - 1);
           assert length(advance_acc(acc_atb)) <= bound - 1;
         } else {
           buckets_ok_chn_bound_rec(advance_acc(acc_atb), t, i - 1, bound);
@@ -5597,91 +5373,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void multiset_eq_map<t1,t2>(fixpoint (t1,t2) f,
-                                    list<t1> l1,
-                                    list<t1> l2)
-  requires true == multiset_eq(l1, l2);
-  ensures true == multiset_eq(map(f, l1), map(f, l2));
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_distinct<t>(list<t> l1, list<t> l2)
-  requires true == multiset_eq(l1, l2);
-  ensures distinct(l1) == distinct(l2);
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-/*@
-  lemma void multiset_eq_forall<t>(list<t> l1, list<t> l2, fixpoint (t,bool) f)
-  requires true == multiset_eq(l1, l2);
-  ensures forall(l1, f) == forall(l2, f);
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_append_assoc<t>(list<t> l1, list<t> l2, list<t> l3)
-  requires true;
-  ensures true == multiset_eq(append(append(l1, l2), l3),
-                              append(l1, append(l2, l3)));
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_append<t>(list<t> l1, list<t> l2,
-                                   list<t> l3, list<t> l4)
-  requires true == multiset_eq(l1, l2) &*&
-           true == multiset_eq(l3, l4);
-  ensures true == multiset_eq(append(l1, l3), append(l2, l4));
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_append_comm<t>(list<t> l1, list<t> l2)
-  requires true;
-  ensures true == multiset_eq(append(l1, l2), append(l2, l1));
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_trans<t>(list<t> l1, list<t> l2, list<t> l3)
-  requires true == multiset_eq(l1, l2) &*&
-           true == multiset_eq(l2, l3);
-  ensures true == multiset_eq(l1, l3);
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void eq_multiset_eq<t>(list<t> l1, list<t> l2)
-  requires l1 == l2;
-  ensures true == multiset_eq(l1, l2);
-  {
-    multiset_eq_refl(l1);
-  }
-  @*/
-
-
-/*@
   lemma void intersection_nil_comm<t>(list<t> l1, list<t> l2)
   requires true;
   ensures true == ((intersection(l1, l2) == nil) ==
@@ -5744,16 +5435,16 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   @*/
 
 /*@
-  lemma void upper_limit_less_than<kt>(list<pair<kt, nat> > l, int lim)
+  lemma void upper_limit_nat_lt<kt>(list<pair<kt, nat> > l, int lim)
   requires true;
   ensures true == forall(get_just_tails(filter((upper_limit)(lim), l)),
-                         (less_than)(lim));
+                         (nat_lt)(lim));
   {
     switch(l) {
       case nil:
       case cons(h,t):
         switch(h) { case pair(key, dist): }
-        upper_limit_less_than(t, lim);
+        upper_limit_nat_lt(t, lim);
     }
   
   }
@@ -5761,15 +5452,15 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void less_than_and_ge_disjoint(list<nat> lst, int lim)
-  requires true == forall(lst, (less_than)(lim)) &*&
+  lemma void nat_lt_and_ge_disjoint(list<nat> lst, int lim)
+  requires true == forall(lst, (nat_lt)(lim)) &*&
            true == forall(lst, (ge_than)(lim));
   ensures lst == nil;
   {
     switch(lst) {
       case nil:
       case cons(h,t):
-        assert true == less_than(lim, h);
+        assert true == nat_lt(lim, h);
         assert true == ge_than(lim, h);
     }
   }
@@ -5821,7 +5512,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                                            filter((upper_limit)(lim), t))),
                             l);
         }
-        upper_limit_less_than(l, lim);
+        upper_limit_nat_lt(l, lim);
         lower_limit_ge_than(l, lim);
         intersection_subset(get_just_tails(filter((lower_limit)(lim), l)),
                             get_just_tails(filter((upper_limit)(lim), l)));
@@ -5831,8 +5522,8 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
         subset_forall(inters, get_just_tails(filter((lower_limit)(lim), l)),
                       (ge_than)(lim));
         subset_forall(inters, get_just_tails(filter((upper_limit)(lim), l)),
-                      (less_than)(lim));
-        less_than_and_ge_disjoint(inters, lim);
+                      (nat_lt)(lim));
+        nat_lt_and_ge_disjoint(inters, lim);
     }
   }//took 55m
   @*/
@@ -5917,7 +5608,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
           assert true == multiset_eq(acc, append(sacc, lacc));
           assert true == multiset_eq(chains, append(lchains, schains));
           assert atb == append(acc, chains);
-          eq_multiset_eq(atb, append(acc, chains));
+          multiset_eq_refl(atb);
           multiset_eq_append(acc, append(sacc, lacc),
                              chains, append(lchains, schains));
           multiset_eq_trans(atb, append(acc, chains),
@@ -5968,179 +5659,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
     }
   }
   @*/
-
-/*@
-  fixpoint bool msubset<t>(list<t> l1, list<t> l2) {
-    switch(l1) {
-      case nil: return true;
-      case cons(h,t):
-        return true == mem(h, l2) && msubset(t, remove(h, l2));
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void filter_msubset<t>(fixpoint (t, bool) f, list<t> l)
-  requires true;
-  ensures true == msubset(filter(f, l), l);
-  {
-    assume(false);//TODO
-  }
-  @*/
-
-
-/*@
-  lemma void msubset_distinct<t>(list<t> l1, list<t> l2)
-  requires true == msubset(l1, l2) &*& true == distinct(l2);
-  ensures true == distinct(l1);
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void msubset_subset<t>(list<t> l1, list<t> l2)
-  requires true == msubset(l1, l2);
-  ensures true == subset(l1, l2);
-  {
-    assume(false);//TODO 
-  }
-  @*/
-
-
-/*@
-  lemma void msubset_refl<t>(list<t> l)
-  requires true;
-  ensures true == msubset(l, l);
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        msubset_refl(t);
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_map_cons_remove<t1,t2>(fixpoint (t1,t2) f,
-                                                list<t1> l,
-                                                t1 x, t1 y)
-  requires true == mem(x, l) &*& f(x) == f(y);
-  ensures true == multiset_eq(map(f, l),
-                              map(f, cons(y, remove(x, l))));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        if (h == x) {
-          multiset_eq_refl(map(f, l));
-        }
-        else {
-          multiset_eq_map_cons_remove(f, t, x, y);
-        }
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void multiset_eq_msubset<t>(list<t> l1, list<t> l2)
-  requires true == multiset_eq(l1, l2);
-  ensures true == msubset(l1, l2);
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        multiset_eq_msubset(t, remove(h, l2));
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void map_remove_swap<t1,t2>(fixpoint (t1,t2) f,
-                                    t1 x, list<t1> l)
-  requires true == mem(x, l);
-  ensures true == multiset_eq(remove(f(x), map(f, l)),
-                              map(f, remove(x, l)));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        if (h == x) {
-           multiset_eq_refl(map(f, remove(x, l)));
-        } else {
-          if (f(h) == f(x)) {
-            multiset_eq_map_cons_remove(f, t, x, h);
-          } else {
-            map_remove_swap(f, x, t);
-          }
-        }
-    }
-  }//took 40m
-  @*/
-
-
-/*@
-  lemma void msubset_remove<t>(list<t> l1, list<t> l2, t x)
-  requires true == msubset(l1, l2);
-  ensures true == msubset(remove(x, l1), remove(x, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        if (h == x) {}
-        else {
-          msubset_remove(t, remove(h, l2), x);
-          neq_mem_remove(h, x, l2);
-          remove_commutes(l2, h, x);
-        }
-    }
-  }
-  @*/
-
-
-/*@
-  lemma void msubset_trans<t>(list<t> l1, list<t> l2, list<t> l3)
-  requires true == msubset(l1, l2) &*& true == msubset(l2, l3);
-  ensures true == msubset(l1, l3);
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        msubset_remove(l2, l3, h);
-        msubset_trans(t, remove(h, l2), remove(h, l3));
-        msubset_subset(l2, l3);
-        subset_mem_trans(l2, l3, h);
-    }
-  }//took 10m
-  @*/
-
-
-/*@
-  lemma void msubset_map<t1, t2>(fixpoint (t1, t2) f, list<t1> l1, list<t1> l2)
-  requires true == msubset(l1, l2);
-  ensures true == msubset(map(f, l1), map(f, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        msubset_map(f, t, remove(h, l2));
-        map_remove_swap(f, h, l2);
-        multiset_eq_comm(remove(f(h), map(f, l2)),
-                         map(f, remove(h, l2)));
-        multiset_eq_msubset(map(f, remove(h, l2)),
-                            remove(f(h), map(f, l2)));
-        msubset_trans(map(f, t), map(f, remove(h, l2)),
-                      remove(f(h), map(f, l2)));
-        mem_map(h, l2, f);
-    }
-  }//took 10m
-  @*/
-
 
 /*@
   lemma void buckets_split_ok_orig_ok<kt>(list<pair<kt, nat> > acc,

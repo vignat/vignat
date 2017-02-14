@@ -143,4 +143,114 @@ ensures true == multiset_eq(append(l1, l3), append(l2, l3));
   }
 }
 
+lemma void multiset_eq_map<t1,t2>(fixpoint (t1,t2) f,
+                                  list<t1> l1,
+                                  list<t1> l2)
+requires true == multiset_eq(l1, l2);
+ensures true == multiset_eq(map(f, l1), map(f, l2));
+{
+  assume(false);//TODO 
+}
+
+lemma void multiset_eq_distinct<t>(list<t> l1, list<t> l2)
+requires true == multiset_eq(l1, l2);
+ensures distinct(l1) == distinct(l2);
+{
+  assume(false);//TODO 
+}
+
+
+
+lemma void multiset_eq_forall<t>(list<t> l1, list<t> l2, fixpoint (t,bool) f)
+requires true == multiset_eq(l1, l2);
+ensures forall(l1, f) == forall(l2, f);
+{
+  assume(false);//TODO 
+}
+
+
+
+
+lemma void multiset_eq_append_assoc<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true;
+ensures true == multiset_eq(append(append(l1, l2), l3),
+                            append(l1, append(l2, l3)));
+{
+  assume(false);//TODO 
+}
+
+
+
+
+lemma void multiset_eq_append<t>(list<t> l1, list<t> l2,
+                                 list<t> l3, list<t> l4)
+requires true == multiset_eq(l1, l2) &*&
+         true == multiset_eq(l3, l4);
+ensures true == multiset_eq(append(l1, l3), append(l2, l4));
+{
+  assume(false);//TODO 
+}
+
+
+
+
+lemma void multiset_eq_append_comm<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == multiset_eq(append(l1, l2), append(l2, l1));
+{
+  assume(false);//TODO 
+}
+
+
+
+
+lemma void multiset_eq_trans<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == multiset_eq(l1, l2) &*&
+         true == multiset_eq(l2, l3);
+ensures true == multiset_eq(l1, l3);
+{
+  assume(false);//TODO 
+}
+
+lemma void multiset_eq_map_cons_remove<t1,t2>(fixpoint (t1,t2) f,
+                                              list<t1> l,
+                                              t1 x, t1 y)
+requires true == mem(x, l) &*& f(x) == f(y);
+ensures true == multiset_eq(map(f, l),
+                            map(f, cons(y, remove(x, l))));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (h == x) {
+        multiset_eq_refl(map(f, l));
+      }
+      else {
+        multiset_eq_map_cons_remove(f, t, x, y);
+      }
+  }
+}
+
+lemma void map_remove_swap<t1,t2>(fixpoint (t1,t2) f,
+                                  t1 x, list<t1> l)
+requires true == mem(x, l);
+ensures true == multiset_eq(remove(f(x), map(f, l)),
+                            map(f, remove(x, l)));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (h == x) {
+        multiset_eq_refl(map(f, remove(x, l)));
+      } else {
+        if (f(h) == f(x)) {
+          multiset_eq_map_cons_remove(f, t, x, h);
+        } else {
+          map_remove_swap(f, x, t);
+        }
+      }
+  }
+}//took 40m
+
+
 #endif//MULTISET_GH

@@ -1,0 +1,132 @@
+#ifndef MULTISUBSET_GH
+#define MULTISUBSET_GH
+
+#include "multiset.gh"
+
+
+fixpoint bool msubset<t>(list<t> l1, list<t> l2) {
+  switch(l1) {
+    case nil: return true;
+    case cons(h,t):
+      return true == mem(h, l2) && msubset(t, remove(h, l2));
+  }
+}
+
+
+
+
+lemma void filter_msubset<t>(fixpoint (t, bool) f, list<t> l)
+requires true;
+ensures true == msubset(filter(f, l), l);
+{
+  assume(false);//TODO
+}
+
+
+
+
+lemma void msubset_distinct<t>(list<t> l1, list<t> l2)
+requires true == msubset(l1, l2) &*& true == distinct(l2);
+ensures true == distinct(l1);
+{
+  assume(false);//TODO 
+}
+
+
+
+
+lemma void msubset_subset<t>(list<t> l1, list<t> l2)
+requires true == msubset(l1, l2);
+ensures true == subset(l1, l2);
+{
+  assume(false);//TODO 
+}
+
+
+
+
+lemma void msubset_refl<t>(list<t> l)
+requires true;
+ensures true == msubset(l, l);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      msubset_refl(t);
+  }
+}
+
+
+
+
+
+lemma void multiset_eq_msubset<t>(list<t> l1, list<t> l2)
+requires true == multiset_eq(l1, l2);
+ensures true == msubset(l1, l2);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      multiset_eq_msubset(t, remove(h, l2));
+  }
+}
+
+
+
+
+lemma void msubset_remove<t>(list<t> l1, list<t> l2, t x)
+requires true == msubset(l1, l2);
+ensures true == msubset(remove(x, l1), remove(x, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      if (h == x) {}
+      else {
+        msubset_remove(t, remove(h, l2), x);
+        neq_mem_remove(h, x, l2);
+        remove_commutes(l2, h, x);
+      }
+  }
+}
+
+
+
+
+lemma void msubset_trans<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == msubset(l1, l2) &*& true == msubset(l2, l3);
+ensures true == msubset(l1, l3);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_remove(l2, l3, h);
+      msubset_trans(t, remove(h, l2), remove(h, l3));
+      msubset_subset(l2, l3);
+      subset_mem_trans(l2, l3, h);
+  }
+}//took 10m
+
+
+lemma void msubset_map<t1, t2>(fixpoint (t1, t2) f, list<t1> l1, list<t1> l2)
+requires true == msubset(l1, l2);
+ensures true == msubset(map(f, l1), map(f, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_map(f, t, remove(h, l2));
+      map_remove_swap(f, h, l2);
+      multiset_eq_comm(remove(f(h), map(f, l2)),
+                       map(f, remove(h, l2)));
+      multiset_eq_msubset(map(f, remove(h, l2)),
+                          remove(f(h), map(f, l2)));
+      msubset_trans(map(f, t), map(f, remove(h, l2)),
+                    remove(f(h), map(f, l2)));
+      mem_map(h, l2, f);
+  }
+}//took 10m
+
+
+
+#endif// MULTISUBSET_GH

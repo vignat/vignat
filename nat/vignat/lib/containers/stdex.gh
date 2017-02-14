@@ -1,10 +1,12 @@
 #ifndef STDEX_GH
 #define STDEX_GH
 
+#include <nat.gh>
 #include <listex.gh>
 #include "listexex.gh"
 #include "set.gh"
 #include "multiset.gh"
+#include "multisubset.gh"
 
 
 fixpoint t get_some<t>(option<t> x) {
@@ -56,6 +58,28 @@ fixpoint bool opt_no_dups<t>(list<option<t> > l) {
       return opt_no_dups(t) && (h == none || !(mem(h, t)));
   }
 }
+
+lemma void less_and_not_eq_lesser(nat x, nat lim)
+requires int_of_nat(x) < int_of_nat(succ(lim)) &*&
+         x != lim;
+ensures int_of_nat(x) < int_of_nat(lim);
+{
+  switch(x) {
+    case zero:
+      switch(lim) {
+        case zero:
+        case succ(ln):
+      }
+    case succ(xn):
+      switch(lim) {
+        case zero:
+        case succ(ln):
+          less_and_not_eq_lesser(xn,ln);
+      }
+  }
+}
+
+fixpoint bool nat_lt(int x, nat y) { return int_of_nat(y) < x; }
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
