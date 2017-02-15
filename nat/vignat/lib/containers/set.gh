@@ -390,4 +390,21 @@ ensures distinct(l1) == distinct(l2);
   }
 }
 
+lemma void intersection_subset<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == subset(intersection(l1, l2), l1) &*&
+        true == subset(intersection(l1, l2), l2);
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      intersection_subset(l1, t);
+      if (contains(l1, h)) {
+        subset_unremove(intersection(l1, l2), t, h);
+      } else {
+        add_extra_preserves_subset(intersection(l1, l2), t, h);
+      }
+  }
+}//took 27m
+
 #endif SET_GH

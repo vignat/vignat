@@ -253,7 +253,12 @@ should also be compatible with the one Martin is implementing.
 ** refactor proof
 *** split into modules
     :LOGBOOK:
-    CLOCK: [2017-02-15 Mit 09:53]
+    CLOCK: [2017-02-15 Mit 16:43]
+    CLOCK: [2017-02-15 Mit 14:46]--[2017-02-15 Mit 15:10] =>  0:24
+    CLOCK: [2017-02-15 Mit 13:02]--[2017-02-15 Mit 13:28] =>  0:26
+    CLOCK: [2017-02-15 Mit 11:49]--[2017-02-15 Mit 12:29] =>  0:40
+    CLOCK: [2017-02-15 Mit 11:08]--[2017-02-15 Mit 11:21] =>  0:13
+    CLOCK: [2017-02-15 Mit 09:53]--[2017-02-15 Mit 10:46] =>  0:53
     CLOCK: [2017-02-14 Die 19:18]--[2017-02-14 Die 21:34] =>  2:16
     CLOCK: [2017-02-14 Die 14:32]--[2017-02-14 Die 14:54] =>  0:22
     :END:

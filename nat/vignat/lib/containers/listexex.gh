@@ -748,4 +748,62 @@ ensures remove(el, append(l1, l2)) == append(remove(el, l1), l2);
   }
 }
 
+lemma void rem_preserves_no_mem<kt>(list<option<kt> > ks, kt k, int i)
+requires false == mem(some(k), ks);
+ensures false == mem(some(k), update(i, none, ks));
+{
+  switch(ks) {
+    case nil: break;
+    case cons(h,t):
+      if (i == 0) {
+      } else {
+        rem_preserves_no_mem(t, k, i-1);
+      }
+  }
+}
+
+fixpoint bool disjoint<t>(list<t> l1, list<t> l2) {
+  return intersection(l1, l2) == nil;
+}
+
+lemma void distinct_and_disjoint_append<t>(list<t> l1, list<t> l2)
+requires true == distinct(l1) &*&
+         true == distinct(l2) &*&
+         true == disjoint(l1,l2);
+ensures true == distinct(append(l1,l2));
+{
+  assume(false);//TODO 
+}
+
+lemma void disjoint_comm<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == (disjoint(l1, l2) == disjoint(l2, l1));
+{
+  assume(false);//TODO 
+}
+
+lemma void disjoint_append<t>(list<t> l1, list<t> l2,
+                              list<t> l3, list<t> l4)
+requires true == disjoint(l1, l3) &*&
+         true == disjoint(l2, l4);
+ensures intersection(append(l1, l2), append(l3, l4)) == nil;
+{
+  assume(false);//TODO 
+}
+
+lemma void distinct_unmap<t1,t2>(list<t1> lst, fixpoint (t1,t2) f)
+requires true == distinct(map(f, lst));
+ensures true == distinct(lst);
+{
+  switch(lst) {
+    case nil:
+    case cons(h,t):
+      if (mem(h, t)) {
+        mem_map(h, t, f);
+        assert true == mem(f(h), map(f, t));
+      }
+      distinct_unmap(t, f);
+  }
+}
+
 #endif//LISTEXEX_GH
