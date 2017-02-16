@@ -835,7 +835,9 @@ requires buckets != nil &*&
          true == buckets_ok_rec(acc, buckets, capacity) &*&
          start < length(buckets) &*&
          true == bucket_has_key_fp(k, nth(start, buckets));
-ensures true == mem(k, map(fst, get_crossing_chains_rec_fp(acc, buckets, start + int_of_nat(i))));
+ensures true == mem(k, map(fst,
+                           get_crossing_chains_rec_fp(acc, buckets,
+                                                      start + int_of_nat(i))));
 {
   switch(buckets) {
     case nil: return;
@@ -856,9 +858,12 @@ ensures true == mem(k, map(fst, get_crossing_chains_rec_fp(acc, buckets, start +
           case succ(n):
             assert buckets_get_keys_rec_fp(acc, buckets) ==
                    cons(get_current_key_fp(acc_at_this_bucket(acc, h)),
-                        buckets_get_keys_rec_fp(advance_acc(acc_at_this_bucket(acc, h)), t));
+                        buckets_get_keys_rec_fp(
+                          advance_acc(acc_at_this_bucket(acc, h)), t));
             upToNthPropShift1(n, get_current_key_fp(acc_at_this_bucket(acc, h)),
-                              buckets_get_keys_rec_fp(advance_acc(acc_at_this_bucket(acc, h)), t), (neq)(some(k)));
+                              buckets_get_keys_rec_fp(
+                                advance_acc(acc_at_this_bucket(acc, h)), t),
+                              (neq)(some(k)));
             assert true == up_to(n, (nthProp)(buckets_get_keys_rec_fp(advance_acc(acc_at_this_bucket(acc, h)), t), (neq)(some(k))));
             assert true == neq(some(k), get_current_key_fp(acc_at_this_bucket(acc, h)));
             assert true == mem(k, map(fst, acc_at_this_bucket(acc, h)));
@@ -870,13 +875,21 @@ ensures true == mem(k, map(fst, get_crossing_chains_rec_fp(acc, buckets, start +
         }
 
       } else {
-        assume(false);//TODO VF bug 68
-        //upToByLoopNthPropShift1(i, get_current_key_fp(acc_at_this_bucket(acc, h)),
-        //                        buckets_get_keys_rec_fp(advance_acc(acc_at_this_bucket(acc, h)), t),
-        //                        (neq)(some(k)),
-        //                        capacity,
-        //                        start);
-        //crossing_chains_keep_key_hlp_inbound(t, i, start - 1, capacity, k, advance_acc(acc_at_this_bucket(acc, h)));
+        if (t == nil) {
+          return;
+        }
+        less_than_neq(0, start + int_of_nat(i));
+        upToByLoopNthPropShift1(
+          succ(i),
+          get_current_key_fp(acc_at_this_bucket(acc, h)),
+          buckets_get_keys_rec_fp(
+            advance_acc(acc_at_this_bucket(acc, h)), t),
+          (neq)(some(k)),
+          capacity,
+          start);
+        crossing_chains_keep_key_hlp_inbound(t, i, start - 1, capacity, k,
+                                             advance_acc(
+                                               acc_at_this_bucket(acc, h)));
       }
   }
 }
