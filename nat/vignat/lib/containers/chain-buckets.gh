@@ -509,15 +509,102 @@ ensures true == exists(buckets, (bucket_has_key_fp)(k));
   }
 }
 
+lemma void nozero_no_current_key<kt>(list<pair<kt, nat> > acc)
+requires true;
+ensures mem(zero, map(snd, acc)) ? get_current_key_fp(acc) != none :
+        get_current_key_fp(acc) == none;
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(k,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              nozero_no_current_key(t);
+          }
+      }
+  }
+}
+
+lemma void advance_acc_preserves_key<kt>(list<pair<kt, nat> > acc, kt key)
+requires true == distinct(map(snd, acc)) &*& get_current_key_fp(acc) != some(key);
+ensures mem(key, map(fst, acc)) == mem(key, map(fst, advance_acc(acc)));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(k,dst):
+          switch(dst) {
+            case zero:
+              nozero_no_current_key(t);
+              assert get_current_key_fp(t) == none;
+              if (k == key) {
+              } else {
+                advance_acc_preserves_key(t, key);
+              }
+            case succ(n):
+              assert get_current_key_fp(t) == get_current_key_fp(acc);
+              if (k == key) {
+              } else {
+                advance_acc_preserves_key(t, key);
+              }
+          }
+      }
+  }
+}
+
+lemma void in_acc_then_in_the_map<kt>(list<bucket<kt> > buckets,
+                                      kt k, int bound,
+                                      list<pair<kt, nat> > acc)
+requires true == mem(k, map(fst, acc)) &*&
+         true == buckets_ok_rec(acc, buckets, bound) &*&
+         false == mem(k, map(fst, get_wraparound(acc, buckets)));
+ensures true == mem(some(k), buckets_get_keys_rec_fp(acc, buckets));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+      switch(h) {
+        case bucket(chains):
+          map_append(fst, acc, chains);
+      }
+      if (get_current_key_fp(atb) != some(k)) {
+        advance_acc_preserves_key(atb, k);
+        in_acc_then_in_the_map(t, k, bound, advance_acc(atb));
+      }
+    }
+}
+
 lemma void in_this_bucket_then_in_the_map<kt>(list<bucket<kt> > buckets,
                                               int n, kt k, int bound,
                                               list<pair<kt, nat> > acc)
 requires true == buckets_ok_rec(acc, buckets, bound) &*&
          0 <= n &*& n < length(buckets) &*&
-         true == bucket_has_key_fp(k, nth(n, buckets));
+         true == bucket_has_key_fp(k, nth(n, buckets)) &*&
+         false == mem(k, map(fst, get_wraparound(acc, buckets)));
 ensures true == mem(some(k), buckets_get_keys_rec_fp(acc, buckets));
 {
-  assume(false);//TODO 30m
+    switch(buckets) {
+      case nil:
+      case cons(h,t):
+        list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+        switch(h) {
+          case bucket(chains):
+            map_append(fst, acc, chains);
+        }
+        if (n == 0) {
+          if (get_current_key_fp(atb) != some(k)) {
+            advance_acc_preserves_key(atb, k);
+            in_acc_then_in_the_map(t, k, bound, advance_acc(atb));
+          }
+        } else {
+          in_this_bucket_then_in_the_map(t, n - 1, k, bound, advance_acc(atb));
+        }
+    }
 }//debugged VeriFast:Redux for 30m, not done yet
 
 lemma void key_in_wraparound_then_key_in_a_bucket<kt>(list<bucket<kt> > buckets,
@@ -673,53 +760,6 @@ ensures length(buckets_get_keys_fp(buckets)) == length(buckets) &*&
         length(buckets_get_chns_fp(buckets)) == length(buckets);
 {
   buckets_keys_chns_same_len_rec(get_wraparound(nil, buckets), buckets);
-}
-
-lemma void nozero_no_current_key<kt>(list<pair<kt, nat> > acc)
-requires true;
-ensures mem(zero, map(snd, acc)) ? get_current_key_fp(acc) != none :
-        get_current_key_fp(acc) == none;
-{
-  switch(acc) {
-    case nil:
-    case cons(h,t):
-      switch(h) {
-        case pair(k,dist):
-          switch(dist) {
-            case zero:
-            case succ(n):
-              nozero_no_current_key(t);
-          }
-      }
-  }
-}
-
-lemma void advance_acc_preserves_key<kt>(list<pair<kt, nat> > acc, kt key)
-requires true == distinct(map(snd, acc)) &*& get_current_key_fp(acc) != some(key);
-ensures mem(key, map(fst, acc)) == mem(key, map(fst, advance_acc(acc)));
-{
-  switch(acc) {
-    case nil:
-    case cons(h,t):
-      switch(h) {
-        case pair(k,dst):
-          switch(dst) {
-            case zero:
-              nozero_no_current_key(t);
-              assert get_current_key_fp(t) == none;
-              if (k == key) {
-              } else {
-                advance_acc_preserves_key(t, key);
-              }
-            case succ(n):
-              assert get_current_key_fp(t) == get_current_key_fp(acc);
-              if (k == key) {
-              } else {
-                advance_acc_preserves_key(t, key);
-              }
-          }
-      }
-  }
 }
 
 lemma void next_cell_keeps_keys<kt>(list<pair<kt, nat> > acc, bucket<kt> b, kt k)

@@ -275,6 +275,7 @@ int loop(int k, int capacity)
            0 <= shift &*& shift <= loop_fp(hash(k), capacity) &*&
            0 < capacity &*&
            capacity - shift == length(buckets) &*&
+           false == mem(k, map(fst, get_wraparound(acc, buckets))) &*&
            buckets != nil;
   ensures loop_fp(hash(k), capacity) - shift < length(buckets) &*&
           mem(some(k), buckets_get_keys_rec_fp(acc, buckets)) ==
@@ -392,6 +393,7 @@ int loop(int k, int capacity)
       buckets_ok_get_wraparound_idemp(buckets);
       key_in_wraparound_then_in_bucket(buckets, k);
     } else {
+      buckets_ok_get_wraparound_idemp(buckets);
       key_is_contained_in_the_bucket_rec(buckets, get_wraparound(nil, buckets),
                                          0, capacity, hash, k);
     }
