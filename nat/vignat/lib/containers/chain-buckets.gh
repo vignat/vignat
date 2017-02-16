@@ -999,11 +999,10 @@ fixpoint list<int> add_partial_chain_fp(int start,
                                         int len,
                                         list<int> chain_cnts) {
   return ((length(chain_cnts) < start + len) ?
-          add_partial_chain_rec_fp
-          (add_partial_chain_rec_fp
-           (chain_cnts, start, len),
-           0,
-           len + start - length(chain_cnts)) :
+          add_partial_chain_rec_fp(
+            add_partial_chain_rec_fp(chain_cnts, start, len),
+            0,
+            len + start - length(chain_cnts)) :
           add_partial_chain_rec_fp(chain_cnts, start, len));
 }
 
@@ -1032,17 +1031,41 @@ fixpoint int buckets_get_chain_fp<kt>(list<bucket<kt> > buckets,
   return int_of_nat(bucket_get_chain_fp(nth(start, buckets), k));
 }
 
+fixpoint list<int> rem_partial_chain_rec_fp(list<int> chain_cnts,
+                                            int start,
+                                            int len) {
+  switch(chain_cnts) {
+    case nil:
+      return nil;
+    case cons(h,t):
+      return ((start == 0)             ?
+              ((len == 0) ? cons(h, t) :
+               cons(h-1, add_partial_chain_rec_fp(t, 0, len-1))) :
+              cons(h,add_partial_chain_rec_fp(t, start-1, len)));
+  }
+}
+
+fixpoint list<int> rem_partial_chain_fp(int start,
+                                        int len,
+                                        list<int> chain_cnts) {
+  return ((length(chain_cnts) < start + len) ?
+          rem_partial_chain_rec_fp(
+            rem_partial_chain_rec_fp(chain_cnts, start, len),
+            0,
+            len + start - length(chain_cnts)) :
+          rem_partial_chain_rec_fp(chain_cnts, start, len));
+}
+
 lemma void buckets_remove_add_one_chain<kt>(list<bucket<kt> > buckets,
                                             int start, kt k)
 requires 0 <= start &*& start < length(buckets) &*&
          true == bucket_has_key_fp(k, nth(start, buckets));
 ensures buckets_get_chns_fp(buckets) ==
-        add_partial_chain_fp
-        (start, buckets_get_chain_fp(buckets, k, start),
-         buckets_get_chns_fp(buckets_remove_key_fp(buckets,
-                                                   k)));
+        add_partial_chain_fp(
+          start, buckets_get_chain_fp(buckets, k, start),
+          buckets_get_chns_fp(buckets_remove_key_fp(buckets, k)));
 {
-  assume(false);//TODO 30m
+  assume(false);//TODO
 }//took 11m and counting
 
 lemma void buckets_get_chns_rec_nonneg<kt>(list<pair<kt, nat> > acc,
@@ -4777,8 +4800,7 @@ lemma void buckets_add_part_get_chns_norm<kt>(list<bucket<kt> > buckets,
                                               kt k, int start, int dist)
 requires start + dist < length(buckets) &*&
          0 <= start &*& start < length(buckets) &*&
-         0 <= dist &*&
-         true == buckets_ok(buckets);
+         0 <= dist;
 ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                start, dist)) ==
         add_partial_chain_fp(start, dist,
@@ -4794,10 +4816,9 @@ ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
   buckets_keys_chns_same_len(buckets_put_key_fp(buckets, k, start, dist));
 }//took 200m
 
-        lemma void
-        buckets_put_chain_lim_wraparound_add_zero_chain<kt>(list<pair<kt, nat> > acc,
-                                                            list<bucket<kt> > buckets,
-                                                            kt k, int start)
+lemma void buckets_put_chain_lim_wraparound_add_zero_chain<kt>(list<pair<kt, nat> > acc,
+                                                               list<bucket<kt> > buckets,
+                                                               kt k, int start)
 requires 0 <= start &*& start < length(buckets);
 ensures true == multiset_eq
         (get_wraparound(acc, buckets_put_key_fp(buckets,
@@ -4813,8 +4834,7 @@ ensures true == multiset_eq
 
 lemma void buckets_add_part_get_chns_lim<kt>(list<bucket<kt> > buckets,
                                              kt k, int start)
-requires 0 <= start &*& start < length(buckets) &*&
-         true == buckets_ok(buckets);
+requires 0 <= start &*& start < length(buckets);
 ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
                                                start,
                                                length(buckets) - start)) ==
@@ -4995,6 +5015,24 @@ ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
          (buckets_get_chns_rec_fp(get_wraparound(nil, buckets), buckets),
           start, dist);
 }//took 240m
+
+lemma void buckets_add_part_get_chns<kt>(list<bucket<kt> > buckets,
+                                         kt k, int start, int dist)
+requires 0 <= start &*& start < length(buckets) &*&
+         0 <= dist;
+ensures buckets_get_chns_fp(buckets_put_key_fp(buckets, k,
+                                               start, dist)) ==
+        add_partial_chain_fp(start, dist,
+                             buckets_get_chns_fp(buckets));
+{
+  if (dist + start == length(buckets)) {
+    buckets_add_part_get_chns_lim(buckets, k, start);
+  } else if (length(buckets) < dist + start) {
+    buckets_add_part_get_chns_inv(buckets, k, start, dist);
+  } else {
+    buckets_add_part_get_chns_norm(buckets, k, start, dist);
+  }
+}
 
 
 #endif//CHAIN_BUCKETS_GH

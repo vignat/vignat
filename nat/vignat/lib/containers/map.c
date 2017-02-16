@@ -2128,18 +2128,16 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
       loop_bijection(capacity + fin - start, capacity);
       loop_injection(0, capacity);
       loop_bijection(0, capacity);
-      buckets_add_part_get_chns_lim(buckets, k, start);
     } else if (fin < start) {
       dist = fin + capacity - start;
       loop_bijection(fin - start + capacity, capacity);
-      buckets_add_part_get_chns_inv(buckets, k, start, dist);
       loop_injection_n(fin + capacity, capacity, -1);
     } else {
       dist = fin - start;
       loop_injection_n(fin - start + capacity, capacity, -1);
       loop_bijection(fin - start, capacity);
-      buckets_add_part_get_chns_norm(buckets, k, start, dist);
     }
+    buckets_add_part_get_chns(buckets, k, start, dist);
     assert loop_fp(capacity + fin - start, capacity) == dist;
     loop_bijection(fin, capacity);
     assert loop_fp(start + dist, capacity) == fin;
