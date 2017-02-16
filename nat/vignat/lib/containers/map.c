@@ -2098,20 +2098,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
 
 
 /*@
-  lemma void cons_content_eq_this_cur_key<kt>(list<pair<kt, nat> > acc1,
-                                              list<pair<kt, nat> > acc2,
-                                              kt k)
-  requires true == set_eq(cons(pair(k, zero), acc1), acc2) &*&
-           true == distinct(map(snd, acc2));
-  ensures get_current_key_fp(acc2) == some(k);
-  {
-    subset_mem_trans(cons(pair(k, zero), acc1), acc2, pair(k, zero));
-    distinct_and_zero_this_is_the_key(acc2, k);
-  }
-  @*/
-
-
-/*@
   lemma void buckets_ks_put_key_insync<kt>(int* chns, int capacity,
                                            fixpoint (kt,int) hsh,
                                            int start,
