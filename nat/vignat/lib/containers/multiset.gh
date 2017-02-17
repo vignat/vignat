@@ -253,4 +253,12 @@ ensures true == multiset_eq(remove(f(x), map(f, l)),
 }//took 40m
 
 
+lemma void multiset_eq_mem<t>(t x, list<t> l1, list<t> l2)
+requires true == multiset_eq(l1, l2);
+ensures mem(x, l1) == mem(x, l2);
+{
+  assume(false);//TODO 5m
+}
+
+
 #endif//MULTISET_GH

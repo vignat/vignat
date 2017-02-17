@@ -2098,7 +2098,6 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }//took 10m
   @*/
 
-
 /*@
   lemma void buckets_ks_put_key_insync<kt>(int* chns, int capacity,
                                            fixpoint (kt,int) hsh,
@@ -2111,6 +2110,7 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
            capacity == length(buckets) &*&
            0 <= start &*& start < length(buckets) &*&
            0 <= fin &*& fin < length(buckets) &*&
+           false == mem(k, buckets_all_keys_fp(buckets)) &*&
            start == loop_fp(hsh(k), capacity) &*&
            nth(fin, buckets_get_keys_fp(buckets)) == none;
   ensures buckets_ks_insync(chns, capacity,
@@ -2208,6 +2208,7 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   //@ assert length(hmap_ks_fp(hm)) == capacity;
   //@ assert length(ks) == capacity;
   //@ assert length(ks) == length(buckets);
+  //@ no_key_in_ks_no_key_in_buckets(buckets, k);
   /*@ buckets_ks_put_key_insync(chns, capacity,
                                 hsh,
                                 start, index, k,

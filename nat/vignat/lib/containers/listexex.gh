@@ -724,19 +724,6 @@ ensures false == distinct(append(l1, l2));
   }
 }
 
-lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
-requires true == distinct(append(l1,l2));
-ensures true == distinct(l1) &*& true == distinct(l2) &*&
-        intersection(l2, l1) == nil;
-{
-  switch(l1) {
-    case nil:
-    case cons(h,t):
-      mem_append(h, t, l2);
-      distinct_unappend(t, l2);
-  }
-}
-
 lemma void append_remove_first<t>(list<t> l1, list<t> l2, t el)
 requires true == mem(el, l1);
 ensures remove(el, append(l1, l2)) == append(remove(el, l1), l2);
@@ -766,11 +753,34 @@ fixpoint bool disjoint<t>(list<t> l1, list<t> l2) {
   return intersection(l1, l2) == nil;
 }
 
+lemma void distinct_unappend<t>(list<t> l1, list<t> l2)
+requires true == distinct(append(l1,l2));
+ensures true == distinct(l1) &*&
+        true == distinct(l2) &*&
+        true == disjoint(l2, l1);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      mem_append(h, t, l2);
+      distinct_unappend(t, l2);
+  }
+}
+
 lemma void distinct_and_disjoint_append<t>(list<t> l1, list<t> l2)
 requires true == distinct(l1) &*&
          true == distinct(l2) &*&
          true == disjoint(l1,l2);
 ensures true == distinct(append(l1,l2));
+{
+  assume(false);//TODO 
+}
+
+lemma void disjoint_unappend<t>(list<t> l1, list<t> l2,
+                                list<t> l3, list<t> l4)
+requires true == disjoint(append(l1, l2), append(l3, l4));
+ensures true == disjoint(l1, l3) &*& true == disjoint(l1, l4) &*&
+        true == disjoint(l2, l3) &*& true == disjoint(l2, l4);
 {
   assume(false);//TODO 
 }
@@ -786,7 +796,7 @@ lemma void disjoint_append<t>(list<t> l1, list<t> l2,
                               list<t> l3, list<t> l4)
 requires true == disjoint(l1, l3) &*&
          true == disjoint(l2, l4);
-ensures intersection(append(l1, l2), append(l3, l4)) == nil;
+ensures true == disjoint(append(l1, l2), append(l3, l4));
 {
   assume(false);//TODO 
 }

@@ -103,8 +103,22 @@ fixpoint list<bucket<kt> > buckets_put_key_fp<kt>(list<bucket<kt> > buckets,
   }
 }
 
+fixpoint list<kt> buckets_all_keys_fp<kt>(list<bucket<kt> > buckets) {
+  switch(buckets) {
+    case nil:
+      return nil;
+    case cons(h,t):
+      return switch(h) {
+        case bucket(chains):
+          return append(map(fst, chains), buckets_all_keys_fp(t));
+      };
+  }
+}
+
 fixpoint bool buckets_ok<kt>(list<bucket<kt> > buckets) {
-  return buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
+  return
+  true == distinct(buckets_all_keys_fp(buckets)) &&
+  buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
 }
 
 fixpoint list<int> buckets_get_chns_rec_fp<kt>(list<pair<kt, nat> > acc,
@@ -1065,7 +1079,7 @@ ensures buckets_get_chns_fp(buckets) ==
           start, buckets_get_chain_fp(buckets, k, start),
           buckets_get_chns_fp(buckets_remove_key_fp(buckets, k)));
 {
-  assume(false);//TODO
+  assume(false);//TODO 200m
 }//took 11m and counting
 
 lemma void buckets_get_chns_rec_nonneg<kt>(list<pair<kt, nat> > acc,
@@ -1996,6 +2010,14 @@ ensures true == buckets_ok_rec(filter((not_this_key_pair_fp)(k), acc),
   acc_subset_buckets_still_ok_rec(filter((not_this_key_pair_fp)(k), acc),
                                   acc, buckets, bound);
 }
+
+lemma void buckets_remove_key_still_distinct<kt>(list<bucket<kt> > buckets, kt k)
+requires true == distinct(buckets_all_keys_fp(buckets));
+ensures true == distinct(buckets_all_keys_fp(buckets_remove_key_fp(buckets, k)));
+{
+  assume(false);//TODO 20m
+}
+
 lemma void buckets_remove_key_still_ok<kt>(list<bucket<kt> > buckets, kt k)
 requires true == buckets_ok(buckets);
 ensures true == buckets_ok(buckets_remove_key_fp(buckets, k));
@@ -2013,6 +2035,7 @@ ensures true == buckets_ok(buckets_remove_key_fp(buckets, k));
   acc_remove_key_buckets_still_ok_rec(get_wraparound(nil, buckets),
                                       buckets_remove_key_fp(buckets, k),
                                       k, length(buckets));
+  buckets_remove_key_still_distinct(buckets, k);
 } //took 225m
 
 lemma void nonmem_not_this_key<kt>(list<pair<kt, nat> > acc, kt k)
@@ -2643,6 +2666,13 @@ ensures length(empty_buckets_fp<kt>(len)) == int_of_nat(len);
   repeat_n_length(len, bucket(nil));
 }
 
+lemma void empty_buckets_keys_distinct<kt>(nat len)
+requires true;
+ensures true == distinct(buckets_all_keys_fp(empty_buckets_fp<kt>(len)));
+{
+  assume(false);//TODO 5m
+}
+
 lemma void empty_buckets_ok<kt>(nat capacity)
 requires capacity != zero;
 ensures true == buckets_ok(empty_buckets_fp<kt>(capacity));
@@ -2650,6 +2680,7 @@ ensures true == buckets_ok(empty_buckets_fp<kt>(capacity));
   empty_buckets_empty_wraparound(capacity);
   empty_buckets_length(capacity);
   empty_buckets_ok_rec(capacity, int_of_nat(capacity));
+  empty_buckets_keys_distinct(capacity);
 }
 
 lemma void buckets_put_same_len<kt>(list<bucket<kt> > buckets,
@@ -4218,17 +4249,271 @@ ensures true == buckets_long_fp(keep_long_fp(buckets));
   }
 }
 
+lemma void buckets_all_keys_decompose_some<kt>(list<pair<kt, nat> > acc,
+                                               bucket<kt> bucket,
+                                               list<bucket<kt> > rest)
+requires get_current_key_fp(acc_at_this_bucket(acc, bucket)) == some(?k);
+ensures true == multiset_eq(append(map(fst, acc),
+                                   buckets_all_keys_fp(cons(bucket,rest))),
+                            cons(k, append(map(fst,
+                                               advance_acc(
+                                                 acc_at_this_bucket(acc,
+                                                                    bucket))),
+                                        buckets_all_keys_fp(rest))));
+{
+  assume(false);//TODO 20m
+}
+
+lemma void advance_acc_keys_none<kt>(list<pair<kt, nat> > acc)
+requires get_current_key_fp(acc) == none;
+ensures map(fst, acc) == map(fst, advance_acc(acc));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key,dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              advance_acc_keys_none(t);
+          }
+      }
+  }
+}//took 3m
+
+lemma void buckets_all_keys_decompose_none<kt>(list<pair<kt, nat> > acc,
+                                               bucket<kt> bucket,
+                                               list<bucket<kt> > rest)
+requires get_current_key_fp(acc_at_this_bucket(acc, bucket)) == none;
+ensures true == multiset_eq(append(map(fst, acc),
+                                   buckets_all_keys_fp(cons(bucket,rest))),
+                            append(map(fst,
+                                       advance_acc(acc_at_this_bucket(acc,
+                                                                      bucket))),
+                                   buckets_all_keys_fp(rest)));
+{
+  switch(bucket) {
+    case bucket(chains):
+      list<pair<kt, nat> > atb = acc_at_this_bucket(acc, bucket);
+      advance_acc_keys_none(atb);
+      // VVV multiset-eq list manipulation boilerplate
+      multiset_eq_refl(append(map(fst, acc),
+                              buckets_all_keys_fp(cons(bucket, rest))));
+      assert true == multiset_eq(append(map(fst, acc),
+                                        buckets_all_keys_fp(cons(bucket, rest))),
+                                 append(map(fst, acc),
+                                        append(map(fst, chains),
+                                               buckets_all_keys_fp(rest))));
+      multiset_eq_append_assoc(map(fst, acc), map(fst, chains),
+                               buckets_all_keys_fp(rest));
+      multiset_eq_comm(append(append(map(fst, acc), map(fst, chains)),
+                              buckets_all_keys_fp(rest)),
+                       append(map(fst, acc),
+                              append(map(fst, chains),
+                                     buckets_all_keys_fp(rest))));
+      multiset_eq_trans(append(map(fst, acc),
+                               buckets_all_keys_fp(cons(bucket, rest))),
+                        append(map(fst, acc),
+                               append(map(fst, chains),
+                                      buckets_all_keys_fp(rest))),
+                        append(append(map(fst, acc),
+                                      map(fst, chains)),
+                               buckets_all_keys_fp(rest)));
+      assert true == multiset_eq(append(map(fst, acc),
+                                        buckets_all_keys_fp(cons(bucket, rest))),
+                                 append(append(map(fst, acc),
+                                               map(fst, chains)),
+                                        buckets_all_keys_fp(rest)));
+      map_append(fst, acc, chains);
+      multiset_eq_refl(map(fst, atb));
+      multiset_eq_append_both(append(map(fst, acc), map(fst, chains)),
+                              map(fst, atb),
+                              buckets_all_keys_fp(rest));
+      multiset_eq_trans(append(map(fst, acc),
+                               buckets_all_keys_fp(cons(bucket, rest))),
+                        append(append(map(fst, acc),
+                                      map(fst, chains)),
+                               buckets_all_keys_fp(rest)),
+                        append(map(fst, atb),
+                               buckets_all_keys_fp(rest)));
+      assert true == multiset_eq(append(map(fst, acc),
+                                        buckets_all_keys_fp(cons(bucket, rest))),
+                                 append(map(fst, atb),
+                                        buckets_all_keys_fp(rest)));
+      assert true == multiset_eq(append(map(fst, acc),
+                                        buckets_all_keys_fp(cons(bucket, rest))),
+                                 append(map(fst, advance_acc(atb)),
+                                        buckets_all_keys_fp(rest)));
+
+  }
+}// took 25m
+
+lemma void lift_upper_bound<kt>(list<pair<kt, nat> > l, int x, int y)
+requires true == forall(l, (sup)((nat_lt)(x), snd)) &*& x <= y;
+ensures true == forall(l, (sup)((nat_lt)(y), snd));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      lift_upper_bound(t, x, y);
+  }
+}
+
+lemma void no_key_in_ks_no_key_in_buckets_short_rec<kt>(list<pair<kt, nat> > acc,
+                                                        list<bucket<kt> > buckets,
+                                                        kt k,
+                                                        int bound)
+requires false == mem(some(k), buckets_get_keys_rec_fp(acc, buckets)) &*&
+         true == buckets_short_fp(buckets) &*&
+         true == forall(acc, (sup)((nat_lt)(length(buckets)), snd)) &*&
+         true == buckets_ok_rec(acc, buckets, bound);
+ensures false == mem(k, buckets_all_keys_fp(buckets)) &*&
+        false == mem(k, map(fst, acc));
+{
+  switch(buckets) {
+    case nil:
+      upper_limit_nonpos_no_tail(acc, 0);
+    case cons(h,t):
+      list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+      switch(h) {
+        case bucket(chains):
+          forall_append(acc, chains,
+                        (sup)((nat_lt)(length(buckets)), snd));
+          advance_acc_lower_limit(atb, length(buckets));
+          no_key_in_ks_no_key_in_buckets_short_rec(advance_acc(atb),
+                                                   t, k, bound);
+          switch(get_current_key_fp(atb)) {
+            case none:
+              buckets_all_keys_decompose_none(acc, h, t);
+              multiset_eq_mem(k, append(map(fst, acc),
+                                        buckets_all_keys_fp(buckets)),
+                              append(map(fst, advance_acc(atb)),
+                                     buckets_all_keys_fp(t)));
+            case some(cur_k):
+              buckets_all_keys_decompose_some(acc, h, t);
+              multiset_eq_mem(k, append(map(fst, acc),
+                                        buckets_all_keys_fp(buckets)),
+                              cons(cur_k,
+                                   append(map(fst, advance_acc(atb)),
+                                          buckets_all_keys_fp(t))));
+          }
+          mem_append(k, map(fst, acc), buckets_all_keys_fp(buckets));
+      }
+  }
+}// took 36m
+
+lemma void all_keys_in_short_and_wraparound<kt>(list<bucket<kt> > buckets)
+requires true;
+ensures true == multiset_eq(buckets_all_keys_fp(buckets),
+                            append(buckets_all_keys_fp(keep_short_fp(buckets)),
+                                   map(fst, get_wraparound(nil, buckets))));
+{
+  assume(false);//TODO 10m
+}
+
+lemma void no_key_in_ks_no_key_in_buckets<kt>(list<bucket<kt> > buckets, kt k)
+requires false == mem(some(k), buckets_get_keys_fp(buckets)) &*&
+         true == buckets_ok(buckets);
+ensures false == mem(k, buckets_all_keys_fp(buckets));
+{
+  keep_short_same_len(buckets);
+  buckets_ok_short_long_ok(get_wraparound(nil, buckets),
+                           buckets, length(buckets));
+  buckets_short_get_keys_rec(get_wraparound(nil, buckets), buckets);
+  keep_short_indeed_short(buckets);
+  buckets_ok_wraparound_bounded(buckets);
+  lift_upper_bound(get_wraparound(nil, buckets),
+                   length(buckets) - 1,
+                   length(buckets));
+  no_key_in_ks_no_key_in_buckets_short_rec(get_wraparound(nil, buckets),
+                                           keep_short_fp(buckets),
+                                           k,
+                                           length(buckets));
+  mem_append(k,
+             buckets_all_keys_fp(keep_short_fp(buckets)),
+             map(fst, get_wraparound(nil, buckets)));
+  all_keys_in_short_and_wraparound(buckets);
+  multiset_eq_mem(k,
+                  buckets_all_keys_fp(buckets),
+                  append(buckets_all_keys_fp(keep_short_fp(buckets)),
+                         map(fst, get_wraparound(nil, buckets))));
+}//took 30m
+
+lemma void buckets_put_keys_disjoint<kt>(list<kt> ks,
+                                         list<bucket<kt> > buckets,
+                                         kt k, int start, int dist)
+requires true == disjoint(ks, buckets_all_keys_fp(buckets)) &*&
+         false == mem(k, ks);
+ensures true == disjoint(ks,
+                         buckets_all_keys_fp(buckets_put_key_fp(buckets, k,
+                                                                start, dist)));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          if (start == 0) {
+          } else {
+            disjoint_unappend(nil, ks, map(fst, chains),
+                              buckets_all_keys_fp(t));
+            buckets_put_keys_disjoint(ks, t, k, start - 1, dist);
+            disjoint_append(nil, ks, map(fst, chains),
+                            buckets_all_keys_fp(buckets_put_key_fp(t, k,
+                                                                   start - 1,
+                                                                   dist)));
+          }
+      }
+  }
+}//took 10m
+
+lemma void buckets_put_keys_distinct<kt>(list<bucket<kt> > buckets,
+                                         kt k,
+                                         int start,
+                                         int dist)
+requires true == distinct(buckets_all_keys_fp(buckets)) &*&
+         false == mem(k, buckets_all_keys_fp(buckets));
+ensures true == distinct(buckets_all_keys_fp(buckets_put_key_fp(buckets,
+                                                                k,
+                                                                start,
+                                                                dist)));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          if (start == 0) {
+          } else {
+            distinct_unappend(map(fst, chains), buckets_all_keys_fp(t));
+            disjoint_comm(map(fst, chains),
+                          buckets_all_keys_fp(t));
+            buckets_put_keys_disjoint(map(fst, chains), t,
+                                      k, start - 1, dist);
+            buckets_put_keys_distinct(t, k, start - 1, dist);
+            distinct_and_disjoint_append(map(fst, chains),
+                                         buckets_all_keys_fp(
+                                           buckets_put_key_fp(t, k,
+                                                              start - 1,
+                                                              dist)));
+        }
+      }
+  }
+}//took 16m
 
 lemma void buckets_put_still_ok<kt>(list<bucket<kt> > buckets,
                                     kt k, int start, int dist)
 requires true == buckets_ok(buckets) &*&
          0 <= start &*& start < length(buckets) &*&
          0 <= dist &*& dist < length(buckets) &*&
+         false == mem(k, buckets_all_keys_fp(buckets)) &*&
          nth(loop_fp(start + dist, length(buckets)),
              buckets_get_keys_fp(buckets)) == none;
 ensures true == buckets_ok(buckets_put_key_fp(buckets, k, start, dist));
 {
   buckets_put_same_len(buckets, k, start, dist);
+  buckets_put_keys_distinct(buckets, k, start, dist);
   if (length(buckets) <= start + dist) {
     assert true == buckets_ok_rec(get_wraparound(nil, buckets), buckets, length(buckets));
     buckets_put_wraparound_is_cons(nil, buckets, k, start, dist);
