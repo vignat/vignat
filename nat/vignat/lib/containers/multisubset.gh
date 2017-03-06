@@ -127,6 +127,13 @@ ensures true == msubset(map(f, l1), map(f, l2));
   }
 }//took 10m
 
+lemma void msubset_append<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == msubset(l1, append(l1, l2)) &*&
+        true == msubset(l2, append(l1, l2));
+{
+  assume(false);//TODO 5m
+}
 
 
 #endif// MULTISUBSET_GH
