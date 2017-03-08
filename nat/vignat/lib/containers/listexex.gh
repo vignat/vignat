@@ -767,6 +767,13 @@ ensures true == distinct(l1) &*&
   }
 }
 
+lemma void disjoint_mem<t>(list<t> l1, list<t> l2, t x)
+requires true == disjoint(l1, l2);
+ensures true == ((mem(x, l1)) != (mem(x, l2)));
+{
+  assume(false);//TODO
+}
+
 lemma void distinct_and_disjoint_append<t>(list<t> l1, list<t> l2)
 requires true == distinct(l1) &*&
          true == distinct(l2) &*&
