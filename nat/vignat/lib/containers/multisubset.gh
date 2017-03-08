@@ -72,6 +72,13 @@ ensures true == msubset(l1, l2);
 }
 
 
+lemma void msubset_remove_lesser<t>(list<t> l1, list<t> l2, t x)
+requires true == msubset(l1, l2);
+ensures true == msubset(remove(x, l1), l2);
+{
+  assume(false);//TODO 5m
+}
+
 
 
 lemma void msubset_remove<t>(list<t> l1, list<t> l2, t x)

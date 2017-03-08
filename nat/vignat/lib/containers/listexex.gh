@@ -833,5 +833,15 @@ ensures remove(x, append(l1, l2)) ==
   assume(false);//TODO 5m
 }
 
+lemma void map_remove<t1,t2>(fixpoint (t1,t2) f,
+                             t1 x,
+                             list<t1> l)
+requires true == distinct(map(f, l));
+ensures map(f, remove(x, l)) ==
+        remove(f(x), map(f, l));
+{
+  assume(false);//TODO 5m
+}
+
 
 #endif//LISTEXEX_GH
