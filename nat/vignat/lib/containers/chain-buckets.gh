@@ -1756,19 +1756,154 @@ ensures buckets_get_chns_fp(buckets_remove_key_fp(buckets, k)) ==
     buckets_rem_part_get_chns_norm(buckets, k, start, dist);
   }
 }
+
 //<---- rem_partial_chain_symmetric_lemmas start here
+
+lemma void add_rem_part_chain_rec(list<int> chns,
+                                  int start,
+                                  int len)
+requires 0 <= start &*& 0 <= len;
+ensures chns ==
+        add_partial_chain_rec_fp(
+          rem_partial_chain_rec_fp(chns,
+                                   start,
+                                   len),
+          start, len);
+{
+  switch(chns) {
+    case nil:
+    case cons(h,t):
+      if (start == 0) {
+        if (len == 0) {
+        } else {
+          add_rem_part_chain_rec(t, 0, len - 1);
+        }
+      } else {
+        add_rem_part_chain_rec(t, start - 1, len);
+      }
+  }
+}
+
+lemma void rem_part_chn_rec_same_len(int start,
+                                     int len,
+                                     list<int> chn_cnts)
+requires true;
+ensures length(chn_cnts) ==
+        length(rem_partial_chain_rec_fp(chn_cnts,
+                                        start, len));
+{
+  switch(chn_cnts) {
+    case nil:
+    case cons(h,t):
+      if (start == 0) {
+        if (len != 0)
+        rem_part_chn_rec_same_len(0, len-1, t);
+      } else {
+        rem_part_chn_rec_same_len(start - 1, len, t);
+      }
+  }
+}
+
+lemma void rem_partial_chain_same_len(int start,
+                                      int len,
+                                      list<int> chns)
+requires true;
+ensures length(chns) ==
+        length(rem_partial_chain_fp(start, len, chns));
+{
+  if (length(chns) < len + start) {
+    rem_part_chn_rec_same_len(start, len, chns);
+    rem_part_chn_rec_same_len(0, len + start - length(chns),
+                              rem_partial_chain_rec_fp(chns,
+                                                       start,
+                                                       len));
+  } else {
+    rem_part_chn_rec_same_len(start, len, chns);
+  }
+}//took 3m
+
+lemma void rem_part_chn_rec_swap(list<int> chns,
+                                 int st1, int l1,
+                                 int st2, int l2)
+requires 0 <= st1 &*& 0 <= l1 &*&
+         0 <= st2 &*& 0 <= l2;
+ensures rem_partial_chain_rec_fp(rem_partial_chain_rec_fp
+                                 (chns, st1, l1),
+                                 st2, l2) ==
+        rem_partial_chain_rec_fp(rem_partial_chain_rec_fp
+                                 (chns, st2, l2),
+                                 st1, l1);
+{
+  switch(chns) {
+    case nil:
+    case cons(h,t):
+      if (st1 == 0 && st2 == 0 && l1 != 0 && l2 != 0) {
+        rem_part_chn_rec_swap(t,
+                              0, l1 -1,
+                              0, l2 - 1);
+      } else if (st1 == 0 && st2 != 0 && l1 != 0) {
+        rem_part_chn_rec_swap(t,
+                              0, l1 - 1,
+                              st2 - 1, l2);
+      } else if (st1 != 0 && st2 == 0 && l2 != 0) {
+        rem_part_chn_rec_swap(t,
+                              st1 - 1, l1,
+                              0, l2 - 1);
+      } else if (st1 != 0 && st2 != 0) {
+        rem_part_chn_rec_swap(t,
+                              st1 - 1, l1,
+                              st2 - 1, l2);
+      }
+  }
+}
+
+lemma void add_rem_part_chain(int start,
+                              int len,
+                              list<int> chns)
+requires 0 <= start &*& start < length(chns) &*& 0 <= len;
+ensures chns ==
+        add_partial_chain_fp(start, len,
+                             rem_partial_chain_fp(start, len,
+                                                  chns));
+{
+  rem_part_chn_rec_same_len(start, len, chns);
+  if (length(chns) < start + len) {
+    rem_part_chn_rec_same_len(0, len + start - length(chns),
+                              rem_partial_chain_rec_fp(chns, start, len));
+    rem_part_chn_rec_swap(chns,
+                          start, len,
+                          0, len + start - length(chns));
+    add_rem_part_chain_rec(
+      rem_partial_chain_rec_fp(chns,
+                               0,
+                               len + start - length(chns)),
+      start, len);
+    add_rem_part_chain_rec(chns,
+                           0,
+                           len + start - length(chns));
+  } else {
+    rem_part_chn_rec_same_len(start, len, chns);
+    add_rem_part_chain_rec(chns, start, len);
+  }
+}
 
 lemma void buckets_remove_add_one_chain<kt>(list<bucket<kt> > buckets,
                                             int start, kt k)
 requires 0 <= start &*& start < length(buckets) &*&
-         true == bucket_has_key_fp(k, nth(start, buckets));
+         true == bucket_has_key_fp(k, nth(start, buckets)) &*&
+         true == buckets_ok(buckets);
 ensures buckets_get_chns_fp(buckets) ==
         add_partial_chain_fp(
           start, buckets_get_chain_fp(buckets, k, start),
           buckets_get_chns_fp(buckets_remove_key_fp(buckets, k)));
 {
-  assume(false);//TODO 200m
-}//took 11m and counting
+  nat ndist = bucket_get_chain_fp(nth(start, buckets), k);
+  int dist = int_of_nat(ndist);
+  buckets_rem_part_get_chns(buckets, k, start, dist);
+  list<int> orig_chains = buckets_get_chns_fp(buckets);
+  buckets_keys_chns_same_len(buckets);
+  add_rem_part_chain(start, dist, orig_chains);
+}
 
 lemma void buckets_get_chns_rec_nonneg<kt>(list<pair<kt, nat> > acc,
                                            list<bucket<kt> > buckets)
