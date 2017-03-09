@@ -823,22 +823,22 @@ ensures true == distinct(lst);
   }
 }
 
-lemma void remove_append_swap<t>(t x, list<t> l1, list<t> l2)
-requires true;
-ensures remove(x, append(l1, l2)) ==
-        (mem(x, l1) ?
-         append(remove(x, l1), l2) :
-         append(l1, remove(x, l2)));
-{
-  assume(false);//TODO 5m
-}
-
 lemma void map_remove<t1,t2>(fixpoint (t1,t2) f,
                              t1 x,
                              list<t1> l)
 requires true == distinct(map(f, l));
 ensures map(f, remove(x, l)) ==
         remove(f(x), map(f, l));
+{
+  assume(false);//TODO 5m
+}
+
+lemma void remove_append_swap<t>(t x, list<t> l1, list<t> l2)
+requires true;
+ensures remove(x, append(l1, l2)) ==
+        (mem(x, l1) ?
+         append(remove(x, l1), l2) :
+         append(l1, remove(x, l2)));
 {
   assume(false);//TODO 5m
 }

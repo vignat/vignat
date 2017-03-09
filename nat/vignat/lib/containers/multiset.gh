@@ -260,5 +260,13 @@ ensures mem(x, l1) == mem(x, l2);
   assume(false);//TODO 5m
 }
 
+lemma void multiset_remove_append_swap<t>(t x, list<t> l1, list<t> l2)
+requires true == mem(x, l2);
+ensures true == multiset_eq(remove(x, append(l1, l2)),
+                            append(l1, remove(x, l2)));
+{
+  assume(false);//TODO 5m
+}
+
 
 #endif//MULTISET_GH
