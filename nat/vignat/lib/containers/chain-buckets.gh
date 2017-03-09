@@ -2433,6 +2433,26 @@ ensures int_of_nat(dst) != i;
   }
 }
 
+lemma void bucket_get_chain_mem<kt>(list<pair<kt, nat> > chains, kt k)
+requires true == bucket_has_key_fp(k, bucket(chains));
+ensures true == mem(pair(k, bucket_get_chain_fp(bucket(chains), k)),
+                    chains);
+{
+  assume(false);//TODO 5m
+}
+
+lemma void acc_has_chain_here_is_the_key<kt>(list<pair<kt, nat> > acc,
+                                             list<bucket<kt> > buckets,
+                                             kt k, int dst, int bound)
+requires 0 <= dst &*& dst < length(buckets) &*&
+         true == buckets_ok_rec(acc, buckets, bound) &*&
+         true == mem(pair(k, nat_of_int(dst)), acc);
+ensures nth(dst, buckets_get_keys_rec_fp(acc, buckets)) ==
+        some(k);
+{
+  assume(false);//TODO 5m
+}
+
 lemma void buckets_get_chain_longer_rec<kt>(list<bucket<kt> > buckets,
                                             list<pair<kt, nat> > acc,
                                             int start, int i, kt k,
@@ -2454,10 +2474,16 @@ ensures buckets_get_chain_fp(buckets, k, start) != i;
          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, bh);
          if (start == 0) {
            nat dst = bucket_get_chain_fp(bh, k);
-           assume(false);//TODO: 2h
-           assume(true == mem(pair(k,dst), acc_at_this_bucket(acc, bh)));
-           acc_has_chain_longer(acc_at_this_bucket(acc, bh),
-                                bt, dst, k, i, bound);
+           if (length(buckets) <= int_of_nat(dst)) return;
+           bucket_get_chain_mem(chains, k);
+           switch(dst) {
+             case zero:
+               distinct_and_zero_this_is_the_key(atb, k);
+             case succ(dp):
+               mem_advance_acc_swap(atb, k, dp);
+               acc_has_chain_here_is_the_key(advance_acc(atb), bt,
+                                             k, int_of_nat(dp), bound);
+           }
          } else {
            buckets_distinct_all_keys_breakdown(chains, bt);
            distinct_key_in_following_not_in_the_first_bucket(k, start-1, chains,
