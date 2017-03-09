@@ -12,8 +12,10 @@ local log    = require "log"
 local DST_MAC		= "90:e2:ba:55:14:11" -- resolved via ARP on GW_IP or DST_IP, can be overriden with a string here
 local SRC_IP_BASE	= "192.168.6.5" -- actual address will be SRC_IP_BASE + random(0, flows)
 local DST_IP		= "192.168.4.10"
-local SRC_PORT		= 234
+local SRC_PORT		= 1
 local DST_PORT		= 319
+local START_PROBE_PORT	= 64000
+local N_PROBE_FLOWS	= 1000
 
 function configure(parser)
 	parser:description("Generates UDP traffic and measure latencies. Edit the source to modify constants like IPs.")
@@ -36,33 +38,33 @@ function master(args)
 	local file = io.open("mf-lat.txt", "w")
 	file:write("#flows rate meanLat stdevLat\n")
 	setRate(txDev:getTxQueue(0), args.size, args.rate);
-	for _,nflws in pairs({1,10,100,1000,10000,20000,30000,40000,50000,60000,65000,65535}) do
+	for _,nflws in pairs({100,1000,10000,20000,30000,40000,50000,60000,63999}) do
 		-- Heatup phase
 		printf("heatup for %d flows - %d secs", nflws, args.upheat);
-		--local loadTask = mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, nflws, args.upheat)
-		local timerTask = mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, nflws, args.upheat)
-		--local snt, rcv = loadTask:wait()
+		local loadTask = mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, nflws, args.upheat)
+		local timerTask = mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, N_PROBE_FLOWS, args.upheat)
+		local snt, rcv = loadTask:wait()
 		mg.waitForTasks()
-		--[[printf("heatup results: %d sent, %f loss", snt, (snt-rcv)/snt);
+		printf("heatup results: %d sent, %f loss", snt, (snt-rcv)/snt);
 		if (rcv < snt/100) then
 			printf("unsuccessfull exiting");
 			return	
-		end]]
+		end
 		mg.waitForTasks()
 		-- Testing phase
-		--local loadTask = mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, nflws, args.timeout)
-		local timerTask = mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, nflws, args.timeout)
-		--local packetsSent, packetsRecv = loadTask:wait()
+		local loadTask = mg.startTask("loadSlave", txDev:getTxQueue(0), rxDev, args.size, nflws, args.timeout)
+		local timerTask = mg.startTask("timerSlave", txDev:getTxQueue(1), rxDev:getRxQueue(1), args.size, N_PROBE_FLOWS, args.timeout)
+		local packetsSent, packetsRecv = loadTask:wait()
 		local latency, stdev = timerTask:wait()
-		--local loss = (packetsSent - packetsRecv)/packetsSent
+		local loss = (packetsSent - packetsRecv)/packetsSent
 		printf("total: %d flows, %f latency (+-%f)",
 			nflws, latency, stdev);
 		mg.waitForTasks()
-		--if (0 < loss) then
-		--	printf("loss: %f --> queuing latency measurement is not representative", loss)
-		--else
+		if (0 < loss) then
+			printf("loss: %f --> queuing latency measurement is not representative", loss)
+		else
 			file:write(nflws .. " " .. args.rate .. " " .. latency .. " " .. stdev .. "\n")
-		--end
+		end
 	end
 end
 
@@ -117,7 +119,7 @@ function loadSlave(queue, rxDev, size, flows, duration)
 	return txCtr.total, rxCtr.total
 end
 
-function timerSlave(txQueue, rxQueue, size, flows, duration)
+function timerSlave(txQueue, rxQueue, size, nflows, duration)
 	if size < 84 then
 		log:warn("Packet size %d is smaller than minimum timestamp size 84. Timestamped packets will be larger than load packets.", size)
 		size = 84
@@ -126,9 +128,9 @@ function timerSlave(txQueue, rxQueue, size, flows, duration)
 	local timestamper = ts:newUdpTimestamper(txQueue, rxQueue)
 	local hist = hist:new()
 	local counter = 0
-	local rateLimit = timer:new(0.0001)
+	local rateLimit = timer:new(2.1/nflows)
 	local baseIP = parseIPAddress(SRC_IP_BASE)
-	local baseSRCP = SRC_PORT
+	local baseSRCP = START_PROBE_PORT
 	while finished:running() and mg.running() do
 		hist:update(timestamper:measureLatency(size, function(buf)
 			fillUdpPacket(buf, size)
@@ -136,7 +138,7 @@ function timerSlave(txQueue, rxQueue, size, flows, duration)
 			-- pkt.ip4.src:set(baseIP + counter)
 			pkt.ip4.src:set(baseIP)
 			pkt.udp.src = (baseSRCP + counter)
-			counter = incAndWrap(counter, flows)
+			counter = incAndWrap(counter, nflows)
 		end))
 		rateLimit:wait()
 		rateLimit:reset()

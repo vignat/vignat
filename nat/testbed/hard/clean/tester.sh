@@ -10,3 +10,8 @@ sudo $RTE_SDK/tools/dpdk-devbind.py -b $KERN_NIC_DRIVER $TESTER_PCI_INTERNAL $TE
 
 echo "[clean] Killing pktgen on tester..."
 sudo pkill -9 pktgen
+
+echo "[clean] Killing moongen on tester..."
+sudo pkill -9 MoonGen
+sudo pkill -9 moongen
+sudo pkill -9 moon-gen

@@ -95,7 +95,16 @@ fi
 
 
 if [ "$1" = "netfilter" ]; then
-    : # Nothing to do, already configured by init-network
+    case $2 in
+	"mg-new-flows-latency")
+	    EXPIRATION_TIME=2
+	    ;;
+        "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"rr"|"passthrough")
+            EXPIRATION_TIME=60
+            ;;
+    esac
+
+    bash ./util/netfilter-short-timeout.sh $EXPIRATION_TIME
 else
     echo "[bench] Launching $1..."
 
@@ -104,7 +113,7 @@ else
     case $2 in
         "mg-new-flows-latency")
             SIMPLE_SCENARIO="loopback"
-            EXPIRATION_TIME=10
+            EXPIRATION_TIME=2
             ;;
         "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency")
             SIMPLE_SCENARIO="loopback"
@@ -136,21 +145,21 @@ case $2 in
     "mg-1p")
         LUA_SCRIPT="l3-load-find-1p.lua"
         echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 3000 -u 60 -t 20 1 0"
+        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 3000 -u 5 -t 20 1 0"
         scp $TESTER_HOST:mf-find-mg-1p.txt "./$RESULTS_FILE"
         ssh $TESTER_HOST "sudo rm mf-find-mg-1p.txt"
     ;;
     "mg-existing-flows-latency")
         LUA_SCRIPT="l3-latency-light.lua"
         echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 20 -u 60 -t 20 1 0"
+        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 100 -u 5 -t 20 1 0"
         scp $TESTER_HOST:mf-lat.txt "./$RESULTS_FILE"
         ssh $TESTER_HOST "sudo rm mf-lat.txt"
     ;;
     "mg-new-flows-latency")
-        LUA_SCRIPT="l3-latency-new-flows.lua"
+        LUA_SCRIPT="l3-latency-light.lua"
         echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 20 -u 60 -t 20 1 0"
+        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 100 -u 5 -t 20 1 0"
         scp $TESTER_HOST:mf-lat.txt "./$RESULTS_FILE"
         ssh $TESTER_HOST "sudo rm mf-lat.txt"
     ;;

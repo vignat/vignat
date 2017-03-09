@@ -42,7 +42,7 @@ function master(args)
 	end
 	local minRate = 10
 	local rate = minRate + (maxRate - minRate)/2
-	for _,nflws in pairs({1,10,100,1000,10000,20000,30000,40000,50000,60000,65000,65535}) do
+	for _,nflws in pairs({1,10,100,1000,10000,20000,30000,40000,50000,60000,64000,65000,65535}) do
 		-- Heatup phase
 		printf("heatup at %d rate for %d flows - %d secs", minRate, nflws, args.upheat);
 		setRate(txDev:getTxQueue(0), args.size, minRate);
@@ -54,7 +54,7 @@ function master(args)
 			return	
 		end
 		mg.waitForTasks()
-		local steps = 10;
+		local steps = 11;
 		local upperbound = maxRate
 		local lowerbound = minRate
 		-- Testing phase
@@ -74,7 +74,7 @@ function master(args)
 				file:write(nflws .. " " .. rate .. " " .. packetsSent .. " " ..
 					   packetsSent/args.timeout .. " " .. loss .. "\n")
 			end
-			if (loss < 0.01) then
+			if (loss < 0.001) then
 				lowerbound = rate
 				rate = rate + (upperbound - rate)/2
 			else
