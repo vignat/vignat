@@ -307,7 +307,6 @@ static inline st_hash_t
 do_hash(st_data_t key, st_table *tab)
 {
     st_hash_t hash = (st_hash_t)(tab->type->hash)(key);
-
     /* RESERVED_HASH_VAL is used for a deleted entry.  Map it into
        another value.  Such mapping should be extremely rare.  */
     return hash == RESERVED_HASH_VAL ? RESERVED_HASH_SUBSTITUTION_VAL : hash;
