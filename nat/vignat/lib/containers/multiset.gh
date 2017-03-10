@@ -268,5 +268,4 @@ ensures true == multiset_eq(remove(x, append(l1, l2)),
   assume(false);//TODO 5m
 }
 
-
 #endif//MULTISET_GH

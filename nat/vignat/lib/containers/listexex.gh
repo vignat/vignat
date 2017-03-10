@@ -843,5 +843,16 @@ ensures remove(x, append(l1, l2)) ==
   assume(false);//TODO 5m
 }
 
+lemma void distinct_map_identical_elems<t1,t2>(fixpoint (t1,t2) f,
+                                               list<t1> l,
+                                               t1 x1, t1 x2)
+requires true == distinct(map(f, l)) &*&
+         true == mem(x1, l) &*&
+         true == mem(x2, l) &*&
+         f(x1) == f(x2);
+ensures x1 == x2;
+{
+  assume(false);//TODO 5m
+}
 
 #endif//LISTEXEX_GH
