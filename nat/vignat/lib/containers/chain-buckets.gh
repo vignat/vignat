@@ -2646,6 +2646,20 @@ ensures buckets_get_chain_fp(buckets, k, start) != i;
   }
 }
 
+lemma void unadvance_acc_mem<kt>(list<pair<kt, nat> > acc, kt k, nat dst)
+requires true == mem(pair(k, dst), advance_acc(acc));
+ensures true == mem(pair(k, succ(dst)), acc);
+{
+  assume(false);//TODO 2m
+}
+
+lemma void current_key_pair_zero<kt>(list<pair<kt, nat> > acc, kt k)
+requires get_current_key_fp(acc) == some(k);
+ensures true == mem(pair(k, zero), acc);
+{
+  assume(false);//TODO 2m
+}
+
 lemma void acc_chain_end_rec<kt>(list<pair<kt, nat> > acc,
                                  list<bucket<kt> > buckets,
                                  kt k, int dist, int bound)
@@ -2655,7 +2669,47 @@ requires nth(dist, buckets_get_keys_rec_fp(acc, buckets)) == some(k) &*&
          false == mem(k, buckets_all_keys_fp(buckets));
 ensures true == mem(pair(k, nat_of_int(dist)), acc);
 {
-  assume(false);//TODO 20m
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          if (mem(pair(k, nat_of_int(dist)), chains)) {
+            mem_map(pair(k, nat_of_int(dist)), chains, fst);
+          }
+          assert false == mem(pair(k, nat_of_int(dist)), chains);
+          if (dist == 0) {
+            current_key_pair_zero(atb, k);
+          } else {
+            acc_chain_end_rec(advance_acc(atb), t, k, dist - 1, bound);
+            unadvance_acc_mem(atb, k, nat_of_int(dist - 1));
+            assert true == mem(pair(k, nat_of_int(dist)), atb);
+            assert false == mem(k, map(fst, chains));
+          }
+      }
+  }
+  
+}
+
+lemma void key_not_in_acc_then_in_buckets<kt>(list<pair<kt, nat> > acc,
+                                              list<bucket<kt> > buckets,
+                                              kt k, int x)
+requires 0 <= x &*& x < length(buckets) &*&
+         nth(x, buckets_get_keys_rec_fp(acc, buckets)) == some(k) &*&
+         false == mem(k, map(fst, acc));
+ensures true == mem(k, buckets_all_keys_fp(buckets));
+{
+  assume(false);//TODO 10m
+}
+
+lemma void advance_last_chain_with_zero_nonmem<kt>(list<pair<kt, nat> > acc,
+                                                   kt k)
+requires true == mem(pair(k, zero), acc) &*&
+         false == mem(k, remove(k, map(fst, acc)));
+ensures false == mem(k, map(fst, advance_acc(acc)));
+{
+  assume(false);//TODO 5m
 }
 
 lemma void buckets_chain_end_rec<kt>(list<pair<kt, nat> > acc,
@@ -2681,12 +2735,48 @@ ensures buckets_get_chain_fp(buckets, k, start) == i;
       list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
       switch(h) {
         case bucket(chains):
+          map_append(fst, acc, chains);
           buckets_distinct_all_keys_breakdown(chains, t);
+          remove_append_swap(k, map(fst, acc), map(fst, chains));
+          distinct_unique(map(fst, chains), k);
           if (start == 0) {
-            assume(false);//TODO 1h
             nat chn = bucket_get_chain_fp(h, k);
-            assert nth(int_of_nat(chn),
-                       buckets_get_keys_rec_fp(acc, buckets)) == some(k);
+            bucket_get_chain_mem(chains, k);
+            switch(chn) {
+              case zero:
+                if (i != 0) {
+                  assert true == mem(pair(k, zero), chains);
+                  assert true == mem(k, map(fst, chains));
+                  advance_last_chain_with_zero_nonmem(atb, k);
+                  distinct_key_in_here_not_in_the_following(k, chains, t);
+                  key_not_in_acc_then_in_buckets(advance_acc(atb),
+                                                 t, k, i - 1);
+                  assert true == mem(k, buckets_all_keys_fp(t));
+                  assert false;
+                }
+                return;
+              case succ(pchn):
+                if (i == 0) {
+                  current_key_pair_zero(atb, k);
+                  assert true == mem(pair(k, chn), atb);
+                  assert true == mem(pair(k, zero), atb);
+                  unique_map_identical_elems(fst, atb, pair(k, nat_of_int(i)),
+                                             pair(k, chn));
+                  return;
+                }
+                distinct_key_in_here_not_in_the_following(k, chains, t);
+                acc_chain_end_rec(advance_acc(atb), t,
+                                  k, i - 1, capacity);
+            }
+            assert true == mem(pair(k, nat_of_int(i - 1)), advance_acc(atb));
+            mem_advance_acc_swap(atb, k, nat_of_int(i - 1));
+            assert true == mem(pair(k, nat_of_int(i)), atb);
+            assert true == mem(pair(k, chn), chains);
+            assert true == mem(pair(k, chn), atb);
+            assert false == mem(k, remove(k, map(fst, atb)));
+            unique_map_identical_elems(fst, atb, pair(k, nat_of_int(i)),
+                                       pair(k, chn));
+            assert nat_of_int(i) == chn;
             assert bucket_get_chain_fp(h, k) == nat_of_int(i);
           } else {
             distinct_key_in_following_not_in_the_first_bucket(k, start - 1,
@@ -3230,15 +3320,6 @@ ensures false == mem(k, remove(k, map(fst, advance_acc(acc))));
   assume(false);//TODO 10m
 }
 
-lemma void advance_last_chain_with_zero_nonmem<kt>(list<pair<kt, nat> > acc,
-                                                   kt k)
-requires true == mem(pair(k, zero), acc) &*&
-         false == mem(k, remove(k, map(fst, acc)));
-ensures false == mem(k, map(fst, advance_acc(acc)));
-{
-  assume(false);//TODO 5m
-}
-
 lemma void no_chain_whatsoever_no_key_in_wraparound<kt>(list<pair<kt, nat> > acc,
                                                         list<bucket<kt> > buckets,
                                                         kt k)
@@ -3258,13 +3339,6 @@ ensures false == mem(k, map(fst, get_wraparound(acc, buckets)));
                                                    t, k);
       }
   }
-}
-
-lemma void current_key_pair_zero<kt>(list<pair<kt, nat> > acc, kt k)
-requires get_current_key_fp(acc) == some(k);
-ensures true == mem(pair(k, zero), acc);
-{
-  assume(false);//TODO 2m
 }
 
 lemma void see_chain_end_no_key_in_wraparound<kt>(list<pair<kt, nat> > acc,
@@ -3316,7 +3390,6 @@ ensures false == mem(k, map(fst, get_wraparound(acc, buckets)));
           }
       }
   }
-  
 }
 
 lemma void no_long_chain_not_in_wraparound<kt>(list<pair<kt, nat> > acc,
