@@ -7,12 +7,19 @@ APP = nat
 CC = g++
 
 # sources
-SRCS-y := nat_forward_nat.c nat_map_dpdk.c ../nf_main.c ../lib/nat_config.c ../lib/nf_time.c ../lib/nf_util.c
+SRCS-y := nat_forward_nat.c ../nf_main.c ../lib/nat_config.c ../lib/nf_time.c ../lib/nf_util.c \
+          nat_map_dpdk.c
+#          ruby/st.c nat_map_ruby.c
 
 # g++ flags
 CFLAGS += -O3
 CFLAGS += -I.. -I../..
 CFLAGS += -std=gnu++11
+
+# Ruby needs that if it's, well, not Ruby
+CFLAGS += -DNOT_RUBY
+# Ruby's onigmo generates a ton of these
+CFLAGS += -Wno-narrowing
 
 LDFLAGS += -lstdc++
 
