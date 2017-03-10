@@ -1229,16 +1229,36 @@ ensures buckets_remove_key_fp(cons(bucket(chains), buckets), k) ==
   assume(false);//TODO 20m
 }
 
+lemma void bucket_has_key_mem_all_keys<kt>(kt k, int start,
+                                           list<bucket<kt> > buckets)
+requires 0 <= start &*& start < length(buckets) &*&
+         true == bucket_has_key_fp(k, nth(start, buckets));
+ensures true == mem(k, buckets_all_keys_fp(buckets));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          if (start == 0) {
+          } else {
+            bucket_has_key_mem_all_keys(k, start - 1, t);
+          }
+      }
+  }
+}
 
 lemma void distinct_key_in_following_not_in_the_first_bucket<kt>(kt k, int start,
                                                                  list<pair<kt, nat> > chains,
                                                                  list<bucket<kt> > buckets)
 requires true == distinct(buckets_all_keys_fp(cons(bucket(chains), buckets))) &*&
-         true == bucket_has_key_fp(k, nth(start, buckets)) &*&
-         0 <= start &*& start < length(buckets);
+         0 <= start &*& start < length(buckets) &*&
+         true == bucket_has_key_fp(k, nth(start, buckets));
 ensures false == mem(k, map(fst, chains));
 {
-  assume(false);//TODO 1h
+  bucket_has_key_mem_all_keys(k, start, buckets);
+  distinct_unappend(map(fst, chains), buckets_all_keys_fp(buckets));
+  disjoint_mem(buckets_all_keys_fp(buckets), map(fst, chains), k);
 }
 
 lemma void distinct_key_in_here_not_in_the_following<kt>(kt k,
@@ -1248,7 +1268,8 @@ requires true == distinct(buckets_all_keys_fp(cons(bucket(chains), buckets))) &*
          true == bucket_has_key_fp(k, bucket(chains));
 ensures false == mem(k, buckets_all_keys_fp(buckets));
 {
-  assume(false);//TODO 10m
+  distinct_unappend(map(fst, chains), buckets_all_keys_fp(buckets));
+  disjoint_mem(buckets_all_keys_fp(buckets), map(fst, chains), k);
 }
 
 
