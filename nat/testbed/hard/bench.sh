@@ -28,12 +28,15 @@
 #           there are two subnets, tester-middlebox and middlebox-server.
 #           a.k.a. request/response
 
-if [ -z $1 ]; then
+MIDDLEBOX=$1
+SCENARIO=$2
+
+if [ -z $MIDDLEBOX ]; then
     echo "[bench] No app specified" 1>&2
     exit 1
 fi
 
-if [ -z $2 ]; then
+if [ -z $SCENARIO ]; then
     echo "[bench] No scenario specified" 1>&2
     exit 2
 fi
@@ -41,8 +44,8 @@ fi
 
 # HACK: VigNAT isn't yet verified with 3 interfaces
 #       Thus it has to be patched to support it
-if [ $1 != "netfilter" ] && [ $2 = "rr" ] && [ -f $1/main.c ]; then
-    sed -i -- "s~//{2, 0, 0}~{2, 0, 0}~g" $1/main.c
+if [ $MIDDLEBOX != "netfilter" ] && [ $SCENARIO = "rr" ] && [ -f $MIDDLEBOX/main.c ]; then
+    sed -i -- "s~//{2, 0, 0}~{2, 0, 0}~g" $MIDDLEBOX/main.c
 fi
 
 
@@ -54,8 +57,8 @@ fi
 
 # Initialize the network;
 # to do that, we need to know which scenario we use, and whether we'll run a DPDK app or not.
-NETWORK_SCENARIO=$2
-case $2 in
+NETWORK_SCENARIO=$SCENARIO
+case $SCENARIO in
     "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"mg-new-flows-latency")
         NETWORK_SCENARIO="loopback"
         ;;
@@ -66,24 +69,24 @@ case $2 in
         NETWORK_SCENARIO="rr"
         ;;
     *)
-        echo "unknown scenario $2" 1>&2
+        echo "unknown scenario $SCENARIO" 1>&2
         exit 10
 esac
 
 NETWORK_APP="dpdk"
-if [ $1 = "netfilter" ]; then
+if [ $MIDDLEBOX = "netfilter" ]; then
     NETWORK_APP="netfilter"
-elif [ ! -d $1 ]; then
-    echo "Unknown middlebox app: $1" 1>&2
+elif [ ! -d $MIDDLEBOX ]; then
+    echo "Unknown middlebox app: $MIDDLEBOX" 1>&2
     exit 10
 fi
 
 . ./init-network.sh $NETWORK_SCENARIO $NETWORK_APP
 
 
-CLEAN_APP_NAME=`echo "$1" | tr '/' '_'`
-RESULTS_FILE="bench-$CLEAN_APP_NAME-$2.results"
-LOG_FILE="bench-$CLEAN_APP_NAME-$2.log"
+CLEAN_APP_NAME=`echo "$MIDDLEBOX" | tr '/' '_'`
+RESULTS_FILE="bench-$CLEAN_APP_NAME-$SCENARIO.results"
+LOG_FILE="bench-$CLEAN_APP_NAME-$SCENARIO.log"
 
 if [ -f "$RESULTS_FILE" ]; then
     rm "$RESULTS_FILE"
@@ -94,8 +97,8 @@ if [ -f "$LOG_FILE" ]; then
 fi
 
 
-if [ "$1" = "netfilter" ]; then
-    case $2 in
+if [ "$MIDDLEBOX" = "netfilter" ]; then
+    case $SCENARIO in
 	"mg-new-flows-latency")
 	    EXPIRATION_TIME=2
 	    ;;
@@ -106,11 +109,11 @@ if [ "$1" = "netfilter" ]; then
 
     bash ./util/netfilter-short-timeout.sh $EXPIRATION_TIME
 else
-    echo "[bench] Launching $1..."
+    echo "[bench] Launching $MIDDLEBOX..."
 
     EXPIRATION_TIME=60
 
-    case $2 in
+    case $SCENARIO in
         "mg-new-flows-latency")
             SIMPLE_SCENARIO="loopback"
             EXPIRATION_TIME=2
@@ -124,14 +127,14 @@ else
             EXPIRATION_TIME=60
             ;;
         *)
-            echo "Unknown scenario $2" 1>&2
+            echo "Unknown scenario $SCENARIO" 1>&2
             exit 10
             ;;
     esac
 
     # Run the app in the background
     # The arguments are not always necessary, but they'll be ignored if unneeded
-    (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$1" \
+    (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$MIDDLEBOX" \
         "--expire $EXPIRATION_TIME --max-flows 65535 --starting-port 1" \
         0<&- &>"$LOG_FILE") &
 
@@ -141,7 +144,7 @@ fi
 
 
 # Then, run the benchmark depending on the scenario
-case $2 in
+case $SCENARIO in
     "mg-1p")
         LUA_SCRIPT="l3-load-find-1p.lua"
         echo "[bench] Benchmarking throughput..."
@@ -165,7 +168,7 @@ case $2 in
     ;;
     "loopback"|"1p")
         LUA_SCRIPT="regular-with-bin-mf.lua"
-        if [ $2 = "1p" ]; then
+        if [ $SCENARIO = "1p" ]; then
             LUA_SCRIPT="find-breaking-point-mf.lua"
         fi
 
@@ -185,15 +188,15 @@ case $2 in
         ;;
 
     *)
-        echo "[bench] Unknown scenario: $1" 1>&2
+        echo "[bench] Unknown scenario: $MIDDLEBOX" 1>&2
         exit 10
         ;;
 esac
 
 
 # HACK: See above HACK
-if [ $1 != "netfilter" ] && [ $2 = "rr" ] && [ -f $1/main.c ]; then
-    sed -i -- "s~{2, 0, 0}~//{2, 0, 0}~g" $1/main.c
+if [ $MIDDLEBOX != "netfilter" ] && [ $SCENARIO = "rr" ] && [ -f $MIDDLEBOX/main.c ]; then
+    sed -i -- "s~{2, 0, 0}~//{2, 0, 0}~g" $MIDDLEBOX/main.c
 fi
 
 

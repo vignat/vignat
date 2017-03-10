@@ -12,7 +12,7 @@ vignat <- read.table("vignat-mf-find-mg-1p.txt")
 vignat["middlebox"] <- "VigNAT"
 nop <- read.table("nop-mf-find-mg-1p.txt")
 nop["middlebox"] <- "NOP"
-unverified <- read.table("unverified-thru-lat.txt")
+unverified <- read.table("unverified-mf-find-mg-1p.txt")
 unverified["middlebox"] <- "DPDK-unverified"
 
 all_data <- rbind(all_data, netfilter)
@@ -27,7 +27,7 @@ p <- ggplot(all_data, aes(x=V1/1000, y=V4/1e6,
                           color=middlebox,
                           shape=middlebox)) +
      geom_line(size=1) +
-     labs(title="Loopback throughput, 64B packets") +
+     labs(title="Loopback throughput, 1% packets lost") +
      xlab("# concurrent flows (K)") +
      ylab(bquote("Throughput Mpkt/s")) +
      theme_bw() +

@@ -20,7 +20,7 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2"
 
 pd <- position_dodge(1)
 
-p1 <- ggplot(all_data, aes(x=V2/1e6, y=V5/1e3,
+p1 <- ggplot(all_data, aes(x=V3/1e6, y=V5/1e3,
                           group=middlebox,
                           color=middlebox,
                           shape=middlebox)) +
@@ -36,7 +36,7 @@ p1 <- ggplot(all_data, aes(x=V2/1e6, y=V5/1e3,
      #expand_limits(x=0,y=0) +
      theme( plot.margin = unit( c(0,0,0,0) , "in" ) )
 
-p2 <- ggplot(all_data, aes(x=V2/1e6, y=V4,
+p2 <- ggplot(all_data, aes(x=V3/1e6, y=V4,
                           group=middlebox,
                           color=middlebox,
                           shape=middlebox)) +
