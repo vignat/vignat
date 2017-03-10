@@ -1317,7 +1317,6 @@ ensures buckets_get_chns_rec_fp
           }
       }
   }
-  
 }
 
 lemma void advance_acc_removes_zero<kt>(list<pair<kt, nat> > acc, kt k)
@@ -1707,14 +1706,35 @@ requires true == multiset_eq(acc1, remove(pair(k, zero), acc2)) &*&
 ensures buckets_get_chns_rec_fp(acc1, buckets) ==
         buckets_get_chns_rec_fp(acc2, buckets);
 {
-  assume(false);//TODO 30m
   switch(buckets) {
     case nil:
     case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb1 = acc_at_this_bucket(acc1, h);
+          list<pair<kt, nat> > atb2 = acc_at_this_bucket(acc2, h);
+          if (mem(pair(k, zero), acc2)) {
+            remove_append_swap(pair(k, zero), acc2, chains);
+            assert remove(pair(k, zero), atb2) ==
+                   append(remove(pair(k, zero), acc2), chains);
+            multiset_eq_append_both(acc1, remove(pair(k, zero), acc2), chains);
+            assert true == multiset_eq(atb1, remove(pair(k, zero), atb2));
+            advance_acc_multiset_eq(atb1, remove(pair(k, zero), atb2));
+            advance_acc_forget_rem_zero_chain(atb2, k);
+            assert true == multiset_eq(advance_acc(atb1), advance_acc(atb2));
+          } else {
+            remove_nonmem(pair(k, zero), acc2);
+            assert remove(pair(k, zero), acc2) == acc2;
+            multiset_eq_append_both(acc1, acc2, chains);
+            advance_acc_multiset_eq(atb1, atb2);
+          }
+          assert true == multiset_eq(advance_acc(atb1),
+                                     advance_acc(atb2));
+          multiset_eq_same_len(advance_acc(atb1), advance_acc(atb2));
+          assert length(advance_acc(atb1)) == length(advance_acc(atb2));
+          acc_eq_get_chns_eq(advance_acc(atb1), advance_acc(atb2), t);
+      }
   }
-  assert 0 < length(buckets);
-  acc_eq_cons_get_chns_like_add_part_chn(acc1, acc2, buckets, k, 0);
-  add_part_chn_zero_len(buckets_get_chns_rec_fp(acc2, buckets), 0);
 }
 
 lemma void chain_just_overflown<kt>(list<bucket<kt> > buckets,
