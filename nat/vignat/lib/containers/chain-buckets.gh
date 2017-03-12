@@ -1573,8 +1573,17 @@ ensures buckets_get_chns_rec_fp(acc, buckets_remove_key_fp(buckets, k)) ==
         rem_partial_chain_rec_fp(buckets_get_chns_rec_fp(acc, buckets),
                                  start, dist);
 {
-  // just unwrap 1 bucket and call the lemma above.
-  assume(false);//TODO 5m
+  buckets_rem_part_get_chns_norm_rec(acc, buckets, k, start, dist, bound);
+}
+
+lemma void acc_rem_short_chain_same_wraparound<kt>(list<pair<kt, nat> > acc,
+                                                   list<bucket<kt> > buckets,
+                                                   kt k, int dist)
+requires 0 <= dist &*& dist < length(buckets);
+ensures get_wraparound(remove(pair(k, nat_of_int(dist)), acc), buckets) ==
+        get_wraparound(acc, buckets);
+{
+  assume(false);//TODO 10m
 }
 
 lemma void buckets_rem_short_chain_same_wraparound<kt>(list<pair<kt, nat> > acc,
@@ -1585,12 +1594,57 @@ lemma void buckets_rem_short_chain_same_wraparound<kt>(list<pair<kt, nat> > acc,
                                                        int capacity)
 requires 0 <= start &*& start < length(buckets) &*&
          start + dist < length(buckets) &*&
+         true == distinct(buckets_all_keys_fp(buckets)) &*&
          0 <= dist &*&
-         bucket_get_chain_fp(nth(start, buckets), k) == nat_of_int(dist);
+         true == bucket_has_key_fp(k, nth(start, buckets)) &*&
+         bucket_get_chain_fp(nth(start, buckets), k) == nat_of_int(dist) &*&
+         false == mem(k, map(fst, acc));
 ensures get_wraparound(acc, buckets_remove_key_fp(buckets, k)) ==
         get_wraparound(acc, buckets);
 {
-  assume(false);//TODO 5m
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > new_atb = acc_at_this_bucket(
+            acc, bucket(filter((not_this_key_pair_fp)(k), chains)));
+          buckets_distinct_all_keys_breakdown(chains, t);
+          if (start == 0) {
+            distinct_key_in_here_not_in_the_following(k, chains, t);
+            buckets_remove_nonexistent_key(t, k);
+            distinct_unique(map(fst, chains), k);
+            key_unique_filter_remove(k, chains);
+            remove_append_swap(pair(k, nat_of_int(dist)), acc, chains);
+            if (mem(pair(k, nat_of_int(dist)), acc)) {
+              mem_map(pair(k, nat_of_int(dist)), acc, fst);
+              assert false;
+            }
+            assert new_atb == remove(pair(k, nat_of_int(dist)), atb);
+            if (dist == 0) {
+              advance_acc_removes_zero(atb, k);
+              assert get_wraparound(acc, buckets_remove_key_fp(buckets, k)) ==
+                     get_wraparound(advance_acc(new_atb), t);
+              assert advance_acc(new_atb) == advance_acc(atb);
+              return;
+            }
+            acc_rem_short_chain_same_wraparound(advance_acc(atb),
+                                                t, k, dist - 1);
+            remove_advance_acc_swap(atb, k, nat_of_int(dist-1));
+          } else {
+            distinct_key_in_following_not_in_the_first_bucket(k, start - 1,
+                                                              chains, t);
+            no_key_in_acc_filter_no_effect(chains, k);
+            assert new_atb == atb;
+            map_append(fst, acc, chains);
+            advance_acc_still_no_key(atb, k);
+            buckets_rem_short_chain_same_wraparound(advance_acc(atb), t,
+                                                    k, start - 1, dist,
+                                                    capacity);
+          }
+      }
+  }
 }
 
 lemma void short_chain_does_not_wraparound<kt>(list<bucket<kt> > buckets,
