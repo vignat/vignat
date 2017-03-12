@@ -1454,6 +1454,14 @@ ensures buckets_remove_key_fp(buckets, k) == buckets;
   assume(false);//TODO 10m
 }
 
+lemma void keep_short_remove_key_swap<kt>(list<bucket<kt> > buckets, kt k)
+requires true;
+ensures keep_short_fp(buckets_remove_key_fp(buckets, k)) ==
+        buckets_remove_key_fp(keep_short_fp(buckets), k);
+{
+  assume(false);//TODO 5m
+}
+
 lemma void buckets_rem_part_get_chns_norm_rec<kt>(list<pair<kt, nat> > acc,
                                                   list<bucket<kt> > buckets,
                                                   kt k, int start, int dist,
@@ -4045,85 +4053,6 @@ ensures true == opt_no_dups(ks1);
   assume(false);//TODO 10m
 }
 
-lemma void dups_in_acc_dups_in_keys<kt>(list<pair<kt, nat> > acc,
-                                        list<bucket<kt> > buckets,
-                                        int bound)
-requires false == distinct(map(fst, acc)) &*&
-//true == distinct(map(snd, acc)) &*& should follow from buckets_ok
-         //true == distinct(buckets_all_keys_fp(buckets)) &*&
-         true == buckets_ok_rec(acc, buckets, bound);
-//true == forall(acc, (sup)((nat_lt)(length(buckets)), snd));  also
-ensures false == opt_no_dups(buckets_get_keys_rec_fp(acc, buckets));
-{
-  switch(buckets) {
-    case nil:
-      assume(false);//TODO (fst distinct is false -> acc has 2 elems, snd distinct is true -> the dists are not all 0, -> length(buckets) is more than zero
-    case cons(h,t):
-      list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
-      switch(h) {
-        case bucket(chains):
-          list<pair<kt, nat> > acc_atb_bnd =
-          append(acc, filter((sup)((nat_lt)(length(buckets)), snd),
-                             chains));
-          filter_forall((sup)((nat_lt)(length(buckets)), snd), chains);
-          forall_append(acc, filter((sup)((nat_lt)(length(buckets)), snd), chains),
-                        (sup)((nat_lt)(length(buckets)), snd));
-          assert true == forall(filter((sup)((nat_lt)(length(buckets)), snd), chains),
-                                (sup)((nat_lt)(length(buckets)), snd));
-          assume(forall(acc_atb_bnd, (sup)((nat_lt)(length(buckets)), snd)));//TODO
-          assert true == forall(acc_atb_bnd, (sup)((nat_lt)(length(buckets)), snd));
-          assume( false == distinct(map(fst, acc_atb_bnd)));//TODO
-          assert false == distinct(map(fst, acc_atb_bnd));
-          assume( true == subset(acc_atb_bnd, acc_atb));//TODO
-          assert true == subset(acc_atb_bnd, acc_atb);
-          advance_acc_subset(acc_atb_bnd, acc_atb);
-          assert true == subset(advance_acc(acc_atb_bnd), advance_acc(acc_atb));
-          assume( keys_contain_keys(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t),
-                                    buckets_get_keys_rec_fp(advance_acc(acc_atb), t))); //TODO
-          assert true == keys_contain_keys(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t),
-                                           buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
-          option<kt> ck = get_current_key_fp(acc_atb_bnd);
-          switch(ck) {
-            case none:
-              assume( false == distinct(map(fst, advance_acc(acc_atb_bnd))));//TODO
-              assert false == distinct(map(fst, advance_acc(acc_atb_bnd)));
-            case some(k):
-              assume( get_current_key_fp(acc_atb) == some(k));//TODO
-              assert get_current_key_fp(acc_atb) == some(k);
-              if (mem(k, map(fst, acc_atb_bnd))) {
-                assume( true == mem(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t)));//TODO
-                assert true == mem(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t));
-                assume( true == mem(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb), t)));//TODO
-                assert true == mem(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
-                list<option<kt> > kss = buckets_get_keys_rec_fp(acc, buckets);
-                assert kss == cons(some(k), buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
-                assert false == opt_no_dups(buckets_get_keys_rec_fp(acc, buckets));
-                return;
-              } else {
-                assume( false == distinct(map(fst, advance_acc(acc_atb_bnd))));//TODO
-                assert false == distinct(map(fst, advance_acc(acc_atb_bnd)));
-              }
-          }
-        assert true == distinct(map(snd, acc_atb));
-        assume(true == distinct(map(snd, acc_atb_bnd)));//TODO
-        assert true == distinct(map(snd, acc_atb_bnd));
-        assume(true == distinct(map(snd, advance_acc(acc_atb_bnd))));//TODO
-        assert true == distinct(map(snd, advance_acc(acc_atb_bnd)));
-        acc_subset_buckets_still_ok_rec(advance_acc(acc_atb_bnd), advance_acc(acc_atb), t, bound);
-        assert true == forall(acc_atb_bnd, (sup)((nat_lt)(length(buckets)), snd));
-        advance_acc_lower_limit(acc_atb_bnd, length(buckets));
-        assert true == forall(advance_acc(acc_atb_bnd), (sup)((nat_lt)(length(t)), snd));
-        dups_in_acc_dups_in_keys(advance_acc(acc_atb_bnd), t, bound);
-        assert false == opt_no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t));
-        if (opt_no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb), t))) {
-              keys_contain_keys_nodups(buckets_get_keys_rec_fp(advance_acc(acc_atb_bnd), t),
-                                       buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
-        }
-        assert false == opt_no_dups(buckets_get_keys_rec_fp(advance_acc(acc_atb), t));
-      }
-  }
-}
-
 lemma void dup_survives_buckets_get_keys<kt>(list<pair<kt, nat> > acc,
                                              list<bucket<kt> > buckets,
                                              int bound)
@@ -4273,6 +4202,44 @@ ensures buckets_get_keys_rec_fp(acc, buckets_remove_key_fp(buckets, k)) ==
   assume(false);//TODO 30m
 }
 
+lemma void rem_key_filter_from_wraparound<kt>(list<pair<kt, nat> > acc,
+                                              list<bucket<kt> > buckets,
+                                              kt k)
+requires false == mem(k, map(fst, acc));
+ensures get_wraparound(acc, buckets_remove_key_fp(buckets, k)) ==
+        filter((not_this_key_pair_fp)(k), get_wraparound(acc, buckets));
+{
+  assume(false);//TODO 30m
+}
+
+lemma void no_chain_make_it_to_wraparound_rem_safe<kt>(list<bucket<kt> > buckets,
+                                                       kt k)
+requires true == forall(get_wraparound(nil, buckets),
+                        (not_this_key_pair_fp)(k));
+ensures get_wraparound(nil, buckets) ==
+        get_wraparound(nil, buckets_remove_key_fp(buckets, k));
+{
+  rem_key_filter_from_wraparound(nil, buckets, k);
+  filter_forall((not_this_key_pair_fp)(k),
+                get_wraparound(nil, buckets));
+}
+
+lemma void not_forall_not_this_mem<kt>(list<pair<kt, nat> > acc, kt k)
+requires false == forall(acc, (not_this_key_pair_fp)(k));
+ensures true == mem(k, map(fst, acc));
+{
+  assume(false);//TODO 3m
+}
+
+lemma void buckets_get_keys_short_enough<kt>(list<pair<kt, nat> > acc,
+                                             list<bucket<kt> > buckets)
+requires true;
+ensures buckets_get_keys_rec_fp(acc, buckets) ==
+        buckets_get_keys_rec_fp(acc, keep_short_fp(buckets));
+{
+  assume(false);//TODO 10m
+}
+
 lemma void buckets_rm_key_get_keys<kt>(list<bucket<kt> > buckets,
                                        kt k)
 requires true == mem(some(k), buckets_get_keys_fp(buckets)) &*&
@@ -4282,29 +4249,61 @@ ensures buckets_get_keys_fp(buckets_remove_key_fp(buckets, k)) ==
         update(index_of(some(k), buckets_get_keys_fp(buckets)),
                none, buckets_get_keys_fp(buckets));
 {
-  if (forall(get_wraparound(nil, buckets), (not_this_key_pair_fp)(k))) {
-    assume(get_wraparound(nil, buckets) ==
-           get_wraparound(nil, buckets_remove_key_fp(buckets, k))); //TODO
-    assert get_wraparound(nil, buckets) ==
-           get_wraparound(nil, buckets_remove_key_fp(buckets, k));
-    buckets_rm_key_get_keys_rec(get_wraparound(nil, buckets), buckets,
+  list<pair<kt, nat> > wrp = get_wraparound(nil, buckets);
+  list<pair<kt, nat> > nwrp = get_wraparound(nil, buckets_remove_key_fp(buckets, k));
+  if (forall(wrp, (not_this_key_pair_fp)(k))) {
+    no_chain_make_it_to_wraparound_rem_safe(buckets, k);
+    assert wrp == nwrp;
+    buckets_rm_key_get_keys_rec(wrp, buckets,
                                 buckets_get_keys_fp(buckets), k);
   } else {
-    if (!distinct(map(fst, get_wraparound(nil, buckets)))) {
-      dups_in_acc_dups_in_keys(get_wraparound(nil, buckets), buckets,
-                               length(buckets));
-    }
+    buckets_keys_distinct_wraparound_too(buckets);
     buckets_ok_get_wraparound_idemp(buckets);
-    acc_rm_key_buckets_get_keys_rec(get_wraparound(nil, buckets),
+    acc_rm_key_buckets_get_keys_rec(wrp,
                                     buckets,
                                     buckets_get_keys_fp(buckets),
                                     k, length(buckets));
-    assume(get_wraparound(nil, buckets_remove_key_fp(buckets, k)) ==
-           filter((not_this_key_pair_fp)(k), get_wraparound(nil, buckets)));//TODO
-    assert get_wraparound(nil, buckets_remove_key_fp(buckets, k)) ==
-           filter((not_this_key_pair_fp)(k), get_wraparound(nil, buckets));
-    assume(buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k), get_wraparound(nil, buckets)), buckets) ==
-           buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k), get_wraparound(nil, buckets)), buckets_remove_key_fp(buckets, k)));//TODO
+    rem_key_filter_from_wraparound(nil, buckets, k);
+    assert nwrp ==
+           filter((not_this_key_pair_fp)(k), wrp);
+    list<bucket<kt> > low = keep_short_fp(buckets);
+    list<bucket<kt> > high = keep_long_fp(buckets);
+    keep_long_same_wraparound(nil, buckets);
+    buckets_split_all_keys(buckets);
+    keep_long_indeed_long(buckets);
+    keep_short_indeed_short(buckets);
+    multiset_eq_distinct(append(buckets_all_keys_fp(low),
+                                buckets_all_keys_fp(high)),
+                         buckets_all_keys_fp(buckets));
+    distinct_unappend(buckets_all_keys_fp(low),
+                      buckets_all_keys_fp(high));
+    disjoint_mem(buckets_all_keys_fp(high),
+                 buckets_all_keys_fp(low),
+                 k);
+    assert wrp == get_wraparound(nil, high);
+    not_forall_not_this_mem(wrp, k);
+    assert true == mem(k, map(fst, wrp));
+    assert true == mem(k, map(fst, get_wraparound(nil, high)));
+    long_buckets_all_keys_in_wraparound(high);
+    multiset_eq_mem(k, map(fst, get_wraparound(nil, high)),
+                    buckets_all_keys_fp(high));
+    assert true == mem(k, buckets_all_keys_fp(high));
+    assert false == mem(k, buckets_all_keys_fp(low));
+    buckets_get_keys_short_enough(nwrp, buckets);
+    assert buckets_get_keys_rec_fp(nwrp, buckets) ==
+           buckets_get_keys_rec_fp(nwrp, low);
+    buckets_remove_nonexistent_key(low, k);
+    assert buckets_get_keys_rec_fp(nwrp, low) ==
+           buckets_get_keys_rec_fp(nwrp, buckets_remove_key_fp(low, k));
+    keep_short_remove_key_swap(buckets, k);
+    assert buckets_get_keys_rec_fp(nwrp, buckets_remove_key_fp(low, k)) ==
+           buckets_get_keys_rec_fp(nwrp, keep_short_fp(buckets_remove_key_fp(buckets, k)));
+    buckets_get_keys_short_enough(nwrp, buckets_remove_key_fp(buckets, k));
+    assert buckets_get_keys_rec_fp(nwrp, keep_short_fp(buckets_remove_key_fp(buckets, k))) ==
+           buckets_get_keys_rec_fp(nwrp, buckets_remove_key_fp(buckets, k));
+    assert buckets_get_keys_rec_fp(nwrp, buckets) ==
+           buckets_get_keys_rec_fp(nwrp, buckets_remove_key_fp(buckets, k));
+
     assert buckets_get_keys_fp(buckets_remove_key_fp(buckets, k)) ==
            buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k),
                                           get_wraparound(nil, buckets)),
