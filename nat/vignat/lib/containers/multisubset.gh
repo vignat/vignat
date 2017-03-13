@@ -19,7 +19,7 @@ lemma void filter_msubset<t>(fixpoint (t, bool) f, list<t> l)
 requires true;
 ensures true == msubset(filter(f, l), l);
 {
-  assume(false);//TODO
+  assume(false);//TODO 5m
 }
 
 
@@ -29,7 +29,7 @@ lemma void msubset_distinct<t>(list<t> l1, list<t> l2)
 requires true == msubset(l1, l2) &*& true == distinct(l2);
 ensures true == distinct(l1);
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 
@@ -39,7 +39,7 @@ lemma void msubset_subset<t>(list<t> l1, list<t> l2)
 requires true == msubset(l1, l2);
 ensures true == subset(l1, l2);
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 

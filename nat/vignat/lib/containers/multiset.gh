@@ -149,14 +149,14 @@ lemma void multiset_eq_map<t1,t2>(fixpoint (t1,t2) f,
 requires true == multiset_eq(l1, l2);
 ensures true == multiset_eq(map(f, l1), map(f, l2));
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 lemma void multiset_eq_distinct<t>(list<t> l1, list<t> l2)
 requires true == multiset_eq(l1, l2);
 ensures distinct(l1) == distinct(l2);
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 
@@ -165,7 +165,7 @@ lemma void multiset_eq_forall<t>(list<t> l1, list<t> l2, fixpoint (t,bool) f)
 requires true == multiset_eq(l1, l2);
 ensures forall(l1, f) == forall(l2, f);
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 
@@ -176,7 +176,7 @@ requires true;
 ensures true == multiset_eq(append(append(l1, l2), l3),
                             append(l1, append(l2, l3)));
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 
@@ -188,7 +188,7 @@ requires true == multiset_eq(l1, l2) &*&
          true == multiset_eq(l3, l4);
 ensures true == multiset_eq(append(l1, l3), append(l2, l4));
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 
@@ -198,7 +198,7 @@ lemma void multiset_eq_append_comm<t>(list<t> l1, list<t> l2)
 requires true;
 ensures true == multiset_eq(append(l1, l2), append(l2, l1));
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 
@@ -209,7 +209,7 @@ requires true == multiset_eq(l1, l2) &*&
          true == multiset_eq(l2, l3);
 ensures true == multiset_eq(l1, l3);
 {
-  assume(false);//TODO 
+  assume(false);//TODO 5m
 }
 
 lemma void multiset_eq_map_cons_remove<t1,t2>(fixpoint (t1,t2) f,
