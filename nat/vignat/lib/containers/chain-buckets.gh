@@ -1968,13 +1968,52 @@ ensures true == buckets_long_fp(keep_long_fp(buckets));
   }
 }
 
+lemma void long_chains_advance_acc_same_keys<kt>(list<pair<kt, nat> > acc,
+                                                 int lim)
+requires 0 < lim &*&
+         true == forall(acc, (sup)((nat_ge)(lim), snd));
+ensures map(fst, acc) == map(fst, advance_acc(acc));
+{
+  assume(false);//TODO 5m
+}
+
+lemma void long_buckets_all_keys_in_wraparound_rec<kt>(list<pair<kt, nat> > acc,
+                                                       list<bucket<kt> > buckets)
+requires true == buckets_long_fp(buckets) &*&
+         true == forall(acc, (sup)((nat_ge)(length(buckets)), snd));
+ensures true == multiset_eq(map(fst, get_wraparound(acc, buckets)),
+                            append(map(fst, acc),
+                                   buckets_all_keys_fp(buckets)));
+{
+  switch(buckets) {
+    case nil:
+      multiset_eq_refl(map(fst, acc));
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          map_append(fst, acc, chains);
+          forall_append(acc, chains,
+                        (sup)((nat_ge)(length(buckets)), snd));
+          advance_acc_lower_llimit(atb, length(buckets));
+          long_chains_advance_acc_same_keys(atb, length(buckets));
+          long_buckets_all_keys_in_wraparound_rec(advance_acc(atb), t);
+          assert true == multiset_eq(map(fst, get_wraparound(acc, buckets)),
+                                     append(map(fst, advance_acc(atb)),
+                                            buckets_all_keys_fp(t)));
+          append_append_assoc(map(fst, acc), map(fst, chains),
+                              buckets_all_keys_fp(t));
+      }
+  }
+}//took 17m
+
 lemma void long_buckets_all_keys_in_wraparound<kt>(list<bucket<kt> > buckets)
 requires true == buckets_long_fp(buckets);
 ensures true == multiset_eq(map(fst, get_wraparound(nil, buckets)),
                             buckets_all_keys_fp(buckets));
 {
-  assume(false);//TODO 10m
-}
+  long_buckets_all_keys_in_wraparound_rec(nil, buckets);
+}//took 3m
 
 lemma void filter_zero_lower_limit_no_effect<kt>(list<pair<kt, nat> > acc)
 requires true;

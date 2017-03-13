@@ -372,6 +372,14 @@ ensures append(append(l1, cons(el, nil)), l2) == append(l1, cons(el, l2));
   }
 }
 
+lemma void append_append_assoc<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true;
+ensures append(append(l1, l2), l3) ==
+        append(l1, append(l2, l3));
+{
+  assume(false);//TODO 2m
+}
+
 
 lemma void forall_nth<t>(list<t> lst, fixpoint(t, bool) p, int i)
 requires 0 <= i &*& i < length(lst) &*& true == forall(lst, p);
