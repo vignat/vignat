@@ -239,6 +239,15 @@ ensures true == multiset_eq(append(filter((sup)((nat_ge)(lim), snd), l),
   }
 }//took 55m
 
+lemma void separated_by_bnd_disjoint(list<nat> l1, list<nat> l2, int bnd)
+requires true == forall(l1, (nat_lt)(bnd)) &*&
+         true == forall(l2, (nat_ge)(bnd));
+ensures true == disjoint(l1, l2);
+{
+  assume(false);//TODO 10m
+}
+
+
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
 lemma void note(bool b)

@@ -802,6 +802,8 @@ ensures true == (disjoint(l1, l2) == disjoint(l2, l1));
 lemma void disjoint_append<t>(list<t> l1, list<t> l2,
                               list<t> l3, list<t> l4)
 requires true == disjoint(l1, l3) &*&
+         true == disjoint(l1, l4) &*&
+         true == disjoint(l2, l3) &*&
          true == disjoint(l2, l4);
 ensures true == disjoint(append(l1, l2), append(l3, l4));
 {
@@ -866,5 +868,14 @@ ensures x1 == x2;
 {
   assume(false);//TODO 5m
 }
+
+lemma void subset_disjoint<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == subset(l1, l2) &*&
+         true == disjoint(l2, l3);
+ensures true == disjoint(l1, l3);
+{
+  assume(false);//TODO 5m
+}
+
 
 #endif//LISTEXEX_GH
