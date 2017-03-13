@@ -41,11 +41,11 @@ if [ -z $SCENARIO ]; then
     exit 2
 fi
 
+CLEAN_APP_NAME=`echo "$MIDDLEBOX" | tr '/' '_'`
+RESULTS_FILE="bench-$CLEAN_APP_NAME-$SCENARIO.results"
 
-# HACK: VigNAT isn't yet verified with 3 interfaces
-#       Thus it has to be patched to support it
-if [ $MIDDLEBOX != "netfilter" ] && [ $SCENARIO = "rr" ] && [ -f $MIDDLEBOX/main.c ]; then
-    sed -i -- "s~//{2, 0, 0}~{2, 0, 0}~g" $MIDDLEBOX/main.c
+if [ -f "$RESULTS_FILE" ]; then
+    rm "$RESULTS_FILE"
 fi
 
 
@@ -55,150 +55,8 @@ fi
 # Clean first, just in case
 . ./clean.sh
 
-# Initialize the network;
-# to do that, we need to know which scenario we use, and whether we'll run a DPDK app or not.
-NETWORK_SCENARIO=$SCENARIO
-case $SCENARIO in
-    "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"mg-new-flows-latency")
-        NETWORK_SCENARIO="loopback"
-        ;;
-    "passthrough")
-        NETWORK_SCENARIO="passthrough"
-        ;;
-    "rr")
-        NETWORK_SCENARIO="rr"
-        ;;
-    *)
-        echo "unknown scenario $SCENARIO" 1>&2
-        exit 10
-esac
+. init.sh $MIDDLEBOX $SCENARIO
 
-NETWORK_APP="dpdk"
-if [ $MIDDLEBOX = "netfilter" ]; then
-    NETWORK_APP="netfilter"
-elif [ ! -d $MIDDLEBOX ]; then
-    echo "Unknown middlebox app: $MIDDLEBOX" 1>&2
-    exit 10
-fi
+. run.sh $MIDDLEBOX $SCENARIO $RESULT_FILE
 
-. ./init-network.sh $NETWORK_SCENARIO $NETWORK_APP
-
-
-CLEAN_APP_NAME=`echo "$MIDDLEBOX" | tr '/' '_'`
-RESULTS_FILE="bench-$CLEAN_APP_NAME-$SCENARIO.results"
-LOG_FILE="bench-$CLEAN_APP_NAME-$SCENARIO.log"
-
-if [ -f "$RESULTS_FILE" ]; then
-    rm "$RESULTS_FILE"
-fi
-
-if [ -f "$LOG_FILE" ]; then
-    rm "$LOG_FILE"
-fi
-
-
-if [ "$MIDDLEBOX" = "netfilter" ]; then
-    case $SCENARIO in
-	"mg-new-flows-latency")
-	    EXPIRATION_TIME=2
-	    ;;
-        "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"rr"|"passthrough")
-            EXPIRATION_TIME=60
-            ;;
-    esac
-
-    bash ./util/netfilter-short-timeout.sh $EXPIRATION_TIME
-else
-    echo "[bench] Launching $MIDDLEBOX..."
-
-    EXPIRATION_TIME=60
-
-    case $SCENARIO in
-        "mg-new-flows-latency")
-            SIMPLE_SCENARIO="loopback"
-            EXPIRATION_TIME=2
-            ;;
-        "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency")
-            SIMPLE_SCENARIO="loopback"
-            EXPIRATION_TIME=60
-            ;;
-        "rr"|"passthrough")
-            SIMPLE_SCENARIO="rr"
-            EXPIRATION_TIME=60
-            ;;
-        *)
-            echo "Unknown scenario $SCENARIO" 1>&2
-            exit 10
-            ;;
-    esac
-
-    # Run the app in the background
-    # The arguments are not always necessary, but they'll be ignored if unneeded
-    (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$MIDDLEBOX" \
-        "--expire $EXPIRATION_TIME --max-flows 65535 --starting-port 1" \
-        0<&- &>"$LOG_FILE") &
-
-    # Wait for it to have started
-    sleep 20
-fi
-
-
-# Then, run the benchmark depending on the scenario
-case $SCENARIO in
-    "mg-1p")
-        LUA_SCRIPT="l3-load-find-1p.lua"
-        echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 3000 -u 5 -t 20 1 0"
-        scp $TESTER_HOST:mf-find-mg-1p.txt "./$RESULTS_FILE"
-        ssh $TESTER_HOST "sudo rm mf-find-mg-1p.txt"
-    ;;
-    "mg-existing-flows-latency")
-        LUA_SCRIPT="l3-latency-light.lua"
-        echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 100 -u 5 -t 20 1 0"
-        scp $TESTER_HOST:mf-lat.txt "./$RESULTS_FILE"
-        ssh $TESTER_HOST "sudo rm mf-lat.txt"
-    ;;
-    "mg-new-flows-latency")
-        LUA_SCRIPT="l3-latency-light.lua"
-        echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "sudo ~/moon-gen/build/MoonGen ~/scripts/moongen/$LUA_SCRIPT -r 100 -u 5 -t 20 1 0"
-        scp $TESTER_HOST:mf-lat.txt "./$RESULTS_FILE"
-        ssh $TESTER_HOST "sudo rm mf-lat.txt"
-    ;;
-    "loopback"|"1p")
-        LUA_SCRIPT="regular-with-bin-mf.lua"
-        if [ $SCENARIO = "1p" ]; then
-            LUA_SCRIPT="find-breaking-point-mf.lua"
-        fi
-
-        echo "[bench] Benchmarking throughput..."
-        ssh $TESTER_HOST "bash ~/scripts/pktgen/run.sh ~/scripts/pktgen/$LUA_SCRIPT"
-        scp $TESTER_HOST:pktgen/multi-flows.txt "./$RESULTS_FILE"
-        ssh $TESTER_HOST "rm pktgen/multi-flows.txt"
-        ;;
-
-    "rr"|"passthrough")
-        # No difference from a benchmarking point of view, only setup varies
-
-        echo "[bench] Benchmarking latency..."
-        ssh $TESTER_HOST "bash ~/scripts/bench/latency.sh ~/bench.results"
-        scp $TESTER_HOST:bench.results "./$RESULTS_FILE"
-        ssh $TESTER_HOST "rm ~/bench.results"
-        ;;
-
-    *)
-        echo "[bench] Unknown scenario: $MIDDLEBOX" 1>&2
-        exit 10
-        ;;
-esac
-
-
-# HACK: See above HACK
-if [ $MIDDLEBOX != "netfilter" ] && [ $SCENARIO = "rr" ] && [ -f $MIDDLEBOX/main.c ]; then
-    sed -i -- "s~{2, 0, 0}~//{2, 0, 0}~g" $MIDDLEBOX/main.c
-fi
-
-
-# Leave the machines in a proper state
-. ./clean.sh
+. clean.sh
