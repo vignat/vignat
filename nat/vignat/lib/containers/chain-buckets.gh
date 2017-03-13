@@ -1340,8 +1340,12 @@ ensures true == distinct(map(fst, chains)) &*&
         true == msubset(buckets_all_keys_fp(buckets),
                         buckets_all_keys_fp(cons(bucket(chains), buckets)));
 {
-  assume(false);//TODO 10m
-}
+  distinct_unappend(map(fst, chains),
+                    buckets_all_keys_fp(buckets));
+  disjoint_comm(map(fst, chains),
+                buckets_all_keys_fp(buckets));
+  msubset_append(map(fst, chains), buckets_all_keys_fp(buckets));
+}//took 3m
 
 lemma void key_unique_filter_remove<kt>(kt k, list<pair<kt, nat> > acc)
 requires true == mem(k, map(fst, acc)) &*&
