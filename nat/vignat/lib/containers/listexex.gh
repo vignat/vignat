@@ -877,5 +877,17 @@ ensures true == disjoint(l1, l3);
   assume(false);//TODO 5m
 }
 
+lemma void filter_filter_swap<t>(fixpoint (t,bool) f1,
+                                 fixpoint (t,bool) f2,
+                                 list<t> l)
+requires true;
+ensures filter(f1, filter(f2, l)) == filter(f2, filter(f1, l));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      filter_filter_swap(f1, f2, t);
+  }
+}//took 1m
 
 #endif//LISTEXEX_GH

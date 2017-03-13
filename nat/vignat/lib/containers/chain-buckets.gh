@@ -1355,8 +1355,19 @@ ensures filter((not_this_key_pair_fp)(k), acc) ==
         length(filter((not_this_key_pair_fp)(k), acc)) + 1 ==
         length(acc);
 {
-  assume(false);//TODO 5m
-}
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key,dist):
+          if (k == key) {
+            no_key_in_acc_filter_no_effect(t, k);
+          } else {
+            key_unique_filter_remove(k, t);
+          }
+      }
+  }
+}//took 3m
 
 lemma void append_void_acc_same_chain_with_key<kt>(kt k, list<pair<kt, nat> > acc,
                                                    list<pair<kt, nat> > chains)
@@ -1364,8 +1375,30 @@ requires false == mem(k, map(fst, acc));
 ensures chain_with_key_fp(append(acc, chains), k) ==
         chain_with_key_fp(chains, k);
 {
-  assume(false);//TODO 5m
-}
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key,dist):
+      }
+      append_void_acc_same_chain_with_key(k, t, chains);
+  }
+}//took 2m
+
+lemma void buckets_remove_nonexistent_key<kt>(list<bucket<kt> > buckets, kt k)
+requires false == mem(k, buckets_all_keys_fp(buckets));
+ensures buckets_remove_key_fp(buckets, k) == buckets;
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          no_key_in_acc_filter_no_effect(chains, k);
+          buckets_remove_nonexistent_key(t, k);
+      }
+  }
+}//took 3m
 
 lemma void distinct_key_here_remove_only_here<kt>(kt k,
                                                   list<pair<kt, nat> > chains,
@@ -1376,8 +1409,10 @@ ensures buckets_remove_key_fp(cons(bucket(chains), buckets), k) ==
         cons(bucket(filter((not_this_key_pair_fp)(k), chains)),
              buckets);
 {
-  assume(false);//TODO 20m
-}
+  buckets_distinct_all_keys_breakdown(chains, buckets);
+  disjoint_mem(map(fst, chains), buckets_all_keys_fp(buckets), k);
+  buckets_remove_nonexistent_key(buckets, k);
+}//took 3m
 
 lemma void bucket_has_key_mem_all_keys<kt>(kt k, int start,
                                            list<bucket<kt> > buckets)
@@ -1505,20 +1540,53 @@ ensures true == mem(pair(k,n), advance_acc(acc));
   }
 }
 
-lemma void buckets_remove_nonexistent_key<kt>(list<bucket<kt> > buckets, kt k)
-requires false == mem(k, buckets_all_keys_fp(buckets));
-ensures buckets_remove_key_fp(buckets, k) == buckets;
+lemma void buckets_remove_key_same_len<kt>(list<bucket<kt> > buckets, kt k)
+requires true;
+ensures length(buckets_remove_key_fp(buckets, k)) == length(buckets);
 {
-  assume(false);//TODO 10m
-}
+  switch(buckets) {
+    case nil:
+    case cons(bh,bt):
+      switch(bh) {
+        case bucket(chains):
+          buckets_remove_key_same_len(bt,k);
+      }
+  }
+}//took 2m
+
+lemma void keep_short_same_len<kt>(list<bucket<kt> > buckets)
+requires true;
+ensures length(buckets) == length(keep_short_fp(buckets));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+      }
+      keep_short_same_len(t);
+  }
+}//took 1m
 
 lemma void keep_short_remove_key_swap<kt>(list<bucket<kt> > buckets, kt k)
 requires true;
 ensures keep_short_fp(buckets_remove_key_fp(buckets, k)) ==
         buckets_remove_key_fp(keep_short_fp(buckets), k);
 {
-  assume(false);//TODO 5m
-}
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          keep_short_remove_key_swap(t, k);
+          filter_filter_swap((sup)((nat_lt)(length(buckets)), snd),
+                             (not_this_key_pair_fp)(k),
+                             chains);
+          buckets_remove_key_same_len(buckets, k);
+          keep_short_same_len(buckets);
+      }
+  }
+}//took 8m
 
 lemma void buckets_rem_part_get_chns_norm_rec<kt>(list<pair<kt, nat> > acc,
                                                   list<bucket<kt> > buckets,
@@ -2674,20 +2742,6 @@ ensures length(chns) == length(add_partial_chain_fp(start, len, chns));
   }
 }//took 3m
 
-lemma void buckets_remove_key_same_len<kt>(list<bucket<kt> > buckets, kt k)
-requires true;
-ensures length(buckets_remove_key_fp(buckets, k)) == length(buckets);
-{
-  switch(buckets) {
-    case nil:
-    case cons(bh,bt):
-      switch(bh) {
-        case bucket(chains):
-          buckets_remove_key_same_len(bt,k);
-      }
-  }
-}//took 2m
-
 lemma void acc_has_chain_longer<kt>(list<pair<kt, nat> > acc,
                                     list<bucket<kt> > buckets,
                                     nat dst, kt k,
@@ -2979,13 +3033,6 @@ ensures buckets_get_chain_fp(buckets, k, start) == i;
           }
       }
   }
-}
-
-lemma void keep_short_same_len<kt>(list<bucket<kt> > buckets)
-requires true;
-ensures length(buckets) == length(keep_short_fp(buckets));
-{
-  assume(false);//TODO 5m
 }
 
 lemma void keep_long_same_len<kt>(list<bucket<kt> > buckets)
