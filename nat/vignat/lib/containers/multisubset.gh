@@ -142,5 +142,14 @@ ensures true == msubset(l1, append(l1, l2)) &*&
   assume(false);//TODO 5m
 }
 
+lemma void msubset_append_both<t>(list<t> l1, list<t> l2,
+                                  list<t> l3, list<t> l4)
+requires true == msubset(l1, l3) &*&
+         true == msubset(l2, l4);
+ensures true == msubset(append(l1, l2), append(l3, l4));
+{
+  assume(false);//TODO 10m
+}
+
 
 #endif// MULTISUBSET_GH
