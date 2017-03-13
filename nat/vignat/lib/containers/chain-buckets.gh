@@ -218,8 +218,25 @@ ensures true == msubset(map(fst, advance_acc(acc)),
         true == subset(map(fst, advance_acc(acc)),
                        map(fst, acc));
 {
-  assume(false);//TODO 5m
-}
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(k,dist):
+          advance_acc_subset_keys(t);
+          switch(dist) {
+            case zero:
+              msubset_append(cons(k, nil), map(fst, t));
+              msubset_trans(map(fst, advance_acc(acc)),
+                            map(fst, t),
+                            map(fst, acc));
+              msubset_subset(map(fst, advance_acc(acc)), map(fst, acc));
+            case succ(n):
+              msubset_subset(map(fst, advance_acc(acc)), map(fst, acc));
+          }
+      }
+  }
+}//took 15m
 
 lemma void acc_at_this_bucket_subset<kt>(list<pair<kt, nat> > acc1,
                                          list<pair<kt, nat> > acc2,
@@ -1292,11 +1309,23 @@ ensures true == multiset_eq(get_wraparound(acc1, buckets),
   }
 }
 
+lemma void nonmem_not_this_key<kt>(list<pair<kt, nat> > acc, kt k)
+requires false == mem(k, map(fst, acc));
+ensures true == forall(acc, (not_this_key_pair_fp)(k));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      nonmem_not_this_key(t, k);
+  }
+}
+
 lemma void no_key_in_acc_filter_no_effect<kt>(list<pair<kt, nat> > acc, kt k)
 requires false == mem(k, map(fst, acc));
 ensures acc == filter((not_this_key_pair_fp)(k), acc);
 {
-  assume(false);//TODO 2m
+  nonmem_not_this_key(acc, k);
+  filter_forall((not_this_key_pair_fp)(k), acc);
 }
 
 lemma void buckets_distinct_all_keys_breakdown<kt>(list<pair<kt, nat> > chains,
@@ -4004,17 +4033,6 @@ ensures true == buckets_ok(buckets_remove_key_fp(buckets, k));
                                       k, length(buckets));
   buckets_remove_key_still_distinct(buckets, k);
 } //took 225m
-
-lemma void nonmem_not_this_key<kt>(list<pair<kt, nat> > acc, kt k)
-requires false == mem(k, map(fst, acc));
-ensures true == forall(acc, (not_this_key_pair_fp)(k));
-{
-  switch(acc) {
-    case nil:
-    case cons(h,t):
-      nonmem_not_this_key(t, k);
-  }
-}
 
 lemma void current_key_is_mem<kt>(list<pair<kt, nat> > acc, kt k)
 requires get_current_key_fp(acc) == some(k);
