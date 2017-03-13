@@ -1390,13 +1390,6 @@ ensures false == mem(k, buckets_all_keys_fp(buckets));
 }
 
 
-lemma void nonmem_filter_no_change<kt>(kt k, list<pair<kt, nat> > chains)
-requires false == mem(k, map(fst, chains));
-ensures chains == filter((not_this_key_pair_fp)(k), chains);
-{
-  assume(false);//TODO 5m
-}
-
 lemma void acc_remove_chain_get_chns<kt>(kt k, int dist,
                                          list<pair<kt, nat> > acc,
                                          list<bucket<kt> > buckets)
@@ -1592,7 +1585,7 @@ ensures buckets_get_chns_rec_fp(acc, buckets_remove_key_fp(buckets, k)) ==
             buckets_rem_part_get_chns_norm_rec(advance_acc(atb),
                                                t, k, start - 1, dist,
                                                bound);
-            nonmem_filter_no_change(k, chains);
+            no_key_in_acc_filter_no_effect(chains, k);
           }
       }
   }
@@ -4111,6 +4104,45 @@ ensures false == distinct(map(fst, advance_acc(acc)));
   assume(false);//TODO 20m
 }
 
+lemma void filter_ntk_affects_just_first_half<kt>(list<pair<kt, nat> > acc1,
+                                                  list<pair<kt, nat> > acc2,
+                                                  kt k)
+requires true == forall(acc2, (not_this_key_pair_fp)(k));
+ensures filter((not_this_key_pair_fp)(k), append(acc1, acc2)) ==
+        append(filter((not_this_key_pair_fp)(k), acc1), acc2);
+{
+  assume(false);//TODO 5m
+}
+
+lemma void curr_key_out_no_other_zero_chain<kt>(list<pair<kt, nat> > acc, kt k)
+requires true == distinct(map(fst, acc)) &*&
+         true == distinct(map(snd, acc)) &*&
+         get_current_key_fp(acc) == some(k);
+ensures false == mem(zero, map(snd, filter((not_this_key_pair_fp)(k), acc)));
+{
+  assume(false);//TODO 15m
+}
+
+lemma void curr_key_filter_advance_acc_same_effect<kt>(list<pair<kt, nat> > acc,
+                                                       kt k)
+requires true == distinct(map(fst, acc)) &*&
+         true == distinct(map(snd, acc)) &*&
+         get_current_key_fp(acc) == some(k);
+ensures advance_acc(acc) == advance_acc(filter((not_this_key_pair_fp)(k), acc));
+{
+  assume(false);//TODO 20m
+}
+
+lemma void filter_other_key_curr_key_same<kt>(list<pair<kt, nat> > acc, kt k)
+requires get_current_key_fp(acc) != some(k) &*&
+         true == distinct(map(snd, acc)) &*&
+         true == distinct(map(fst, acc));
+ensures get_current_key_fp(filter((not_this_key_pair_fp)(k), acc)) ==
+        get_current_key_fp(acc);
+{
+  assume(false);//TODO 10m
+}
+
 lemma void acc_rm_key_buckets_get_keys_rec<kt>(list<pair<kt, nat> > acc,
                                                list<bucket<kt> > buckets,
                                                list<option<kt> > keys,
@@ -4136,46 +4168,46 @@ ensures buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k), acc),
           list<pair<kt, nat> > acc_atb = acc_at_this_bucket(acc, h);
           list<pair<kt, nat> > new_atb = filter((not_this_key_pair_fp)(k),
                                                 acc_atb);
-          assume(append(filter((not_this_key_pair_fp)(k), acc),
-                        chains) ==
-                 new_atb);//TODO 10m
+          buckets_distinct_all_keys_breakdown(chains, t);
+          msubset_subset(map(fst, chains), buckets_all_keys_fp(buckets));
+          msubset_subset(buckets_all_keys_fp(t),
+                         buckets_all_keys_fp(buckets));
+          disjoint_comm(map(fst, acc),
+                        buckets_all_keys_fp(buckets));
+          subset_disjoint(map(fst, chains), buckets_all_keys_fp(buckets),
+                          map(fst, acc));
+          subset_disjoint(buckets_all_keys_fp(t),
+                          buckets_all_keys_fp(buckets),
+                          map(fst, acc));
+          disjoint_comm(map(fst, chains), map(fst, acc));
+          disjoint_comm(buckets_all_keys_fp(t), map(fst, acc));
+          disjoint_mem(map(fst, acc), map(fst, chains), k);
+          nonmem_not_this_key(chains, k);
+          filter_ntk_affects_just_first_half(acc, chains, k);
           assert append(filter((not_this_key_pair_fp)(k), acc),
                         chains) ==
                  new_atb;
         assert keys == cons(get_current_key_fp(acc_atb), ?kt);
-        buckets_distinct_all_keys_breakdown(chains, t);
-        msubset_subset(map(fst, chains), buckets_all_keys_fp(buckets));
-        msubset_subset(buckets_all_keys_fp(t),
-                       buckets_all_keys_fp(buckets));
-        disjoint_comm(map(fst, acc),
-                      buckets_all_keys_fp(buckets));
-        subset_disjoint(map(fst, chains), buckets_all_keys_fp(buckets),
-                        map(fst, acc));
-        subset_disjoint(buckets_all_keys_fp(t),
-                        buckets_all_keys_fp(buckets),
-                        map(fst, acc));
-        disjoint_comm(map(fst, chains), map(fst, acc));
-        disjoint_comm(buckets_all_keys_fp(t), map(fst, acc));
 
+        map_append(fst, acc, chains);
+        distinct_and_disjoint_append(map(fst, acc),
+                                     map(fst, chains));
           if (get_current_key_fp(acc_atb) == some(k)) {
             assert false == mem(some(k), kt);
             assert index_of(some(k), keys) == 0;
             assert update(index_of(some(k), keys), none, keys) == cons(none, kt);
-            assume(false == mem(zero, map(snd, new_atb))); //TODO 10m
+            curr_key_out_no_other_zero_chain(acc_atb, k);
             assert false == mem(zero, map(snd, new_atb));
             nozero_no_current_key(new_atb);
-            assume(advance_acc(acc_atb) == advance_acc(new_atb)); //TODO 10m
+            curr_key_filter_advance_acc_same_effect(acc_atb, k);
             assert advance_acc(acc_atb) == advance_acc(new_atb);
             return;
           } else {
-            assume (get_current_key_fp(new_atb) == get_current_key_fp(acc_atb)); //TODO 10m
+            filter_other_key_curr_key_same(acc_atb, k);
             assert get_current_key_fp(new_atb) == get_current_key_fp(acc_atb);
             remkey_advance_acc_idemp(acc_atb, k);
             assert advance_acc(new_atb) == filter((not_this_key_pair_fp)(k),
                                                   advance_acc(acc_atb));
-            map_append(fst, acc, chains);
-            distinct_and_disjoint_append(map(fst, acc),
-                                         map(fst, chains));
             advance_acc_preserve_distinct_keys(acc_atb);
             disjoint_append(map(fst, acc), map(fst, chains),
                             nil, buckets_all_keys_fp(t));
@@ -4183,7 +4215,7 @@ ensures buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k), acc),
             subset_disjoint(map(fst, advance_acc(acc_atb)),
                             map(fst, acc_atb),
                             buckets_all_keys_fp(t));
-            assume(true == mem(k, map(fst, advance_acc(acc_atb))));//TODO 10m
+            advance_acc_preserves_key(acc_atb, k);
             acc_rm_key_buckets_get_keys_rec
             (advance_acc(acc_atb), t, kt, k, bound);
             assert buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k), acc),
