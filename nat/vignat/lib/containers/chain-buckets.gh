@@ -1717,8 +1717,26 @@ requires 0 <= dist &*& dist < length(buckets);
 ensures get_wraparound(remove(pair(k, nat_of_int(dist)), acc), buckets) ==
         get_wraparound(acc, buckets);
 {
-  assume(false);//TODO 10m
-}
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          if (!mem(pair(k, nat_of_int(dist)), acc)) {
+            remove_nonmem(pair(k, nat_of_int(dist)), acc);
+            return;
+          }
+          remove_append_swap(pair(k, nat_of_int(dist)), acc, chains);
+          if (dist == 0) {
+            advance_acc_forget_rem_zero_chain(atb, k);
+          } else {
+            advance_acc_remove_swap(atb, k, nat_of_int(dist - 1));
+            acc_rem_short_chain_same_wraparound(advance_acc(atb), t, k, dist - 1);
+          }
+      }
+  }
+}//took 5m
 
 lemma void buckets_rem_short_chain_same_wraparound<kt>(list<pair<kt, nat> > acc,
                                                        list<bucket<kt> > buckets,
