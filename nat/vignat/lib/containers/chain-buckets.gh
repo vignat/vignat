@@ -3720,6 +3720,86 @@ ensures buckets_get_chain_fp(buckets, k, start) == i;
   }
 }
 
+lemma void split_one_bucket_no_key_lost<kt>(list<pair<kt, nat> > acc, int bnd)
+requires true;
+ensures true == multiset_eq(append(map(fst, filter((sup)((nat_ge)(bnd), snd),
+                                                   acc)),
+                                   map(fst, filter((sup)((nat_lt)(bnd), snd),
+                                                   acc))),
+                            map(fst, acc));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          split_one_bucket_no_key_lost(t, bnd);
+          if ((sup)((nat_ge)(bnd), snd)(h)) {
+          } else {
+            cons_in_the_middle_multiset_eq(map(fst, filter((sup)((nat_ge)(bnd),
+                                                                 snd),
+                                                           t)),
+                                           map(fst, filter((sup)((nat_lt)(bnd),
+                                                                 snd),
+                                                           t)),
+                                           key);
+            multiset_eq_trans(append(map(fst,
+                                         filter((sup)((nat_ge)(bnd), snd), t)),
+                                     cons(key,
+                                          map(fst,
+                                              filter((sup)((nat_lt)(bnd), snd),
+                                                     t)))),
+                              cons(key,
+                                   append(map(fst,
+                                              filter((sup)((nat_ge)(bnd), snd),
+                                                          t)),
+                                          map(fst,
+                                              filter((sup)((nat_lt)(bnd), snd),
+                                                          t)))),
+                              cons(key, map(fst, t)));
+          }
+      }
+  }
+}//took 10m
+
+lemma void multiset_eq_reshuffle_appends<t>(list<t> l1, list<t> l2,
+                                            list<t> l3, list<t> l4,
+                                            list<t> l5)
+requires true == multiset_eq(l1, append(append(l2, l3), append(l4, l5)));
+ensures true == multiset_eq(l1, append(append(l2, l5), append(l3, l4)));
+{
+  multiset_eq_append_assoc(l2, l3, append(l4, l5));
+  multiset_eq_trans(l1, append(append(l2, l3),
+                               append(l4, l5)),
+                    append(l2, append(l3, append(l4, l5))));
+  assert true == multiset_eq(l1, append(l2, append(l3, append(l4, l5))));
+  multiset_eq_append_assoc(l3, l4, l5);
+  multiset_eq_comm(append(append(l3, l4), l5),
+                   append(l3, append(l4, l5)));
+  multiset_eq_append_comm(append(l3, l4), l5);
+  multiset_eq_trans(append(l3, append(l4, l5)),
+                    append(append(l3, l4), l5),
+                    append(l5, append(l3, l4)));
+  multiset_eq_refl(l2);
+  multiset_eq_append(l2, l2,
+                     append(l3, append(l4, l5)),
+                     append(l5, append(l3, l4)));
+  multiset_eq_trans(l1,
+                    append(l2, append(l3, append(l4, l5))),
+                    append(l2, append(l5, append(l3, l4))));
+  assert true == multiset_eq(l1, append(l2, append(l5, append(l3, l4))));
+  multiset_eq_append_assoc(l2, l5, append(l3, l4));
+  multiset_eq_comm(append(append(l2, l5), append(l3, l4)),
+                   append(l2, append(l5, append(l3, l4))));
+  assert true == multiset_eq(append(l2, append(l5, append(l3, l4))),
+                             append(append(l2, l5), append(l3, l4)));
+  assert true == multiset_eq(append(l2, append(l5, append(l3, l4))),
+                             append(append(l2, l5), append(l3, l4)));
+
+  multiset_eq_trans(l1, append(l2, append(l5, append(l3, l4))),
+                    append(append(l2, l5), append(l3, l4)));
+}
+
 lemma void buckets_split_all_keys<kt>(list<bucket<kt> > buckets)
 requires true;
 ensures true == multiset_eq(append
@@ -3727,8 +3807,56 @@ ensures true == multiset_eq(append
                              buckets_all_keys_fp(keep_long_fp(buckets))),
                             buckets_all_keys_fp(buckets));
 {
-  assume(false);//TODO 15m
-}
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > lchns = filter((sup)((nat_ge)(length(buckets)), snd),
+                                              chains);
+          list<pair<kt, nat> > schns = filter((sup)((nat_lt)(length(buckets)), snd),
+                                              chains);
+          split_one_bucket_no_key_lost(chains, length(buckets));
+          buckets_split_all_keys(t);
+          assert true == multiset_eq(append
+                                     (buckets_all_keys_fp(keep_short_fp(t)),
+                                      buckets_all_keys_fp(keep_long_fp(t))),
+                                     buckets_all_keys_fp(t));
+          multiset_eq_append(append(map(fst, lchns), map(fst, schns)),
+                             map(fst, chains),
+                             append
+                             (buckets_all_keys_fp(keep_short_fp(t)),
+                              buckets_all_keys_fp(keep_long_fp(t))),
+                             buckets_all_keys_fp(t));
+          assert true == multiset_eq(append(append(map(fst, lchns), map(fst, schns)),
+                                            append
+                                            (buckets_all_keys_fp(keep_short_fp(t)),
+                                             buckets_all_keys_fp(keep_long_fp(t)))),
+                                     append(map(fst, chains),
+                                            buckets_all_keys_fp(t)));
+          multiset_eq_comm(append(append(map(fst, lchns), map(fst, schns)),
+                                  append
+                                  (buckets_all_keys_fp(keep_short_fp(t)),
+                                   buckets_all_keys_fp(keep_long_fp(t)))),
+                           buckets_all_keys_fp(buckets));
+          multiset_eq_reshuffle_appends(buckets_all_keys_fp(buckets),
+                                        map(fst, lchns),
+                                        map(fst, schns),
+                                        buckets_all_keys_fp(keep_short_fp(t)),
+                                        buckets_all_keys_fp(keep_long_fp(t)));
+          multiset_eq_append_comm(buckets_all_keys_fp(keep_long_fp(buckets)),
+                                  buckets_all_keys_fp(keep_short_fp(buckets)));
+          multiset_eq_trans(buckets_all_keys_fp(buckets),
+                            append(buckets_all_keys_fp(keep_long_fp(buckets)),
+                                   buckets_all_keys_fp(keep_short_fp(buckets))),
+                            append(buckets_all_keys_fp(keep_short_fp(buckets)),
+                                   buckets_all_keys_fp(keep_long_fp(buckets))));
+          multiset_eq_comm(buckets_all_keys_fp(buckets),
+                           append(buckets_all_keys_fp(keep_short_fp(buckets)),
+                                  buckets_all_keys_fp(keep_long_fp(buckets))));
+      }
+  }
+}//took 19m
 
 lemma void long_chain_in_keep_long<kt>(list<bucket<kt> > buckets,
                                        kt k, int start)
@@ -5403,6 +5531,7 @@ ensures keep_long_fp(buckets) ==
       }
   }
 }//took 30m
+
 lemma void advance_acc_still_disjoint<kt>(list<pair<kt, nat> > acc1,
                                           list<pair<kt, nat> > acc2)
 requires true == disjoint(map(snd, acc1), map(snd, acc2));
@@ -5423,44 +5552,6 @@ ensures true == disjoint(map(snd, advance_acc(acc1)),
       }
   }
 }//took 7m
-
-lemma void multiset_eq_reshuffle_appends<t>(list<t> l1, list<t> l2,
-                                            list<t> l3, list<t> l4,
-                                            list<t> l5)
-requires true == multiset_eq(l1, append(append(l2, l3), append(l4, l5)));
-ensures true == multiset_eq(l1, append(append(l2, l5), append(l3, l4)));
-{
-  multiset_eq_append_assoc(l2, l3, append(l4, l5));
-  multiset_eq_trans(l1, append(append(l2, l3),
-                               append(l4, l5)),
-                    append(l2, append(l3, append(l4, l5))));
-  assert true == multiset_eq(l1, append(l2, append(l3, append(l4, l5))));
-  multiset_eq_append_assoc(l3, l4, l5);
-  multiset_eq_comm(append(append(l3, l4), l5),
-                   append(l3, append(l4, l5)));
-  multiset_eq_append_comm(append(l3, l4), l5);
-  multiset_eq_trans(append(l3, append(l4, l5)),
-                    append(append(l3, l4), l5),
-                    append(l5, append(l3, l4)));
-  multiset_eq_refl(l2);
-  multiset_eq_append(l2, l2,
-                     append(l3, append(l4, l5)),
-                     append(l5, append(l3, l4)));
-  multiset_eq_trans(l1,
-                    append(l2, append(l3, append(l4, l5))),
-                    append(l2, append(l5, append(l3, l4))));
-  assert true == multiset_eq(l1, append(l2, append(l5, append(l3, l4))));
-  multiset_eq_append_assoc(l2, l5, append(l3, l4));
-  multiset_eq_comm(append(append(l2, l5), append(l3, l4)),
-                   append(l2, append(l5, append(l3, l4))));
-  assert true == multiset_eq(append(l2, append(l5, append(l3, l4))),
-                             append(append(l2, l5), append(l3, l4)));
-  assert true == multiset_eq(append(l2, append(l5, append(l3, l4))),
-                             append(append(l2, l5), append(l3, l4)));
-
-  multiset_eq_trans(l1, append(l2, append(l5, append(l3, l4))),
-                    append(append(l2, l5), append(l3, l4)));
-}
 
 lemma void buckets_split_ok_orig_ok_rec<kt>(list<pair<kt, nat> > sacc,
                                             list<pair<kt, nat> > lacc,
