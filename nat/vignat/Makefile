@@ -47,6 +47,7 @@ verify:
 verifast:
 	verifast -I . -allow_assume -shared \
 		lib/assumptions_stubs.c \
+		lib/flow.c \
 		lib/containers/double-chain-impl.c lib/containers/double-chain.c lib/containers/map.c lib/containers/double-map.c \
 		lib/containers/batcher.c lib/coherence.c lib/expirator.c \
 		lib/containers/array-bat-verifast.c lib/containers/array-rq-verifast.c lib/containers/array-u16-verifast.c lib/containers/array-lcc-verifast.c \

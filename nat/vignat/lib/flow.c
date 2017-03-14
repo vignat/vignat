@@ -47,19 +47,12 @@ int ext_key_eq(void* a, void* b)
   return TO_INT(rez);
 }
 
-static int ovf_cast(uint32_t x)
+static long long wrap(long long x)
 //@ requires true;
-//@ ensures x <= INT_MAX ? result == x : result == x - INT_MAX - 1;
+//@ ensures result == _wrap(x) &*& INT_MIN <= result &*& result <= INT_MAX;
 {
-  uint32_t mx = INT_MAX;
-  if (x <= INT_MAX) return (int)x;
-  //@ assert x <= UINT_MAX;
-  //@ assert UINT_MAX == 2*INT_MAX + 1;
-  //@ assert x <= 2*INT_MAX + 1;
-  // TODO: Obviously??
-  //@ assert (x - INT_MAX - 1 <= INT_MAX);
-  uint32_t rez = x - mx - 1;
-  return (int)rez;
+  //@ div_rem(x, INT_MAX);
+  return x % INT_MAX;
 }
 
 int int_key_hash(void* key)
@@ -67,15 +60,27 @@ int int_key_hash(void* key)
 //@ ensures [f]int_k_p(key, k) &*& result == int_hash(k);
 {
   struct int_key* ik = key;
-uint32_t hash = 17;
-hash = hash * 31 + ik->int_src_port;
-hash = hash * 31 + ik->dst_port;
-hash = hash * 31 + ik->int_src_ip;
-hash = hash * 31 + ik->dst_ip;
-hash = hash * 31 + ik->int_device_id;
-hash = hash * 31 + ik->protocol;
 
-  return ovf_cast(hash);
+  long long hash = ik->int_src_port;
+  hash *= 31;
+
+  hash += ik->dst_port;
+  hash *= 31;
+
+  hash += ik->int_src_ip;
+  hash *= 31;
+
+  hash += ik->dst_ip;
+  hash *= 31;
+
+  hash += ik->int_device_id;
+  hash *= 31;
+
+  hash += ik->protocol;
+
+  hash = wrap(hash);
+
+  return (int) hash;
 }
 
 int ext_key_hash(void* key)
@@ -83,14 +88,27 @@ int ext_key_hash(void* key)
 //@ ensures [f]ext_k_p(key, k) &*& result == ext_hash(k);
 {
   struct ext_key* ek = key;
-uint32_t hash = 17;
-hash = hash * 31 + ek->ext_src_port;
-hash = hash * 31 + ek->dst_port;
-hash = hash * 31 + ek->ext_src_ip;
-hash = hash * 31 + ek->dst_ip;
-hash = hash * 31 + ek->ext_device_id;
-hash = hash * 31 + ek->protocol;
-  return ovf_cast(hash);
+
+  long long hash = ek->ext_src_port;
+  hash *= 31;
+
+  hash += ek->dst_port;
+  hash *= 31;
+
+  hash += ek->ext_src_ip;
+  hash *= 31;
+
+  hash += ek->dst_ip;
+  hash *= 31;
+
+  hash += ek->ext_device_id;
+  hash *= 31;
+
+  hash += ek->protocol;
+
+  hash = wrap(hash);
+
+  return (int) hash;
 }
 
 //@ fixpoint bool my_offset(struct flow* fp, struct int_key* ik, struct ext_key* ek) { return &(fp->ik) == ik && &(fp->ek) == ek; }
