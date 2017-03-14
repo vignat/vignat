@@ -2397,15 +2397,174 @@ requires true == distinct(map(fst, acc)) &*&
          true == mem(pair(k, zero), acc);
 ensures false == mem(k, map(fst, advance_acc(acc)));
 {
-  assume(false);//TODO 10m
-}
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          if (key == k) {
+            switch(dist) {
+              case zero:
+                advance_acc_still_no_key(t, k);
+              case succ(n):
+                assert true == mem(pair(k, zero), t);
+                mem_map(pair(k, zero), t, fst);
+                assert false;
+            }
+          } else {
+            switch(dist) {
+              case zero:
+              case succ(n):
+            }
+            distinct_mem_zero_advance_acc_none(k, t);
+          }
+      }
+  }
+}//took 6m
+
+lemma void no_cur_key_advance_acc_preserve_mem<kt>(list<pair<kt, nat> > acc,
+                                                   kt k)
+requires get_current_key_fp(acc) == none;
+ensures mem(k, map(fst, acc)) == mem(k, map(fst, advance_acc(acc)));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+          }
+      }
+      no_cur_key_advance_acc_preserve_mem(t, k);
+  }
+}//took 1m
+
+lemma void no_cur_key_advance_acc_preserve_distinct<kt>(list<pair<kt, nat> > acc)
+requires get_current_key_fp(acc) == none;
+ensures distinct(map(fst, acc)) ==
+        distinct(map(fst, advance_acc(acc)));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          switch(dist) {
+            case zero:
+              assert false;
+            case succ(n):
+          }
+          no_cur_key_advance_acc_preserve_mem(t, key);
+          no_cur_key_advance_acc_preserve_distinct(t);
+      }
+  }
+}//took 3m
+
+lemma void curr_key_no_dup_advance_acc_keep_distinct<kt>(list<pair<kt, nat> > acc,
+                                                         kt k)
+requires get_current_key_fp(acc) == some(k) &*&
+         false == mem(k, map(fst, advance_acc(acc))) &*&
+         true == distinct(map(snd, acc)) &*&
+         false == distinct(map(fst, acc));
+ensures false == distinct(map(fst, advance_acc(acc)));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          switch(dist) {
+            case zero:
+              assert key == k;
+              nozero_no_current_key(t);
+              no_cur_key_advance_acc_preserve_distinct(t);
+              no_cur_key_advance_acc_preserve_mem(t, k);
+              assert distinct(map(fst, acc)) ==
+                     (!mem(k, map(fst, t)) && distinct(map(fst, t)));
+              assert distinct(map(fst, advance_acc(acc))) ==
+                     distinct(map(fst, advance_acc(t)));
+            case succ(n):
+              if (distinct(map(fst, t))) {
+                assert true == mem(key, map(fst, t));
+                advance_acc_preserves_key(t, key);
+                assert true == mem(key, map(fst, advance_acc(t)));
+              } else {
+                curr_key_no_dup_advance_acc_keep_distinct(t, k);
+              }
+          }
+      }
+  }
+}//took 8m
+
+lemma void advance_acc_preserve_distinct_keys<kt>(list<pair<kt, nat> > acc)
+requires true == distinct(map(fst, acc));
+ensures true == distinct(map(fst, advance_acc(acc)));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          switch(dist) {
+            case zero:
+            case succ(n):
+              advance_acc_still_no_key(t, key);
+          }
+      }
+      advance_acc_preserve_distinct_keys(t);
+  }
+}//took 2m
+
+lemma void buckets_keys_distinct_wraparound_too_rec<kt>(list<pair<kt, nat> > acc,
+                                                        list<bucket<kt> > buckets)
+requires true == distinct(buckets_all_keys_fp(buckets)) &*&
+         true == distinct(map(fst, acc)) &*&
+         true == disjoint(map(fst, acc),
+                          buckets_all_keys_fp(buckets));
+ensures true == distinct(map(fst, get_wraparound(acc, buckets)));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+
+          buckets_distinct_all_keys_breakdown(chains, t);
+          msubset_subset(map(fst, chains), buckets_all_keys_fp(buckets));
+          msubset_subset(buckets_all_keys_fp(t),
+                         buckets_all_keys_fp(buckets));
+          disjoint_comm(map(fst, acc),
+                        buckets_all_keys_fp(buckets));
+          subset_disjoint(map(fst, chains), buckets_all_keys_fp(buckets),
+                          map(fst, acc));
+          subset_disjoint(buckets_all_keys_fp(t),
+                          buckets_all_keys_fp(buckets),
+                          map(fst, acc));
+          disjoint_comm(map(fst, chains), map(fst, acc));
+          disjoint_comm(buckets_all_keys_fp(t), map(fst, acc));
+          map_append(fst, acc, chains);
+          distinct_and_disjoint_append(map(fst, acc), map(fst, chains));
+          advance_acc_preserve_distinct_keys(atb);
+          disjoint_append(map(fst, acc), map(fst, chains),
+                          nil, buckets_all_keys_fp(t));
+          advance_acc_subset_keys(atb);
+          subset_disjoint(map(fst, advance_acc(atb)),
+                          map(fst, atb),
+                          buckets_all_keys_fp(t));
+          buckets_keys_distinct_wraparound_too_rec(advance_acc(atb), t);
+      }
+  }
+}//took 6m
 
 lemma void buckets_keys_distinct_wraparound_too<kt>(list<bucket<kt> > buckets)
 requires true == distinct(buckets_all_keys_fp(buckets));
 ensures true == distinct(map(fst, get_wraparound(nil, buckets)));
 {
-  assume(false);//TODO 20m
-}
+  buckets_keys_distinct_wraparound_too_rec(nil, buckets);
+}//took 3m
 
 lemma void buckets_rem_part_get_chns_lim<kt>(list<bucket<kt> > buckets,
                                              kt k, int start)
@@ -2544,14 +2703,13 @@ lemma void bucket_has_key_in_wraparound<kt>(list<bucket<kt> > buckets,
 requires 0 <= start &*& start < length(buckets) &*&
          true == bucket_has_key_fp(k, nth(start, buckets)) &*&
          length(buckets) <= i + start &*&
-         i == buckets_get_chain_fp(buckets, k, start) &*&
-         true == buckets_ok(buckets); //this may be removed
+         i == buckets_get_chain_fp(buckets, k, start);
 ensures true == mem(pair(k, nat_of_int(start + i - length(buckets))),
                     get_wraparound(nil, buckets));
 {
   bucket_has_key_in_wraparound_rec(buckets, nil,
                                    k, start, i);
-}//took 110m (undone yet, VF bug on the way.)
+}//took 110m
 
 lemma void msubset_buckets_ok_rec<kt>(list<pair<kt, nat> > acc1,
                                       list<pair<kt, nat> > acc2,
@@ -4399,32 +4557,6 @@ requires true == keys_contain_keys(ks1, ks2) &*& true == opt_no_dups(ks2);
 ensures true == opt_no_dups(ks1);
 {
   assume(false);//TODO 10m
-}
-
-lemma void no_cur_key_advance_acc_preserve_distinct<kt>(list<pair<kt, nat> > acc)
-requires get_current_key_fp(acc) == none;
-ensures distinct(map(fst, acc)) ==
-        distinct(map(fst, advance_acc(acc)));
-{
-  assume(false);//TODO 10m
-}
-
-lemma void advance_acc_preserve_distinct_keys<kt>(list<pair<kt, nat> > acc)
-requires true == distinct(map(fst, acc));
-ensures true == distinct(map(fst, advance_acc(acc)));
-{
-  assume(false);//TODO 5m
-}
-
-lemma void curr_key_no_dup_advance_acc_keep_distinct<kt>(list<pair<kt, nat> > acc,
-                                                         kt k)
-requires get_current_key_fp(acc) == some(k) &*&
-         false == mem(k, map(fst, advance_acc(acc))) &*&
-         true == distinct(map(snd, acc)) &*&
-         false == distinct(map(fst, acc));
-ensures false == distinct(map(fst, advance_acc(acc)));
-{
-  assume(false);//TODO 20m
 }
 
 lemma void filter_ntk_affects_just_first_half<kt>(list<pair<kt, nat> > acc1,
