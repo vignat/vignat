@@ -1974,8 +1974,20 @@ requires 0 < lim &*&
          true == forall(acc, (sup)((nat_ge)(lim), snd));
 ensures map(fst, acc) == map(fst, advance_acc(acc));
 {
-  assume(false);//TODO 5m
-}
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          switch(dist) {
+            case zero:
+              assert false;
+            case succ(n):
+          }
+      }
+      long_chains_advance_acc_same_keys(t, lim);
+  }
+}//took 1m
 
 lemma void long_buckets_all_keys_in_wraparound_rec<kt>(list<pair<kt, nat> > acc,
                                                        list<bucket<kt> > buckets)
@@ -2158,8 +2170,15 @@ lemma void buckets_rem_same_len<kt>(list<bucket<kt> > buckets, kt k)
 requires true;
 ensures length(buckets) == length(buckets_remove_key_fp(buckets, k));
 {
-  assume(false);//TODO 2m
-}
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          buckets_rem_same_len(t, k);
+      }
+  }
+}//took 1m
 
 lemma void buckets_rem_part_get_chns_norm<kt>(list<bucket<kt> > buckets,
                                               kt k, int start, int dist)
@@ -2316,6 +2335,51 @@ ensures buckets_get_chns_rec_fp(acc1, buckets) ==
   }
 }
 
+lemma void chain_just_overflown_in_acc<kt>(list<pair<kt, nat> > acc,
+                                           list<bucket<kt> > buckets,
+                                           kt k)
+requires true == mem(pair(k, nat_of_int(length(buckets))), acc);
+ensures true == mem(pair(k, zero), get_wraparound(acc, buckets));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          mem_advance_acc_swap(atb, k, nat_of_int(length(buckets) - 1));
+          chain_just_overflown_in_acc(advance_acc(atb), t, k);
+      }
+  }
+}//took 1m
+
+lemma void chain_just_overflown_rec<kt>(list<pair<kt, nat> > acc,
+                                        list<bucket<kt> > buckets,
+                                        kt k, int start)
+requires 0 <= start &*& start < length(buckets) &*&
+         true == bucket_has_key_fp(k, nth(start, buckets)) &*&
+         bucket_get_chain_fp(nth(start, buckets), k) ==
+         nat_of_int(length(buckets) - start);
+ensures true == mem(pair(k, zero), get_wraparound(acc, buckets));
+{
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          if (start == 0) {
+            bucket_get_chain_mem(chains, k);
+            mem_advance_acc_swap(atb, k, nat_of_int(length(buckets) - 1));
+            chain_just_overflown_in_acc(advance_acc(atb), t, k);
+          } else {
+            chain_just_overflown_rec(advance_acc(atb), t, k, start - 1);
+          }
+
+      }
+  }
+}//took 3m
+
 lemma void chain_just_overflown<kt>(list<bucket<kt> > buckets,
                                     kt k, int start)
 requires 0 <= start &*& start < length(buckets) &*&
@@ -2324,8 +2388,8 @@ requires 0 <= start &*& start < length(buckets) &*&
          nat_of_int(length(buckets) - start);
 ensures true == mem(pair(k, zero), get_wraparound(nil, buckets));
 {
-  assume(false);//TODO 5m
-}
+  chain_just_overflown_rec(nil, buckets, k, start);
+}//took 4m
 
 lemma void distinct_mem_zero_advance_acc_none<kt>(kt k,
                                                   list<pair<kt, nat> > acc)
