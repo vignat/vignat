@@ -172,7 +172,7 @@ struct DoubleMap {
                          right_offsets, vk1, vk2) &*&
     mp->capacity |-> capacity &*&
     mp->n_vals |-> map_size_fp(ma) &*&
-    0 <= capacity &*& capacity < keys_capacity &*&
+    0 <= capacity &*& capacity <= keys_capacity &*&
     values + val_size*capacity <= (void*)UINTPTR_MAX &*&
     true == insync_fp(val_arr, ma, mb, vk1, vk2, 0) &*&
     true == no_extra_ptrs(addrsa, ma) &*&
@@ -285,7 +285,7 @@ int dmap_allocate/*@ <K1,K2,V> @*/
              dmap_record_property2<K2>(?recp2) &*&
              *map_out |-> ?old_map_out &*&
              0 < value_size &*& value_size < 4096 &*&
-             0 < capacity &*& capacity < keys_capacity &*&
+             0 < capacity &*& capacity <= keys_capacity &*&
              keys_capacity < CAPACITY_UPPER_LIMIT; @*/
 /*@ ensures result == 0 ?
             (*map_out |-> old_map_out) :

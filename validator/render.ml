@@ -263,7 +263,7 @@ let guess_support_assignments constraints symbs =
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          if (String.equal x "reset_arr19_52") then
+          if (String.equal x "reset_arr18_52") then
               ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
           else
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)
