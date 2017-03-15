@@ -407,4 +407,18 @@ ensures true == subset(intersection(l1, l2), l1) &*&
   }
 }//took 27m
 
+lemma void subset_unremove_outer<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, remove(el, ys));
+ensures true == subset(xs, ys);
+{
+  switch(xs) {
+    case nil:
+    case cons(h,t):
+      if (h!=el)
+      neq_mem_remove(h, el, t);
+      subset_unremove_outer(t, ys, el);
+      mem_remove_mem(h, el, ys);
+  }
+}
+
 #endif SET_GH
