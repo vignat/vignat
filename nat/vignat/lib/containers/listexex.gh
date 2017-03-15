@@ -906,12 +906,4 @@ ensures true == mem(el, filter(f, l));
   assume(false);//TODO 2m
 }
 
-lemma void remove_remove_swap<t>(t x, t y, list<t> l)
-requires true;
-ensures remove(x, remove(y, l)) ==
-        remove(y, remove(x, l));
-{
-  assume(false);//TODO 5m
-}
-
 #endif//LISTEXEX_GH

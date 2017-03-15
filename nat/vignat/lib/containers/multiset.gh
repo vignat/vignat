@@ -59,6 +59,20 @@ ensures true == msubset(l1, l2) &*&
   multiset_eq_msubset_rec(l2, l1);
 }
 
+lemma void msubset_multiset_eq<t>(list<t> l1, list<t> l2)
+requires true == msubset(l1, l2) &*&
+         true == msubset(l2, l1);
+ensures true == multiset_eq(l1, l2);
+{
+  switch(l1) {
+    case nil:
+      msubset_of_nil(l2);
+    case cons(h,t):
+      msubset_remove(l2, l1, h);
+      msubset_multiset_eq(t, remove(h, l2));
+  }
+}//took 4m
+
 lemma void multiset_eq_subset<t>(list<t> l1, list<t> l2)
 requires true == multiset_eq(l1, l2);
 ensures true == subset(l1, l2);
@@ -188,7 +202,7 @@ ensures true == multiset_eq(remove(el, l1), remove(el, l2));
     case cons(h,t):
       if (h != el) {
         multiset_eq_remove(t, remove(h, l2), el);
-        remove_remove_swap(el, h, l2);
+        remove_commutes(l2, el, h);
         neq_mem_remove(h, el, l2);
       }
   }
@@ -274,8 +288,15 @@ lemma void multiset_eq_forall<t>(list<t> l1, list<t> l2, fixpoint (t,bool) f)
 requires true == multiset_eq(l1, l2);
 ensures forall(l1, f) == forall(l2, f);
 {
-  assume(false);//TODO 5m
-}
+  multiset_eq_msubset(l1, l2);
+  if (forall(l1, f)) {
+    msubset_forall(l2, l1, f);
+  }
+
+  if (forall(l2, f)) {
+    msubset_forall(l1, l2, f);
+  }
+}//took 3m
 
 
 
@@ -285,8 +306,13 @@ requires true;
 ensures true == multiset_eq(append(append(l1, l2), l3),
                             append(l1, append(l2, l3)));
 {
-  assume(false);//TODO 5m
-}
+  switch(l1) {
+    case nil:
+      multiset_eq_refl(append(l2, l3));
+    case cons(h,t):
+      multiset_eq_append_assoc(t, l2, l3);
+  }
+}//took 2m
 
 
 
@@ -297,8 +323,12 @@ requires true == multiset_eq(l1, l2) &*&
          true == multiset_eq(l3, l4);
 ensures true == multiset_eq(append(l1, l3), append(l2, l4));
 {
-  assume(false);//TODO 5m
-}
+  multiset_eq_msubset(l1, l2);
+  multiset_eq_msubset(l3, l4);
+  msubset_append_both(l1, l3, l2, l4);
+  msubset_append_both(l2, l4, l1, l3);
+  msubset_multiset_eq(append(l1, l3), append(l2, l4));
+}//took 5m
 
 
 
@@ -307,8 +337,10 @@ lemma void multiset_eq_append_comm<t>(list<t> l1, list<t> l2)
 requires true;
 ensures true == multiset_eq(append(l1, l2), append(l2, l1));
 {
-  assume(false);//TODO 5m
-}
+  msubset_append_swap(l1, l2);
+  msubset_append_swap(l2, l1);
+  msubset_multiset_eq(append(l1, l2), append(l2, l1));
+}//took 2m
 
 
 
@@ -353,12 +385,41 @@ ensures true == multiset_eq(remove(f(x), map(f, l)),
   }
 }//took 40m
 
+lemma void multiset_eq_lift_element_append<t>(t el, list<t> l1, list<t> l2)
+requires true == mem(el, l2);
+ensures true == multiset_eq(append(l1, l2),
+                            append(cons(el, l1), remove(el, l2)));
+{
+  switch(l1) {
+    case nil:
+      multiset_eq_lift_element(el, l2);
+      multiset_eq_comm(cons(el, remove(el, l2)), l2);
+    case cons(h,t):
+      multiset_eq_lift_element_append(el, t, l2);
+  }
+}//took 1m
+
 lemma void multiset_remove_append_swap<t>(t x, list<t> l1, list<t> l2)
 requires true == mem(x, l2);
 ensures true == multiset_eq(remove(x, append(l1, l2)),
                             append(l1, remove(x, l2)));
 {
-  assume(false);//TODO 5m
-}
+  switch(l1) {
+    case nil:
+      multiset_eq_refl(remove(x, l2));
+    case cons(h,t):
+      if (x == h) {
+        multiset_eq_lift_element_append(x, t, l2);
+        assert true == multiset_eq(append(t, l2),
+                                   append(cons(x, t), remove(x, l2)));
+      } else {
+        multiset_remove_append_swap(x, t, l2);
+        assert true == multiset_eq(remove(x, append(t, l2)),
+                                   append(t, remove(x, l2)));
+        assert true == multiset_eq(remove(x, append(l1, l2)),
+                                   append(l1, remove(x, l2)));
+      }
+  }
+}//took 9m
 
 #endif//MULTISET_GH
