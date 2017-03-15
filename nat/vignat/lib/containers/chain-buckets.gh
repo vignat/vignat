@@ -1320,6 +1320,17 @@ ensures true == forall(acc, (not_this_key_pair_fp)(k));
   }
 }
 
+lemma void not_this_key_nonmem<kt>(list<pair<kt, nat> > acc, kt k)
+requires true == forall(acc, (not_this_key_pair_fp)(k));
+ensures false == mem(k, map(fst, acc));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      not_this_key_nonmem(t, k);
+  }
+}
+
 lemma void no_key_in_acc_filter_no_effect<kt>(list<pair<kt, nat> > acc, kt k)
 requires false == mem(k, map(fst, acc));
 ensures acc == filter((not_this_key_pair_fp)(k), acc);
@@ -5013,38 +5024,6 @@ ensures false == mem(zero, map(snd, filter((not_this_key_pair_fp)(k), acc)));
   }
 }//start 47
 
-lemma void curr_key_filter_advance_acc_same_effect<kt>(list<pair<kt, nat> > acc,
-                                                       kt k)
-requires true == distinct(map(fst, acc)) &*&
-         true == distinct(map(snd, acc)) &*&
-         get_current_key_fp(acc) == some(k);
-ensures advance_acc(acc) == advance_acc(filter((not_this_key_pair_fp)(k), acc));
-{
-  switch(acc) {
-    case nil:
-    case cons(h,t):
-      switch(h) {
-        case pair(key, dist):
-          switch(dist) {
-            case zero:
-              assert key == k;
-              assert false == mem(zero, map(snd, t));
-              no_key_in_acc_filter_no_effect(t, k);
-              assert filter((not_this_key_pair_fp)(k), t) == t;
-            case succ(n):
-              if (key == k) {
-                current_key_pair_zero(t, k);
-                mem_map(pair(k, zero), t, fst);
-                assert false;
-              }
-              assert key != k;
-              curr_key_filter_advance_acc_same_effect(t, k);
-          }
-
-      }
-  }
-}//took 6m
-
 lemma void filter_other_key_curr_key_same<kt>(list<pair<kt, nat> > acc, kt k)
 requires get_current_key_fp(acc) != some(k);
 ensures get_current_key_fp(filter((not_this_key_pair_fp)(k), acc)) ==
@@ -5121,7 +5100,7 @@ ensures buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k), acc),
             curr_key_out_no_other_zero_chain(acc_atb, k);
             assert false == mem(zero, map(snd, new_atb));
             nozero_no_current_key(new_atb);
-            curr_key_filter_advance_acc_same_effect(acc_atb, k);
+            advance_acc_filter_current_key(acc_atb, k);
             assert advance_acc(acc_atb) == advance_acc(new_atb);
             return;
           } else {
@@ -5228,12 +5207,26 @@ ensures buckets_get_keys_rec_fp(filter((not_this_key_pair_fp)(k),
 lemma void rem_key_filter_from_wraparound<kt>(list<pair<kt, nat> > acc,
                                               list<bucket<kt> > buckets,
                                               kt k)
-requires false == mem(k, map(fst, acc));
-ensures get_wraparound(acc, buckets_remove_key_fp(buckets, k)) ==
+requires true;
+ensures get_wraparound(filter((not_this_key_pair_fp)(k),
+                              acc), buckets_remove_key_fp(buckets, k)) ==
         filter((not_this_key_pair_fp)(k), get_wraparound(acc, buckets));
 {
-  assume(false);//TODO 30m
-}
+  switch(buckets) {
+    case nil:
+      filter_forall((not_this_key_pair_fp)(k), acc);
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          list<pair<kt, nat> > atb = acc_at_this_bucket(acc, h);
+          list<pair<kt, nat> > new_atb = filter((not_this_key_pair_fp)(k),
+                                                atb);
+          rem_key_filter_from_wraparound(advance_acc(atb), t, k);
+          remkey_advance_acc_idemp(atb, k);
+          filter_append_idemp(acc, chains, (not_this_key_pair_fp)(k));
+      }
+  }
+}//took 36m
 
 lemma void no_chain_make_it_to_wraparound_rem_safe<kt>(list<bucket<kt> > buckets,
                                                        kt k)
@@ -5251,8 +5244,10 @@ lemma void not_forall_not_this_mem<kt>(list<pair<kt, nat> > acc, kt k)
 requires false == forall(acc, (not_this_key_pair_fp)(k));
 ensures true == mem(k, map(fst, acc));
 {
-  assume(false);//TODO 3m
-}
+  if (!mem(k, map(fst, acc))) {
+    nonmem_not_this_key(acc, k);
+  }
+}//took 2m
 
 lemma void buckets_rm_key_get_keys<kt>(list<bucket<kt> > buckets,
                                        kt k)
@@ -5635,8 +5630,12 @@ lemma void empty_buckets_keys_distinct<kt>(nat len)
 requires true;
 ensures true == distinct(buckets_all_keys_fp(empty_buckets_fp<kt>(len)));
 {
-  assume(false);//TODO 5m
-}
+  switch(len) {
+    case zero:
+    case succ(n):
+      empty_buckets_keys_distinct(n);
+  }
+}//took 1m
 
 lemma void empty_buckets_ok<kt>(nat capacity)
 requires capacity != zero;
@@ -5779,12 +5778,23 @@ fixpoint bool buckets_content_eq_fp<kt>(list<bucket<kt> > bkts1,
 
 lemma void buckets_put_key_keep_short_swap<kt>(list<bucket<kt> > buckets,
                                                kt k, int start, int dist)
-requires start + dist < length(buckets);
+requires 0 <= dist &*& start + dist < length(buckets);
 ensures keep_short_fp(buckets_put_key_fp(buckets, k, start, dist)) ==
         buckets_put_key_fp(keep_short_fp(buckets), k, start, dist);
 {
-  assume(false);//TODO 10m
-}
+  switch(buckets) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case bucket(chains):
+          buckets_put_same_len(buckets, k, start, dist);
+          if (start == 0) {
+          } else {
+            buckets_put_key_keep_short_swap(t, k, start - 1, dist);
+          }
+      }
+  }
+}//took 9m
 
 lemma void buckets_put_key_keep_long_no_effect<kt>(list<bucket<kt> > buckets,
                                                    kt k, int start, int dist)
@@ -6920,8 +6930,25 @@ ensures true == multiset_eq(buckets_all_keys_fp(buckets),
                             append(buckets_all_keys_fp(keep_short_fp(buckets)),
                                    map(fst, get_wraparound(nil, buckets))));
 {
-  assume(false);//TODO 10m
-}
+  buckets_split_all_keys(buckets);
+  keep_long_indeed_long(buckets);
+  keep_long_same_wraparound(nil, buckets);
+  long_buckets_all_keys_in_wraparound(keep_long_fp(buckets));
+  list<kt> shrt_keys = buckets_all_keys_fp(keep_short_fp(buckets));
+  list<kt> lng_keys = buckets_all_keys_fp(keep_long_fp(buckets));
+  list<kt> wrp_keys = map(fst, get_wraparound(nil, buckets));
+  assert true == multiset_eq(append(shrt_keys, lng_keys),
+                             buckets_all_keys_fp(buckets));
+  assert true == multiset_eq(wrp_keys, lng_keys);
+  multiset_eq_refl(shrt_keys);
+  multiset_eq_append(shrt_keys, shrt_keys,
+                     wrp_keys, lng_keys);
+  multiset_eq_trans(append(shrt_keys, wrp_keys),
+                    append(shrt_keys, lng_keys),
+                    buckets_all_keys_fp(buckets));
+  multiset_eq_comm(append(shrt_keys, wrp_keys),
+                   buckets_all_keys_fp(buckets));
+}//took 11m
 
 lemma void no_key_in_ks_no_key_in_buckets<kt>(list<bucket<kt> > buckets, kt k)
 requires false == mem(some(k), buckets_get_keys_fp(buckets)) &*&
