@@ -6770,21 +6770,6 @@ ensures mem(chain, map(snd, get_wraparound(acc1, buckets))) ==
   }
 }//took 5m
 
-lemma void buckets_all_keys_decompose_some<kt>(list<pair<kt, nat> > acc,
-                                               bucket<kt> bucket,
-                                               list<bucket<kt> > rest)
-requires get_current_key_fp(acc_at_this_bucket(acc, bucket)) == some(?k);
-ensures true == multiset_eq(append(map(fst, acc),
-                                   buckets_all_keys_fp(cons(bucket,rest))),
-                            cons(k, append(map(fst,
-                                               advance_acc(
-                                                 acc_at_this_bucket(acc,
-                                                                    bucket))),
-                                        buckets_all_keys_fp(rest))));
-{
-  assume(false);//TODO 20m
-}
-
 lemma void advance_acc_keys_none<kt>(list<pair<kt, nat> > acc)
 requires get_current_key_fp(acc) == none;
 ensures map(fst, acc) == map(fst, advance_acc(acc));
@@ -6802,6 +6787,65 @@ ensures map(fst, acc) == map(fst, advance_acc(acc));
       }
   }
 }//took 3m
+
+lemma void acc_decompose_curr_key_advance_acc_keys<kt>(list<pair<kt, nat> > acc,
+                                                       kt k)
+requires get_current_key_fp(acc) == some(k) &*&
+         true == distinct(map(snd, acc));
+ensures true == multiset_eq(map(fst, acc),
+                            cons(k, map(fst, advance_acc(acc))));
+{
+  switch(acc) {
+    case nil:
+    case cons(h,t):
+      switch(h) {
+        case pair(key, dist):
+          switch(dist) {
+            case zero:
+              assert key == k;
+              assert false == mem(zero, map(snd, t));
+              nozero_no_current_key(t);
+              assert get_current_key_fp(t) == none;
+              advance_acc_keys_none(t);
+              multiset_eq_refl(map(fst, t));
+            case succ(n):
+              acc_decompose_curr_key_advance_acc_keys(t, k);
+          }
+      }
+  }
+}//took 12m
+
+lemma void buckets_all_keys_decompose_some<kt>(list<pair<kt, nat> > acc,
+                                               bucket<kt> bucket,
+                                               list<bucket<kt> > rest)
+requires get_current_key_fp(acc_at_this_bucket(acc, bucket)) == some(?k) &*&
+         true == distinct(map(snd, acc_at_this_bucket(acc, bucket)));
+ensures true == multiset_eq(append(map(fst, acc),
+                                   buckets_all_keys_fp(cons(bucket,rest))),
+                            cons(k, append(map(fst,
+                                               advance_acc(
+                                                 acc_at_this_bucket(acc,
+                                                                    bucket))),
+                                        buckets_all_keys_fp(rest))));
+{
+  switch(bucket) {
+    case bucket(chains):
+      list<pair<kt, nat> > atb = acc_at_this_bucket(acc, bucket);
+      acc_decompose_curr_key_advance_acc_keys(atb, k);
+
+      assert true == multiset_eq(map(fst, atb),
+                                 cons(k, map(fst, advance_acc(atb))));
+      multiset_eq_append_both(map(fst, atb), cons(k, map(fst, advance_acc(atb))),
+                              buckets_all_keys_fp(rest));
+      map_append(fst, acc, chains);
+      append_append_assoc(map(fst, acc), map(fst, chains),
+                          buckets_all_keys_fp(rest));
+      assert append(map(fst, atb), buckets_all_keys_fp(rest)) ==
+             append(map(fst, acc), buckets_all_keys_fp(cons(bucket, rest)));
+
+  }
+
+}//took 16m
 
 lemma void buckets_all_keys_decompose_none<kt>(list<pair<kt, nat> > acc,
                                                bucket<kt> bucket,
