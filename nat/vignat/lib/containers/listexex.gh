@@ -898,4 +898,12 @@ ensures filter(f1, filter(f2, l)) == filter(f2, filter(f1, l));
   }
 }//took 1m
 
+lemma void filter_mem<t>(t el, list<t> l, fixpoint (t,bool) f)
+requires true == mem(el, l) &*&
+         true == f(el);
+ensures true == mem(el, filter(f, l));
+{
+  assume(false);//TODO 2m
+}
+
 #endif//LISTEXEX_GH

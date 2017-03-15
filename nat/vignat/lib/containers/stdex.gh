@@ -247,6 +247,11 @@ ensures true == disjoint(l1, l2);
   assume(false);//TODO 10m
 }
 
+lemma void lt_and_ge_false(int x, int y)
+requires x < y &*& y <= x;
+ensures false;
+{
+}
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19

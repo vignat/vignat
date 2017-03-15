@@ -13,7 +13,7 @@ fixpoint bool multiset_eq<t>(list<t> l1, list<t> l2) {
 }
 
 lemma void multiset_eq_unremove<t>(list<t> l1, list<t> l2, t x)
-requires true == mem(x, l1) &*& 
+requires true == mem(x, l1) &*&
          true == multiset_eq(remove(x, l1), l2);
 ensures true == multiset_eq(l1, cons(x, l2));
 {
