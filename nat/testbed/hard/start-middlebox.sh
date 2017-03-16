@@ -41,32 +41,55 @@ if [ -z $SCENARIO ]; then
     exit 2
 fi
 
+CLEAN_APP_NAME=`echo "$MIDDLEBOX" | tr '/' '_'`
+LOG_FILE="bench-$CLEAN_APP_NAME-$SCENARIO-init.log"
 
-# Initialize the network;
-# to do that, we need to know which scenario we use, and whether we'll run a DPDK app or not.
-NETWORK_SCENARIO=$SCENARIO
-case $SCENARIO in
-    "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"mg-new-flows-latency")
-        NETWORK_SCENARIO="loopback"
-        ;;
-    "passthrough")
-        NETWORK_SCENARIO="passthrough"
-        ;;
-    "rr")
-        NETWORK_SCENARIO="rr"
-        ;;
-    *)
-        echo "unknown scenario $SCENARIO" 1>&2
-        exit 10
-esac
-
-NETWORK_APP="dpdk"
-if [ $MIDDLEBOX = "netfilter" ]; then
-    NETWORK_APP="netfilter"
-elif [ ! -d $MIDDLEBOX ]; then
-    echo "Unknown middlebox app: $MIDDLEBOX" 1>&2
-    exit 10
+if [ -f "$LOG_FILE" ]; then
+    rm "$LOG_FILE"
 fi
 
-. ./init-network.sh $NETWORK_SCENARIO $NETWORK_APP
 
+if [ "$MIDDLEBOX" = "netfilter" ]; then
+    case $SCENARIO in
+	"mg-new-flows-latency")
+	    EXPIRATION_TIME=2
+	    ;;
+        "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"rr"|"passthrough")
+            EXPIRATION_TIME=60
+            ;;
+    esac
+
+    bash ./util/netfilter-short-timeout.sh $EXPIRATION_TIME
+else
+    echo "[bench] Launching $MIDDLEBOX..."
+
+    EXPIRATION_TIME=60
+
+    case $SCENARIO in
+        "mg-new-flows-latency")
+            SIMPLE_SCENARIO="loopback"
+            EXPIRATION_TIME=2
+            ;;
+        "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency")
+            SIMPLE_SCENARIO="loopback"
+            EXPIRATION_TIME=60
+            ;;
+        "rr"|"passthrough")
+            SIMPLE_SCENARIO="rr"
+            EXPIRATION_TIME=60
+            ;;
+        *)
+            echo "Unknown scenario $SCENARIO" 1>&2
+            exit 10
+            ;;
+    esac
+
+    # Run the app in the background
+    # The arguments are not always necessary, but they'll be ignored if unneeded
+    (bash ./bench/run-dpdk.sh $SIMPLE_SCENARIO "$MIDDLEBOX" \
+        "--expire $EXPIRATION_TIME --max-flows 65535 --starting-port 1" \
+        0<&- &>"$LOG_FILE") &
+
+    # Wait for it to have started
+    sleep 20
+fi

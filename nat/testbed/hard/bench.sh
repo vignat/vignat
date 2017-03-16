@@ -57,6 +57,10 @@ fi
 
 . init.sh $MIDDLEBOX $SCENARIO
 
+. start-middlebox.sh $MIDDLEBOX $SCENARIO
+
 . run.sh $MIDDLEBOX $SCENARIO $RESULT_FILE
+
+. stop-middlebox.sh $MIDDLEBOX
 
 . clean.sh
