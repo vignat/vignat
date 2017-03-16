@@ -56,4 +56,10 @@ ensures a*x == a*y;
       decreases a-i;
   {}
 }
+
+lemma void less_than_neq(int a, int b)
+requires a < b;
+ensures a != b;
+{
+}
 #endif ARITH_GH

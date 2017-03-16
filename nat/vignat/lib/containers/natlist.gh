@@ -1,0 +1,81 @@
+#ifndef NATLIST_GH
+#define NATLIST_GH
+
+#include <nat.gh>
+#include <listex.gh>
+#include "stdex.gh"
+
+lemma void nat_lt_not_eq_upper_lesser(list<nat> tails, nat lim)
+requires true == forall(tails, (nat_lt)(int_of_nat(succ(lim)))) &*&
+         false == mem(lim, tails);
+ensures true == forall(tails, (nat_lt)(int_of_nat(lim)));
+{
+  switch(tails) {
+    case nil:
+    case cons(h,t):
+      assert int_of_nat(h) < int_of_nat(succ(lim));
+      assert h != lim;
+      less_and_not_eq_lesser(h, lim);
+      assert int_of_nat(h) < int_of_nat(lim);
+      nat_lt_not_eq_upper_lesser(t, lim);
+  }
+}
+
+lemma void nat_lt_remove_big(list<nat> tails, nat lim)
+requires true == forall(tails, (nat_lt)(int_of_nat(succ(lim)))) &*&
+         true == distinct(tails);
+ensures true == forall(remove(lim, tails), (nat_lt)(int_of_nat(lim)));
+{
+  switch(tails) {
+    case nil:
+    case cons(h,t):
+      if (h == lim) {
+        assert false == mem(lim, t);
+        assert true == forall(t, (nat_lt)(int_of_nat(succ(lim))));
+        nat_lt_not_eq_upper_lesser(t, lim);
+        assert true == forall(t, (nat_lt)(int_of_nat(lim)));
+      } else {
+        nat_lt_remove_big(t, lim);
+        less_and_not_eq_lesser(h, lim);
+      }
+  }
+}
+
+lemma void nat_lt_distinct_few_rec(list<nat> tails, nat lim)
+requires true == forall(tails, (nat_lt)(int_of_nat(lim))) &*&
+         true == distinct(tails);
+ensures length(tails) <= int_of_nat(lim);
+{
+  switch(lim) {
+    case zero:
+      switch(tails) {
+        case nil:
+        case cons(h,t):
+          assert int_of_nat(h) < 0;
+          assert false;
+      };
+    case succ(n):
+      if (mem(n, tails)) {
+        assert length(remove(n, tails)) + 1 == length(tails);
+      } else {
+        assert length(remove(n, tails)) == length(tails);
+      }
+      nat_lt_remove_big(tails, n);
+      distinct_remove(n, tails);
+      nat_lt_distinct_few_rec(remove(n, tails), n);
+  }
+}
+
+lemma void nat_lt_distinct_few(list<nat> tails, int lim)
+requires true == forall(tails, (nat_lt)(lim)) &*&
+         true == distinct(tails) &*&
+         0 <= lim;
+ensures length(tails) <= lim;
+{
+  assert true == forall(tails, (nat_lt)(lim));
+  assert lim == int_of_nat(nat_of_int(lim));
+  assert true == forall(tails, (nat_lt)(int_of_nat(nat_of_int(lim))));
+  nat_lt_distinct_few_rec(tails, nat_of_int(lim));
+}
+
+#endif//NATLIST_GH

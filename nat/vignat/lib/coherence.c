@@ -185,19 +185,6 @@ ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
   @*/
 
 /*@
-  lemma void subset_append2<t>(list<t> xs, list<t> ys, list<t> zs)
-  requires true == subset(xs, ys);
-  ensures true == subset(xs, append(ys, zs));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        subset_append2(t, ys, zs);
-    }
-  }
-  @*/
-
-/*@
 lemma void coherent_put_allocated_preserves_coherent<t1,t2,vt>
 (dmap<t1,t2,vt> m, dchain ch, t1 k1, t2 k2,
  vt value, int ind, uint32_t t,

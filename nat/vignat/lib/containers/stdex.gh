@@ -1,312 +1,13 @@
 #ifndef STDEX_GH
 #define STDEX_GH
 
+#include <nat.gh>
 #include <listex.gh>
+#include "listexex.gh"
+#include "set.gh"
+#include "multiset.gh"
+#include "multisubset.gh"
 
-lemma void length_0_nil<T>(list<T> lst)
-requires length(lst) == 0;
-ensures lst == nil;
-{
-    switch (lst) {
-    case nil: return;
-    case cons(h, t):
-        assert(length(lst) > length(t));
-        assert(length(t) == 0);
-        assert(length(lst) > 0);
-        assert(length(lst) == 0);
-        return;
-    }
-}
-
-  
-lemma void nth_0_head<t>(list<t> lst)
-requires lst != nil;
-ensures nth(0, lst) == head(lst);
-{
-    switch(lst) {
-    case nil: return;
-    case cons(h, t): return;
-    }
-}
-  
-lemma void nth_cons<T>(int n, list<T> lst, T head)
-requires 0 < n;
-ensures nth(n-1, lst) == nth(n, cons(head, lst));
-{
-    switch(lst) {
-    case nil: return;
-    case cons(h, t): return;
-    }
-}
-  
-lemma void nth_len_append_cons<T>(list<T> lst, T x)
-requires true;
-ensures nth(length(lst), append(lst, cons(x, nil))) == x;
-{
-    switch(lst) {
-    case nil: return;
-    case cons(h, t):
-        nth_len_append_cons(t, x);
-        return;
-    }
-}
-
-lemma void append_take_nth_to_take<T>(list<T> lst, int n)
-requires 0 <= n &*& n < length(lst);
-ensures take(n + 1, lst) == append(take(n, lst), cons(nth(n, lst), nil));
-{
-  switch(lst) {
-    case nil:
-    case cons(h,t):
-      if (0 != n) append_take_nth_to_take(t, n - 1);
-  }
-}
-
-lemma void nth_less_append_cons<T>(int n, list<T> lst, T x)
-requires 0 <= n &*& n < length(lst);
-ensures nth(n, append(lst, cons(x, nil))) == nth(n, lst);
-{
-    switch(lst) {
-    case nil: return;
-    case cons(h, t):
-        if (n == 0) {
-            assert(h == nth(n, lst));
-            assert(h == nth(n, append(lst, cons(x, nil))));
-            return;
-        } else {
-            nth_less_append_cons(n - 1, t, x);
-            return;
-        }
-    }
-}
-  
-lemma void append_take_cons<T>(list<T> lst)
-requires lst != nil;
-ensures lst == append(take(length(lst) - 1, lst), cons(nth(length(lst) - 1, lst), nil));
-{
-    switch(lst) {
-    case nil: return;
-    case cons(h, t):
-        if (t == nil) {
-            assert(length(lst) == 1);
-            assert(take(length(lst) - 1, lst) == nil);
-            assert(cons(nth(length(lst) - 1, lst), nil) == lst);
-            assert(append(nil, lst) == lst);
-            return;
-        } else {
-            append_take_cons(t);
-            assert(take(length(lst) - 1, lst) == cons(h, take(length(t) - 1, t)));
-            assert(nth(length(lst) - 1, lst) == nth(length(t) - 1, t));
-            assert(append(take(length(lst) - 1, lst), cons(nth(length(lst) - 1, lst), nil)) ==
-                   cons(h, append(take(length(t) - 1, t), cons(nth(length(t) - 1, t), nil))));
-            return;
-        }
-    }
-}
-
-
-lemma void cons_take_take_cons<T>(T head, list<T> tail, int n)
-requires 0 <= n;
-ensures cons(head, take(n, tail)) == take(n + 1, cons(head, tail));
-{
-    switch(tail) {
-    case nil: return;
-    case cons(h, t):
-        return;
-    }
-}
-
-  
-lemma void cons_head_tail<T>(list<T> lst)
-requires lst != nil;
-ensures lst == cons(head(lst), tail(lst));
-{
-    switch(lst){
-    case nil: return;
-    case cons(h, t): return;
-    }
-}
-  
-lemma void length_tail<T>(list<T> lst)
-requires lst != nil;
-ensures length(lst) == 1 + length(tail(lst)) &*& 0 < length(lst);
-{
-    switch(lst) {
-    case nil: return;
-    case cons(h,t): return;
-    }
-}
-
-lemma void update_tail_tail_update<T>(T lhead, list<T> ltail, int index, T val)
-requires 0 < index;
-ensures tail(update(index, val, cons(lhead, ltail))) == update(index - 1, val, ltail);
-{
-  switch(ltail) {
-    case nil: return;
-    case cons(h, t):
-      if (index - 1 == 0) {
-      } else {
-        update_tail_tail_update(h, t, index - 1, val);
-        assert(update(index - 1, val, ltail) == cons(h, update(index - 2, val, t)));
-        assert(update(index, val, cons(lhead, ltail)) == cons(lhead, update(index - 1, val, ltail)));
-      }
-      return;
-  }
-}
-
-  lemma void tail_of_update_0<t>(list<t> lst, t val)
-  requires lst != nil;
-  ensures tail(lst) == tail(update(0, val, lst));
-  {
-    switch(lst) {
-      case nil: break;
-      case cons(h,t): break;
-    }
-  }
-
-lemma void update_id<T>(int index, list<T> lst)
-requires true;
-ensures lst == update(index, nth(index, lst), lst);
-{
-  switch(lst){
-    case nil: return;
-    case cons(h, t):
-      if (index == 0) {
-      } else {
-        update_id(index - 1, t);
-      }
-      return;
-  }
-}
-
-  lemma void update_non_nil<t>(list<t> lst, int n, t val)
-  requires lst != nil;
-  ensures update(n, val, lst) != nil;
-  {
-    switch(lst) {
-      case nil: break;
-      case cons(h,t): break;
-    }
-  }
-
-  lemma void head_update_0<t>(t val, list<t> lst)
-  requires lst != nil;
-  ensures head(update(0, val, lst)) == val;
-  {
-    switch(lst) {
-      case nil:
-      case cons(h,t):
-    }
-  }
-
-  lemma void head_update_nonzero<t>(int n, t val, list<t> lst)
-  requires 0 < n;
-  ensures head(update(n, val, lst)) == head(lst);
-  {
-    switch(lst) {
-      case nil:
-      case cons(h,t):
-    }
-  }
-
-  lemma void update_irrelevant_cell<t>(t vsearch, int n, t vnew, list<t> l)
-  requires false == mem(vsearch, l) &*& vsearch != vnew;
-  ensures false == mem(vsearch, update(n, vnew, l));
-  {
-    switch(l) {
-      case nil: break;
-      case cons(h,t):
-        if (n == 0) {
-        } else {
-          update_irrelevant_cell(vsearch, n-1, vnew, t);
-        }
-    }
-  }
-
-lemma void drop_update_relevant<t>(int k, int i, t val, list<t> l)
-requires 0 <= k &*& k <= i &*& i < length(l);
-ensures drop(k, update(i, val, l)) == update(i-k, val, drop(k, l));
-{
-  switch(l) {
-    case nil: return;
-    case cons(h,t):
-      if (k == 0) return;
-      drop_update_relevant(k-1, i-1, val, t);
-  }
-}
-
-lemma void drop_update_unrelevant<t>(int k, int i, t val, list<t> l)
-requires 0 <= i &*& i < k;
-ensures drop(k, update(i, val, l)) == drop(k, l);
-{
-  switch(l) {
-    case nil: return;
-    case cons(h,t):
-      if (i == 0) return;
-      drop_update_unrelevant(k-1, i-1, val, t);
-  }
-}
-
-lemma void take_update_relevant<t>(int k, int i, t val, list<t> l)
-requires 0 <= i &*& i <= k &*& k < length(l);
-ensures take(k, update(i, val, l)) == update(i, val, take(k, l));
-{
-  switch(l) {
-    case nil: return;
-    case cons(h,t):
-      if (i == 0) return;
-      take_update_relevant(k-1, i-1, val, t);
-  }
-}
-
-lemma void take_update_unrelevant<t>(int k, int i, t val, list<t> l)
-requires 0 <= k &*& k <= i;
-ensures take(k, update(i, val, l)) == take(k, l);
-{
-  switch(l) {
-    case nil: return;
-    case cons(h,t):
-      if (k == 0) return;
-      take_update_unrelevant(k-1, i-1, val, t);
-  }
-}
-
-lemma void forall_update<t>(list<t> lst, fixpoint(t,bool) prop, int i, t v)
-requires true == forall(lst, prop) &*& true == prop(v);
-ensures true == forall(update(i, v, lst), prop);
-{
-  switch(lst) {
-    case nil: return;
-    case cons(h,t):
-      if (i != 0) forall_update(t, prop, i-1, v);
-  }
-}
-
-lemma void update_update<t>(list<t> lst, int i, t vi, int j, t vj)
-requires i != j;
-ensures update(i, vi, update(j, vj, lst)) == update(j, vj, update(i, vi, lst));
-{
-  switch(lst) {
-    case nil: return;
-    case cons(h,t):
-      if (i == 0) return;
-      if (j == 0) return;
-      update_update(t, i-1, vi, j-1, vj);
-  }
-}
-
-  lemma void nth_update_unrelevant<t>(int i, int j, t y, list<t> xs)
-  requires i != j;
-  ensures nth(i, update(j, y, xs)) == nth(i, xs);
-  {
-    switch(xs){
-      case nil: break;
-      case cons(h,t):
-        if (j == 0) break;
-        if (i == 0) break;
-        nth_update_unrelevant(i-1, j-1, y, t);
-    }
-  }
 
 fixpoint t get_some<t>(option<t> x) {
   switch(x) {
@@ -325,504 +26,240 @@ ensures some(get_some(x)) == x;
   }
 }
 
-lemma void tail_drop<t>(list<t> lst, int n)
-requires 0 <= n &*& n < length(lst);
-ensures drop(n+1, lst) == tail(drop(n, lst));
-{
-  switch(lst) {
-    case nil: return;
-    case cons(h,t):
-      if (n == 0) {
-        return;
-      } else {
-        tail_drop(t, n-1);
-      }
-  }
-}
-
-lemma void drop_cons<t>(list<t> lst, int n)
-requires 0 <= n &*& n < length(lst);
-ensures drop(n, lst) == cons(nth(n, lst), drop(n+1, lst));
-{
-  switch(lst) {
-    case nil:
-    case cons(h,t):
-      if (n != 0) drop_cons(t, n - 1);
-  }
-}
-
-  lemma void reverse_cons<t>(t head, list<t> tail)
-  requires true;
-  ensures reverse(cons(head, tail)) == append(reverse(tail), cons(head, nil));
-  {
-    reverse_append(reverse(tail), cons(head, nil));
-  }
-
-  lemma void append_reverse_take_cons<t>(int n, t head, list<t> tail,
-                                         list<t> tt)
-  requires 0 < n;
-  ensures append(reverse(take(n-1, tail)), cons(head, tt)) ==
-          append(reverse(take(n,cons(head, tail))), tt);
-  {
-    reverse_cons(head, take(n-1, tail));
-    append_assoc(reverse(take(n-1, tail)), cons(head, nil), tt);
-  }
-
-  lemma void append_reverse_tail_cons_head<t>(list<t> l1, list<t> l2)
-  requires l1 != nil;
-  ensures append(reverse(tail(l1)), cons(head(l1), l2)) ==
-          append(reverse(l1), l2);
-  {
-    reverse_cons(head(l1), tail(l1));
-    cons_head_tail(l1);
-    append_assoc(reverse(tail(l1)), cons(head(l1), nil), l2);
-  }
-
-  lemma void append_append_cons_to_append_cons<t>(list<t> l1, t el, list<t> l2)
-  requires true;
-  ensures append(append(l1, cons(el, nil)), l2) == append(l1, cons(el, l2));
-  {
-    switch(l1) {
-      case nil: return;
-      case cons(h,t):
-        append_append_cons_to_append_cons(t, el, l2);
-    }
-  }
-
-
-  lemma void forall_nth<t>(list<t> lst, fixpoint(t, bool) p, int i)
-  requires 0 <= i &*& i < length(lst) &*& true == forall(lst, p);
-  ensures true == p(nth(i, lst));
-  {
-    switch(lst) {
-      case nil: return;
-      case cons(h,t):
-        if (i == 0){}
-        else {
-          forall_nth(t, p, i-1);
-        }
-    }
-  }
-
-lemma void forall_remove<t>(list<t> lst, t x, fixpoint(t, bool) p)
-requires true == forall(lst, p);
-ensures true == forall(remove(x, lst), p);
-{
-  switch(lst) {
-    case nil: return;
-    case cons(h,t):
-      if (h == x) {
-      } else {
-        forall_remove(t, x, p);
-      }
-  }
-}
-
-  lemma void drop_drop<t>(int n, int m, list<t> l)
-  requires 0 <= n &*& 0 <= m &*& n + m <= length(l);
-  ensures drop(n, drop(m, l)) == drop(n + m, l);
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (n == 0) return;
-        if (m == 0) return;
-        drop_drop(n, m-1, t);
-    }
-  }
-
-lemma void append_nonnil_l<t>(list<t> a, list<t> b)
-requires a != nil;
-ensures append(a, b) != nil;
-{
-  switch(a) {
-    case nil: return;
-    case cons(h,t):
-      return;
-  }
-}
-
-  lemma void filter_no_increase_len<t>(fixpoint (t, bool) f, list<t> xs)
-  requires true;
-  ensures length(filter(f, xs)) <= length(xs);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        filter_no_increase_len(f, t);
-    }
-  }
-
-  lemma void map_preserves_length<a,b>(fixpoint (a,b) f, list<a> xs)
-  requires true;
-  ensures length(map(f, xs)) == length(xs);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        map_preserves_length(f, t);
-    }
-  }
-  
-  lemma void take_effect_on_len<t>(list<t> l, int n)
-  requires 0 <= n;
-  ensures (n <= length(l) ?
-            (length(take(n, l)) == n) :
-            (length(take(n, l)) == length(l)));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (n != 0) take_effect_on_len(t, n-1);
-    }
-  }
-
-  lemma void map_effect_on_len<a,b>(list<a> l, fixpoint (a,b) f)
-  requires true;
-  ensures length(l) == length(map(f, l));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        map_effect_on_len(t, f);
-    }
-  }
-
-  lemma void filter_effect_on_len<t>(list<t> l, fixpoint (t,bool) f)
-  requires true;
-  ensures (length(filter(f, l)) == length(l) ?
-            (filter(f, l) == l) :
-            (length(filter(f, l)) < length(l)));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        filter_effect_on_len(t, f);
-    }
-  }
-
-  lemma void car_drop_is_nth<t>(int n, list<t> lst)
-  requires 0 <= n &*& n < length(lst) &*& drop(n, lst) == cons(?head,_);
-  ensures nth(n, lst) == head;
-  {
-    switch(lst) {
-      case nil: return;
-      case cons(h,t):
-        if (0 < n) car_drop_is_nth(n-1, t);
-    }
-  }
-
-  lemma void take_take<t>(int n, int m, list<t> lst)
-  requires 0 <= n &*& n <= m;
-  ensures take(n, take(m, lst)) == take(n, lst);
-  {
-    switch(lst) {
-      case nil: return;
-      case cons(h,t):
-        if (0 < n) take_take(n-1, m-1, t);
-    }
-  }
-
-  lemma void take_map<a,b>(int n, fixpoint (a,b) f, list<a> lst)
-  requires 0 <= n &*& n < length(lst);
-  ensures take(n, map(f, lst)) == map(f, take(n, lst));
-  {
-    switch(lst) {
-      case nil: return;
-      case cons(h,t):
-        if (0 < n) take_map(n-1, f, t);
-    }
-  }
-
-  lemma void remove_nonmem<t>(t el, list<t> l)
-  requires false == mem(el, l);
-  ensures remove(el, l) == l;
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (h != el) remove_nonmem(el, t);
-    }
-  }
-
-  lemma void distinct_unique<t>(list<t> lst, t x)
-  requires true == distinct(lst);
-  ensures false == mem(x, remove(x, lst));
-  {
-    switch(lst) {
-      case nil: return ;
-      case cons(h,t):
-        if (h != x) distinct_unique(t, x);
-    }
-  }
-
-  lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys);
-  ensures true == subset(remove(el, xs), ys);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        if (h != el) subset_remove(t, ys, el);
-    }
-  }
-
-  lemma void remove_subset<t>(list<t> xs, t el, list<t> ys)
-  requires true == subset(xs, ys) &*&
-           false == mem(el, xs);
-  ensures true == subset(xs, remove(el, ys));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        neq_mem_remove(h, el, ys);
-        remove_subset(t, el, ys);
-    }
-  }
-
-  lemma void remove_both_subset<t>(t el, list<t> xs, list<t> ys)
-  requires true == subset(xs, ys) &*&
-           false == mem(el, remove(el, xs));
-  ensures true == subset(remove(el, xs), remove(el, ys));
-  {
-    subset_remove(xs, ys, el);
-    remove_subset(remove(el, xs), el, ys);
-  }
-
-  lemma void subset_remove_unrelevant<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys) &*& false == mem(el, xs);
-  ensures true == subset(xs, remove(el, ys));
-  {
-    remove_nonmem(el, xs);
-    remove_both_subset(el, xs, ys);
-  }
-
-  lemma void subset_append<t>(list<t> xs, list<t> ys, list<t> zs)
-  requires true == subset(xs, zs) &*& true == subset(ys, zs);
-  ensures true == subset(append(xs, ys), zs);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        subset_append(t, ys, zs);
-    }
-  }
-
-  lemma void remove_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys) &*& true == mem(el, remove(el, ys));
-  ensures true == subset(xs, remove(el, ys));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        if (h != el) neq_mem_remove(h, el, ys);
-        remove_extra_preserves_subset(t, ys, el);
-    }
-  }
-
-  lemma void add_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys);
-  ensures true == subset(xs, cons(el, ys));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        add_extra_preserves_subset(t, ys, el);
-    }
-  }
-
-  lemma void subset_unremove<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(remove(el, xs), ys);
-  ensures true == subset(xs, cons(el, ys));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        if (h != el) subset_unremove(t, ys, el);
-        else add_extra_preserves_subset(t, ys, el);
-    }
-  }
-
-  lemma void subset_mem_trans<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys) &*& true == mem(el, xs);
-  ensures true == mem(el, ys);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        if (h != el) subset_mem_trans(t, ys, el);
-    }
-  }
-
-  lemma void distinct2_subset_sublen<t>(list<t> xs, list<t> ys)
-  requires true == distinct(xs) &*&
-           true == distinct(ys) &*&
-           true == subset(xs, ys);
-  ensures length(xs) <= length(ys);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        subset_remove_unrelevant(t, ys, h);
-        distinct_remove(h, ys);
-        distinct2_subset_sublen(t, remove(h, ys));
-    }
-  }
-
-  lemma list<t> distinct_superset<t>(list<t> xs, list<t> ys)
-  requires true == subset(xs, ys) &*&
-           true == distinct(xs);
-  ensures true == subset(xs, result) &*& true == subset(result, ys) &*&
-          true == distinct(result) &*& length(result) <= length(ys);
-  {
-    switch(ys) {
-      case nil: return nil;
-      case cons(h,t):
-        if (mem(h, t)) {
-          remove_extra_preserves_subset(xs, ys, h);
-          list<t> rez = distinct_superset(xs, t);
-          add_extra_preserves_subset(rez, t, h);
-          return rez;
-        }
-        else {
-          distinct_unique(xs, h);
-          remove_both_subset(h, xs, ys);
-          distinct_remove(h, xs);
-          list<t> t_rez = distinct_superset(remove(h, xs), t);
-          subset_unremove(xs, t_rez, h);
-          add_extra_preserves_subset(t_rez, t, h);
-          if (true == mem(h, t_rez)) {
-            subset_mem_trans(t_rez, t, h);
-          }
-          assert false == mem(h, t_rez);
-          return cons(h, t_rez);
-        }
-    }
-  }
-
-  lemma void distinct_subset_sublen<t>(list<t> xs, list<t> ys)
-  requires true == distinct(xs) &*&
-           true == subset(xs, ys);
-  ensures length(xs) <= length(ys);
-  {
-    distinct2_subset_sublen(xs, distinct_superset(xs, ys));
-  }
-
-  lemma void subset_push_to_the_end<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys);
-  ensures true == subset(xs, append(remove(el, ys), cons(el, nil)));
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        if (h == el) {
-        } else {
-          neq_mem_remove(h, el, ys);
-        }
-        subset_push_to_the_end(t, ys, el);
-    }
-  }
-
-  lemma void push_to_the_end_subset<t>(list<t> xs, list<t> ys, t el)
-  requires true == subset(xs, ys) &*& true == mem(el, ys);
-  ensures true == subset(append(remove(el, xs), cons(el, nil)), ys);
-  {
-    subset_remove(xs, ys, el);
-    subset_append(remove(el, xs), cons(el, nil), ys);
-  }
-
-  lemma void drop_append_small<t>(int n, list<t> l1, list<t> l2)
-  requires 0 <= n &*& n <= length(l1);
-  ensures append(drop(n, l1), l2) == drop(n, append(l1, l2));
-  {
-    switch(l1) {
-      case nil: return;
-      case cons(h, t):
-        if (n == 0) return;
-        drop_append_small(n-1, t, l2);
-    }
-  }
-
-  lemma void take_append_small<t>(int n, list<t> l1, list<t> l2)
-  requires 0 <= n &*& n <= length(l1);
-  ensures take(n, l1) == take(n, append(l1, l2));
-  {
-    switch(l1) {
-      case nil: return;
-      case cons(h, t):
-        if (n == 0) return;
-        take_append_small(n-1, t, l2);
-    }
-  }
-
-  lemma void head_take<t>(int n, list<t> l)
-  requires 0 < n;
-  ensures head(l) == head(take(n, l));
-  {
-    switch(l) {
-      case nil: return;
-      case cons(h,t):
-        if (n == 1) return;
-        else head_take(n-1, t);
-    }
-  }
-
 fixpoint bool no_dups<t>(list<t> l) {
   switch(l) {
     case nil: return true;
     case cons(h,t):
       return (!mem(h,t)) &&
-             no_dups(t);
+      no_dups(t);
   }
 }
-
-  lemma void subset_forall<t>(list<t> xs, list<t> ys, fixpoint (t,bool) prop)
-  requires true == subset(xs, ys) &*& true == forall(ys, prop);
-  ensures true == forall(xs, prop);
-  {
-    switch(xs) {
-      case nil: return;
-      case cons(h,t):
-        forall_mem(h, ys, prop);
-        subset_forall(t, ys, prop);
-    }
-  }
 
 
 fixpoint bool ge(int x, int y) { return x <= y; }
 
 fixpoint bool lt(int x, int y) { return y < x; }
 
-  lemma void ge_le_ge(list<int> l, int i, int x)
-  requires x <= i &*& true == forall(l, (ge)(i));
-  ensures true == forall(l, (ge)(x));
-  {
-    switch(l) {
-      case nil:
-      case cons(h,t):
-        ge_le_ge(t, i, x);
-    }
+lemma void ge_le_ge(list<int> l, int i, int x)
+requires x <= i &*& true == forall(l, (ge)(i));
+ensures true == forall(l, (ge)(x));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      ge_le_ge(t, i, x);
   }
+}
 
-  fixpoint bool opt_no_dups<t>(list<option<t> > l) {
-    switch(l) {
-      case nil: return true;
-      case cons(h,t):
-        return opt_no_dups(t) && (h == none || !(mem(h, t)));
-    }
+fixpoint bool opt_no_dups<t>(list<option<t> > l) {
+  switch(l) {
+    case nil: return true;
+    case cons(h,t):
+      return opt_no_dups(t) && (h == none || !(mem(h, t)));
   }
+}
 
-  lemma void subset_map<t1,t2>(fixpoint (t1,t2) f, list<t1> l1, list<t1> l2)
-  requires true == subset(l1, l2);
-  ensures true == subset(map(f, l1), map(f, l2));
-  {
-    switch(l1) {
-      case nil:
-      case cons(h,t):
-        subset_map(f, t, l2);
-        mem_map(h, l2, f);
-    }
+lemma void rem_preserves_opt_no_dups<kt>(list<option<kt> > ks, int i)
+requires true == opt_no_dups(ks) &*& 0 <= i;
+ensures true == opt_no_dups(update(i, none, ks));
+{
+  switch(ks) {
+    case nil: return;
+    case cons(h,t):
+      if (i == 0) {
+      } else {
+        rem_preserves_opt_no_dups(t, i-1);
+        if (h == none){
+        } else {
+          assert(false == mem(h, t));
+          some_get_some(h);
+          rem_preserves_no_mem(t, get_some(h), i-1);
+        }
+      }
+      return;
   }
+}
+
+lemma void no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
+requires true == opt_no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
+         0 <= m &*& m < length(ks) &*&
+         nth(n, ks) == some(k) &*& nth(m, ks) == some(k);
+ensures n == m;
+{
+  switch(ks) {
+    case nil: return;
+    case cons(h,t):
+      if (n == 0) {
+        assert(h == some(k));
+        assert(!mem(h, t));
+      } else if (m == 0) {
+      } else {
+        assert(0<n);
+        assert(0<m);
+        no_dups_same(t, k, n-1, m-1);
+      }
+  }
+}
+
+lemma void less_and_not_eq_lesser(nat x, nat lim)
+requires int_of_nat(x) < int_of_nat(succ(lim)) &*&
+         x != lim;
+ensures int_of_nat(x) < int_of_nat(lim);
+{
+  switch(x) {
+    case zero:
+      switch(lim) {
+        case zero:
+        case succ(ln):
+      }
+    case succ(xn):
+      switch(lim) {
+        case zero:
+        case succ(ln):
+          less_and_not_eq_lesser(xn,ln);
+      }
+  }
+}
+
+fixpoint bool neq<t>(t x, t y) { return x != y; }
+
+fixpoint bool nat_ge(int x, nat y) { return x <= int_of_nat(y); }
+
+fixpoint bool nat_lt(int x, nat y) { return int_of_nat(y) < x; }
+
+fixpoint t3 sup<t1,t2,t3>(fixpoint (t2,t3) f1, fixpoint (t1,t2) f2, t1 x) {
+  return f1(f2(x));
+}
+
+lemma void forall_sup_map<t1,t2>(list<t1> l,
+                                 fixpoint (t2,bool) f1,
+                                 fixpoint (t1,t2) f2)
+requires true;
+ensures forall(l, (sup)(f1, f2)) == forall(map(f2, l), f1);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      forall_sup_map(t, f1, f2);
+  }
+}
+
+lemma void two_inequalities_give_eq(int a, int b)
+requires a <= b &*& b <= a;
+ensures a == b;
+{
+}
+
+fixpoint list<t> repeat_n<t>(nat len, t x) {
+  switch(len) {
+    case zero: return nil;
+    case succ(n): return cons(x, repeat_n(n, x));
+  }
+}
+
+lemma void repeat_n_length<t>(nat len, t x)
+requires true;
+ensures length(repeat_n(len, x)) == int_of_nat(len);
+{
+  switch(len) {
+    case zero:
+    case succ(n):
+      repeat_n_length(n, x);
+  }
+}
+
+lemma void lower_limit_ge_than<kt>(list<pair<kt, nat> > l, int lim)
+requires true;
+ensures true == forall(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                       (nat_ge)(lim));
+{
+  filter_forall((sup)((nat_ge)(lim), snd), l);
+  forall_sup_map(filter((sup)((nat_ge)(lim), snd), l), (nat_ge)(lim), snd);
+}
+
+lemma void upper_limit_nat_lt<kt>(list<pair<kt, nat> > l, int lim)
+requires true;
+ensures true == forall(map(snd, filter((sup)((nat_lt)(lim), snd), l)),
+                       (nat_lt)(lim));
+{
+  filter_forall((sup)((nat_lt)(lim), snd), l);
+  forall_sup_map(filter((sup)((nat_lt)(lim), snd), l), (nat_lt)(lim), snd);
+}
+
+lemma void nat_lt_and_ge_disjoint(list<nat> lst, int lim)
+requires true == forall(lst, (nat_lt)(lim)) &*&
+         true == forall(lst, (nat_ge)(lim));
+ensures lst == nil;
+{
+  switch(lst) {
+    case nil:
+    case cons(h,t):
+      assert true == nat_lt(lim, h);
+      assert true == nat_ge(lim, h);
+  }
+}
+
+lemma void lower_and_upper_limit_complement<kt>(list<pair<kt, nat> > l,
+                                                int lim)
+requires true;
+ensures true == multiset_eq(append(filter((sup)((nat_ge)(lim), snd), l),
+                                   filter((sup)((nat_lt)(lim), snd), l)), l) &*&
+        true == disjoint(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                         map(snd, filter((sup)((nat_lt)(lim), snd), l)));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      lower_and_upper_limit_complement(t, lim);
+      switch(h) {
+        case pair(key, dist):
+      }
+      if ((sup)((nat_ge)(lim), snd)(h)) {
+      } else {
+          cons_in_the_middle_multiset_eq
+          (filter((sup)((nat_ge)(lim), snd), t), filter((sup)((nat_lt)(lim), snd), t), h);
+          multiset_eq_trans(append(filter((sup)((nat_ge)(lim), snd), l),
+                                   filter((sup)((nat_lt)(lim), snd), l)),
+                            cons(h, append(filter((sup)((nat_ge)(lim), snd), t),
+                                           filter((sup)((nat_lt)(lim), snd), t))),
+                            l);
+      }
+      upper_limit_nat_lt(l, lim);
+      lower_limit_ge_than(l, lim);
+      intersection_subset(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                          map(snd, filter((sup)((nat_lt)(lim), snd), l)));
+      list<nat> inters =
+      intersection(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                   map(snd, filter((sup)((nat_lt)(lim), snd), l)));
+      subset_forall(inters, map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                    (nat_ge)(lim));
+      subset_forall(inters, map(snd, filter((sup)((nat_lt)(lim), snd), l)),
+                    (nat_lt)(lim));
+      nat_lt_and_ge_disjoint(inters, lim);
+  }
+}//took 55m
+
+lemma void separated_by_bnd_disjoint(list<nat> l1, list<nat> l2, int bnd)
+requires true == forall(l1, (nat_lt)(bnd)) &*&
+         true == forall(l2, (nat_ge)(bnd));
+ensures true == disjoint(l1, l2);
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      if (mem(h, l1)) {
+        forall_mem(h, l1, (nat_lt)(bnd));
+        assert false;
+      }
+      separated_by_bnd_disjoint(l1, t, bnd);
+  }
+}//took 3m
+
+lemma void lt_and_ge_false(int x, int y)
+requires x < y &*& y <= x;
+ensures false;
+{
+}
 
 // Workaround for unmindful Redux solver.
 // See https://github.com/verifast/verifast/issues/19
