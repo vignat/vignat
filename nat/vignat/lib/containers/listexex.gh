@@ -956,8 +956,14 @@ ensures remove(x, append(l1, l2)) ==
          append(remove(x, l1), l2) :
          append(l1, remove(x, l2)));
 {
-  assume(false);//TODO 5m
-}
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      if (h != x) {
+        remove_append_swap(x, t, l2);
+      }
+  }
+}//took 1m
 
 lemma void unique_map_identical_elems<t1,t2>(fixpoint (t1,t2) f,
                                              list<t1> l,
@@ -968,8 +974,30 @@ requires false == mem(f(x1), remove(f(x1), map(f, l))) &*&
          f(x1) == f(x2);
 ensures x1 == x2;
 {
-  assume(false);//TODO 5m
-}
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (h == x1) {
+        if (h != x2) {
+          mem_map(x2, t, f);
+          assert mem(f(x1), t);
+          assert false;
+        }
+        assert h == x2;
+      } else {
+        if (h == x2) {
+          mem_map(x1, t, f);
+          assert false;
+        }
+        assert h != x2;
+        if (f(h) == f(x1)) {
+          mem_map(x1, t, f);
+          assert false;
+        }
+        unique_map_identical_elems(f, t, x1, x2);
+      }
+  }
+}//took 3m
 
 lemma void distinct_map_identical_elems<t1,t2>(fixpoint (t1,t2) f,
                                                list<t1> l,
@@ -980,16 +1008,9 @@ requires true == distinct(map(f, l)) &*&
          f(x1) == f(x2);
 ensures x1 == x2;
 {
-  assume(false);//TODO 5m
-}
-
-lemma void subset_disjoint<t>(list<t> l1, list<t> l2, list<t> l3)
-requires true == subset(l1, l2) &*&
-         true == disjoint(l2, l3);
-ensures true == disjoint(l1, l3);
-{
-  assume(false);//TODO 5m
-}
+  distinct_unique(map(f, l), f(x1));
+  unique_map_identical_elems(f, l, x1, x2);
+}//took 1m
 
 lemma void filter_filter_swap<t>(fixpoint (t,bool) f1,
                                  fixpoint (t,bool) f2,
@@ -1009,7 +1030,13 @@ requires true == mem(el, l) &*&
          true == f(el);
 ensures true == mem(el, filter(f, l));
 {
-  assume(false);//TODO 2m
-}
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (h != el) {
+        filter_mem(el, t, f);
+      }
+  }
+}//took 1m
 
 #endif//LISTEXEX_GH

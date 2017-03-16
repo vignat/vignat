@@ -124,6 +124,21 @@ ensures true == mem(el, ys);
   }
 }
 
+lemma void subset_disjoint<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == subset(l1, l2) &*&
+         true == disjoint(l2, l3);
+ensures true == disjoint(l1, l3);
+{
+  switch(l3) {
+    case nil:
+    case cons(h,t):
+      if (mem(h, l1)) {
+        subset_mem_trans(l1, l2, h);
+        assert false;
+      }
+      subset_disjoint(l1, l2, t);
+  }
+}//took 3m
 
 lemma void distinct2_subset_sublen<t>(list<t> xs, list<t> ys)
 requires true == distinct(xs) &*&
