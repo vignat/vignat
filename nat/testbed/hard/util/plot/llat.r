@@ -44,7 +44,8 @@ p2 <- ggplot(all_data, aes(x=V3/1e6, y=V4,
      geom_line() +
      xlab("rate (Mpkt/s)") +
      ylab(bquote("packet loss, fraction, log scale")) +
-     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x)) +
+     scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                   labels = trans_format("log10", math_format(10^.x))) +
      theme_bw() +
      #expand_limits(x=0,y=0) +
      theme( plot.margin = unit( c(0,0,0,0) , "in" ) )

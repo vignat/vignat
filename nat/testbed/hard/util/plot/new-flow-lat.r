@@ -18,8 +18,8 @@ counted <- read.table("counted-chains-new-flows-latency.txt")
 counted["middlebox"] <- "Counted-chains map"
 
 all_data <- rbind(all_data, netfilter)
-all_data <- rbind(all_data, vignat)
-all_data <- rbind(all_data, vignat2)
+#all_data <- rbind(all_data, vignat)
+#all_data <- rbind(all_data, vignat2)
 all_data <- rbind(all_data, unverified)
 all_data <- rbind(all_data, counted)
 
@@ -42,7 +42,7 @@ p <- ggplot(all_data, aes(x=V1/1e3, y=V3/1e3,
      expand_limits(x=0,y=1) +
      #scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
      #              labels = trans_format("log10", math_format(10^.x))) +
-     #coord_cartesian(ylim=c(0,25)) +
+     coord_cartesian(ylim=c(0,25)) +
      theme( plot.margin = unit( c(0,0,0,0) , "in" ) )
 
 ggsave(filename="new-flow-latency.png")

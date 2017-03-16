@@ -9,6 +9,8 @@ netfilter <- read.table("netfilter-latency.txt")
 netfilter["middlebox"] <- "NetFilter"
 vignat <- read.table("vignat-latency.txt")
 vignat["middlebox"] <- "VigNAT"
+counted_chains <- read.table("counted-chains-latency.txt")
+counted_chains ["middlebox"] <- "counted-chains"
 nop <- read.table("nop-latency.txt")
 nop["middlebox"] <- "NOP"
 unverified <- read.table("unverified-latency.txt")
@@ -16,6 +18,7 @@ unverified["middlebox"] <- "DPDK-unverified"
 
 all_data <- rbind(all_data, netfilter)
 all_data <- rbind(all_data, vignat)
+all_data <- rbind(all_data, counted_chains)
 all_data <- rbind(all_data, nop)
 all_data <- rbind(all_data, unverified)
 

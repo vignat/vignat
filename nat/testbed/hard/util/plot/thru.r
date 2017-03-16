@@ -10,12 +10,15 @@ netfilter <- read.table("netfilter-mf-find-mg-1p.txt")
 netfilter["middlebox"] <- "NetFilter"
 vignat <- read.table("vignat-mf-find-mg-1p.txt")
 vignat["middlebox"] <- "VigNAT"
+counted_chains <- read.table("counted-chains-mf-find-mg-1p.txt")
+counted_chains ["middlebox"] <- "counted-chains"
 nop <- read.table("nop-mf-find-mg-1p.txt")
 nop["middlebox"] <- "NOP"
 unverified <- read.table("unverified-mf-find-mg-1p.txt")
 unverified["middlebox"] <- "DPDK-unverified"
 
 all_data <- rbind(all_data, netfilter)
+all_data <- rbind(all_data, counted_chains)
 all_data <- rbind(all_data, vignat)
 all_data <- rbind(all_data, nop)
 all_data <- rbind(all_data, unverified)
