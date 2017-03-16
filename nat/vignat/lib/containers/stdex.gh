@@ -244,8 +244,16 @@ requires true == forall(l1, (nat_lt)(bnd)) &*&
          true == forall(l2, (nat_ge)(bnd));
 ensures true == disjoint(l1, l2);
 {
-  assume(false);//TODO 10m
-}
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      if (mem(h, l1)) {
+        forall_mem(h, l1, (nat_lt)(bnd));
+        assert false;
+      }
+      separated_by_bnd_disjoint(l1, t, bnd);
+  }
+}//took 3m
 
 lemma void lt_and_ge_false(int x, int y)
 requires x < y &*& y <= x;

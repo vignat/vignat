@@ -4639,7 +4639,20 @@ ensures buckets_get_chain_fp(buckets, k, start) == i;
                           capacity);
     assert real_value == i;
   } else {
+    bucket_has_key_mem_all_keys(k, start, buckets);
     assert false == mem(k, buckets_all_keys_fp(low));
+    if (!mem(k, buckets_all_keys_fp(high))) {
+      assert true == mem(k, buckets_all_keys_fp(buckets));
+      multiset_eq_comm(append(buckets_all_keys_fp(low),
+                              buckets_all_keys_fp(high)),
+                       buckets_all_keys_fp(buckets));
+      multiset_eq_mem(k, buckets_all_keys_fp(buckets),
+                      append(buckets_all_keys_fp(low),
+                             buckets_all_keys_fp(high)));
+      mem_append(k, buckets_all_keys_fp(low),
+                 buckets_all_keys_fp(high));
+      assert false;
+    }
     assert true == mem(k, buckets_all_keys_fp(high));
     multiset_eq_mem(k, map(fst, get_wraparound(nil, high)),
                     buckets_all_keys_fp(high));
