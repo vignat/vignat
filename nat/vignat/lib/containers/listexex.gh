@@ -795,14 +795,57 @@ ensures (mem(x, l1) ? !mem(x, l2) : true);
   }
 }//took 2m
 
+lemma void disjoint_uncons<t>(t el, list<t> l1, list<t> l2)
+requires true == disjoint(cons(el, l1), l2);
+ensures false == mem(el, l2) &*&
+        true == disjoint(l1, l2);
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      disjoint_uncons(el, l1, t);
+  }
+}//took 1m
+
+lemma void disjoint_cons<t>(list<t> l1, list<t> l2, t el)
+requires true == disjoint(l1, l2) &*&
+         false == mem(el, l2);
+ensures true == disjoint(cons(el, l1), l2);
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      disjoint_cons(l1, t, el);
+  }
+}//took 1m
+
+
 lemma void distinct_and_disjoint_append<t>(list<t> l1, list<t> l2)
 requires true == distinct(l1) &*&
          true == distinct(l2) &*&
          true == disjoint(l1,l2);
 ensures true == distinct(append(l1,l2));
 {
-  assume(false);//TODO 5m
-}
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      disjoint_uncons(h, t, l2);
+      mem_append(h, t, l2);
+      distinct_and_disjoint_append(t, l2);
+  }
+}//took 4m
+
+lemma void disjoint_unappend_left<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == disjoint(append(l1, l2), l3);
+ensures true == disjoint(l1, l3) &*& true == disjoint(l2, l3);
+{
+  switch(l3) {
+    case nil:
+    case cons(h, t):
+      mem_append(h, l1, l2);
+      disjoint_unappend_left(l1, l2, t);
+  }
+}//took 1m
 
 lemma void disjoint_unappend<t>(list<t> l1, list<t> l2,
                                 list<t> l3, list<t> l4)
@@ -810,15 +853,48 @@ requires true == disjoint(append(l1, l2), append(l3, l4));
 ensures true == disjoint(l1, l3) &*& true == disjoint(l1, l4) &*&
         true == disjoint(l2, l3) &*& true == disjoint(l2, l4);
 {
-  assume(false);//TODO 10m
-}
+  switch(l3) {
+    case nil:
+      disjoint_unappend_left(l1, l2, l4);
+    case cons(h,t):
+      mem_append(h, l1, l2);
+      disjoint_unappend(l1, l2, t, l4);
+  }
+}//took 5m
 
 lemma void disjoint_comm<t>(list<t> l1, list<t> l2)
 requires true;
 ensures true == (disjoint(l1, l2) == disjoint(l2, l1));
 {
-  assume(false);//TODO 5m
-}
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      disjoint_comm(t, l2);
+      if (disjoint(l1, l2)) {
+        disjoint_uncons(h, t, l2);
+        assert false == mem(h, l2);
+        assert true == disjoint(l2, t);
+      }
+      if (disjoint(l2, l1)) {
+        assert false == mem(h, l2);
+        assert true == disjoint(t, l2);
+        disjoint_cons(t, l2, h);
+      }
+  }
+}//took 5m
+
+lemma void disjoint_append_left<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == disjoint(l1, l3) &*&
+         true == disjoint(l2, l3);
+ensures true == disjoint(append(l1, l2), l3);
+{
+  switch(l3) {
+    case nil:
+    case cons(h,t):
+      mem_append(h, l1, l2);
+      disjoint_append_left(l1, l2, t);
+  }
+}//took 1m
 
 lemma void disjoint_append<t>(list<t> l1, list<t> l2,
                               list<t> l3, list<t> l4)
@@ -828,8 +904,14 @@ requires true == disjoint(l1, l3) &*&
          true == disjoint(l2, l4);
 ensures true == disjoint(append(l1, l2), append(l3, l4));
 {
-  assume(false);//TODO 5m
-}
+  switch(l3) {
+    case nil:
+      disjoint_append_left(l1, l2, l4);
+    case cons(h,t):
+      mem_append(h, l1, l2);
+      disjoint_append(l1, l2, t, l4);
+  }
+}//took 3m
 
 lemma void distinct_unmap<t1,t2>(list<t1> lst, fixpoint (t1,t2) f)
 requires true == distinct(map(f, lst));
@@ -846,15 +928,26 @@ ensures true == distinct(lst);
   }
 }
 
-lemma void map_remove<t1,t2>(fixpoint (t1,t2) f,
-                             t1 x,
-                             list<t1> l)
-requires true == distinct(map(f, l));
-ensures map(f, remove(x, l)) ==
-        remove(f(x), map(f, l));
+lemma void map_remove<t1,t2>(fixpoint (t1,t2) f, t1 x, list<t1> l)
+requires true == distinct(map(f, l)) &*&
+         true == mem(x, l);
+ensures map(f, remove(x, l)) == remove(f(x), map(f, l));
 {
-  assume(false);//TODO 5m
-}
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (f(h) == f(x)) {
+        if (h != x) {
+          mem_map(x, t, f);
+          assert true == mem(f(h), map(f, t));
+          assert false;
+        }
+        assert h == x;
+      } else {
+        map_remove(f, x, t);
+      }
+  }
+}//took 2m
 
 lemma void remove_append_swap<t>(t x, list<t> l1, list<t> l2)
 requires true;
