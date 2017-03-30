@@ -1,0 +1,122 @@
+
+This document describes the basic functionality of an Ethernet bridge with MAC learning capability. For the sake of simplicity we ignore the group MAC addresses.
+
+* parameters
+These configuration parameters control operation of the bridge:
+
+- ~CAPACITY~ -- maximum number of dynamic filtering entries.
+- ~T_EXP~ -- expiration time. If a dynamic filtering entry is not refreshed fter ~T_EXP~, it is removed.
+
+* MAC forwarding abstract state
+
+The following defines the abstract representation of the Bridge state and its environment.
+
+#+BEGIN_SRC haskell
+Frame := <src :: Mac_addr,
+           dst :: Mac_addr,
+           interface :: Int, -- admits a special case "all" for fluding
+           content>
+
+Static_rule := {addr :: Mac_addr,
+                interface :: Int,
+                filter :: Boolean,
+                use_dyn :: Boolean,
+                fwd_to :: Int}
+
+Dynamic_rule := {addr :: Mac_addr,
+                 timestamp :: Time,
+                 fwd_to :: Int}
+
+Static_table := set<Static_rule>
+Dynamic_table := set<Dynamic_rule>
+
+Filtering_table := <static :: Static_table,
+                    dynamic :: Dynamic_table>
+
+Network := <incast_frame :: Frame, -- frame waiting in the receive buffer 
+            outcast_frame :: Frame> -- last forwarded frame 
+
+State := <table :: Filtering_table,
+          network :: Network>
+
+state :: State
+#+END_SRC
+
+* rules
+
+We define the bridge operation as a sequence of imperative functions that transform the abstract state /state/.
+
+** Frame processing pipeline
+The bridge works sequentially. In the abscence of frames arriving, it stays
+idle and keeps its abstract state intact. Once a frame arrives, /accept/
+triggers the pipeline below. If a next frame arrives before the processing is
+complete, it is kept in a queue that is out of scope of this document. Once the
+previous frame is processed, /accept/ triggers forwarding of the buffered frame.
+
+#+BEGIN_SRC haskell
+accept(Frame f, at Time t) =>
+expire_rules(t) =>
+refresh_rule(t, f) =>
+forward(f)
+#+END_SRC
+
+** definitions
+Here we define the functions of the pipeline above. All functions have access to
+the global variable /state/ and transform it accordingly. Special function
+/accept/ blocks and waits until there is an unprocessed frame on the incast interface.
+
+#+BEGIN_SRC haskell
+accept(f :: Frame, t :: Time) :=
+  wait until network.incast_frame is non nil then
+  f <- network.incast_frame
+  t <- now
+  network.incast_frame <- nil
+
+expire_rules(t :: Time) :=
+  forall Dynamic_rule d in state.table.dynamic
+    : d.timestamp + T_EXP < t
+    remove d from state.table.dynamic
+
+refresh_rule(t :: Time, f :: Frame) :=
+  unless exists Static_rule s in state.table.static 
+                : s.addr == f.src and
+                  s.interface = f.interface and
+                  not s.use_dyn then
+      remove Dynamic_rule d from state.table.dynamic : d.addr == f.src ;
+      if size(state.table.dynamic) < CAPACITY then
+          insert Dynamic_rule d(f.src, t, f.interface) into state.table.dynamic
+
+forward_dyn(f :: Frame) :=
+  find Dynamic_rule d in state.table.dynamic : d.addr == f.dst 
+  if found then network.outcast_frame <- {f with interface = fwd_to}
+  else network.outcast_frame <- {f with interface = ALL} -- flooding
+
+forward(f :: Frame) :=
+  find Static_rule s in state.table.static 
+       : s.addr == f.dst and
+         s.interface == f.interface
+  if found and not s.use_dyn then
+      if s.filter then network.outcast_frame = nil
+      else return network.outcast_frame = {f with interface = s.fwd_to}
+  else forward_dyn(addr)
+#+END_SRC
+
+** Notes
+The standard leaves some details to implementation. Here are some desisions made
+during its formalization.
+
+> If the Filtering Database is already filled to capacity, but a new entry would
+otherwise be made, then an existing entry may be removed to make room for the
+new entry
+
+_Interpretation_: if the table is full, no new entry is created until some entry
+expires naturally (sounds easier to formalize)
+
+> A Port Map consisting of a control element that specifies forwarding of
+frames destined for that MAC Address to a single Port.
+> NOTE 1—This is
+equivalent to specifying a single port number; hence, this specification is
+directly equivalent to the specification of dynamic entries in IEEE Std 802.1D,
+1993 Edition
+
+_Interpretation_: dynamic forwarding table keeps only one port for each address.
