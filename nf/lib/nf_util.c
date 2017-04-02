@@ -17,16 +17,16 @@
 
 
 struct ether_hdr*
-nat_get_mbuf_ether_header(struct rte_mbuf* mbuf)
+nf_get_mbuf_ether_header(struct rte_mbuf* mbuf)
 {
 	return rte_pktmbuf_mtod(mbuf, struct ether_hdr*);
 }
 
 // TODO for consistency it'd be nice if this took an ether_hdr as argument, or if they all took rte_mbuf
 struct ipv4_hdr*
-nat_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
+nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
 {
-	struct ether_hdr* ether_header = nat_get_mbuf_ether_header(mbuf);
+	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 	if (!RTE_ETH_IS_IPV4_HDR(mbuf->packet_type) && !(mbuf->packet_type == 0 && ether_header->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
 		return NULL;
 	}
@@ -35,7 +35,7 @@ nat_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
 }
 
 struct tcpudp_hdr*
-nat_get_ipv4_tcpudp_header(struct ipv4_hdr* header)
+nf_get_ipv4_tcpudp_header(struct ipv4_hdr* header)
 {
 	if (header->next_proto_id != IPPROTO_TCP && header->next_proto_id != IPPROTO_UDP) {
 		return NULL;
@@ -47,7 +47,7 @@ nat_get_ipv4_tcpudp_header(struct ipv4_hdr* header)
 }
 
 void
-nat_set_ipv4_checksum(struct ipv4_hdr* header)
+nf_set_ipv4_checksum(struct ipv4_hdr* header)
 {
 	// TODO: See if can be offloaded to hardware
 	header->hdr_checksum = 0;
@@ -67,13 +67,13 @@ nat_set_ipv4_checksum(struct ipv4_hdr* header)
 
 
 char*
-nat_mac_to_str(struct ether_addr* addr)
+nf_mac_to_str(struct ether_addr* addr)
 {
 	// format is xx:xx:xx:xx:xx:xx\0
 	uint16_t buffer_size = 6 * 2 + 5 + 1;
 	char* buffer = (char*) calloc(buffer_size, sizeof(char));
 	if (buffer == NULL) {
-		rte_exit(EXIT_FAILURE, "Out of memory in nat_mac_to_str!");
+		rte_exit(EXIT_FAILURE, "Out of memory in nf_mac_to_str!");
 	}
 
 	ether_format_addr(buffer, buffer_size, addr);
@@ -81,13 +81,13 @@ nat_mac_to_str(struct ether_addr* addr)
 }
 
 char*
-nat_ipv4_to_str(uint32_t addr)
+nf_ipv4_to_str(uint32_t addr)
 {
 	// format is xxx.xxx.xxx.xxx\0
 	uint16_t buffer_size = 4 * 3 + 3 + 1;
 	char* buffer = (char*) calloc(buffer_size, sizeof(char));
 	if (buffer == NULL) {
-		rte_exit(EXIT_FAILURE, "Out of memory in nat_ipv4_to_str!");
+		rte_exit(EXIT_FAILURE, "Out of memory in nf_ipv4_to_str!");
 	}
 
 	snprintf(buffer, buffer_size, "%" PRIu8 ".%" PRIu8 ".%" PRIu8 ".%" PRIu8,

@@ -13,14 +13,14 @@
 #include "../lib/nf_util.h"
 
 void
-nat_core_init(struct nat_config* config)
+nf_core_init(struct nat_config* config)
 {
 	// Nothing; just mark the parameter as unused.
 	(void) config;
 }
 
 uint8_t
-nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
+nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
 {
 	// Mark now as unused, we don't care about time
 	(void) now;
@@ -37,7 +37,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 	}
 
 	// L2 forwarding
-	struct ether_hdr* ether_header = nat_get_mbuf_ether_header(mbuf);
+	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 	ether_header->s_addr = config->device_macs[dst_device];
 	ether_header->d_addr = config->endpoint_macs[dst_device];
 

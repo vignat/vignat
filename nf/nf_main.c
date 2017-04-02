@@ -49,39 +49,39 @@ static const unsigned MEMPOOL_CACHE_SIZE = 256;
 static void
 nat_print_config(struct nat_config* config)
 {
-	NAT_INFO("\n--- NAT Config ---\n");
+	NF_INFO("\n--- NAT Config ---\n");
 
 // TODO see remark in lcore_main
-//	NAT_INFO("Batch size: %" PRIu16, BATCH_SIZE);
+//	NF_INFO("Batch size: %" PRIu16, BATCH_SIZE);
 
-	NAT_INFO("Devices mask: 0x%" PRIx32, config->devices_mask);
-	NAT_INFO("Main LAN device: %" PRIu8, config->lan_main_device);
-	NAT_INFO("WAN device: %" PRIu8, config->wan_device);
+	NF_INFO("Devices mask: 0x%" PRIx32, config->devices_mask);
+	NF_INFO("Main LAN device: %" PRIu8, config->lan_main_device);
+	NF_INFO("WAN device: %" PRIu8, config->wan_device);
 
-	char* ext_ip_str = nat_ipv4_to_str(config->external_addr);
-	NAT_INFO("External IP: %s", ext_ip_str);
+	char* ext_ip_str = nf_ipv4_to_str(config->external_addr);
+	NF_INFO("External IP: %s", ext_ip_str);
 	free(ext_ip_str);
 
 	uint8_t nb_devices = rte_eth_dev_count();
 	for (uint8_t dev = 0; dev < nb_devices; dev++) {
-		char* dev_mac_str = nat_mac_to_str(&(config->device_macs[dev]));
-		char* end_mac_str = nat_mac_to_str(&(config->endpoint_macs[dev]));
+		char* dev_mac_str = nf_mac_to_str(&(config->device_macs[dev]));
+		char* end_mac_str = nf_mac_to_str(&(config->endpoint_macs[dev]));
 
-		NAT_INFO("Device %" PRIu8 " own-mac: %s, end-mac: %s", dev, dev_mac_str, end_mac_str);
+		NF_INFO("Device %" PRIu8 " own-mac: %s, end-mac: %s", dev, dev_mac_str, end_mac_str);
 
 		free(dev_mac_str);
 		free(end_mac_str);
 	}
 
-	NAT_INFO("Starting port: %" PRIu16, config->start_port);
-	NAT_INFO("Expiration time: %" PRIu32, config->expiration_time);
-	NAT_INFO("Max flows: %" PRIu16, config->max_flows);
+	NF_INFO("Starting port: %" PRIu16, config->start_port);
+	NF_INFO("Expiration time: %" PRIu32, config->expiration_time);
+	NF_INFO("Max flows: %" PRIu16, config->max_flows);
 
-	NAT_INFO("\n--- --- ------ ---\n");
+	NF_INFO("\n--- --- ------ ---\n");
 }
 
 static int
-nat_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
+nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 {
 	int retval;
 
@@ -161,13 +161,13 @@ lcore_main(struct nat_config* config)
 
 	for (uint8_t device = 0; device < nb_devices; device++) {
 		if (rte_eth_dev_socket_id(device) > 0 && rte_eth_dev_socket_id(device) != (int) rte_socket_id()) {
-			NAT_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
+			NF_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
 		}
 	}
 
-	nat_core_init(config);
+	nf_core_init(config);
 
-	NAT_INFO("Core %u forwarding packets.", rte_lcore_id());
+	NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
 	// Run until the application is killed
 #ifdef KLEE_VERIFICATION
@@ -194,7 +194,7 @@ lcore_main(struct nat_config* config)
 			uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
 
 			if (actual_rx_len != 0) {
-				uint8_t dst_device = nat_core_process(config, device, buf[0], now);
+				uint8_t dst_device = nf_core_process(config, device, buf[0], now);
 
 				if (dst_device == device) {
 					rte_pktmbuf_free(buf[0]);
@@ -211,7 +211,7 @@ lcore_main(struct nat_config* config)
 //			uint16_t bufs_len = rte_eth_rx_burst(device, 0, bufs, BATCH_SIZE);
 
 //			if (likely(bufs_len != 0)) {
-//				nat_core_process(config, core_id, device, bufs, bufs_len);
+//				nf_core_process(config, core_id, device, bufs, bufs_len);
 //			}
 #ifdef KLEE_VERIFICATION
       loop_iteration_end(get_dmap_pp(), get_dchain_pp(), lcore_id, now, config->max_flows, config->start_port);
@@ -255,9 +255,9 @@ main(int argc, char* argv[])
 	// Initialize all devices
 	for (uint8_t device = 0; device < nb_devices; device++) {
 		if ((config.devices_mask & (1 << device)) == 0) {
-			NAT_INFO("Skipping disabled device %" PRIu8 ".", device);
-		} else if (nat_init_device(device, mbuf_pool) == 0) {
-			NAT_INFO("Initialized device %" PRIu8 ".", device);
+			NF_INFO("Skipping disabled device %" PRIu8 ".", device);
+		} else if (nf_init_device(device, mbuf_pool) == 0) {
+			NF_INFO("Initialized device %" PRIu8 ".", device);
 		} else {
 			rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
 		}

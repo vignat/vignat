@@ -48,7 +48,7 @@ static uint32_t current_timestamp;
 static struct nat_flow_id
 nat_flow_id_from_ipv4(struct ipv4_hdr* header)
 {
-	struct tcpudp_hdr* tcpudp_header = nat_get_ipv4_tcpudp_header(header);
+	struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(header);
 
 	nat_flow_id id;
 	id.src_addr = header->src_addr;
@@ -73,7 +73,7 @@ nat_flows_by_time_refresh(void)
 
 
 void
-nat_core_init(struct nat_config* config)
+nf_core_init(struct nat_config* config)
 {
   int power = 1;
   while(power < config->max_flows)
@@ -89,14 +89,14 @@ nat_core_init(struct nat_config* config)
 
 	current_timestamp = 0;
 
-	NAT_DEBUG("Initialized");
+	NF_DEBUG("Initialized");
 }
 
 uint8_t
-nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
+nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
 {
 	// Set this iteration's time
-	NAT_DEBUG("It is %" PRIu32, now);
+	NF_DEBUG("It is %" PRIu32, now);
 
 	// Expire flows if needed
 	if (now > current_timestamp && !flows_by_time.empty()) {
@@ -116,7 +116,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 			nat_map_remove(flows_from_outside, expired_from_outside);
 			flows_by_time.pop();
 
-			NAT_DEBUG("Expiring %" PRIu16 " -> %" PRIu16 "\n", expired_flow->id.src_port, expired_flow->id.dst_port);
+			NF_DEBUG("Expiring %" PRIu16 " -> %" PRIu16 "\n", expired_flow->id.src_port, expired_flow->id.dst_port);
 
 			free(expired_flow);
 
@@ -129,26 +129,26 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 
 	// Redirect packets
 	if (device == config->wan_device) {
-		NAT_DEBUG("External packet");
+		NF_DEBUG("External packet");
 
-		struct ipv4_hdr* ipv4_header = nat_get_mbuf_ipv4_header(mbuf);
+		struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 		if (ipv4_header == NULL) {
-			NAT_DEBUG("Not IPv4, dropping");
+			NF_DEBUG("Not IPv4, dropping");
 			return device;
 		}
 
-		struct tcpudp_hdr* tcpudp_header = nat_get_ipv4_tcpudp_header(ipv4_header);
+		struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 		if (tcpudp_header == NULL) {
-			NAT_DEBUG("Not TCP/UDP, dropping");
+			NF_DEBUG("Not TCP/UDP, dropping");
 			return device;
 		}
 
 		struct nat_flow_id flow_id = nat_flow_id_from_ipv4(ipv4_header);
-		NAT_DEBUG("Flow: %" PRIu16 " -> %" PRIu16, flow_id.src_port, flow_id.dst_port);
+		NF_DEBUG("Flow: %" PRIu16 " -> %" PRIu16, flow_id.src_port, flow_id.dst_port);
 
 		struct nat_flow* flow;
 		if (!nat_map_get(flows_from_outside, flow_id, &flow)) {
-			NAT_DEBUG("Unknown flow, dropping");
+			NF_DEBUG("Unknown flow, dropping");
 			return device;
 		}
 
@@ -156,7 +156,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 		flow->last_packet_timestamp = current_timestamp;
 
 		// L2 forwarding
-		struct ether_hdr* ether_header = nat_get_mbuf_ether_header(mbuf);
+		struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 		ether_header->s_addr = config->device_macs[flow->internal_device];
 		ether_header->d_addr = config->endpoint_macs[flow->internal_device];
 
@@ -165,31 +165,31 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 		tcpudp_header->dst_port = flow->id.src_port;
 
 		// Checksum
-		nat_set_ipv4_checksum(ipv4_header);
+		nf_set_ipv4_checksum(ipv4_header);
 
 		return flow->internal_device;
 	} else {
-		NAT_DEBUG("Internal packet");
+		NF_DEBUG("Internal packet");
 
-		struct ipv4_hdr* ipv4_header = nat_get_mbuf_ipv4_header(mbuf);
+		struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 		if (ipv4_header == NULL) {
-			NAT_DEBUG("Not IPv4, dropping");
+			NF_DEBUG("Not IPv4, dropping");
 			return device;
 		}
 
-		struct tcpudp_hdr* tcpudp_header = nat_get_ipv4_tcpudp_header(ipv4_header);
+		struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 		if (tcpudp_header == NULL) {
-			NAT_DEBUG("Not TCP/UDP, dropping");
+			NF_DEBUG("Not TCP/UDP, dropping");
 			return device;
 		}
 
 		struct nat_flow_id flow_id = nat_flow_id_from_ipv4(ipv4_header);
-		NAT_DEBUG("Flow: %" PRIu16 " -> %" PRIu16, flow_id.src_port, flow_id.dst_port);
+		NF_DEBUG("Flow: %" PRIu16 " -> %" PRIu16, flow_id.src_port, flow_id.dst_port);
 
 		struct nat_flow* flow;
 		if (!nat_map_get(flows_from_inside, flow_id, &flow)) {
 			if (available_ports.empty()) {
-				NAT_DEBUG("No available ports, dropping");
+				NF_DEBUG("No available ports, dropping");
 				return device;
 			}
 
@@ -213,7 +213,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 			flow_from_outside.dst_port = flow_port;
 			flow_from_outside.protocol = ipv4_header->next_proto_id;
 
-			NAT_DEBUG("Creating flow, port=%" PRIu16, flow_port);
+			NF_DEBUG("Creating flow, port=%" PRIu16, flow_port);
 
 			nat_map_insert(flows_from_inside, flow_id, flow);
 			nat_map_insert(flows_from_outside, flow_from_outside, flow);
@@ -224,7 +224,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 		flow->last_packet_timestamp = current_timestamp;
 
 		// L2 forwarding
-		struct ether_hdr* ether_header = nat_get_mbuf_ether_header(mbuf);
+		struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 		ether_header->s_addr = config->device_macs[config->wan_device];
 		ether_header->d_addr = config->endpoint_macs[config->wan_device];
 
@@ -233,7 +233,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 		tcpudp_header->src_port = flow->external_port;
 
 		// Checksum
-		nat_set_ipv4_checksum(ipv4_header);
+		nf_set_ipv4_checksum(ipv4_header);
 
 		return config->wan_device;
 	}

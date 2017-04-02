@@ -25,7 +25,7 @@
 
 
 void
-nat_core_init(struct nat_config* config)
+nf_core_init(struct nat_config* config)
 {
 	if (!allocate_flowmanager(rte_eth_dev_count(), config->start_port, config->external_addr, config->wan_device, config->expiration_time, config->max_flows)) {
 		rte_exit(EXIT_FAILURE, "Could not allocate flow manager");
@@ -33,33 +33,33 @@ nat_core_init(struct nat_config* config)
 }
 
 uint8_t
-nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
+nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
 {
-	NAT_DEBUG("It is %" PRIu32, now);
+	NF_DEBUG("It is %" PRIu32, now);
 
 	expire_flows(now);
-	NAT_DEBUG("Flows have been expired");
+	NF_DEBUG("Flows have been expired");
 
-	struct ether_hdr* ether_header = nat_get_mbuf_ether_header(mbuf);
+	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 
-	struct ipv4_hdr* ipv4_header = nat_get_mbuf_ipv4_header(mbuf);
+	struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 	if (ipv4_header == NULL) {
-		NAT_DEBUG("Not IPv4, dropping");
+		NF_DEBUG("Not IPv4, dropping");
 		return device;
 	}
 
-	struct tcpudp_hdr* tcpudp_header = nat_get_ipv4_tcpudp_header(ipv4_header);
+	struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 	if (tcpudp_header == NULL) {
-		NAT_DEBUG("Not TCP/UDP, dropping");
+		NF_DEBUG("Not TCP/UDP, dropping");
 		return device;
 	}
 
-	NAT_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
+	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
 
 	uint8_t dst_device;
   int allocated = 0;
 	if (device == config->wan_device) {
-		NAT_DEBUG("Device %" PRIu8 " is external", device);
+		NF_DEBUG("Device %" PRIu8 " is external", device);
 
 		struct ext_key key = {
 			.ext_src_port = tcpudp_header->dst_port, //intentionally swapped.
@@ -70,13 +70,13 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 			.protocol = ipv4_header->next_proto_id
 		};
 
-		NAT_DEBUG("For key:");
+		NF_DEBUG("For key:");
 		log_ext_key(&key);
 
 		struct flow f;
 		int flow_exists = get_flow_by_ext_key(&key, now, &f);
 		if (flow_exists) {
-			NAT_DEBUG("Found flow:");
+			NF_DEBUG("Found flow:");
 			log_flow(&f);
 
 			ipv4_header->dst_addr = f.int_src_ip;
@@ -87,11 +87,11 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
       //klee_assert(f.int_device_id != f.ext_device_id);
       allocated = 1;
 		} else {
-			NAT_DEBUG("Unknown flow, dropping");
+			NF_DEBUG("Unknown flow, dropping");
 			return device;
 		}
 	} else {
-		NAT_DEBUG("Device %" PRIu8 " is internal (not %" PRIu8 ")", device, config->wan_device);
+		NF_DEBUG("Device %" PRIu8 " is internal (not %" PRIu8 ")", device, config->wan_device);
 
 		struct int_key key = {
 			.int_src_port = tcpudp_header->src_port,
@@ -102,21 +102,21 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 			.protocol = ipv4_header->next_proto_id
 		};
 
-		NAT_DEBUG("For key:");
+		NF_DEBUG("For key:");
 		log_int_key(&key);
 
 		struct flow f;
 		int flow_exists = get_flow_by_int_key(&key, now, &f);
 		if (!flow_exists) {
-			NAT_DEBUG("New flow");
+			NF_DEBUG("New flow");
 
 			if (!allocate_flow(&key, now, &f)) {
-				NAT_DEBUG("No space for the flow, dropping");
+				NF_DEBUG("No space for the flow, dropping");
 				return device;
 			}
 		}
 
-		NAT_DEBUG("Forwarding to:");
+		NF_DEBUG("Forwarding to:");
 		log_flow(&f);
 
 		ipv4_header->src_addr = f.ext_src_ip;
@@ -136,7 +136,7 @@ nat_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbu
 	ether_header->s_addr = config->device_macs[dst_device];
 	ether_header->d_addr = config->endpoint_macs[dst_device];
 
-	nat_set_ipv4_checksum(ipv4_header);
+	nf_set_ipv4_checksum(ipv4_header);
 
   //klee_assert(allocated);
   //klee_assert(device != dst_device);

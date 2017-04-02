@@ -1,5 +1,5 @@
-#ifndef NAT_TIME_H_INCLUDED
-#define NAT_TIME_H_INCLUDED
+#ifndef NF_TIME_H_INCLUDED
+#define NF_TIME_H_INCLUDED
 #include <stdint.h>
 
 //@ #include "lib/predicates.gh"
@@ -13,4 +13,4 @@ uint32_t current_time(void);
 //@ requires last_time(?x);
 //@ ensures x <= result &*& last_time(result);
 
-#endif//NAT_TIME_H_INCLUDED
+#endif//NF_TIME_H_INCLUDED

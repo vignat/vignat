@@ -25,13 +25,13 @@ struct DoubleMap *get_flow_table(void) {
 }
 
 int get_flow_int(struct int_key* key, int* index) {
-    NAT_DEBUG("look up for internal key key = ");
+    NF_DEBUG("look up for internal key key = ");
     log_int_key(key);
     return dmap_get_a(flow_map, key, index);
 }
 
 int get_flow_ext(struct ext_key* key, int* index) {
-    NAT_DEBUG("look up for external key key = ");
+    NF_DEBUG("look up for external key key = ");
     log_ext_key(key);
     return dmap_get_b(flow_map, key, index);
 }
@@ -58,7 +58,7 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
 
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
 int add_flow(struct flow *f, int index) {
-    NAT_DEBUG("add_flow (f = ");
+    NF_DEBUG("add_flow (f = ");
     log_flow(f);
     struct int_key* new_int_key = &f->ik;
     struct ext_key* new_ext_key = &f->ek;
