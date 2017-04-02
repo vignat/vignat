@@ -4,7 +4,7 @@
 
 #include "flow.h"
 
-#include "../../nat_log.h"
+#include "lib/nf_log.h"
 
 inline void log_ip(uint32_t addr) {
 #if !ENABLE_LOG

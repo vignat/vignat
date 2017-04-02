@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 
 #ifdef KLEE_VERIFICATION
-#  include "lib/stubs/rte_stubs.h"
+#  include "stubs/rte_stubs.h"
 #else//KLEE_VERIFICATION
 #  include <rte_byteorder.h>
 #  include <rte_ether.h>
@@ -13,7 +13,7 @@
 #  include <rte_udp.h>
 #endif//KLEE_VERIFICATION
 
-#include "nat_util.h"
+#include "nf_util.h"
 
 
 struct ether_hdr*

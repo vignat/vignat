@@ -7,7 +7,7 @@
 #include "containers/double-map.h"
 #include "flowtable.h"
 
-#include "../../nat_log.h"
+#include "lib/nf_log.h"
 
 #ifdef KLEE_VERIFICATION
 #  include "stubs/containers/double-map-stub-control.h"

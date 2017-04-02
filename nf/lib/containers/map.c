@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include "map.h"
-#include "include_ignored_by_verifast.h"
 #include "lib/ignore.h"
 
 //@ #include <list.gh>

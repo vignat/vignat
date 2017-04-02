@@ -2,7 +2,7 @@
 
 #include <inttypes.h>
 
-#include "nat_config.h"
+#include "nf_config.h"
 
 // rte_mbuf
 struct rte_mbuf;

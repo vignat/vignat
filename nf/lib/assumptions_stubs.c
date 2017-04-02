@@ -1,4 +1,4 @@
-#include "lib/containers/double-chain-impl.h"
+#include "containers/double-chain-impl.h"
 
 /*@
   lemma void dcell_layout_assumptions(struct dchain_cell* p)

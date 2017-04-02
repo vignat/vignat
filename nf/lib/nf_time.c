@@ -1,5 +1,5 @@
 #include <time.h>
-#include "nat_time.h"
+#include "nf_time.h"
 
 uint32_t current_time(void)
 //@ requires last_time(?x);

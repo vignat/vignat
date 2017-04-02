@@ -1,5 +1,5 @@
 #include <klee/klee.h>
-#include "../../../nat_time.h"
+#include "lib/nf_time.h"
 #include "my-time-stub-control.h"
 
 uint32_t starting_time = 0;

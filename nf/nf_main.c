@@ -19,11 +19,11 @@
 #  include <rte_mbuf.h>
 #endif//KLEE_VERIFICATION
 
-#include "nat_config.h"
-#include "nat_forward.h"
-#include "nat_log.h"
-#include "nat_time.h"
-#include "nat_util.h"
+#include "lib/nf_config.h"
+#include "lib/nf_forward.h"
+#include "lib/nf_log.h"
+#include "lib/nf_time.h"
+#include "lib/nf_util.h"
 #include <string.h>
 
 

@@ -1,7 +1,7 @@
 #ifndef _COHERENCE_H_INCLUDED_
 #define _COHERENCE_H_INCLUDED_
-#include "lib/containers/double-map.h"
-#include "lib/containers/double-chain.h"
+#include "containers/double-map.h"
+#include "containers/double-chain.h"
 
 
 /*@

@@ -2,9 +2,7 @@
 #include <inttypes.h>
 
 #if KLEE_VERIFICATION
-	// TODO bad, shouldn't point from here to vignat dir :(
-	//      ideally, remove this #if and use forward decls or something... or just stub the entire config?
-	#include "vignat/lib/stubs/rte_stubs.h"
+	#include "stubs/rte_stubs.h"
 #else
 	// DPDK needs these but doesn't include them. :|
 	#include <linux/limits.h>
@@ -17,7 +15,7 @@
 #include <cmdline_parse_etheraddr.h>
 #include <cmdline_parse_ipaddr.h>
 
-#include "nat_config.h"
+#include "nf_config.h"
 
 
 #define PARSE_ERROR(format, ...) \
