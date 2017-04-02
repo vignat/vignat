@@ -3,13 +3,13 @@
 #include <stdlib.h>
 
 #include "flowtable.h"
-#include "containers/double-chain.h"
+#include "lib/containers/double-chain.h"
 #include "flowmanager.h"
-#include "expirator.h"
+#include "lib/expirator.h"
 
 #ifdef KLEE_VERIFICATION
-#  include "stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
-#  include "stubs/containers/double-map-stub-control.h" //<- for set entry cond
+#  include "lib/stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
+#  include "lib/stubs/containers/double-map-stub-control.h" //<- for set entry cond
 #endif //KLEE_VERIFICATION
 
 

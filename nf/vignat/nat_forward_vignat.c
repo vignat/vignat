@@ -1,22 +1,23 @@
 #include <inttypes.h>
 
 #ifdef KLEE_VERIFICATION
-	#include <klee/klee.h>
-	#include "lib/stubs/rte_stubs.h"
+#  include <klee/klee.h>
+#  include "lib/stubs/rte_stubs.h"
+#  include "loop.h"
 #else
-	// DPDK requires these but doesn't include them. :|
-	#include <linux/limits.h>
-	#include <sys/types.h>
-	#include <unistd.h>
+// DPDK requires these but doesn't include them. :|
+#  include <linux/limits.h>
+#  include <sys/types.h>
+#  include <unistd.h>
 
-	#include <rte_ethdev.h>
-	#include <rte_ether.h>
-	#include <rte_ip.h>
-	#include <rte_mbuf.h>
+#  include <rte_ethdev.h>
+#  include <rte_ether.h>
+#  include <rte_ip.h>
+#  include <rte_mbuf.h>
 #endif
 
 #include "lib/flow.h"
-#include "lib/flowmanager.h"
+#include "flowmanager.h"
 
 #include "lib/nf_config.h"
 #include "lib/nf_forward.h"
@@ -142,3 +143,36 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
   //klee_assert(device != dst_device);
 	return dst_device;
 }
+
+
+#ifdef KLEE_VERIFICATION
+
+void nf_loop_iteration_begin(struct nat_config* config,
+                             unsigned lcore_id,
+                             uint32_t time) {
+	loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
+                       lcore_id, time,
+                       config->max_flows,
+                       config->start_port);
+}
+
+void nf_add_loop_iteration_assumptions(struct nat_config* config,
+                                       unsigned lcore_id,
+                                       uint32_t time) {
+  loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+                             lcore_id, time,
+                             config->max_flows,
+                             config->start_port);
+}
+
+void nf_loop_iteration_end(struct nat_config* config,
+                           unsigned lcore_id,
+                           uint32_t time) {
+  loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
+                     lcore_id, time,
+                     config->max_flows,
+                     config->start_port);
+}
+
+#endif //KLEE_VERIFICATION
+

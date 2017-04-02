@@ -5,7 +5,7 @@ APP = nat
 
 # sources
 SRCS-y := nat_forward_vignat.c ../nf_main.c ../lib/nf_config.c ../lib/nf_time.c ../lib/nf_util.c \
-          ../lib/flow.c ../lib/flow-log.c ../lib/flowmanager.c ../lib/flowtable.c \
+          ../lib/flow.c ../lib/flow-log.c flowmanager.c flowtable.c \
           ../lib/expirator.c \
           ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c \
           ../lib/containers/map.c ../lib/containers/double-map.c
@@ -27,8 +27,8 @@ verify:
 		-I . -I .. -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
 		../lib/stubs/rte_stubs.c ../lib/nf_config.c ../lib/nf_util.c \
 		../lib/stubs/my-time-stub.c \
-		../lib/flowtable.c ../lib/flowmanager.c ../lib/flow.c ../lib/flow-log.c \
-		../lib/stubs/loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
+		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
+		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
 		../lib/nf_config.c nat_forward_vignat.c  ../nf_main.c\

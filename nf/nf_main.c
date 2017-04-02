@@ -7,8 +7,6 @@
 #ifdef KLEE_VERIFICATION
 #  include <klee/klee.h>
 #  include "lib/stubs/rte_stubs.h"
-#  include "lib/flowmanager.h"
-#  include "lib/stubs/loop.h"
 #  include "lib/stubs/my-time-stub-control.h"
 #else//KLEE_VERIFICATION
 #  include <rte_common.h>
@@ -175,11 +173,11 @@ lcore_main(struct nat_config* config)
 	unsigned lcore_id = rte_lcore_id(); // TODO do we need that?
 
 	int x = klee_int("loop_termination");
-	loop_iteration_begin(get_dmap_pp(), get_dchain_pp(), lcore_id, starting_time, config->max_flows, config->start_port);
+  nf_loop_iteration_begin(config, lcore_id, starting_time);
   while (klee_induce_invariants() & x) {
     uint8_t device = klee_range(0, nb_devices, "device");
     {
-      loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(), lcore_id, starting_time, config->max_flows, config->start_port);
+      nf_add_loop_iteration_assumptions(config, lcore_id, starting_time);
 #else //KLEE_VERIFICATION
 	while (1) {
 		for (uint8_t device = 0; device < nb_devices; device++) {
@@ -214,7 +212,7 @@ lcore_main(struct nat_config* config)
 //				nf_core_process(config, core_id, device, bufs, bufs_len);
 //			}
 #ifdef KLEE_VERIFICATION
-      loop_iteration_end(get_dmap_pp(), get_dchain_pp(), lcore_id, now, config->max_flows, config->start_port);
+      nf_loop_iteration_end(config, lcore_id, now);
 #endif//KLEE_VERIFICATION
 		}
 	}

@@ -1,7 +1,7 @@
 #ifndef _FLOWTABLE_H_INCLUDED_
 #define _FLOWTABLE_H_INCLUDED_
 
-#include "flow.h"
+#include "lib/flow.h"
 
 //Warning: this is thread-unsafe, do not use with more than 1 lcore!
 int get_flow_int(struct int_key* key, int* index);

@@ -4,14 +4,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "containers/double-map.h"
+#include "lib/containers/double-map.h"
 #include "flowtable.h"
 
 #include "lib/nf_log.h"
 
 #ifdef KLEE_VERIFICATION
-#  include "stubs/containers/double-map-stub-control.h"
-#  include "stubs/my-time-stub-control.h"
+#  include "lib/stubs/containers/double-map-stub-control.h"
+#  include "lib/stubs/my-time-stub-control.h"
 #endif //KLEE_VERIFICATION
 
 struct DoubleMap *flow_map;

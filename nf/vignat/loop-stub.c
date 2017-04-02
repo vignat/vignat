@@ -1,9 +1,9 @@
 #include <klee/klee.h>
 #include "loop.h"
-#include "my-time-stub-control.h"
-#include "containers/double-chain-stub-control.h"
-#include "containers/double-map-stub-control.h"
-#include "rte-stubs-control.h"
+#include "lib/stubs/my-time-stub-control.h"
+#include "lib/stubs/containers/double-chain-stub-control.h"
+#include "lib/stubs/containers/double-map-stub-control.h"
+#include "lib/stubs/rte-stubs-control.h"
 
 //TODO: this is a copy-paste from array_lcc.h and other array headers
 //. Move it to a separate file.
