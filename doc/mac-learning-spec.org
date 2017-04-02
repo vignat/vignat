@@ -14,7 +14,7 @@ The following defines the abstract representation of the Bridge state and its en
 #+BEGIN_SRC haskell
 Frame := <src :: Mac_addr,
            dst :: Mac_addr,
-           interface :: Int, -- admits a special case "all" for fluding
+           interface :: Int, -- admits a special case "all" for flooding
            content>
 
 Static_rule := {addr :: Mac_addr,
@@ -47,7 +47,7 @@ state :: State
 We define the bridge operation as a sequence of imperative functions that transform the abstract state /state/.
 
 ** Frame processing pipeline
-The bridge works sequentially. In the abscence of frames arriving, it stays
+The bridge works sequentially. In the abcence of frames arriving, it stays
 idle and keeps its abstract state intact. Once a frame arrives, /accept/
 triggers the pipeline below. If a next frame arrives before the processing is
 complete, it is kept in a queue that is out of scope of this document. Once the
@@ -88,7 +88,7 @@ refresh_rule(t :: Time, f :: Frame) :=
 
 forward_dyn(f :: Frame) :=
   find Dynamic_rule d in state.table.dynamic : d.addr == f.dst 
-  if found then network.outcast_frame <- {f with interface = fwd_to}
+  if found then network.outcast_frame <- {f with interface = d.fwd_to}
   else network.outcast_frame <- {f with interface = ALL} -- flooding
 
 forward(f :: Frame) :=
@@ -102,7 +102,7 @@ forward(f :: Frame) :=
 #+END_SRC
 
 ** Notes
-The standard leaves some details to implementation. Here are some desisions made
+The standard leaves some details to implementation. Here are some decisions made
 during its formalization.
 
 > If the Filtering Database is already filled to capacity, but a new entry would
