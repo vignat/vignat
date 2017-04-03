@@ -4,7 +4,8 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = nat
 
 # sources
-SRCS-y := nat_forward_vignat.c ../nf_main.c ../lib/nf_config.c ../lib/nf_time.c ../lib/nf_util.c \
+SRCS-y := nat_forward_vignat.c ../nf_main.c ../lib/nat_config.c \
+          ../lib/nf_time.c ../lib/nf_util.c \
           ../lib/flow.c ../lib/flow-log.c flowmanager.c flowtable.c \
           ../lib/expirator.c \
           ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c \
@@ -25,17 +26,17 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 verify:
 	clang -DKLEE_VERIFICATION \
 		-I . -I .. -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
-		../lib/stubs/rte_stubs.c ../lib/nf_config.c ../lib/nf_util.c \
+		../lib/stubs/rte_stubs.c ../lib/nat_config.c ../lib/nf_util.c \
 		../lib/stubs/my-time-stub.c \
 		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
-		../lib/nf_config.c nat_forward_vignat.c  ../nf_main.c\
+		../lib/nat_config.c nat_forward_vignat.c  ../nf_main.c\
 		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc \
 		rte_stubs.bc nat_forward_vignat.bc \
-		nf_main.bc nf_util.bc nf_config.bc \
+		nf_main.bc nf_util.bc nat_config.bc \
 		my-time-stub.bc \
 		flowtable.bc flowmanager.bc flow.bc flow-log.bc \
 		loop-stub.bc double-chain-stub.bc expirator-stub.bc double-map-stub.bc \

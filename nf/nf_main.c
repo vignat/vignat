@@ -17,7 +17,6 @@
 #  include <rte_mbuf.h>
 #endif//KLEE_VERIFICATION
 
-#include "lib/nf_config.h"
 #include "lib/nf_forward.h"
 #include "lib/nf_log.h"
 #include "lib/nf_time.h"
@@ -43,41 +42,6 @@ static const unsigned MEMPOOL_CACHE_SIZE = 256;
 
 
 // --- Initialization ---
-
-static void
-nat_print_config(struct nat_config* config)
-{
-	NF_INFO("\n--- NAT Config ---\n");
-
-// TODO see remark in lcore_main
-//	NF_INFO("Batch size: %" PRIu16, BATCH_SIZE);
-
-	NF_INFO("Devices mask: 0x%" PRIx32, config->devices_mask);
-	NF_INFO("Main LAN device: %" PRIu8, config->lan_main_device);
-	NF_INFO("WAN device: %" PRIu8, config->wan_device);
-
-	char* ext_ip_str = nf_ipv4_to_str(config->external_addr);
-	NF_INFO("External IP: %s", ext_ip_str);
-	free(ext_ip_str);
-
-	uint8_t nb_devices = rte_eth_dev_count();
-	for (uint8_t dev = 0; dev < nb_devices; dev++) {
-		char* dev_mac_str = nf_mac_to_str(&(config->device_macs[dev]));
-		char* end_mac_str = nf_mac_to_str(&(config->endpoint_macs[dev]));
-
-		NF_INFO("Device %" PRIu8 " own-mac: %s, end-mac: %s", dev, dev_mac_str, end_mac_str);
-
-		free(dev_mac_str);
-		free(end_mac_str);
-	}
-
-	NF_INFO("Starting port: %" PRIu16, config->start_port);
-	NF_INFO("Expiration time: %" PRIu32, config->expiration_time);
-	NF_INFO("Max flows: %" PRIu16, config->max_flows);
-
-	NF_INFO("\n--- --- ------ ---\n");
-}
-
 static int
 nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 {
@@ -152,8 +116,7 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 // --- Per-core work ---
 
 //static __attribute__((noreturn))
-void
-lcore_main(struct nat_config* config)
+void lcore_main(void)
 {
 	uint8_t nb_devices = rte_eth_dev_count();
 
@@ -163,7 +126,7 @@ lcore_main(struct nat_config* config)
 		}
 	}
 
-	nf_core_init(config);
+	nf_core_init();
 
 	NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
@@ -173,18 +136,14 @@ lcore_main(struct nat_config* config)
 	unsigned lcore_id = rte_lcore_id(); // TODO do we need that?
 
 	int x = klee_int("loop_termination");
-  nf_loop_iteration_begin(config, lcore_id, starting_time);
+  nf_loop_iteration_begin(lcore_id, starting_time);
   while (klee_induce_invariants() & x) {
     uint8_t device = klee_range(0, nb_devices, "device");
     {
-      nf_add_loop_iteration_assumptions(config, lcore_id, starting_time);
+      nf_add_loop_iteration_assumptions(lcore_id, starting_time);
 #else //KLEE_VERIFICATION
 	while (1) {
 		for (uint8_t device = 0; device < nb_devices; device++) {
-			if ((config->devices_mask & (1 << device)) == 0) {
-				continue;
-			}
-
 #endif //KLEE_VERIFICATION
       uint32_t now = current_time();
 
@@ -192,7 +151,7 @@ lcore_main(struct nat_config* config)
 			uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
 
 			if (actual_rx_len != 0) {
-				uint8_t dst_device = nf_core_process(config, device, buf[0], now);
+				uint8_t dst_device = nf_core_process(device, buf[0], now);
 
 				if (dst_device == device) {
 					rte_pktmbuf_free(buf[0]);
@@ -212,7 +171,7 @@ lcore_main(struct nat_config* config)
 //				nf_core_process(config, core_id, device, bufs, bufs_len);
 //			}
 #ifdef KLEE_VERIFICATION
-      nf_loop_iteration_end(config, lcore_id, now);
+      nf_loop_iteration_end(lcore_id, now);
 #endif//KLEE_VERIFICATION
 		}
 	}
@@ -232,9 +191,8 @@ main(int argc, char* argv[])
 	argc -= ret;
 	argv += ret;
 
-	struct nat_config config;
-	nat_config_init(&config, argc, argv);
-	nat_print_config(&config);
+	nf_config_init(argc, argv);
+	nf_print_config();
 
 	// Create a memory pool
 	unsigned nb_devices = rte_eth_dev_count();
@@ -252,9 +210,7 @@ main(int argc, char* argv[])
 
 	// Initialize all devices
 	for (uint8_t device = 0; device < nb_devices; device++) {
-		if ((config.devices_mask & (1 << device)) == 0) {
-			NF_INFO("Skipping disabled device %" PRIu8 ".", device);
-		} else if (nf_init_device(device, mbuf_pool) == 0) {
+		if (nf_init_device(device, mbuf_pool) == 0) {
 			NF_INFO("Initialized device %" PRIu8 ".", device);
 		} else {
 			rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
@@ -263,7 +219,7 @@ main(int argc, char* argv[])
 
 	// Run!
 	// ...in single-threaded mode, that is.
-	lcore_main(&config);
+	lcore_main();
 
 	return 0;
 }

@@ -39,8 +39,9 @@ struct nat_config {
 };
 
 
-void
-nat_config_init(struct nat_config* config, int argc, char** argv);
+void nat_config_init(struct nat_config* config,
+                     int argc, char** argv);
 
-void
-nat_config_cmdline_print_usage(void);
+void nat_config_cmdline_print_usage(void);
+
+void nat_print_config(struct nat_config* config);

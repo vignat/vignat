@@ -13,13 +13,16 @@
 #include <rte_ip.h>
 #include <rte_mbuf.h>
 
-#include "../lib/nf_config.h"
+#include "../lib/nat_config.h"
 #include "../lib/nf_forward.h"
 #include "../lib/nf_log.h"
 #include "../lib/nf_util.h"
 
 #include "nat_flow.h"
 #include "nat_map.h"
+
+
+struct nat_config config;
 
 // ICMP support is not implemented, as this NAT only exists for benchmarking purposes;
 // since the protocol type has to be checked anyway, an ICMP check would not significantly
@@ -72,19 +75,18 @@ nat_flows_by_time_refresh(void)
 }
 
 
-void
-nf_core_init(struct nat_config* config)
+void nf_core_init(void)
 {
   int power = 1;
-  while(power < config->max_flows)
+  while(power < config.max_flows)
     power*=2;
 	nat_map_set_fns(&nat_flow_id_hash, &nat_flow_id_eq);
 	flows_from_inside = nat_map_create(power);
 	flows_from_outside = nat_map_create(power);
 
 	// uint32_t for the port as max_flows is 1-based and thus may be 2^16.
-	for (uint32_t port = 0; port < config->max_flows; port++) {
-		available_ports.push_back((uint16_t) port + config->start_port);
+	for (uint32_t port = 0; port < config.max_flows; port++) {
+		available_ports.push_back((uint16_t) port + config.start_port);
 	}
 
 	current_timestamp = 0;
@@ -92,8 +94,9 @@ nf_core_init(struct nat_config* config)
 	NF_DEBUG("Initialized");
 }
 
-uint8_t
-nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
+uint8_t nf_core_process(uint8_t device,
+                        struct rte_mbuf* mbuf,
+                        uint32_t now)
 {
 	// Set this iteration's time
 	NF_DEBUG("It is %" PRIu32, now);
@@ -103,11 +106,11 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 		nat_flows_by_time_refresh();
 
 		nat_flow* expired_flow = flows_by_time.top();
-		while ((current_timestamp - expired_flow->last_packet_timestamp) > config->expiration_time) {
+		while ((current_timestamp - expired_flow->last_packet_timestamp) > config.expiration_time) {
 			struct nat_flow_id expired_from_outside;
 			expired_from_outside.src_addr = expired_flow->id.dst_addr;
 			expired_from_outside.src_port = expired_flow->id.dst_port;
-			expired_from_outside.dst_addr = config->external_addr;
+			expired_from_outside.dst_addr = config.external_addr;
 			expired_from_outside.dst_port = expired_flow->external_port;
 			expired_from_outside.protocol = expired_flow->id.protocol;
 
@@ -128,7 +131,7 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 
 
 	// Redirect packets
-	if (device == config->wan_device) {
+	if (device == config.wan_device) {
 		NF_DEBUG("External packet");
 
 		struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
@@ -157,8 +160,8 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 
 		// L2 forwarding
 		struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
-		ether_header->s_addr = config->device_macs[flow->internal_device];
-		ether_header->d_addr = config->endpoint_macs[flow->internal_device];
+		ether_header->s_addr = config.device_macs[flow->internal_device];
+		ether_header->d_addr = config.endpoint_macs[flow->internal_device];
 
 		// L3 forwarding
 		ipv4_header->dst_addr = flow->id.src_addr;
@@ -209,7 +212,7 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 			struct nat_flow_id flow_from_outside;
 			flow_from_outside.src_addr = ipv4_header->dst_addr;
 			flow_from_outside.src_port = tcpudp_header->dst_port;
-			flow_from_outside.dst_addr = config->external_addr;
+			flow_from_outside.dst_addr = config.external_addr;
 			flow_from_outside.dst_port = flow_port;
 			flow_from_outside.protocol = ipv4_header->next_proto_id;
 
@@ -225,16 +228,28 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 
 		// L2 forwarding
 		struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
-		ether_header->s_addr = config->device_macs[config->wan_device];
-		ether_header->d_addr = config->endpoint_macs[config->wan_device];
+		ether_header->s_addr = config.device_macs[config.wan_device];
+		ether_header->d_addr = config.endpoint_macs[config.wan_device];
 
 		// L3 forwarding
-		ipv4_header->src_addr = config->external_addr;
+		ipv4_header->src_addr = config.external_addr;
 		tcpudp_header->src_port = flow->external_port;
 
 		// Checksum
 		nf_set_ipv4_checksum(ipv4_header);
 
-		return config->wan_device;
+		return config.wan_device;
 	}
+}
+
+void nf_config_init(int argc, char** argv) {
+  nat_config_init(&config, argc, argv);
+}
+
+void nf_config_cmdline_print_usage(void) {
+  nat_config_cmdline_print_usage();
+}
+
+void nf_print_config() {
+  nat_print_config(&config);
 }

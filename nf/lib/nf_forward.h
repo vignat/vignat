@@ -2,29 +2,26 @@
 
 #include <inttypes.h>
 
-#include "nf_config.h"
-
-// rte_mbuf
 struct rte_mbuf;
 
-
-void
-nf_core_init(struct nat_config* config);
+void nf_core_init(void);
 
 // TODO make the uint32_t a time_t
-uint8_t
-nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now);
+uint8_t nf_core_process(uint8_t device,
+                        struct rte_mbuf* mbuf,
+                        uint32_t now);
+
+void nf_config_init(int argc, char** argv);
+void nf_config_cmdline_print_usage(void);
+void nf_print_config(void);
 
 #ifdef KLEE_VERIFICATION
-void nf_loop_iteration_begin(struct nat_config* config,
-                             unsigned lcore_id,
+void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time);
 
-void nf_add_loop_iteration_assumptions(struct nat_config* config,
-                                       unsigned lcore_id,
+void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        uint32_t time);
 
-void nf_loop_iteration_end(struct nat_config* config,
-                           unsigned lcore_id,
+void nf_loop_iteration_end(unsigned lcore_id,
                            uint32_t time);
 #endif //KLEE_VERIFICATION

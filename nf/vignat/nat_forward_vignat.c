@@ -19,22 +19,28 @@
 #include "lib/flow.h"
 #include "flowmanager.h"
 
-#include "lib/nf_config.h"
+#include "lib/nat_config.h"
 #include "lib/nf_forward.h"
 #include "lib/nf_log.h"
 #include "lib/nf_util.h"
 
+struct nat_config config;
 
-void
-nf_core_init(struct nat_config* config)
+void nf_core_init()
 {
-	if (!allocate_flowmanager(rte_eth_dev_count(), config->start_port, config->external_addr, config->wan_device, config->expiration_time, config->max_flows)) {
+	if (!allocate_flowmanager(rte_eth_dev_count(),
+                            config.start_port,
+                            config.external_addr,
+                            config.wan_device,
+                            config.expiration_time,
+                            config.max_flows)) {
 		rte_exit(EXIT_FAILURE, "Could not allocate flow manager");
 	}
 }
 
-uint8_t
-nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf, uint32_t now)
+uint8_t nf_core_process(uint8_t device,
+                        struct rte_mbuf* mbuf,
+                        uint32_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
@@ -59,7 +65,7 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 
 	uint8_t dst_device;
   int allocated = 0;
-	if (device == config->wan_device) {
+	if (device == config.wan_device) {
 		NF_DEBUG("Device %" PRIu8 " is external", device);
 
 		struct ext_key key = {
@@ -92,7 +98,7 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 			return device;
 		}
 	} else {
-		NF_DEBUG("Device %" PRIu8 " is internal (not %" PRIu8 ")", device, config->wan_device);
+		NF_DEBUG("Device %" PRIu8 " is internal (not %" PRIu8 ")", device, config.wan_device);
 
 		struct int_key key = {
 			.int_src_port = tcpudp_header->src_port,
@@ -134,8 +140,8 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 		klee_assert(dst_device < RTE_MAX_ETHPORTS);
 	#endif
 
-	ether_header->s_addr = config->device_macs[dst_device];
-	ether_header->d_addr = config->endpoint_macs[dst_device];
+	ether_header->s_addr = config.device_macs[dst_device];
+	ether_header->d_addr = config.endpoint_macs[dst_device];
 
 	nf_set_ipv4_checksum(ipv4_header);
 
@@ -145,33 +151,42 @@ nf_core_process(struct nat_config* config, uint8_t device, struct rte_mbuf* mbuf
 }
 
 
+void nf_config_init(int argc, char** argv) {
+  nat_config_init(&config, argc, argv);
+}
+
+void nf_config_cmdline_print_usage(void) {
+  nat_config_cmdline_print_usage();
+}
+
+void nf_print_config() {
+  nat_print_config(&config);
+}
+
 #ifdef KLEE_VERIFICATION
 
-void nf_loop_iteration_begin(struct nat_config* config,
-                             unsigned lcore_id,
+void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
 	loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
                        lcore_id, time,
-                       config->max_flows,
-                       config->start_port);
+                       config.max_flows,
+                       config.start_port);
 }
 
-void nf_add_loop_iteration_assumptions(struct nat_config* config,
-                                       unsigned lcore_id,
+void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        uint32_t time) {
   loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                              lcore_id, time,
-                             config->max_flows,
-                             config->start_port);
+                             config.max_flows,
+                             config.start_port);
 }
 
-void nf_loop_iteration_end(struct nat_config* config,
-                           unsigned lcore_id,
+void nf_loop_iteration_end(unsigned lcore_id,
                            uint32_t time) {
   loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
                      lcore_id, time,
-                     config->max_flows,
-                     config->start_port);
+                     config.max_flows,
+                     config.start_port);
 }
 
 #endif //KLEE_VERIFICATION
