@@ -7,9 +7,12 @@ struct rte_mbuf;
 void nf_core_init(void);
 
 // TODO make the uint32_t a time_t
-uint8_t nf_core_process(uint8_t device,
-                        struct rte_mbuf* mbuf,
-                        uint32_t now);
+int nf_core_process(uint8_t device,
+                    struct rte_mbuf* mbuf,
+                    uint32_t now);
+enum nf_core_special_results {
+  FLOOD_FRAME = -1
+};
 
 void nf_config_init(int argc, char** argv);
 void nf_config_cmdline_print_usage(void);

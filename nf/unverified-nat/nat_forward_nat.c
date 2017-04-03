@@ -94,9 +94,9 @@ void nf_core_init(void)
 	NF_DEBUG("Initialized");
 }
 
-uint8_t nf_core_process(uint8_t device,
-                        struct rte_mbuf* mbuf,
-                        uint32_t now)
+int nf_core_process(uint8_t device,
+                    struct rte_mbuf* mbuf,
+                    uint32_t now)
 {
 	// Set this iteration's time
 	NF_DEBUG("It is %" PRIu32, now);

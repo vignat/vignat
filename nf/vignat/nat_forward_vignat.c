@@ -38,9 +38,9 @@ void nf_core_init()
 	}
 }
 
-uint8_t nf_core_process(uint8_t device,
-                        struct rte_mbuf* mbuf,
-                        uint32_t now)
+int nf_core_process(uint8_t device,
+                    struct rte_mbuf* mbuf,
+                    uint32_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 

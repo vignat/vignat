@@ -18,9 +18,9 @@ void nf_core_init(void)
 {
 }
 
-uint8_t nf_core_process(uint8_t device,
-                        struct rte_mbuf* mbuf,
-                        uint32_t now)
+int nf_core_process(uint8_t device,
+                    struct rte_mbuf* mbuf,
+                    uint32_t now)
 {
 	// Mark now as unused, we don't care about time
 	(void) now;

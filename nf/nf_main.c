@@ -39,7 +39,9 @@ static const uint16_t TX_QUEUE_SIZE = 512;
 // Memory pool #buffers and per-core cache size (set to their values from l3fwd sample)
 static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
 static const unsigned MEMPOOL_CACHE_SIZE = 256;
+static const unsigned MEMPOOL_CLONE_COUNT = 2;
 
+static struct rte_mempool* clone_pool;
 
 // --- Initialization ---
 static int
@@ -112,6 +114,21 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 	return 0;
 }
 
+void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
+  for (uint8_t device = 0; device < nb_devices; device++) {
+    if (device == skip_device) continue;
+    struct rte_mbuf* copy = rte_pktmbuf_clone(frame, clone_pool);
+    if (copy == NULL) {
+      rte_exit(EXIT_FAILURE, "Cannot clone a frame for flooding");
+    }
+    uint16_t actual_tx_len = rte_eth_tx_burst(device, 0, &copy, 1);
+
+    if (actual_tx_len == 0) {
+      rte_pktmbuf_free(copy);
+    }
+  }
+  rte_pktmbuf_free(frame);
+}
 
 // --- Per-core work ---
 
@@ -151,17 +168,23 @@ void lcore_main(void)
 			uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
 
 			if (actual_rx_len != 0) {
-				uint8_t dst_device = nf_core_process(device, buf[0], now);
+				int fwd_result = nf_core_process(device, buf[0], now);
 
-				if (dst_device == device) {
-					rte_pktmbuf_free(buf[0]);
-				} else {
-					uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
+        if (fwd_result == FLOOD_FRAME) {
+          flood(buf[0], device, nb_devices);
+        } else {
+          uint8_t dst_device = fwd_result;
+          if (dst_device == device) {
+            rte_pktmbuf_free(buf[0]);
+          } else {
+            uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
 
-					if (actual_tx_len == 0) {
-						rte_pktmbuf_free(buf[0]);
-					}
-				}
+            if (actual_tx_len == 0) {
+              rte_pktmbuf_free(buf[0]);
+            }
+          }
+        }
+
 			}
 // TODO benchmark, consider batching
 //			struct rte_mbuf* bufs[BATCH_SIZE];
@@ -206,6 +229,12 @@ main(int argc, char* argv[])
 	);
 	if (mbuf_pool == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
+	}
+  clone_pool = rte_pktmbuf_pool_create("clone_pool", MEMPOOL_CLONE_COUNT,
+                                       32,
+                                       0, 0, rte_socket_id());
+	if (clone_pool == NULL) {
+		rte_exit(EXIT_FAILURE, "Cannot create mbuf clone pool\n");
 	}
 
 	// Initialize all devices
