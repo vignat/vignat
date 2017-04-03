@@ -49,14 +49,10 @@ void nat_config_init(struct nat_config* config,
 		{"extip",		required_argument,	NULL, 'i'},
 		{"lan-dev",		required_argument,	NULL, 'l'},
 		{"max-flows",		required_argument,	NULL, 'f'},
-		{"devs-mask",		required_argument,	NULL, 'p'},
 		{"starting-port",	required_argument,	NULL, 's'},
 		{"wan",			required_argument,	NULL, 'w'},
 		{NULL, 			0,			NULL, 0  }
 	};
-
-	// All devices enabled by default
-	config->devices_mask = UINT32_MAX;
 
 	// Set the devices' own MACs
 	for (uint8_t device = 0; device < nb_devices; device++) {
@@ -112,10 +108,6 @@ void nat_config_init(struct nat_config* config,
 				}
 				break;
 
-			case 'p':
-				config->devices_mask = nat_config_parse_int(optarg, "devices-mask", 16, '\0');
-				break;
-
 			case 's':
 				config->start_port = nat_config_parse_int(optarg, "start-port", 10, '\0');
 				break;
@@ -127,13 +119,6 @@ void nat_config_init(struct nat_config* config,
 				}
 				break;
 		}
-	}
-
-	if ((config->devices_mask & (1 << config->lan_main_device)) == 0) {
-		PARSE_ERROR("Main LAN device is not enabled.\n");
-	}
-	if ((config->devices_mask & (1 << config->wan_device)) == 0) {
-		PARSE_ERROR("WAN device is not enabled.\n");
 	}
 
 	// Reset getopt
@@ -149,7 +134,6 @@ void nat_config_cmdline_print_usage(void)
 		"\t--extip <ip>: external IP address.\n"
 		"\t--lan-dev <device>: set device to be the main LAN device (for non-NAT).\n"
 		"\t--max-flows <n>: flow table capacity.\n"
-		"\t--devs-mask / -p <n>: devices mask to enable/disable devices\n"
 		"\t--starting-port <n>: start of the port range for external ports.\n"
 		"\t--wan <device>: set device to be the external one.\n"
 	);
@@ -162,7 +146,6 @@ void nat_print_config(struct nat_config* config)
 // TODO see remark in lcore_main
 //	NF_INFO("Batch size: %" PRIu16, BATCH_SIZE);
 
-	NF_INFO("Devices mask: 0x%" PRIx32, config->devices_mask);
 	NF_INFO("Main LAN device: %" PRIu8, config->lan_main_device);
 	NF_INFO("WAN device: %" PRIu8, config->wan_device);
 

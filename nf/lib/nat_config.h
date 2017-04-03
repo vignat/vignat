@@ -9,9 +9,6 @@ struct ether_addr;
 
 
 struct nat_config {
-	// Device mask, to enable/disable devices if needed
-	uint32_t devices_mask;
-
 	// "Main" LAN (i.e. internal) device, used for dumb forwarding
 	uint8_t lan_main_device;
 
