@@ -26,7 +26,7 @@
 
 
 static uintmax_t
-nat_config_parse_int(const char* str, const char* name, int base, char next) {
+nf_util_parse_int(const char* str, const char* name, int base, char next) {
 	char* temp;
 	intmax_t result = strtoimax(str, &temp, base);
 
@@ -64,7 +64,7 @@ void nat_config_init(struct nat_config* config,
 		unsigned device;
 		switch (opt) {
 			case 'm':
-				device = nat_config_parse_int(optarg, "eth-dest device", 10, ',');
+				device = nf_util_parse_int(optarg, "eth-dest device", 10, ',');
 				if (device >= nb_devices) {
 					PARSE_ERROR("eth-dest: device %d >= nb_devices (%d)\n", device, nb_devices);
 				}
@@ -76,7 +76,7 @@ void nat_config_init(struct nat_config* config,
 				break;
 
 			case 't':
-				config->expiration_time = nat_config_parse_int(optarg, "exp-time", 10, '\0');
+				config->expiration_time = nf_util_parse_int(optarg, "exp-time", 10, '\0');
 				if (config->expiration_time == 0) {
 					PARSE_ERROR("Expiration time must be strictly positive.\n");
 				}
@@ -95,25 +95,25 @@ void nat_config_init(struct nat_config* config,
 				break;
 
 			case 'l':
-				config->lan_main_device = nat_config_parse_int(optarg, "lan-dev", 10, '\0');
+				config->lan_main_device = nf_util_parse_int(optarg, "lan-dev", 10, '\0');
 				if (config->lan_main_device >= nb_devices) {
 					PARSE_ERROR("Main LAN device does not exist.\n");
 				}
 				break;
 
 			case 'f':
-				config->max_flows = nat_config_parse_int(optarg, "max-flows", 10, '\0');
+				config->max_flows = nf_util_parse_int(optarg, "max-flows", 10, '\0');
 				if (config->max_flows <= 0) {
 					PARSE_ERROR("Flow table size must be strictly positive.\n");
 				}
 				break;
 
 			case 's':
-				config->start_port = nat_config_parse_int(optarg, "start-port", 10, '\0');
+				config->start_port = nf_util_parse_int(optarg, "start-port", 10, '\0');
 				break;
 
 			case 'w':
-				config->wan_device = nat_config_parse_int(optarg, "wan-dev", 10, '\0');
+				config->wan_device = nf_util_parse_int(optarg, "wan-dev", 10, '\0');
 				if (config->wan_device >= nb_devices) {
 					PARSE_ERROR("WAN device does not exist.\n");
 				}

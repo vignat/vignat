@@ -65,6 +65,18 @@ nf_set_ipv4_checksum(struct ipv4_hdr* header)
 	header->hdr_checksum = rte_ipv4_cksum(header);
 }
 
+uintmax_t nf_util_parse_int(const char* str, const char* name,
+                            int base, char next) {
+  char* temp;
+  intmax_t result = strtoimax(str, &temp, base);
+
+  // There's also a weird failure case with overflows, but let's not care
+  if(temp == str || *temp != next) {
+    rte_exit(EXIT_FAILURE, "Error while parsing '%s': %s\n", name, str);
+  }
+
+  return result;
+}
 
 char*
 nf_mac_to_str(struct ether_addr* addr)

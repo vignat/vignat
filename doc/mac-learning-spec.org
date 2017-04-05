@@ -20,7 +20,6 @@ Frame := <src :: Mac_addr,
 Static_rule := {addr :: Mac_addr,
                 interface :: Int,
                 filter :: Boolean,
-                use_dyn :: Boolean,
                 fwd_to :: Int}
 
 Dynamic_rule := {addr :: Mac_addr,
@@ -80,8 +79,7 @@ expire_rules(t :: Time) :=
 refresh_rule(t :: Time, f :: Frame) :=
   unless exists Static_rule s in state.table.static 
                 : s.addr == f.src and
-                  s.interface = f.interface and
-                  not s.use_dyn then
+                  s.interface = f.interface then
       remove Dynamic_rule d from state.table.dynamic : d.addr == f.src ;
       if size(state.table.dynamic) < CAPACITY then
           insert Dynamic_rule d(f.src, t, f.interface) into state.table.dynamic
@@ -95,7 +93,7 @@ forward(f :: Frame) :=
   find Static_rule s in state.table.static 
        : s.addr == f.dst and
          s.interface == f.interface
-  if found and not s.use_dyn then
+  if found then
       if s.filter then network.outcast_frame = nil
       else return network.outcast_frame = {f with interface = s.fwd_to}
   else forward_dyn(addr)

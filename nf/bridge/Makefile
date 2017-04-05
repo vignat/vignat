@@ -4,7 +4,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = bridge
 
 # sources
-SRCS-y := bridge_forward.c ../nf_main.c ../lib/nat_config.c ../lib/nf_time.c ../lib/nf_util.c ../lib/containers/map.c ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c
+SRCS-y := bridge_forward.c ../nf_main.c bridge_config.c ../lib/nf_time.c ../lib/nf_util.c ../lib/containers/map.c ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c
 
 # gcc flags
 CFLAGS += -O3

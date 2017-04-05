@@ -20,21 +20,17 @@ struct tcpudp_hdr {
 } __attribute__((__packed__));
 
 
-struct ether_hdr*
-nf_get_mbuf_ether_header(struct rte_mbuf* mbuf);
+struct ether_hdr* nf_get_mbuf_ether_header(struct rte_mbuf* mbuf);
 
 // TODO for consistency it'd be nice if this took an ether_hdr as argument, or if they all took rte_mbuf
-struct ipv4_hdr*
-nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf);
+struct ipv4_hdr* nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf);
 
-struct tcpudp_hdr*
-nf_get_ipv4_tcpudp_header(struct ipv4_hdr* header);
+struct tcpudp_hdr* nf_get_ipv4_tcpudp_header(struct ipv4_hdr* header);
 
-void
-nf_set_ipv4_checksum(struct ipv4_hdr* header);
+void nf_set_ipv4_checksum(struct ipv4_hdr* header);
 
-char*
-nf_mac_to_str(struct ether_addr* addr);
+uintmax_t nf_util_parse_int(const char* str, const char* name,
+                            int base, char next);
+char* nf_mac_to_str(struct ether_addr* addr);
 
-char*
-nf_ipv4_to_str(uint32_t addr);
+char* nf_ipv4_to_str(uint32_t addr);
