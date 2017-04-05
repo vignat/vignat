@@ -1,5 +1,7 @@
 #include <inttypes.h>
 #include <assert.h>
+#include <errno.h>
+#include <stdio.h>
 
 // DPDK uses these but doesn't include them. :|
 #include <linux/limits.h>
@@ -189,9 +191,7 @@ void bridge_put_update_entry(struct ether_addr* src,
   }
 }
 
-void nf_core_init(void)
-{
-  int capacity = config.dyn_capacity;
+void allocate_static_ft(int capacity) {
   static_ft.map.busybits = malloc(capacity*sizeof(int));
   static_ft.map.keyps    = malloc(capacity*sizeof(void*));
   static_ft.map.khs      = malloc(capacity*sizeof(int));
@@ -206,7 +206,125 @@ void nf_core_init(void)
                  static_ft.map.chns,
                  static_ft.map.vals,
                  static_ft.map.capacity);
-  static_ft.keys          = malloc(capacity*sizeof(struct StaticKey));
+  static_ft.keys        = malloc(capacity*sizeof(struct StaticKey));
+}
+
+void read_static_ft_from_file() {
+  if (config.static_config_fname[0] == '\0') {
+    // No static config
+    allocate_static_ft(1);
+    return;
+  }
+
+  FILE* cfg_file = fopen(config.static_config_fname, "r");
+  if (cfg_file == NULL) {
+    NF_INFO("Error opening the static config file: %s",
+            config.static_config_fname);
+
+    int number_of_lines = 0;
+    char ch;
+    do {
+      ch = fgetc(cfg_file);
+      if(ch == '\n')
+        number_of_lines++;
+    } while (ch != EOF);
+
+    // Make sure the hash table is occupied only by 50%
+    int capacity = number_of_lines * 2;
+    rewind(cfg_file);
+    allocate_static_ft(capacity);
+
+    int count = 0;
+
+    while (1) {
+      char mac_addr_str[20];
+      char source_str[10];
+      char target_str[10];
+      int result = fscanf(cfg_file, "%18s", mac_addr_str);
+      if (result != 1) {
+        if (result == EOF) break;
+        else {
+          NF_INFO("Cannot read MAC address from file: %s",
+                  strerror(errno));
+          goto finally;
+        }
+      }
+
+      result = fscanf(cfg_file, "%9s", source_str);
+      if (result != 1) {
+        if (result == EOF) {
+          NF_INFO("Incomplete config string: %s, skip", mac_addr_str);
+          break;
+        } else {
+          NF_INFO("Cannot read the filtering target for MAC %s: %s",
+                  mac_addr_str, strerror(errno));
+          goto finally;
+        }
+      }
+
+      result = fscanf(cfg_file, "%9s", target_str);
+      if (result != 1) {
+        if (result == EOF) {
+          NF_INFO("Incomplete config string: %s, skip", mac_addr_str);
+          break;
+        } else {
+          NF_INFO("Cannot read the filtering target for MAC %s: %s",
+                  mac_addr_str, strerror(errno));
+          goto finally;
+        }
+      }
+
+      int device_from;
+      int device_to;
+      char* temp;
+
+      // Ouff... the strings are extracted, now let's parse them.
+      result = cmdline_parse_etheraddr(NULL, mac_addr_str, &static_ft.keys[count].addr,
+                                       sizeof(struct ether_addr));
+      if (result < 0) {
+        NF_INFO("Invalid MAC address: %s, skip",
+                mac_addr_str);
+        continue;
+      }
+
+      device_from = strtol(source_str, &temp, 10);
+      if (temp == target_str || *temp != '\0') {
+        NF_INFO("Non-integer value for the forwarding rule: %s (%s), skip",
+                mac_addr_str, target_str);
+        continue;
+      }
+
+      device_to = strtol(target_str, &temp, 10);
+      if (temp == target_str || *temp != '\0') {
+        NF_INFO("Non-integer value for the forwarding rule: %s (%s), skip",
+                mac_addr_str, target_str);
+        continue;
+      }
+
+      // Now everything is alright, we can add the entry
+      static_ft.keys[count].device = device_from;
+      int hash = static_key_hash(&static_ft.keys[count]);
+      map_put(static_ft.map.busybits,
+              static_ft.map.keyps,
+              static_ft.map.khs,
+              static_ft.map.chns,
+              static_ft.map.vals,
+              &static_ft.keys[count],
+              hash, device_to,
+              static_ft.map.capacity);
+      ++count;
+      assert(count < number_of_lines);
+    }
+  }
+ finally:
+  fclose(cfg_file);
+}
+
+void nf_core_init(void)
+{
+  read_static_ft_from_file();
+
+  int capacity = config.dyn_capacity;
 
   dynamic_ft.map.busybits = malloc(capacity*sizeof(int));
   dynamic_ft.map.keyps    = malloc(capacity*sizeof(void*));

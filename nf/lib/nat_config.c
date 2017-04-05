@@ -25,19 +25,6 @@
 		rte_exit(EXIT_FAILURE, format, ##__VA_ARGS__);
 
 
-static uintmax_t
-nf_util_parse_int(const char* str, const char* name, int base, char next) {
-	char* temp;
-	intmax_t result = strtoimax(str, &temp, base);
-
-	// There's also a weird failure case with overflows, but let's not care
-	if(temp == str || *temp != next) {
-		rte_exit(EXIT_FAILURE, "Error while parsing '%s': %s\n", name, str);
-	}
-
-	return result;
-}
-
 void nat_config_init(struct nat_config* config,
                      int argc, char** argv)
 {
