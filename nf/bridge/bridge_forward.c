@@ -18,6 +18,7 @@ struct nat_config config;
 
 //const int CAPACITY = 1e3;
 #define CAPACITY 1000
+const uint32_t EXP_TIME = 3;//seconds TODO: should be 300s, but that's tough to test
 
 struct mac_map {
   int busybits[CAPACITY];
@@ -25,9 +26,12 @@ struct mac_map {
   int khs[CAPACITY];
   int chns[CAPACITY];
   int vals[CAPACITY];
+  int devices[CAPACITY];
   struct ether_addr keys[CAPACITY];
   int size;
 } map;
+
+struct DoubleChain* heap;
 
 int ether_addr_eq(struct ether_addr* a,
                   struct ether_addr* b) {
@@ -42,24 +46,61 @@ int ether_addr_hash(struct ether_addr* addr) {
 }
 
 int mac_map_get_device(struct ether_addr* dst) {
-  int port = -1;
+  int index = -1;
   int hash = ether_addr_hash(dst);
   int present = map_get(map.busybits, map.keyps, map.khs,
                         map.chns, map.vals,
-                        dst, ether_addr_eq, hash, &port,
+                        dst, ether_addr_eq, hash, &index,
                         CAPACITY);
   if (present) {
-    return port;
+    return map.devices[index];
   }
   return -1;
 }
 
 void mac_map_remember_device(struct ether_addr* src,
-                             int port) {
+                             int device, uint32_t time) {
   assert(mac_map_get_device(src) == -1);
   int hash = ether_addr_hash(src);
+  int index = 0;
+  int allocated = dchain_allocate_new_index(heap, &index, time);
+  assert(allocated);
+  memcpy(&map.keys[index], src, sizeof(struct ether_addr));
   map_put(map.busybits, map.keyps, map.khs, map.chns,
-          map.vals, src, hash, port, CAPACITY);
+          map.vals, &map.keys[index], hash, index, CAPACITY);
+  map.devices[index] = device;
+}
+
+void mac_map_add_update_entry(struct ether_addr* src,
+                              int device, uint32_t time) {
+  int index = -1;
+  int hash = ether_addr_hash(src);
+  int present = map_get(map.busybits, map.keyps, map.khs,
+                        map.chns, map.vals,
+                        src, ether_addr_eq, hash, &index,
+                        CAPACITY);
+  if (present) {
+    dchain_rejuvenate_index(heap, index, time);
+  } else {
+    mac_map_remember_device(src, device, time);
+  }
+}
+
+int mac_map_expire_entries(uint32_t time) {
+  int count = 0;
+  int index = -1;
+  void *trash;
+  if (time < EXP_TIME) return 0;
+  uint32_t oldest_time = time - EXP_TIME;
+  while (dchain_expire_one_index(heap, &index, oldest_time)) {
+    int hash = ether_addr_hash(&map.keys[index]);
+    map_erase(map.busybits, map.keyps, map.khs,
+              map.chns, &map.keys[index],
+              ether_addr_eq, hash,
+              CAPACITY, &trash);
+    ++count;
+  }
+  return count;
 }
 
 void nf_core_init(void)
@@ -69,15 +110,17 @@ void nf_core_init(void)
                  map.keyps, map.khs, map.chns,
                  map.vals, CAPACITY);
   map.size = 0;
+  dchain_allocate(CAPACITY, &heap);
 }
 
 int nf_core_process(uint8_t device,
                     struct rte_mbuf* mbuf,
                     uint32_t now)
 {
-	(void) now;
-
   struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
+
+  mac_map_expire_entries(now);
+  mac_map_add_update_entry(&ether_header->s_addr, device, now);
 
   int dst_device = mac_map_get_device(&ether_header->d_addr);
 

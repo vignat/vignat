@@ -15,6 +15,7 @@
 #  include <rte_launch.h>
 #  include <rte_lcore.h>
 #  include <rte_mbuf.h>
+#  include "rte_errno.h"
 #endif//KLEE_VERIFICATION
 
 #include "lib/nf_forward.h"
@@ -39,7 +40,7 @@ static const uint16_t TX_QUEUE_SIZE = 512;
 // Memory pool #buffers and per-core cache size (set to their values from l3fwd sample)
 static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
 static const unsigned MEMPOOL_CACHE_SIZE = 256;
-static const unsigned MEMPOOL_CLONE_COUNT = 2;
+static const unsigned MEMPOOL_CLONE_COUNT = 256;
 
 static struct rte_mempool* clone_pool;
 
@@ -47,71 +48,71 @@ static struct rte_mempool* clone_pool;
 static int
 nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 {
-	int retval;
+  int retval;
 
-	// Configure the device
-	// This is ugly code; DPDK samples use designated initializers,
-	// but those are not available in C++, and this code needs to compile
-	// both as C and C++.
-	struct rte_eth_conf device_conf;
-	memset(&device_conf, 0, sizeof(struct rte_eth_conf));
-	device_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
-	device_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
-	device_conf.rxmode.split_hdr_size = 0;
-	device_conf.rxmode.header_split =   0;
-	device_conf.rxmode.hw_ip_checksum = 1;
-	device_conf.rxmode.hw_vlan_filter = 0;
-	device_conf.rxmode.jumbo_frame =    0;
-	device_conf.rxmode.hw_strip_crc =   0;
-	device_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
-	device_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-	device_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
+  // Configure the device
+  // This is ugly code; DPDK samples use designated initializers,
+  // but those are not available in C++, and this code needs to compile
+  // both as C and C++.
+  struct rte_eth_conf device_conf;
+  memset(&device_conf, 0, sizeof(struct rte_eth_conf));
+  device_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+  device_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+  device_conf.rxmode.split_hdr_size = 0;
+  device_conf.rxmode.header_split =   0;
+  device_conf.rxmode.hw_ip_checksum = 1;
+  device_conf.rxmode.hw_vlan_filter = 0;
+  device_conf.rxmode.jumbo_frame =    0;
+  device_conf.rxmode.hw_strip_crc =   0;
+  device_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
+  device_conf.rx_adv_conf.rss_conf.rss_key = NULL;
+  device_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 
-	retval = rte_eth_dev_configure(
-		device, // The device
-		1, // # of RX queues
-		1, // # of TX queues
-		&device_conf // device config
-	);
-	if (retval != 0) {
-		rte_exit(EXIT_FAILURE, "Cannot configure device %" PRIu8 ", err=%d", device, retval);
-	}
+  retval = rte_eth_dev_configure(
+    device, // The device
+    1, // # of RX queues
+    1, // # of TX queues
+    &device_conf // device config
+  );
+  if (retval != 0) {
+    rte_exit(EXIT_FAILURE, "Cannot configure device %" PRIu8 ", err=%d", device, retval);
+  }
 
-	// Allocate and set up 1 RX queue per device
-	retval = rte_eth_rx_queue_setup(
-		device, // device ID
-		0, // queue ID
-		RX_QUEUE_SIZE, // size
-		rte_eth_dev_socket_id(device), // socket
-		NULL, // config (NULL = default)
-		mbuf_pool // memory pool
-	);
-	if (retval < 0) {
-		rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu8 ", err=%d", device, retval);
-	}
+  // Allocate and set up 1 RX queue per device
+  retval = rte_eth_rx_queue_setup(
+    device, // device ID
+    0, // queue ID
+    RX_QUEUE_SIZE, // size
+    rte_eth_dev_socket_id(device), // socket
+    NULL, // config (NULL = default)
+    mbuf_pool // memory pool
+  );
+  if (retval < 0) {
+    rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu8 ", err=%d", device, retval);
+  }
 
-	// Allocate and set up 1 TX queue per device
-	retval = rte_eth_tx_queue_setup(
-		device, // device ID
-		0, // queue ID
-		TX_QUEUE_SIZE, // size
-		rte_eth_dev_socket_id(device), // socket
-		NULL // config (NULL = default)
-	);
-	if (retval < 0) {
-		rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu8 " err=%d", device, retval);
-	}
+  // Allocate and set up 1 TX queue per device
+  retval = rte_eth_tx_queue_setup(
+    device, // device ID
+    0, // queue ID
+    TX_QUEUE_SIZE, // size
+    rte_eth_dev_socket_id(device), // socket
+    NULL // config (NULL = default)
+  );
+  if (retval < 0) {
+    rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu8 " err=%d", device, retval);
+  }
 
-	// Start the device
-	retval = rte_eth_dev_start(device);
-	if (retval < 0) {
-		rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu8 ", err=%d", device, retval);
-	}
+  // Start the device
+  retval = rte_eth_dev_start(device);
+  if (retval < 0) {
+    rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu8 ", err=%d", device, retval);
+  }
 
-	// Enable RX in promiscuous mode for the Ethernet device
-	rte_eth_promiscuous_enable(device);
+  // Enable RX in promiscuous mode for the Ethernet device
+  rte_eth_promiscuous_enable(device);
 
-	return 0;
+  return 0;
 }
 
 void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
@@ -135,40 +136,40 @@ void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
 //static __attribute__((noreturn))
 void lcore_main(void)
 {
-	uint8_t nb_devices = rte_eth_dev_count();
+  uint8_t nb_devices = rte_eth_dev_count();
 
-	for (uint8_t device = 0; device < nb_devices; device++) {
-		if (rte_eth_dev_socket_id(device) > 0 && rte_eth_dev_socket_id(device) != (int) rte_socket_id()) {
-			NF_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
-		}
-	}
+  for (uint8_t device = 0; device < nb_devices; device++) {
+    if (rte_eth_dev_socket_id(device) > 0 && rte_eth_dev_socket_id(device) != (int) rte_socket_id()) {
+      NF_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
+    }
+  }
 
-	nf_core_init();
+  nf_core_init();
 
-	NF_INFO("Core %u forwarding packets.", rte_lcore_id());
+  NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
-	// Run until the application is killed
+  // Run until the application is killed
 #ifdef KLEE_VERIFICATION
-	uint32_t starting_time = start_time();
-	unsigned lcore_id = rte_lcore_id(); // TODO do we need that?
+  uint32_t starting_time = start_time();
+  unsigned lcore_id = rte_lcore_id(); // TODO do we need that?
 
-	int x = klee_int("loop_termination");
+  int x = klee_int("loop_termination");
   nf_loop_iteration_begin(lcore_id, starting_time);
   while (klee_induce_invariants() & x) {
     uint8_t device = klee_range(0, nb_devices, "device");
     {
       nf_add_loop_iteration_assumptions(lcore_id, starting_time);
 #else //KLEE_VERIFICATION
-	while (1) {
-		for (uint8_t device = 0; device < nb_devices; device++) {
+  while (1) {
+    for (uint8_t device = 0; device < nb_devices; device++) {
 #endif //KLEE_VERIFICATION
       uint32_t now = current_time();
 
-			struct rte_mbuf* buf[1];
-			uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
+      struct rte_mbuf* buf[1];
+      uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
 
-			if (actual_rx_len != 0) {
-				int fwd_result = nf_core_process(device, buf[0], now);
+      if (actual_rx_len != 0) {
+        int fwd_result = nf_core_process(device, buf[0], now);
 
         if (fwd_result == FLOOD_FRAME) {
           flood(buf[0], device, nb_devices);
@@ -185,19 +186,19 @@ void lcore_main(void)
           }
         }
 
-			}
+      }
 // TODO benchmark, consider batching
-//			struct rte_mbuf* bufs[BATCH_SIZE];
-//			uint16_t bufs_len = rte_eth_rx_burst(device, 0, bufs, BATCH_SIZE);
+//      struct rte_mbuf* bufs[BATCH_SIZE];
+//      uint16_t bufs_len = rte_eth_rx_burst(device, 0, bufs, BATCH_SIZE);
 
-//			if (likely(bufs_len != 0)) {
-//				nf_core_process(config, core_id, device, bufs, bufs_len);
-//			}
+//      if (likely(bufs_len != 0)) {
+//        nf_core_process(config, core_id, device, bufs, bufs_len);
+//      }
 #ifdef KLEE_VERIFICATION
       nf_loop_iteration_end(lcore_id, now);
 #endif//KLEE_VERIFICATION
-		}
-	}
+    }
+  }
 }
 
 
@@ -206,49 +207,50 @@ void lcore_main(void)
 int
 main(int argc, char* argv[])
 {
-	// Initialize the Environment Abstraction Layer (EAL)
-	int ret = rte_eal_init(argc, argv);
-	if (ret < 0) {
-		rte_exit(EXIT_FAILURE, "Error with EAL initialization, ret=%d\n", ret);
-	}
-	argc -= ret;
-	argv += ret;
+  // Initialize the Environment Abstraction Layer (EAL)
+  int ret = rte_eal_init(argc, argv);
+  if (ret < 0) {
+    rte_exit(EXIT_FAILURE, "Error with EAL initialization, ret=%d\n", ret);
+  }
+  argc -= ret;
+  argv += ret;
 
-	nf_config_init(argc, argv);
-	nf_print_config();
+  nf_config_init(argc, argv);
+  nf_print_config();
 
-	// Create a memory pool
-	unsigned nb_devices = rte_eth_dev_count();
-	struct rte_mempool* mbuf_pool = rte_pktmbuf_pool_create(
-		"MEMPOOL", // name
-		MEMPOOL_BUFFER_COUNT * nb_devices, // #elements
-		MEMPOOL_CACHE_SIZE, // cache size
-		0, // application private area size
-		RTE_MBUF_DEFAULT_BUF_SIZE, // data buffer size
-		rte_socket_id() // socket ID
-	);
-	if (mbuf_pool == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
-	}
+  // Create a memory pool
+  unsigned nb_devices = rte_eth_dev_count();
+  struct rte_mempool* mbuf_pool = rte_pktmbuf_pool_create(
+    "MEMPOOL", // name
+    MEMPOOL_BUFFER_COUNT * nb_devices, // #elements
+    MEMPOOL_CACHE_SIZE, // cache size
+    0, // application private area size
+    RTE_MBUF_DEFAULT_BUF_SIZE, // data buffer size
+    rte_socket_id() // socket ID
+  );
+  if (mbuf_pool == NULL) {
+    rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
+  }
   clone_pool = rte_pktmbuf_pool_create("clone_pool", MEMPOOL_CLONE_COUNT,
                                        32,
                                        0, 0, rte_socket_id());
-	if (clone_pool == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot create mbuf clone pool\n");
-	}
+  if (clone_pool == NULL) {
+    rte_exit(EXIT_FAILURE, "Cannot create mbuf clone pool: %s\n",
+             rte_strerror(rte_errno));
+  }
 
-	// Initialize all devices
-	for (uint8_t device = 0; device < nb_devices; device++) {
-		if (nf_init_device(device, mbuf_pool) == 0) {
-			NF_INFO("Initialized device %" PRIu8 ".", device);
-		} else {
-			rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
-		}
-	}
+  // Initialize all devices
+  for (uint8_t device = 0; device < nb_devices; device++) {
+    if (nf_init_device(device, mbuf_pool) == 0) {
+      NF_INFO("Initialized device %" PRIu8 ".", device);
+    } else {
+      rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
+    }
+  }
 
-	// Run!
-	// ...in single-threaded mode, that is.
-	lcore_main();
+  // Run!
+  // ...in single-threaded mode, that is.
+  lcore_main();
 
-	return 0;
+  return 0;
 }
