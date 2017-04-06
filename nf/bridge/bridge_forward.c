@@ -16,17 +16,9 @@
 #include "lib/nf_log.h"
 #include "bridge_config.h"
 
-struct bridge_config config;
+#include "single-map.h"
 
-struct Map {
-  int* busybits;
-  void** keyps;
-  int* khs;
-  int* chns;
-  int* vals;
-  int capacity;
-  int size;
-};
+struct bridge_config config;
 
 struct StaticKey {
   struct ether_addr addr;
@@ -34,39 +26,43 @@ struct StaticKey {
 };
 
 struct DynamicFilterTable {
-  struct Map map;
+  struct Map* map;
   struct DoubleChain* heap;
   struct ether_addr* keys;
   int* devices;
 };
 
 struct StaticFilterTable {
-  struct Map map;
+  struct Map* map;
   struct StaticKey* keys;
 };
 
 struct StaticFilterTable static_ft;
 struct DynamicFilterTable dynamic_ft;
 
-int ether_addr_eq(struct ether_addr* a,
-                  struct ether_addr* b) {
+int ether_addr_eq(void* k1, void* k2) {
+  struct ether_addr* a = (struct ether_addr*)k1;
+  struct ether_addr* b = (struct ether_addr*)k2;
   return 0 == memcmp(a->addr_bytes,
                      b->addr_bytes,
                      6);
 }
 
-int static_key_eq(struct StaticKey* a,
-                  struct StaticKey* b) {
+int static_key_eq(void* k1, void* k2) {
+  struct StaticKey* a = (struct StaticKey*) k1;
+  struct StaticKey* b = (struct StaticKey*) k2;
   return a->device == b->device && ether_addr_eq(&a->addr, &b->addr);
 
 }
 
-int ether_addr_hash(struct ether_addr* addr) {
+int ether_addr_hash(void* k) {
+  struct ether_addr* addr = (struct ether_addr*)k;
   return (int)((*(uint32_t*)addr->addr_bytes) ^
                (*(uint32_t*)(addr->addr_bytes + 2)));
 }
 
-int static_key_hash(struct StaticKey* k) {
+int static_key_hash(void* key) {
+  struct StaticKey *k = (struct StaticKey*)key;
   return (ether_addr_hash(&k->addr) << 2) ^ k->device;
 }
 
@@ -77,18 +73,8 @@ int bridge_expire_entries(uint32_t time) {
   if (time < config.expiration_time) return 0;
   uint32_t min_time = time - config.expiration_time;
   while (dchain_expire_one_index(dynamic_ft.heap, &index, min_time)) {
-    int hash = ether_addr_hash(&dynamic_ft.keys[index]);
-    map_erase(dynamic_ft.map.busybits,
-              dynamic_ft.map.keyps,
-              dynamic_ft.map.khs,
-              dynamic_ft.map.chns,
-              &dynamic_ft.keys[index],
-              ether_addr_eq,
-              hash,
-              dynamic_ft.map.capacity,
-              &trash);
+    smap_erase(dynamic_ft.map, &dynamic_ft.keys[index], &trash);
     ++count;
-    --dynamic_ft.map.size;
   }
   return count;
 }
@@ -100,32 +86,15 @@ int bridge_get_device(struct ether_addr* dst,
   memcpy(&k.addr, dst, sizeof(struct ether_addr));
   k.device = src_device;
   int hash = static_key_hash(&k);
-  int present = map_get(static_ft.map.busybits,
-                        static_ft.map.keyps,
-                        static_ft.map.khs,
-                        static_ft.map.chns,
-                        static_ft.map.vals,
-                        &k,
-                        static_key_eq,
-                        hash,
-                        &device,
-                        static_ft.map.capacity);
+  int present = smap_get(static_ft.map,
+                         &k, &device);
   if (present) {
     return device;
   }
 
   int index = -1;
   hash = ether_addr_hash(dst);
-  present = map_get(dynamic_ft.map.busybits,
-                    dynamic_ft.map.keyps,
-                    dynamic_ft.map.khs,
-                    dynamic_ft.map.chns,
-                    dynamic_ft.map.vals,
-                    dst,
-                    ether_addr_eq,
-                    hash,
-                    &index,
-                    dynamic_ft.map.capacity);
+  present = smap_get(dynamic_ft.map, dst, &index);
   if (present) {
     return dynamic_ft.devices[index];
   }
@@ -140,16 +109,7 @@ void bridge_put_update_entry(struct ether_addr* src,
   memcpy(&k.addr, src, sizeof(struct ether_addr));
   k.device = src_device;
   int hash = static_key_hash(&k);
-  int present = map_get(static_ft.map.busybits,
-                        static_ft.map.keyps,
-                        static_ft.map.khs,
-                        static_ft.map.chns,
-                        static_ft.map.vals,
-                        &k,
-                        static_key_eq,
-                        hash,
-                        &device,
-                        static_ft.map.capacity);
+  int present = smap_get(static_ft.map, &k, &device);
   if (present) {
     // Static entry does not need updating
     return;
@@ -157,16 +117,7 @@ void bridge_put_update_entry(struct ether_addr* src,
 
   int index = -1;
   hash = ether_addr_hash(src);
-  present = map_get(dynamic_ft.map.busybits,
-                    dynamic_ft.map.keyps,
-                    dynamic_ft.map.khs,
-                    dynamic_ft.map.chns,
-                    dynamic_ft.map.vals,
-                    src,
-                    ether_addr_eq,
-                    hash,
-                    &index,
-                    dynamic_ft.map.capacity);
+  present = smap_get(dynamic_ft.map, src, &index);
   if (present) {
     dchain_rejuvenate_index(dynamic_ft.heap, index, time);
   } else {
@@ -178,35 +129,15 @@ void bridge_put_update_entry(struct ether_addr* src,
       return;
     }
     memcpy(&dynamic_ft.keys[index], src, sizeof(struct ether_addr));
-    map_put(dynamic_ft.map.busybits,
-            dynamic_ft.map.keyps,
-            dynamic_ft.map.khs,
-            dynamic_ft.map.chns,
-            dynamic_ft.map.vals,
-            &dynamic_ft.keys[index],
-            hash, index,
-            dynamic_ft.map.capacity);
+    smap_put(dynamic_ft.map, &dynamic_ft.keys[index], index);
     dynamic_ft.devices[index] = device;
-    ++dynamic_ft.map.size;
   }
 }
 
 void allocate_static_ft(int capacity) {
-  static_ft.map.busybits = malloc(capacity*sizeof(int));
-  static_ft.map.keyps    = malloc(capacity*sizeof(void*));
-  static_ft.map.khs      = malloc(capacity*sizeof(int));
-  static_ft.map.chns     = malloc(capacity*sizeof(int));
-  static_ft.map.vals     = malloc(capacity*sizeof(int));
-  static_ft.map.capacity = capacity;
-  static_ft.map.size = 0;
-  map_initialize(static_ft.map.busybits,
-                 static_key_eq,
-                 static_ft.map.keyps,
-                 static_ft.map.khs,
-                 static_ft.map.chns,
-                 static_ft.map.vals,
-                 static_ft.map.capacity);
-  static_ft.keys        = malloc(capacity*sizeof(struct StaticKey));
+  smap_allocate(static_key_eq, static_key_hash,
+                capacity, &static_ft.map);
+  static_ft.keys = malloc(capacity*sizeof(struct StaticKey));
 }
 
 void read_static_ft_from_file() {
@@ -233,7 +164,6 @@ void read_static_ft_from_file() {
     int capacity = number_of_lines * 2;
     rewind(cfg_file);
     allocate_static_ft(capacity);
-
     int count = 0;
 
     while (1) {
@@ -303,15 +233,7 @@ void read_static_ft_from_file() {
 
       // Now everything is alright, we can add the entry
       static_ft.keys[count].device = device_from;
-      int hash = static_key_hash(&static_ft.keys[count]);
-      map_put(static_ft.map.busybits,
-              static_ft.map.keyps,
-              static_ft.map.khs,
-              static_ft.map.chns,
-              static_ft.map.vals,
-              &static_ft.keys[count],
-              hash, device_to,
-              static_ft.map.capacity);
+      smap_put(static_ft.map, &static_ft.keys[count], device_to);
       ++count;
       assert(count < number_of_lines);
     }
@@ -325,25 +247,11 @@ void nf_core_init(void)
   read_static_ft_from_file();
 
   int capacity = config.dyn_capacity;
-
-  dynamic_ft.map.busybits = malloc(capacity*sizeof(int));
-  dynamic_ft.map.keyps    = malloc(capacity*sizeof(void*));
-  dynamic_ft.map.khs      = malloc(capacity*sizeof(int));
-  dynamic_ft.map.chns     = malloc(capacity*sizeof(int));
-  dynamic_ft.map.vals     = malloc(capacity*sizeof(int));
-  dynamic_ft.map.capacity = capacity;
-  dynamic_ft.map.size = 0;
-  map_initialize(dynamic_ft.map.busybits,
-                 ether_addr_eq,
-                 dynamic_ft.map.keyps,
-                 dynamic_ft.map.khs,
-                 dynamic_ft.map.chns,
-                 dynamic_ft.map.vals,
-                 dynamic_ft.map.capacity);
-  dchain_allocate(dynamic_ft.map.capacity,
-                  &dynamic_ft.heap);
-  dynamic_ft.keys         = malloc(capacity*sizeof(struct ether_addr));
-  dynamic_ft.devices      = malloc(capacity*sizeof(int));
+  smap_allocate(ether_addr_eq, ether_addr_hash,
+                capacity, &dynamic_ft.map);
+  dchain_allocate(dynamic_ft.map.capacity, &dynamic_ft.heap);
+  dynamic_ft.keys    = malloc(capacity*sizeof(struct ether_addr));
+  dynamic_ft.devices = malloc(capacity*sizeof(int));
 }
 
 int nf_core_process(uint8_t device,
