@@ -3,6 +3,8 @@
 #include "rte_stubs.h"
 #include "../flow.h"
 
+int rte_errno;
+
 void rte_pktmbuf_free(struct rte_mbuf *mbufp){
   klee_trace_ret();
   klee_trace_param_just_ptr(mbufp, sizeof(*mbufp), "mbufp");
@@ -294,4 +296,14 @@ void rte_exit(int exit_code, const char *format, ...)
 void rte_reset()
 {
   incoming_package_allocated = 0;
+}
+
+const char* rte_strerror(int errnum) {
+  return "rte_strerror stub. no help here";
+}
+
+struct rte_mbuf* rte_pktmbuf_clone(struct rte_mbuf *md,
+                                   struct rte_mempool *mp) {
+  printf("rte_pktmbuf_clone is not implemented");
+  return NULL;
 }

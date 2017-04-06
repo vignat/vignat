@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "lib/containers/map.h"
+#include "lib/containers/map-impl.h"
 #include "single-map.h"
 
 struct Map {
@@ -69,53 +69,53 @@ int smap_allocate(map_keys_equality* keq, smap_key_hash* khash,
   (*map_out)->size = 0;
   (*map_out)->keys_eq = keq;
   (*map_out)->khash = khash;
-  map_initialize((*map_out)->busybits,
-                 keq,
-                 (*map_out)->keyps,
-                 (*map_out)->khs,
-                 (*map_out)->chns,
-                 (*map_out)->vals,
-                 capacity);
+  map_impl_init((*map_out)->busybits,
+                keq,
+                (*map_out)->keyps,
+                (*map_out)->khs,
+                (*map_out)->chns,
+                (*map_out)->vals,
+                capacity);
   return 1;
 }
 
 int smap_get(struct Map* map, void* key, int* value_out) {
   int hash = map->khash(key);
-  return map_get(map->busybits,
-                 map->keyps,
-                 map->khs,
-                 map->chns,
-                 map->vals,
-                 key,
-                 map->keys_eq,
-                 hash,
-                 value_out,
-                 map->capacity);
+  return map_impl_get(map->busybits,
+                      map->keyps,
+                      map->khs,
+                      map->chns,
+                      map->vals,
+                      key,
+                      map->keys_eq,
+                      hash,
+                      value_out,
+                      map->capacity);
 }
 
 void smap_put(struct Map* map, void* key, int value) {
   int hash = map->khash(key);
-  map_put(map->busybits,
-          map->keyps,
-          map->khs,
-          map->chns,
-          map->vals,
-          key, hash, value,
-          map->capacity);
+  map_impl_put(map->busybits,
+               map->keyps,
+               map->khs,
+               map->chns,
+               map->vals,
+               key, hash, value,
+               map->capacity);
   ++map->size;
 }
 
 void smap_erase(struct Map* map, void* key, void** trash) {
   int hash = map->khash(key);
-  map_erase(map->busybits,
-            map->keyps,
-            map->khs,
-            map->chns,
-            key,
-            map->keys_eq,
-            hash,
-            map->capacity,
-            trash);
+  map_impl_erase(map->busybits,
+                 map->keyps,
+                 map->khs,
+                 map->chns,
+                 key,
+                 map->keys_eq,
+                 hash,
+                 map->capacity,
+                 trash);
   --map->size;
 }
 

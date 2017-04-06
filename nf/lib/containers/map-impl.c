@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "map.h"
+#include "map-impl.h"
 #include "lib/ignore.h"
 
 //@ #include <list.gh>
@@ -1456,9 +1456,9 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
   }//took 25m
   @*/
 
-void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
-                                void** keyps, int* khs, int* chns,
-                                int* vals, int capacity)
+void map_impl_init/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
+                               void** keyps, int* khs, int* chns,
+                               int* vals, int capacity)
 /*@ requires map_key_type<kt>(_) &*& map_key_hash<kt>(?hash) &*&
              [?fr]is_map_keys_equality<kt>(eq, ?keyp) &*&
              map_record_property<kt>(?recp) &*&
@@ -1832,10 +1832,12 @@ void map_initialize/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   }
   @*/
 
-int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
-                        int* values,
-                        void* keyp, map_keys_equality* eq, int hash, int* value,
-                        int capacity)
+int map_impl_get/*@ <kt> @*/(int* busybits, void** keyps,
+                             int* k_hashes, int* chns,
+                             int* values,
+                             void* keyp, map_keys_equality* eq,
+                             int hash, int* value,
+                             int capacity)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, chns, values) &*&
              kp(keyp, ?k) &*&
@@ -2152,10 +2154,11 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }//took 275m and counting
   @*/
 
-void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
-                         int* values,
-                         void* keyp, int hash, int value,
-                         int capacity)
+void map_impl_put/*@ <kt> @*/(int* busybits, void** keyps,
+                              int* k_hashes, int* chns,
+                              int* values,
+                              void* keyp, int hash, int value,
+                              int capacity)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, chns, values) &*&
              [0.5]kp(keyp, ?k) &*& true == recp(k, value) &*&
@@ -2409,10 +2412,11 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
   }
   @*/
 
-void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
-                          void* keyp,
-                          map_keys_equality* eq, int hash, int capacity,
-                          void** keyp_out)
+void map_impl_erase/*@ <kt> @*/(int* busybits, void** keyps,
+                                int* k_hashes, int* chns,
+                                void* keyp,
+                                map_keys_equality* eq, int hash, int capacity,
+                                void** keyp_out)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, chns, ?values) &*&
              [0.5]kp(keyp, ?k) &*&
@@ -2493,7 +2497,7 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns
   }
   @*/
 
-int map_size/*@ <kt> @*/(int* busybits, int capacity)
+int map_impl_size/*@ <kt> @*/(int* busybits, int capacity)
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          ?keyps, ?k_hashes, ?chns, ?values); @*/
 /*@ ensures mapping<kt>(m, addrs, kp, recp, hsh, capacity, busybits,

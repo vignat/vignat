@@ -1,5 +1,5 @@
-#ifndef _MAP_H_INCLUDED_
-#define _MAP_H_INCLUDED_
+#ifndef _MAP_IMPL_H_INCLUDED_
+#define _MAP_IMPL_H_INCLUDED_
 
 //@ #include "stdex.gh"
 
@@ -102,9 +102,9 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
  * I could not use integer keys, because need to operate with keys like
  * int_key/ext_key that are much bigger than a 32bit integer.
  */
-void map_initialize/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
-                                 void** keyps, int* khs, int* chns,
-                                 int* vals, int capacity);
+void map_impl_init/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
+                                void** keyps, int* khs, int* chns,
+                                int* vals, int capacity);
 /*@ requires map_key_type<kt>(_) &*& map_key_hash<kt>(?hash) &*&
              [?fr]is_map_keys_equality<kt>(cmp, ?keyp) &*&
              map_record_property<kt>(?recp) &*&
@@ -119,10 +119,12 @@ void map_initialize/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
                         khs, chns, vals) &*&
             [fr]is_map_keys_equality<kt>(cmp, keyp); @*/
 
-int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
-                        int* values,
-                        void* keyp, map_keys_equality* eq, int hash, int* value,
-                        int capacity);
+int map_impl_get/*@ <kt> @*/(int* busybits, void** keyps,
+                             int* k_hashes, int* chns,
+                             int* values,
+                             void* keyp, map_keys_equality* eq,
+                             int hash, int* value,
+                             int capacity);
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, chns, values) &*&
              kp(keyp, ?k) &*&
@@ -141,10 +143,11 @@ int map_get/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
              (result == 0 &*&
               *value |-> v)); @*/
 
-void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
-                         int* values,
-                         void* keyp, int hash, int value,
-                         int capacity);
+void map_impl_put/*@ <kt> @*/(int* busybits, void** keyps,
+                              int* k_hashes, int* chns,
+                              int* values,
+                              void* keyp, int hash, int value,
+                              int capacity);
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, k_hashes, chns, values) &*&
              [0.5]kp(keyp, ?k) &*& true == recp(k, value) &*&
@@ -160,14 +163,14 @@ void map_put/*@ <kt> @*/(int* busybits, void** keyps, int* k_hashes, int* chns,
                         keyps, k_hashes, chns, values); @*/
 
 //TODO: Keep track of the key pointers, in order to preserve the pointer value
-// when releasing it with map_erase.
-//TODO: allow a hint, to reuse the map_get result
+// when releasing it with map_impl_erase.
+//TODO: allow a hint, to reuse the map_impl_get result
 // (in case you were searching before erasing)
-void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* key_hashes,
-                           int* chns,
-                           void* keyp, map_keys_equality* eq, int hash,
-                           int capacity,
-                           void** keyp_out);
+void map_impl_erase/*@ <kt> @*/(int* busybits, void** keyps, int* key_hashes,
+                                int* chns,
+                                void* keyp, map_keys_equality* eq, int hash,
+                                int capacity,
+                                void** keyp_out);
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          keyps, key_hashes, chns, ?values) &*&
              [0.5]kp(keyp, ?k) &*&
@@ -185,11 +188,11 @@ void map_erase/*@ <kt> @*/(int* busybits, void** keyps, int* key_hashes,
                         kp, recp, hsh,
                         capacity, busybits, keyps, key_hashes, chns, values); @*/
 
-int map_size/*@ <kt> @*/(int* busybits, int capacity);
+int map_impl_size/*@ <kt> @*/(int* busybits, int capacity);
 /*@ requires mapping<kt>(?m, ?addrs, ?kp, ?recp, ?hsh, capacity, busybits,
                          ?keyps, ?k_hashes, ?chns, ?values); @*/
 /*@ ensures mapping<kt>(m, addrs, kp, recp, hsh, capacity, busybits,
                         keyps, k_hashes, chns, values) &*&
             result == map_size_fp(m);@*/
 
-#endif //_MAP_H_INCLUDED_
+#endif //_MAP_IMPL_H_INCLUDED_

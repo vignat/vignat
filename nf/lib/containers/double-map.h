@@ -1,7 +1,7 @@
 #ifndef _DOUBLE_MAP_H_INCLUDED_
 #define _DOUBLE_MAP_H_INCLUDED_
 
-#include "map.h"
+#include "map-impl.h"
 
 //@ #include <nat.gh>
 //@ #include "stdex.gh"

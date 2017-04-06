@@ -1,7 +1,7 @@
 #ifndef _SINGLE_MAP_H_INCLUDED_
 #define _SINGLE_MAP_H_INCLUDED_
 
-#include "lib/containers/map.h"
+#include "lib/containers/map-impl.h"
 
 #define SMAP_CAPACITY_UPPER_LIMIT 140000
 

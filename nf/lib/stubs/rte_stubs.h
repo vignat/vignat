@@ -847,5 +847,9 @@ rte_pktmbuf_pool_create(const char *name, unsigned n,
                         unsigned cache_size, uint16_t priv_size, uint16_t data_room_size,
                         int socket_id);
 unsigned rte_get_master_lcore();
+const char* rte_strerror(int errnum);
+struct rte_mbuf* rte_pktmbuf_clone(struct rte_mbuf *md,
+                                   struct rte_mempool *mp);
+extern int rte_errno;
 
 #endif //RTE_STUBS_H
