@@ -16,7 +16,7 @@
 #include "lib/nf_log.h"
 #include "bridge_config.h"
 
-#include "single-map.h"
+#include "map.h"
 #include "vector.h"
 
 struct bridge_config config;
@@ -79,7 +79,7 @@ int bridge_expire_entries(uint32_t time) {
   uint32_t min_time = time - config.expiration_time;
   while (dchain_expire_one_index(dynamic_ft.heap, &index, min_time)) {
     struct DynamicEntry* entry = vector_borrow(dynamic_ft.entries, index);
-    smap_erase(dynamic_ft.map, &entry->addr, &trash);
+    map_erase(dynamic_ft.map, &entry->addr, &trash);
     vector_return(dynamic_ft.entries, index, entry);
     ++count;
   }
@@ -93,15 +93,15 @@ int bridge_get_device(struct ether_addr* dst,
   memcpy(&k.addr, dst, sizeof(struct ether_addr));
   k.device = src_device;
   int hash = static_key_hash(&k);
-  int present = smap_get(static_ft.map,
-                         &k, &device);
+  int present = map_get(static_ft.map,
+                        &k, &device);
   if (present) {
     return device;
   }
 
   int index = -1;
   hash = ether_addr_hash(dst);
-  present = smap_get(dynamic_ft.map, dst, &index);
+  present = map_get(dynamic_ft.map, dst, &index);
   if (present) {
     struct DynamicEntry* entry = vector_borrow(dynamic_ft.entries, index);
     device = entry->device;
@@ -119,7 +119,7 @@ void bridge_put_update_entry(struct ether_addr* src,
   memcpy(&k.addr, src, sizeof(struct ether_addr));
   k.device = src_device;
   int hash = static_key_hash(&k);
-  int present = smap_get(static_ft.map, &k, &device);
+  int present = map_get(static_ft.map, &k, &device);
   if (present) {
     // Static entry does not need updating
     return;
@@ -127,7 +127,7 @@ void bridge_put_update_entry(struct ether_addr* src,
 
   int index = -1;
   hash = ether_addr_hash(src);
-  present = smap_get(dynamic_ft.map, src, &index);
+  present = map_get(dynamic_ft.map, src, &index);
   if (present) {
     dchain_rejuvenate_index(dynamic_ft.heap, index, time);
   } else {
@@ -141,14 +141,14 @@ void bridge_put_update_entry(struct ether_addr* src,
     struct DynamicEntry* entry = vector_borrow(dynamic_ft.entries, index);
     memcpy(&entry->addr, src, sizeof(struct ether_addr));
     entry->device = device;
-    smap_put(dynamic_ft.map, &entry->addr, index);
+    map_put(dynamic_ft.map, &entry->addr, index);
     vector_return(dynamic_ft.entries, index, entry);
   }
 }
 
 void allocate_static_ft(int capacity) {
-  smap_allocate(static_key_eq, static_key_hash,
-                capacity, &static_ft.map);
+  map_allocate(static_key_eq, static_key_hash,
+               capacity, &static_ft.map);
   vector_allocate(sizeof(struct StaticKey), capacity,
                   &static_ft.keys);
 }
@@ -248,7 +248,7 @@ void read_static_ft_from_file() {
 
       // Now everything is alright, we can add the entry
       key->device = device_from;
-      smap_put(static_ft.map, &key->addr, device_to);
+      map_put(static_ft.map, &key->addr, device_to);
       vector_return(static_ft.keys, count, key);
       ++count;
       assert(count < number_of_lines);
@@ -263,8 +263,8 @@ void nf_core_init(void)
   read_static_ft_from_file();
 
   int capacity = config.dyn_capacity;
-  smap_allocate(ether_addr_eq, ether_addr_hash,
-                capacity, &dynamic_ft.map);
+  map_allocate(ether_addr_eq, ether_addr_hash,
+               capacity, &dynamic_ft.map);
   dchain_allocate(capacity, &dynamic_ft.heap);
   vector_allocate(sizeof(struct DynamicEntry), capacity,
                   &dynamic_ft.entries);

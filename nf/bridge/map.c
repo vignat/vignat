@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "lib/containers/map-impl.h"
-#include "single-map.h"
+#include "map.h"
 
 struct Map {
   int* busybits;
@@ -14,9 +14,9 @@ struct Map {
   smap_key_hash* khash;
 };
 
-int smap_allocate(map_keys_equality* keq, smap_key_hash* khash,
-                  int capacity,
-                  struct Map** map_out) {
+int map_allocate(map_keys_equality* keq, smap_key_hash* khash,
+                 int capacity,
+                 struct Map** map_out) {
   struct Map* old_map_val = *map_out;
   struct Map* map_alloc = malloc(sizeof(struct Map));
   if (map_alloc == NULL) return 0;
@@ -79,7 +79,7 @@ int smap_allocate(map_keys_equality* keq, smap_key_hash* khash,
   return 1;
 }
 
-int smap_get(struct Map* map, void* key, int* value_out) {
+int map_get(struct Map* map, void* key, int* value_out) {
   int hash = map->khash(key);
   return map_impl_get(map->busybits,
                       map->keyps,
@@ -93,7 +93,7 @@ int smap_get(struct Map* map, void* key, int* value_out) {
                       map->capacity);
 }
 
-void smap_put(struct Map* map, void* key, int value) {
+void map_put(struct Map* map, void* key, int value) {
   int hash = map->khash(key);
   map_impl_put(map->busybits,
                map->keyps,
@@ -105,7 +105,7 @@ void smap_put(struct Map* map, void* key, int value) {
   ++map->size;
 }
 
-void smap_erase(struct Map* map, void* key, void** trash) {
+void map_erase(struct Map* map, void* key, void** trash) {
   int hash = map->khash(key);
   map_impl_erase(map->busybits,
                  map->keyps,
@@ -119,6 +119,6 @@ void smap_erase(struct Map* map, void* key, void** trash) {
   --map->size;
 }
 
-int smap_size(struct Map* map) {
+int map_size(struct Map* map) {
   return map->size;
 }
