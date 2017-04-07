@@ -79,7 +79,7 @@ expire_rules(t :: Time) :=
 refresh_rule(t :: Time, f :: Frame) :=
   unless exists Static_rule s in state.table.static 
                 : s.addr == f.src and
-                  s.interface = f.interface then
+                  s.fwd_to == f.interface then
       remove Dynamic_rule d from state.table.dynamic : d.addr == f.src ;
       if size(state.table.dynamic) < CAPACITY then
           insert Dynamic_rule d(f.src, t, f.interface) into state.table.dynamic

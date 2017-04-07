@@ -114,17 +114,6 @@ int bridge_get_device(struct ether_addr* dst,
 void bridge_put_update_entry(struct ether_addr* src,
                             uint8_t src_device,
                             uint32_t time) {
-  int device = -1;
-  struct StaticKey k;
-  memcpy(&k.addr, src, sizeof(struct ether_addr));
-  k.device = src_device;
-  int hash = static_key_hash(&k);
-  int present = map_get(static_ft.map, &k, &device);
-  if (present) {
-    // Static entry does not need updating
-    return;
-  }
-
   int index = -1;
   hash = ether_addr_hash(src);
   present = map_get(dynamic_ft.map, src, &index);
