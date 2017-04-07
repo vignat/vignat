@@ -21,6 +21,7 @@ int vector_allocate(int elem_size, int capacity,
     *vector_out = old_vector_val;
     return 0;
   }
+  (*vector_out)->data = data_alloc;
   (*vector_out)->elem_size = elem_size;
   (*vector_out)->capacity = capacity;
   return 1;

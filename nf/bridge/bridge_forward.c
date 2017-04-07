@@ -140,7 +140,7 @@ void bridge_put_update_entry(struct ether_addr* src,
     }
     struct DynamicEntry* entry = vector_borrow(dynamic_ft.entries, index);
     memcpy(&entry->addr, src, sizeof(struct ether_addr));
-    entry->device = device;
+    entry->device = src_device;
     map_put(dynamic_ft.map, &entry->addr, index);
     vector_return(dynamic_ft.entries, index, entry);
   }
@@ -162,97 +162,97 @@ void read_static_ft_from_file() {
 
   FILE* cfg_file = fopen(config.static_config_fname, "r");
   if (cfg_file == NULL) {
-    NF_INFO("Error opening the static config file: %s",
-            config.static_config_fname);
+    rte_exit(EXIT_FAILURE, "Error opening the static config file: %s",
+             config.static_config_fname);
+  }
 
-    int number_of_lines = 0;
-    char ch;
-    do {
-      ch = fgetc(cfg_file);
-      if(ch == '\n')
-        number_of_lines++;
-    } while (ch != EOF);
+  int number_of_lines = 0;
+  char ch;
+  do {
+    ch = fgetc(cfg_file);
+    if(ch == '\n')
+      number_of_lines++;
+  } while (ch != EOF);
 
-    // Make sure the hash table is occupied only by 50%
-    int capacity = number_of_lines * 2;
-    rewind(cfg_file);
-    allocate_static_ft(capacity);
-    int count = 0;
+  // Make sure the hash table is occupied only by 50%
+  int capacity = number_of_lines * 2;
+  rewind(cfg_file);
+  allocate_static_ft(capacity);
+  int count = 0;
 
-    while (1) {
-      char mac_addr_str[20];
-      char source_str[10];
-      char target_str[10];
-      int result = fscanf(cfg_file, "%18s", mac_addr_str);
-      if (result != 1) {
-        if (result == EOF) break;
-        else {
-          NF_INFO("Cannot read MAC address from file: %s",
-                  strerror(errno));
-          goto finally;
-        }
+  while (1) {
+    char mac_addr_str[20];
+    char source_str[10];
+    char target_str[10];
+    int result = fscanf(cfg_file, "%18s", mac_addr_str);
+    if (result != 1) {
+      if (result == EOF) break;
+      else {
+        NF_INFO("Cannot read MAC address from file: %s",
+                strerror(errno));
+        goto finally;
       }
-
-      result = fscanf(cfg_file, "%9s", source_str);
-      if (result != 1) {
-        if (result == EOF) {
-          NF_INFO("Incomplete config string: %s, skip", mac_addr_str);
-          break;
-        } else {
-          NF_INFO("Cannot read the filtering target for MAC %s: %s",
-                  mac_addr_str, strerror(errno));
-          goto finally;
-        }
-      }
-
-      result = fscanf(cfg_file, "%9s", target_str);
-      if (result != 1) {
-        if (result == EOF) {
-          NF_INFO("Incomplete config string: %s, skip", mac_addr_str);
-          break;
-        } else {
-          NF_INFO("Cannot read the filtering target for MAC %s: %s",
-                  mac_addr_str, strerror(errno));
-          goto finally;
-        }
-      }
-
-      int device_from;
-      int device_to;
-      char* temp;
-      struct StaticKey* key = vector_borrow(static_ft.keys, count);
-
-      // Ouff... the strings are extracted, now let's parse them.
-      result = cmdline_parse_etheraddr(NULL, mac_addr_str,
-                                       &key->addr,
-                                       sizeof(struct ether_addr));
-      if (result < 0) {
-        NF_INFO("Invalid MAC address: %s, skip",
-                mac_addr_str);
-        continue;
-      }
-
-      device_from = strtol(source_str, &temp, 10);
-      if (temp == target_str || *temp != '\0') {
-        NF_INFO("Non-integer value for the forwarding rule: %s (%s), skip",
-                mac_addr_str, target_str);
-        continue;
-      }
-
-      device_to = strtol(target_str, &temp, 10);
-      if (temp == target_str || *temp != '\0') {
-        NF_INFO("Non-integer value for the forwarding rule: %s (%s), skip",
-                mac_addr_str, target_str);
-        continue;
-      }
-
-      // Now everything is alright, we can add the entry
-      key->device = device_from;
-      map_put(static_ft.map, &key->addr, device_to);
-      vector_return(static_ft.keys, count, key);
-      ++count;
-      assert(count < number_of_lines);
     }
+
+    result = fscanf(cfg_file, "%9s", source_str);
+    if (result != 1) {
+      if (result == EOF) {
+        NF_INFO("Incomplete config string: %s, skip", mac_addr_str);
+        break;
+      } else {
+        NF_INFO("Cannot read the filtering target for MAC %s: %s",
+                mac_addr_str, strerror(errno));
+        goto finally;
+      }
+    }
+
+    result = fscanf(cfg_file, "%9s", target_str);
+    if (result != 1) {
+      if (result == EOF) {
+        NF_INFO("Incomplete config string: %s, skip", mac_addr_str);
+        break;
+      } else {
+        NF_INFO("Cannot read the filtering target for MAC %s: %s",
+                mac_addr_str, strerror(errno));
+        goto finally;
+      }
+    }
+
+    int device_from;
+    int device_to;
+    char* temp;
+    struct StaticKey* key = vector_borrow(static_ft.keys, count);
+
+    // Ouff... the strings are extracted, now let's parse them.
+    result = cmdline_parse_etheraddr(NULL, mac_addr_str,
+                                     &key->addr,
+                                     sizeof(struct ether_addr));
+    if (result < 0) {
+      NF_INFO("Invalid MAC address: %s, skip",
+              mac_addr_str);
+      continue;
+    }
+
+    device_from = strtol(source_str, &temp, 10);
+    if (temp == source_str || *temp != '\0') {
+      NF_INFO("Non-integer value for the forwarding rule: %s (%s), skip",
+              mac_addr_str, target_str);
+      continue;
+    }
+
+    device_to = strtol(target_str, &temp, 10);
+    if (temp == target_str || *temp != '\0') {
+      NF_INFO("Non-integer value for the forwarding rule: %s (%s), skip",
+              mac_addr_str, target_str);
+      continue;
+    }
+
+    // Now everything is alright, we can add the entry
+    key->device = device_from;
+    map_put(static_ft.map, &key->addr, device_to);
+    vector_return(static_ft.keys, count, key);
+    ++count;
+    assert(count < capacity);
   }
  finally:
   fclose(cfg_file);
