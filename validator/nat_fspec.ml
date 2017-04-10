@@ -984,13 +984,14 @@ let fixpoints =
     "flw_get_ek", {v=Str_idx({v=Id "Arg0";t=Unknown},"ek");t=Unknown};
   ]
 
+(* TODO: make external_ip symbolic *)
 module Iface : Fspec_api.Spec =
 struct
   let preamble = (In_channel.read_all "preamble.tmpl") ^
                  "void to_verify()\n\
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
-                  uint32_t external_ip = 2880154539;\n\
+                  uint32_t external_ip = 0;\n\
                   struct lcore_conf *last_lcc;\n\
                   struct lcore_rx_queue *last_rq;\n\
                   uint8_t received_on_port;\n\

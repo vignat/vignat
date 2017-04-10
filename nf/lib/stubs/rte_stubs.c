@@ -251,36 +251,38 @@ int rte_eal_wait_lcore(unsigned lcore_id){
     return 0;
 }
 
-struct rte_mempool default_pool;
-int default_pool_allocated = 0;
+struct rte_mempool default_pools[5];
+int last_pool_alloc = -1;
 
 struct rte_mempool *
 rte_pktmbuf_pool_create(const char *name, unsigned n,
-                        unsigned cache_size, uint16_t priv_size, uint16_t data_room_size,
+                        unsigned cache_size, uint16_t priv_size,
+                        uint16_t data_room_size,
                         int socket_id){
-    klee_assert(!default_pool_allocated);
-    strncpy(default_pool.name, name, RTE_MEMPOOL_NAMESIZE);
-    default_pool = (struct rte_mempool){
-	.ring = NULL,
-	.phys_addr = 0,
-	.flags = 0,
-	.size = 0,
-	.cache_size = cache_size,
-	.cache_flushthresh = 0,
-	.elt_size = 0,
-        .header_size = 0,
-	.trailer_size = 0,
-	.private_data_size = 0,
-	.pg_num = 0,
-	.pg_shift = 0,
-	.pg_mask = 0,
-	.elt_va_start = 0,
-        .elt_va_end = 0,
-	//.elt_pa = {};
-    };
+  klee_assert(last_pool_alloc < 5);
+  ++last_pool_alloc;
+  strncpy(default_pools[last_pool_alloc].name,
+          name, RTE_MEMPOOL_NAMESIZE);
+  default_pools[last_pool_alloc] = (struct rte_mempool){
+    .ring = NULL,
+    .phys_addr = 0,
+    .flags = 0,
+    .size = 0,
+    .cache_size = cache_size,
+    .cache_flushthresh = 0,
+    .elt_size = 0,
+    .header_size = 0,
+    .trailer_size = 0,
+    .private_data_size = 0,
+    .pg_num = 0,
+    .pg_shift = 0,
+    .pg_mask = 0,
+    .elt_va_start = 0,
+    .elt_va_end = 0,
+    //.elt_pa = {};
+  };
 
-    default_pool_allocated = 1;
-    return &default_pool;
+  return &default_pools[last_pool_alloc];
 }
 
 unsigned rte_get_master_lcore(){
