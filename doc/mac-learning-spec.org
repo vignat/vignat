@@ -106,6 +106,21 @@ flood_frame(f :: Frame)
 drop_frame()
 #+END_SRC
 
+** Properties
+*** Always deliver
+Provided the static configuration is correct, and the destination host did not
+move for the past ~T_EXP~, the bridge will always forward a frame towards the
+correct host.
+*** Never fail to drop
+If the static config orders the bridge to drop packets from a certain interface
+for a certain destination, it will always do.
+*** No arbitriness
+If there is a static rule for a specific interface and a cpecific destination
+address bridge will follow it unconditionally.
+*** Learn and improve
+If for the past ~T_EXP~ there were no frames, and then came a frame from A.
+During the next ~T_EXP~ frames to A will not cause flooding.
+
 ** Notes
 The standard leaves some details to implementation. Here are some decisions made
 during its formalization.
