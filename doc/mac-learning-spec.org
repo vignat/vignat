@@ -57,11 +57,10 @@ complete, it is kept in a queue that is out of scope of this document. Once the
 previous frame is processed, /accept/ triggers forwarding of the buffered frame.
 
 #+BEGIN_SRC haskell
-Frame f <- receive_frame();
-Time t <- now();
-expire_rules(t);
-refresh_rule(t, f);
-forward(f);
+upon_receiving(received_frame :: Frame, arrival_time :: Time) :=
+  expire_rules(arrival_time);
+  refresh_rule_for(received_frame, arrival_time);
+  forward(received_frame);
 #+END_SRC
 
 ** definitions
@@ -71,31 +70,28 @@ the global variable /state/ and transform it accordingly. Special function
 
 #+BEGIN_SRC haskell
 expire_rules(t :: Time) :=
-  forall Dynamic_rule d in state.table.dynamic
+  forall Dynamic_rule d in table.dynamic
     : d.timestamp + T_EXP < t
-    remove d from state.table.dynamic
+    remove d from table.dynamic
 
-refresh_rule(t :: Time, f :: Frame) :=
-  unless exists Static_rule s in state.table.static 
-                : s.dst == f.src and
-                  s.out_iface == f.in_iface then
-      remove Dynamic_rule d from state.table.dynamic : d.dst == f.src ;
-      if size(state.table.dynamic) < CAPACITY then
-          insert Dynamic_rule d(f.src, t, f.in_iface) into state.table.dynamic
+refresh_rule_for(f :: Frame, t :: Time) :=
+  remove Dynamic_rule d from table.dynamic : d.dst == f.src ;
+  if size(table.dynamic) < CAPACITY then
+      insert Dynamic_rule d(f.src, t, f.in_iface) into table.dynamic
 
-forward_dyn(f :: Frame) :=
-  find Dynamic_rule d in state.table.dynamic : d.dst == f.dst 
+forward_dynamic(f :: Frame) :=
+  find Dynamic_rule d in table.dynamic : d.dst == f.dst 
   if found then send_frame(f, d.out_iface)
   else flood_frame(f)
 
 forward(f :: Frame) :=
-  find Static_rule s in state.table.static 
+  find Static_rule s in table.static 
        : s.dst == f.dst and
          s.in_iface == f.in_iface
   if found then
       if s.out_iface == "drop" then drop_frame()
       else send_frame(f, s.out_iface)
-  else forward_dyn(f)
+  else forward_dynamic(f)
 
 -- output the frame f through the interface out_iface
 send_frame(f :: Frame, out_iface :: Integer)
