@@ -18,7 +18,6 @@ environment.
 Frame := <src :: Mac_addr,
           dst :: Mac_addr,
           in_iface :: Integer,
-          out_iface :: Integer | "all", -- special case "all" for flooding
           content> -- payload. irrelevant for a switch
 #+END_SRC
 
@@ -42,14 +41,8 @@ Dynamic_table := set<Dynamic_rule>
 Filtering_table := <static :: Static_table,
                     dynamic :: Dynamic_table>
 
-Network := <incast_frame :: Frame, -- frame waiting in the receive buffer 
-            outcast_frame :: Frame> -- last forwarded frame 
+table :: Filtering_table -- The bridge state: static and dynamic
 
-State := <table :: Filtering_table, -- the filtering state of the switch
-          network :: Network> -- the summary of the network-interactions
-
--- Instantiate the state
-state :: State
 #+END_SRC
 
 * rules
@@ -64,10 +57,11 @@ complete, it is kept in a queue that is out of scope of this document. Once the
 previous frame is processed, /accept/ triggers forwarding of the buffered frame.
 
 #+BEGIN_SRC haskell
-accept(Frame f, at Time t) =>
-expire_rules(t) =>
-refresh_rule(t, f) =>
-forward(f)
+Frame f <- receive_frame();
+Time t <- now();
+expire_rules(t);
+refresh_rule(t, f);
+forward(f);
 #+END_SRC
 
 ** definitions
@@ -76,12 +70,6 @@ the global variable /state/ and transform it accordingly. Special function
 /accept/ blocks and waits until there is an unprocessed frame on the incast interface.
 
 #+BEGIN_SRC haskell
-accept(f :: Frame, t :: Time) :=
-  wait until state.network.incast_frame is non nil then
-  f <- state.network.incast_frame
-  t <- now
-  state.network.incast_frame <- nil
-
 expire_rules(t :: Time) :=
   forall Dynamic_rule d in state.table.dynamic
     : d.timestamp + T_EXP < t
@@ -97,17 +85,22 @@ refresh_rule(t :: Time, f :: Frame) :=
 
 forward_dyn(f :: Frame) :=
   find Dynamic_rule d in state.table.dynamic : d.dst == f.dst 
-  if found then state.network.outcast_frame <- {f with out_iface = d.out_iface}
-  else state.network.outcast_frame <- {f with out_iface = "All"} -- flooding
+  if found then send_frame(f, d.out_iface)
+  else flood_frame(f)
 
 forward(f :: Frame) :=
   find Static_rule s in state.table.static 
        : s.dst == f.dst and
          s.in_iface == f.in_iface
   if found then
-      if s.out_iface == "drop" then state.network.outcast_frame = nil
-      else return state.network.outcast_frame = {f with out_iface = s.out_iface}
+      if s.out_iface == "drop" then drop_frame()
+      else send_frame(f, s.out_iface)
   else forward_dyn(f)
+
+-- output the frame f through the interface out_iface
+send_frame(f :: Frame, out_iface :: Integer)
+-- output the frame f through all the interfaces except f.in_iface
+flood_frame(f :: Frame)
 #+END_SRC
 
 ** Notes
