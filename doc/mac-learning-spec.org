@@ -9,24 +9,34 @@ These configuration parameters control operation of the bridge:
 
 * MAC forwarding abstract state
 
-The following defines the abstract representation of the Bridge state and its environment.
+The following defines the abstract representation of the Bridge state and its
+environment.
 
 #+BEGIN_SRC haskell
+-- An ethernet frame featuring source and destination addresses,
+-- and the associated interfaces (in and out)
 Frame := <src :: Mac_addr,
-           dst :: Mac_addr,
-           interface :: Int, -- admits a special case "all" for flooding
-           content>
+          dst :: Mac_addr,
+          in_iface :: Integer,
+          out_iface :: Integer | "all", -- special case "all" for flooding
+          content> -- payload. irrelevant for a switch
+#+END_SRC
 
-Static_rule := {addr :: Mac_addr,
-                interface :: Int,
-                filter :: Boolean,
-                fwd_to :: Int}
+Static and dynamic rules hold the data necessary to make a forwarding decision
+regarding every incoming frame.
 
-Dynamic_rule := {addr :: Mac_addr,
-                 timestamp :: Time,
-                 fwd_to :: Int}
+#+BEGIN_SRC haskell
+Static_rule := {dst :: Mac_addr, -- destination address of a frame
+                in_iface :: Integer, -- the interface the frame comes from
+                out_iface :: Integer | "drop"} -- "drop" = filter the frame
 
+Dynamic_rule := {dst :: Mac_addr, -- destination address of a frame
+                 timestamp :: Time, -- last time the rule was refreshed
+                 out_iface :: Integer} -- the interface to forward the frame to
+
+-- Static_table keeps the static configuration of the switch
 Static_table := set<Static_rule>
+-- Dynamic_table keeps the accumulated information during the switch operation
 Dynamic_table := set<Dynamic_rule>
 
 Filtering_table := <static :: Static_table,
@@ -35,9 +45,10 @@ Filtering_table := <static :: Static_table,
 Network := <incast_frame :: Frame, -- frame waiting in the receive buffer 
             outcast_frame :: Frame> -- last forwarded frame 
 
-State := <table :: Filtering_table,
-          network :: Network>
+State := <table :: Filtering_table, -- the filtering state of the switch
+          network :: Network> -- the summary of the network-interactions
 
+-- Instantiate the state
 state :: State
 #+END_SRC
 
@@ -66,10 +77,10 @@ the global variable /state/ and transform it accordingly. Special function
 
 #+BEGIN_SRC haskell
 accept(f :: Frame, t :: Time) :=
-  wait until network.incast_frame is non nil then
-  f <- network.incast_frame
+  wait until state.network.incast_frame is non nil then
+  f <- state.network.incast_frame
   t <- now
-  network.incast_frame <- nil
+  state.network.incast_frame <- nil
 
 expire_rules(t :: Time) :=
   forall Dynamic_rule d in state.table.dynamic
@@ -78,25 +89,25 @@ expire_rules(t :: Time) :=
 
 refresh_rule(t :: Time, f :: Frame) :=
   unless exists Static_rule s in state.table.static 
-                : s.addr == f.src and
-                  s.fwd_to == f.interface then
-      remove Dynamic_rule d from state.table.dynamic : d.addr == f.src ;
+                : s.dst == f.src and
+                  s.out_iface == f.in_iface then
+      remove Dynamic_rule d from state.table.dynamic : d.dst == f.src ;
       if size(state.table.dynamic) < CAPACITY then
-          insert Dynamic_rule d(f.src, t, f.interface) into state.table.dynamic
+          insert Dynamic_rule d(f.src, t, f.in_iface) into state.table.dynamic
 
 forward_dyn(f :: Frame) :=
-  find Dynamic_rule d in state.table.dynamic : d.addr == f.dst 
-  if found then network.outcast_frame <- {f with interface = d.fwd_to}
-  else network.outcast_frame <- {f with interface = ALL} -- flooding
+  find Dynamic_rule d in state.table.dynamic : d.dst == f.dst 
+  if found then state.network.outcast_frame <- {f with out_iface = d.out_iface}
+  else state.network.outcast_frame <- {f with out_iface = "All"} -- flooding
 
 forward(f :: Frame) :=
   find Static_rule s in state.table.static 
-       : s.addr == f.dst and
-         s.interface == f.interface
+       : s.dst == f.dst and
+         s.in_iface == f.in_iface
   if found then
-      if s.filter then network.outcast_frame = nil
-      else return network.outcast_frame = {f with interface = s.fwd_to}
-  else forward_dyn(addr)
+      if s.out_iface == "drop" then state.network.outcast_frame = nil
+      else return state.network.outcast_frame = {f with out_iface = s.out_iface}
+  else forward_dyn(f)
 #+END_SRC
 
 ** Notes
