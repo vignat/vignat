@@ -16,8 +16,8 @@
 #include "lib/nf_log.h"
 #include "bridge_config.h"
 
-#include "map.h"
-#include "vector.h"
+#include "lib/containers/map.h"
+#include "lib/containers/vector.h"
 
 struct bridge_config config;
 
