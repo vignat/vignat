@@ -115,8 +115,8 @@ void bridge_put_update_entry(struct ether_addr* src,
                             uint8_t src_device,
                             uint32_t time) {
   int index = -1;
-  hash = ether_addr_hash(src);
-  present = map_get(dynamic_ft.map, src, &index);
+  int hash = ether_addr_hash(src);
+  int present = map_get(dynamic_ft.map, src, &index);
   if (present) {
     dchain_rejuvenate_index(dynamic_ft.heap, index, time);
   } else {
