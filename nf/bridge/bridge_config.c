@@ -1,8 +1,9 @@
 #include <getopt.h>
 #include <inttypes.h>
+#include <string.h>
 
 #if KLEE_VERIFICATION
-#  include "stubs/rte_stubs.h"
+#  include "lib/stubs/rte_stubs.h"
 #else
   // DPDK needs these but doesn't include them. :|
 #  include <linux/limits.h>

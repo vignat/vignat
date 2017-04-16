@@ -1,23 +1,31 @@
 #include <inttypes.h>
-#include <assert.h>
-#include <errno.h>
-#include <stdio.h>
+#include <string.h>
 
+#ifdef KLEE_VERIFICATION
+#  include <klee/klee.h>
+#  include "lib/stubs/rte_stubs.h"
+#  include <cmdline_parse_etheraddr.h>
+#else//KLEE_VERIFICATION
+#  include <assert.h>
+#  include <errno.h>
+#  include <stdio.h>
 // DPDK uses these but doesn't include them. :|
-#include <linux/limits.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include <rte_ethdev.h>
-#include <rte_mbuf.h>
+#  include <linux/limits.h>
+#  include <sys/types.h>
+#  include <unistd.h>
+#  include <rte_ethdev.h>
+#  include <rte_mbuf.h>
+#endif//KLEE_VERIFICATION
 
 #include "lib/nf_forward.h"
 #include "lib/nf_util.h"
 #include "lib/nf_log.h"
 #include "bridge_config.h"
 
+#include "lib/containers/double-chain.h"
 #include "lib/containers/map.h"
 #include "lib/containers/vector.h"
+#include "lib/expirator.h"
 
 struct bridge_config config;
 
@@ -71,19 +79,18 @@ int static_key_hash(void* key) {
   return (ether_addr_hash(&k->addr) << 2) ^ k->device;
 }
 
+void dyn_entry_get_addr(void* entry,
+                        void** addr_out) {
+  *((struct ether_addr**)addr_out) = &((struct DynamicEntry*)entry)->addr;
+}
+
 int bridge_expire_entries(uint32_t time) {
-  int count = 0;
-  int index = -1;
-  void *trash;
   if (time < config.expiration_time) return 0;
   uint32_t min_time = time - config.expiration_time;
-  while (dchain_expire_one_index(dynamic_ft.heap, &index, min_time)) {
-    struct DynamicEntry* entry = vector_borrow(dynamic_ft.entries, index);
-    map_erase(dynamic_ft.map, &entry->addr, &trash);
-    vector_return(dynamic_ft.entries, index, entry);
-    ++count;
-  }
-  return count;
+  return expire_items_single_map(dynamic_ft.heap, dynamic_ft.entries,
+                                 dynamic_ft.map,
+                                 dyn_entry_get_addr,
+                                 min_time);
 }
 
 int bridge_get_device(struct ether_addr* dst,
@@ -294,3 +301,18 @@ void nf_config_cmdline_print_usage(void) {
 void nf_print_config() {
   bridge_print_config(&config);
 }
+
+#ifdef KLEE_VERICIATION
+
+void nf_loop_iteration_begin(unsigned lcore_id,
+                             uint32_t time) {
+}
+
+void nf_add_loop_iteration_assumptions(unsigned lcore_id,
+                                       uint32_t time) {
+}
+
+void nf_loop_iteration_end(unsigned lcore_id,
+                           uint32_t time) {
+}
+#endif//KLEE_VERICIATION

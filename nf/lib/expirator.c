@@ -105,3 +105,21 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
   //@ destroy_dchain_nodups(expire_n_indexes(ch, time, count));
 }
 
+int expire_items_single_map(struct DoubleChain* chain,
+                            struct Vector* vector,
+                            struct Map* map,
+                            void (key_from_entry)(void* entry, void** key),
+                            uint32_t time) {
+  int count = 0;
+  int index = -1;
+  while (dchain_expire_one_index(chain, &index, time)) {
+    void* entry = vector_borrow(vector, index);
+    void* key;
+    key_from_entry(entry, &key);
+    map_erase(map, key, &entry);
+    vector_return(vector, index, entry);
+    ++count;
+  }
+  return count;
+}
+
