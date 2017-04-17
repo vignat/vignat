@@ -24,10 +24,11 @@ int vector_allocate(int elem_size, int capacity,
   klee_trace_param_i32(capacity, "capacity");
   klee_trace_param_ptr(vector_out, sizeof(struct Vector*), "vector_out");
 
-  int allocation_succeeded = klee_int("vector_alloc_success");
-  if (! allocation_succeeded) return 0;
+  /* int allocation_succeeded = klee_int("vector_alloc_success"); */
+  /* if (! allocation_succeeded) return 0; */
 
   *vector_out = malloc(sizeof(struct Vector));
+  if (*vector_out == NULL) return 0;
   klee_make_symbolic(*vector_out, sizeof(struct Vector), "vector");
   (*vector_out)->data = malloc(elem_size);
   klee_make_symbolic((*vector_out)->data, elem_size, "vector_data");

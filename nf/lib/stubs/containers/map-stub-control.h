@@ -1,6 +1,7 @@
 #ifndef _MAP_STUB_CONTROL_H_INCLUDED_
 #define _MAP_STUB_CONTROL_H_INCLUDED_
 
+#include "lib/containers/map.h"
 #include "str-descr.h"
 
 void map_set_layout(struct Map* map,

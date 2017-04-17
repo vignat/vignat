@@ -13,6 +13,7 @@ struct Map {
   int allocated_index;
   int capacity;
 
+  int has_layout;
   int key_size;
   int key_field_count;
   struct str_field_descr key_fields[PREALLOC_SIZE];
@@ -28,15 +29,16 @@ int map_allocate(map_keys_equality* keq, smap_key_hash* khash,
   klee_trace_param_fptr(khash, "khash");
   klee_trace_param_i32(capacity, "capacity");
   klee_trace_param_ptr(map_out, sizeof(struct Map*), "map_out");
-  int allocation_succeeded = klee_int("map_allocation_succeeded");
-  if (allocation_succeeded) {
-    *map_out = malloc(sizeof(struct Map));
+  //int allocation_succeeded = klee_int("map_allocation_succeeded");
+  *map_out = malloc(sizeof(struct Map));
+  if (*map_out != NULL) { //(allocation_succeeded) {
     //TODO: can malloc return NULL during klee execution?
     klee_make_symbolic(*map_out, sizeof(struct Map), "map");
     klee_assert(map_out != NULL);
     (*map_out)->entry_claimed = 0;
     (*map_out)->keq = keq;
     (*map_out)->capacity = capacity;
+    (*map_out)->has_layout = 0;
     klee_assume(0 <= (*map_out)->allocated_index);
     klee_assume((*map_out)->allocated_index < capacity);
     return 1;
@@ -66,10 +68,12 @@ void map_set_layout(struct Map* map,
   map->key_field_count = key_fields_count;
   map->key_size = calculate_str_size(key_fields,
                                      key_fields_count);
+  map->has_layout = 1;
 }
 
 int map_get(struct Map* map, void* key, int* value_out) {
   klee_trace_ret();
+  klee_assert(map->has_layout);
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
@@ -94,6 +98,7 @@ int map_get(struct Map* map, void* key, int* value_out) {
 
 void map_put(struct Map* map, void* key, int value) {
   klee_trace_ret();
+  klee_assert(map->has_layout);
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
@@ -117,6 +122,7 @@ void map_put(struct Map* map, void* key, int value) {
 
 void map_erase(struct Map* map, void* key, void** trash) {
   klee_trace_ret();
+  klee_assert(map->has_layout);
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");

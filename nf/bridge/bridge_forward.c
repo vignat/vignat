@@ -5,6 +5,10 @@
 #  include <klee/klee.h>
 #  include "lib/stubs/rte_stubs.h"
 #  include <cmdline_parse_etheraddr.h>
+
+#  include "lib/stubs/containers/map-stub-control.h"
+#  include "lib/stubs/containers/double-chain-stub-control.h"
+#  include "lib/stubs/containers/vector-stub-control.h"
 #else//KLEE_VERIFICATION
 #  include <assert.h>
 #  include <errno.h>
@@ -119,8 +123,8 @@ int bridge_get_device(struct ether_addr* dst,
 }
 
 void bridge_put_update_entry(struct ether_addr* src,
-                            uint8_t src_device,
-                            uint32_t time) {
+                             uint8_t src_device,
+                             uint32_t time) {
   int index = -1;
   int hash = ether_addr_hash(src);
   int present = map_get(dynamic_ft.map, src, &index);
@@ -148,6 +152,41 @@ void allocate_static_ft(int capacity) {
   vector_allocate(sizeof(struct StaticKey), capacity,
                   &static_ft.keys);
 }
+#ifdef KLEE_VERIFICATION
+
+struct str_field_descr static_map_key_fields[] = {
+  {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
+  {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
+};
+
+struct str_field_descr dynamic_map_key_fields[] = {
+  {0, sizeof(struct ether_addr), "value"}
+};
+
+struct str_field_descr static_vector_entry_fields[] = {
+  {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
+  {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
+};
+
+struct str_field_descr dynamic_vector_entry_fields[] = {
+  {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
+  {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
+};
+
+#endif//KLEE_VERIFICATION
+
+#ifdef KLEE_VERIFICATION
+
+void read_static_ft_from_file() {
+  allocate_static_ft(klee_int("static_capacity"));
+  map_set_layout(static_ft.map, static_map_key_fields,
+                 sizeof(static_map_key_fields)/sizeof(static_map_key_fields[0]));
+  vector_set_layout(static_ft.keys, static_vector_entry_fields,
+                    sizeof(static_vector_entry_fields)/
+                    sizeof(static_vector_entry_fields[0]));
+}
+
+#else//KLEE_VERIFICATION
 
 void read_static_ft_from_file() {
   if (config.static_config_fname[0] == '\0') {
@@ -254,8 +293,9 @@ void read_static_ft_from_file() {
   fclose(cfg_file);
 }
 
-void nf_core_init(void)
-{
+#endif//KLEE_VERIFICATION
+
+void nf_core_init(void) {
   read_static_ft_from_file();
 
   int capacity = config.dyn_capacity;
@@ -264,12 +304,19 @@ void nf_core_init(void)
   dchain_allocate(capacity, &dynamic_ft.heap);
   vector_allocate(sizeof(struct DynamicEntry), capacity,
                   &dynamic_ft.entries);
+
+#ifdef KLEE_VERIFICATION
+  map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
+                 sizeof(dynamic_map_key_fields)/sizeof(dynamic_map_key_fields[0]));
+  vector_set_layout(dynamic_ft.entries, dynamic_vector_entry_fields,
+                    sizeof(dynamic_vector_entry_fields)/
+                    sizeof(dynamic_vector_entry_fields[0]));
+#endif//KLEE_VERIFICATION
 }
 
 int nf_core_process(uint8_t device,
                     struct rte_mbuf* mbuf,
-                    uint32_t now)
-{
+                    uint32_t now) {
   struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 
   bridge_expire_entries(now);
@@ -302,10 +349,15 @@ void nf_print_config() {
   bridge_print_config(&config);
 }
 
-#ifdef KLEE_VERICIATION
+#ifdef KLEE_VERIFICATION
 
 void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
+  /* rte_reset(); */
+  /* dchain_reset(dynamic_ft.heap, ...); */
+  /* map_reset(dynamic_ft.map); */
+  /* vector_reset(dynamic_ft.entries); */
+  /* map_reset(static_ft.map); */
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
@@ -315,4 +367,5 @@ void nf_add_loop_iteration_assumptions(unsigned lcore_id,
 void nf_loop_iteration_end(unsigned lcore_id,
                            uint32_t time) {
 }
-#endif//KLEE_VERICIATION
+
+#endif//KLEE_VERIFICATION

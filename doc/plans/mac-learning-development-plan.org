@@ -36,6 +36,8 @@
 * Verification
 ** symbolic models
    :LOGBOOK:
+   CLOCK: [2017-04-17 Mon 10:49]
+   CLOCK: [2017-04-17 Mon 10:18]--[2017-04-17 Mon 10:31] =>  0:13
    CLOCK: [2017-04-16 Son 19:00]--[2017-04-16 Son 20:14] =>  1:14
    CLOCK: [2017-04-16 Son 11:56]--[2017-04-16 Son 12:25] =>  0:29
    :END:
