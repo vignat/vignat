@@ -109,6 +109,10 @@ int bridge_get_device(struct ether_addr* dst,
   if (present) {
     return device;
   }
+#ifdef KLEE_VERIFICATION
+  map_reset(dynamic_ft.map);
+  vector_reset(dynamic_ft.entries);
+#endif//KLEE_VERIFICATION
 
   int index = -1;
   hash = ether_addr_hash(dst);
@@ -147,10 +151,13 @@ void bridge_put_update_entry(struct ether_addr* src,
 }
 
 void allocate_static_ft(int capacity) {
-  map_allocate(static_key_eq, static_key_hash,
-               capacity, &static_ft.map);
-  vector_allocate(sizeof(struct StaticKey), capacity,
-                  &static_ft.keys);
+  int happy = map_allocate(static_key_eq, static_key_hash,
+                           capacity, &static_ft.map);
+
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating static map");
+  happy = vector_allocate(sizeof(struct StaticKey), capacity,
+                          &static_ft.keys);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating static array");
 }
 #ifdef KLEE_VERIFICATION
 
@@ -299,11 +306,14 @@ void nf_core_init(void) {
   read_static_ft_from_file();
 
   int capacity = config.dyn_capacity;
-  map_allocate(ether_addr_eq, ether_addr_hash,
-               capacity, &dynamic_ft.map);
-  dchain_allocate(capacity, &dynamic_ft.heap);
-  vector_allocate(sizeof(struct DynamicEntry), capacity,
-                  &dynamic_ft.entries);
+  int happy = map_allocate(ether_addr_eq, ether_addr_hash,
+                           capacity, &dynamic_ft.map);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic map");
+  happy = dchain_allocate(capacity, &dynamic_ft.heap);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating heap");
+  happy = vector_allocate(sizeof(struct DynamicEntry), capacity,
+                          &dynamic_ft.entries);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic array");
 
 #ifdef KLEE_VERIFICATION
   map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
@@ -353,8 +363,8 @@ void nf_print_config() {
 
 void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
-  /* rte_reset(); */
-  /* dchain_reset(dynamic_ft.heap, ...); */
+  rte_reset();
+  dchain_reset(dynamic_ft.heap, config.dyn_capacity);
   /* map_reset(dynamic_ft.map); */
   /* vector_reset(dynamic_ft.entries); */
   /* map_reset(static_ft.map); */

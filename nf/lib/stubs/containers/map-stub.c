@@ -32,9 +32,8 @@ int map_allocate(map_keys_equality* keq, smap_key_hash* khash,
   //int allocation_succeeded = klee_int("map_allocation_succeeded");
   *map_out = malloc(sizeof(struct Map));
   if (*map_out != NULL) { //(allocation_succeeded) {
-    //TODO: can malloc return NULL during klee execution?
-    klee_make_symbolic(*map_out, sizeof(struct Map), "map");
-    klee_assert(map_out != NULL);
+    klee_make_symbolic((*map_out), sizeof(struct Map), "map");
+    klee_assert((*map_out) != NULL);
     (*map_out)->entry_claimed = 0;
     (*map_out)->keq = keq;
     (*map_out)->capacity = capacity;
@@ -44,6 +43,16 @@ int map_allocate(map_keys_equality* keq, smap_key_hash* khash,
     return 1;
   }
   return 0;
+}
+
+void map_reset(struct Map* map) {
+  //Do not trace. This function is an internal knob of the model.
+  map->keyp = NULL;
+  map->entry_claimed = 0;
+  map->has_this_key = klee_int("map_has_this_key");
+  map->allocated_index = klee_int("map_allocated_index");
+  klee_assume(0 <= map->allocated_index);
+  klee_assume(map->allocated_index < map->capacity);
 }
 
 static
@@ -62,6 +71,7 @@ int calculate_str_size(struct str_field_descr* descr, int len) {
 void map_set_layout(struct Map* map,
                     struct str_field_descr* key_fields,
                     int key_fields_count) {
+  //Do not trace. This function is an internal knob of the model.
   klee_assert(key_fields_count < PREALLOC_SIZE);
   memcpy(map->key_fields, key_fields,
          sizeof(struct str_field_descr)*key_fields_count);

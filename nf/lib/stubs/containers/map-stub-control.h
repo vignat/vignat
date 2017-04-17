@@ -8,4 +8,6 @@ void map_set_layout(struct Map* map,
                     struct str_field_descr* key_fields,
                     int key_fields_count);
 
+void map_reset(struct Map* map);
+
 #endif//_MAP_STUB_CONTROL_H_INCLUDED_

@@ -31,16 +31,25 @@ int vector_allocate(int elem_size, int capacity,
   if (*vector_out == NULL) return 0;
   klee_make_symbolic(*vector_out, sizeof(struct Vector), "vector");
   (*vector_out)->data = malloc(elem_size);
+  if ((*vector_out)->data == NULL) return 0;
   klee_make_symbolic((*vector_out)->data, elem_size, "vector_data");
   (*vector_out)->elem_size = elem_size;
   (*vector_out)->capacity = capacity;
-  (*vector_out)->index_claimed = 0;
+  (*vector_out)->elem_claimed = 0;
   return 1;
+}
+
+void vector_reset(struct Vector* vector) {
+  //Do not trace. This function is an internal knob of the model.
+  //TODO: reallocate vector->data to avoid having the same pointer?
+  klee_make_symbolic(vector->data, vector->elem_size, "vector_data_reset");
+  vector->elem_claimed = 0;
 }
 
 void vector_set_layout(struct Vector* vector,
                        struct str_field_descr* value_fields,
                        int field_count) {
+  //Do not trace. This function is an internal knob of the model.
   klee_assert(field_count < PREALLOC_SIZE);
   memcpy(vector->fields, value_fields,
          sizeof(struct str_field_descr)*field_count);
