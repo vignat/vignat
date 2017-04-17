@@ -372,6 +372,11 @@ void nf_loop_iteration_begin(unsigned lcore_id,
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        uint32_t time) {
+  rte_reset();
+  dchain_reset(dynamic_ft.heap, config.dyn_capacity);
+  map_reset(dynamic_ft.map);
+  vector_reset(dynamic_ft.entries);
+  map_reset(static_ft.map);
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,

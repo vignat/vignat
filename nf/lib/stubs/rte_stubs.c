@@ -206,7 +206,7 @@ int rte_eal_init(int argc, char ** argv){
 }
 
 uint8_t rte_eth_dev_count(){
-    return 2;
+  return 2;//FIXME: return symbolic
 }
 
 uint8_t rte_lcore_count(){
