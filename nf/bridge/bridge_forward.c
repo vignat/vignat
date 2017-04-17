@@ -150,12 +150,17 @@ void bridge_put_update_entry(struct ether_addr* src,
   }
 }
 
+void init_nothing(void* entry) {
+  /* do nothing */
+}
+
 void allocate_static_ft(int capacity) {
   int happy = map_allocate(static_key_eq, static_key_hash,
                            capacity, &static_ft.map);
 
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating static map");
   happy = vector_allocate(sizeof(struct StaticKey), capacity,
+                          init_nothing,
                           &static_ft.keys);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating static array");
 }
@@ -312,6 +317,7 @@ void nf_core_init(void) {
   happy = dchain_allocate(capacity, &dynamic_ft.heap);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating heap");
   happy = vector_allocate(sizeof(struct DynamicEntry), capacity,
+                          init_nothing,
                           &dynamic_ft.entries);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic array");
 

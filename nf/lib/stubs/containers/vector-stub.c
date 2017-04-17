@@ -18,10 +18,12 @@ struct Vector {
 };
 
 int vector_allocate(int elem_size, int capacity,
+                    vector_init_elem* init_elem,
                     struct Vector** vector_out) {
   klee_trace_ret();
   klee_trace_param_i32(elem_size, "elem_size");
   klee_trace_param_i32(capacity, "capacity");
+  klee_trace_param_fptr(init_elem, "init_elem");
   klee_trace_param_ptr(vector_out, sizeof(struct Vector*), "vector_out");
 
   /* int allocation_succeeded = klee_int("vector_alloc_success"); */

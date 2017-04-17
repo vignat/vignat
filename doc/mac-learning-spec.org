@@ -14,7 +14,7 @@ environment.
 
 #+BEGIN_SRC haskell
 -- An ethernet frame featuring source and destination addresses,
--- and the associated interfaces (in and out)
+-- and the interface the packet originates from
 Frame := <src :: Mac_addr,
           dst :: Mac_addr,
           in_iface :: Integer,
