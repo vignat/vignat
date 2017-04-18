@@ -13,8 +13,12 @@ let last_device_id = ref ""
 let last_time_for_index_alloc = ref ""
 let the_array_lcc_is_local = ref true
 
+let capture_chain ch_name ptr_num args tmp =
+  "//@ assert double_chainp(?" ^ (tmp ch_name) ^ ", " ^
+  (List.nth_exn args ptr_num) ^ ");\n"
 
 let map_struct = Ir.Str ("Map", [])
+let vector_struct = Ir.Str ( "Vector", [] )
 let dchain_struct = Ir.Str ( "DoubleChain", [] )
 let ether_addr_struct = Ir.Str ( "ether_addr", [])
 let static_key_struct = Ir.Str ( "StaticKey", ["addr", ether_addr_struct;
@@ -140,23 +144,35 @@ let fun_types =
                                       "int the_index_rejuvenated = " ^
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
-     "expire_items_single_map", {ret_type = ...;
-                                 arg_types = [];
+     "expire_items_single_map", {ret_type = Sint32;
+                                 arg_types = [Ptr dchain_struct;
+                                              Ptr vector_struct;
+                                              Ptr map_struct;
+                                              Fptr "entry_extract_key";
+                                              Fptr "entry_pack_key";
+                                             Uint32];
                                  extra_ptr_types = [];
                                  lemmas_before = [];
                                  lemmas_after = [];};
-     "map_allocate", {ret_type = ...;
-                      arg_types = [];
+     "map_allocate", {ret_type = Sint32;
+                      arg_types = [Fptr "map_keys_equality";
+                                   Fptr "map_key_hash";
+                                   Sint32;
+                                   Ptr (Ptr map_struct)];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [];};
-     "map_get", {ret_type = ...;
-                 arg_types = [];
+     "map_get", {ret_type = Sint32;
+                 arg_types = [Ptr map_struct;
+                              Ptr Void;
+                              Ptr Sint32];
                  extra_ptr_types = [];
                  lemmas_before = [];
                  lemmas_after = [];};
-     "map_put", {ret_type = ...;
-                 arg_types = [];
+     "map_put", {ret_type = Void;
+                 arg_types = [Ptr map_struct;
+                              Ptr Void;
+                              Sint32];
                  extra_ptr_types = [];
                  lemmas_before = [];
                  lemmas_after = [];};
@@ -202,18 +218,24 @@ let fun_types =
                     extra_ptr_types = [];
                     lemmas_before = [];
                     lemmas_after = [];};
-     "vector_allocate", {ret_type = ...;
-                         arg_types = [];
+     "vector_allocate", {ret_type = Sint32;
+                         arg_types = [Sint32;
+                                      Sint32;
+                                      Fptr "vector_init_elem";
+                                      Ptr (Ptr vector_struct)];
                          extra_ptr_types = [];
                          lemmas_before = [];
                          lemmas_after = [];};
-     "vector_borrow", {ret_type = ...;
-                       arg_types = [];
+     "vector_borrow", {ret_type = Ptr Void;
+                       arg_types = [Ptr vector_struct;
+                                    Sint32];
                        extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};
-     "vector_return", {ret_type = ...;
-                       arg_types = [];
+     "vector_return", {ret_type = Void;
+                       arg_types = [Ptr vector_struct;
+                                    Sint32;
+                                    Ptr Void];
                        extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};]
