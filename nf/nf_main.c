@@ -119,6 +119,8 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 
 void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
   // do nothing for now.
+  // TODO: we do not trace this call, which is wrong.
+  // let us see at which point Vigor discovers that.
 }
 
 #else //KLEE_VERIFICATION
