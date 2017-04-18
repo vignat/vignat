@@ -9,6 +9,7 @@
 #  include "lib/stubs/containers/map-stub-control.h"
 #  include "lib/stubs/containers/double-chain-stub-control.h"
 #  include "lib/stubs/containers/vector-stub-control.h"
+#  include "lib/stubs/rte-stubs-control.h"
 #else//KLEE_VERIFICATION
 #  include <assert.h>
 #  include <errno.h>

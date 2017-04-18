@@ -33,6 +33,9 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
   (*vector_out)->data = data_alloc;
   (*vector_out)->elem_size = elem_size;
   (*vector_out)->capacity = capacity;
+  for (int i = 0; i < capacity; ++i) {
+    init_elem((*vector_out)->data + elem_size*i);
+  }
   return 1;
 }
 

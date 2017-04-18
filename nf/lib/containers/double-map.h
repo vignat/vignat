@@ -2,22 +2,16 @@
 #define _DOUBLE_MAP_H_INCLUDED_
 
 #include "map-impl.h"
+#include "map-util.h"
 
 //@ #include <nat.gh>
 //@ #include "stdex.gh"
-
-#define CAPACITY_UPPER_LIMIT 140000
 
 /*
   This implementation expects keys to be the part of the value. The keys
   are extracted with dmap_extract_keys function and are put back with
   dmap_pack_keys.
  */
-
-typedef int map_key_hash/*@ <K>(predicate (void*; K) keyp,
-                                fixpoint (K,int) hash) @*/(void* k1);
-//@ requires [?fr]keyp(k1, ?kk1);
-//@ ensures [fr]keyp(k1, kk1) &*& result == hash(kk1);
 
 typedef void uq_value_copy/*@<K>(predicate (void*; K) vp, int size) @*/(char* dst, void* src);
 //@ requires [?fr]vp(src, ?v) &*& dst[0..size] |-> _;

@@ -17,11 +17,10 @@ struct Map {
   int key_size;
   int key_field_count;
   struct str_field_descr key_fields[PREALLOC_SIZE];
-  // TODO: add descriptors for keys.
   map_keys_equality* keq;
 };
 
-int map_allocate(map_keys_equality* keq, smap_key_hash* khash,
+int map_allocate(map_keys_equality* keq, map_key_hash* khash,
                  int capacity,
                  struct Map** map_out) {
   klee_trace_ret();

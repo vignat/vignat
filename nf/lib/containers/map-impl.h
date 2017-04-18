@@ -164,8 +164,6 @@ void map_impl_put/*@ <kt> @*/(int* busybits, void** keyps,
 
 //TODO: Keep track of the key pointers, in order to preserve the pointer value
 // when releasing it with map_impl_erase.
-//TODO: allow a hint, to reuse the map_impl_get result
-// (in case you were searching before erasing)
 void map_impl_erase/*@ <kt> @*/(int* busybits, void** keyps, int* key_hashes,
                                 int* chns,
                                 void* keyp, map_keys_equality* eq, int hash,
