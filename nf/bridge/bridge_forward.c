@@ -89,12 +89,17 @@ void dyn_entry_get_addr(void* entry,
   *((struct ether_addr**)addr_out) = &((struct DynamicEntry*)entry)->addr;
 }
 
+void dyn_entry_retrieve_addr(void* entry, void* addr) {
+  /* do nothing */
+}
+
 int bridge_expire_entries(uint32_t time) {
   if (time < config.expiration_time) return 0;
   uint32_t min_time = time - config.expiration_time;
   return expire_items_single_map(dynamic_ft.heap, dynamic_ft.entries,
                                  dynamic_ft.map,
                                  dyn_entry_get_addr,
+                                 dyn_entry_retrieve_addr,
                                  min_time);
 }
 
@@ -190,6 +195,8 @@ struct str_field_descr dynamic_vector_entry_fields[] = {
 
 #ifdef KLEE_VERIFICATION
 
+//TODO: this function must appear in the traces.
+// let's see if we notice that it does not
 void read_static_ft_from_file() {
   allocate_static_ft(klee_int("static_capacity"));
   map_set_layout(static_ft.map, static_map_key_fields,

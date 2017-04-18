@@ -1,11 +1,17 @@
 #ifndef _COHERENCE_H_INCLUDED_
 #define _COHERENCE_H_INCLUDED_
+#include "containers/vector.h"
+#include "containers/map.h"
 #include "containers/double-map.h"
 #include "containers/double-chain.h"
 
 
 /*@
   predicate dmap_dchain_coherent<t1,t2,vt>(dmap<t1,t2,vt> m, dchain ch);
+  @*/
+
+/*@
+  predicate map_vec_chain_coherent<kt,vt>(list<pair<kt, int> > m, list<vt> v, dchain ch);
   @*/
 
 /*@

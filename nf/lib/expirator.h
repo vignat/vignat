@@ -38,9 +38,46 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
             dmap_dchain_coherent<K1,K2,V>(nm, nch) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 
+typedef void entry_extract_key/*@ <kt,et> (predicate (void*;kt) kp,
+                                           predicate (void*;et) full_ep,
+                                           predicate (void*,et) bare_ep,
+                                           fixpoint (void*, void*, bool)
+                                             right_offsets,
+                                           fixpoint (et,kt) ek) @*/
+                           (void* entry, void** key);
+/*@ requires [?fr]full_ep(entry, ?e) &*& *key |-> _; @*/
+/*@ ensures [fr]bare_ep(entry, e) &*& *key |-> ?nk &*&
+            [fr]kp(nk, ek(e)) &*&
+            true == right_offsets(entry, nk); @*/
+
+typedef void entry_pack_key/*@ <kt,et> (predicate (void*;kt) kp,
+                                        predicate (void*;et) full_ep,
+                                        predicate (void*,et) bare_ep,
+                                        fixpoint (void*, void*, bool)
+                                          right_offsets,
+                                        fixpoint (et,kt) ek) @*/
+                           (void* entry, void* key);
+/*@ requires [?fr]bare_ep(entry, ?e) &*&
+             [fr]kp(key, ek(e)) &*&
+             true == right_offsets(entry, key); @*/
+/*@ ensures [fr]full_ep(entry, e); @*/
+
 int expire_items_single_map(struct DoubleChain* chain,
                             struct Vector* vector,
                             struct Map* map,
-                            void (key_from_entry)(void* entry, void** key),
+                            entry_extract_key* eek,
+                            entry_pack_key* epk,
                             uint32_t time);
+/*@ requires mapp(map, ?kp, ?hsh, mapc(?cap, ?m)) &*&
+             [_]is_entry_extract_key(eek, kp, ?fep, ?bep, ?roffs, ?ek) &*&
+             [_]is_entry_pack_key(epk, kp, fep, bep, roffs, ek) &*&
+             vectorp(vector, ?entp, ?v) &*&
+             double_chainp(?ch, chain) &*&
+             map_vec_chain_coherent(m, v, ch); @*/
+/*@ ensures mapp(map, kp, hsh, mapc(cap, ?nm)) &*&
+            vectorp(vector, entp, ?nv) &*&
+            double_chainp(?nch, chain) &*&
+            nch == dchain_expire_old_indexes_fp(ch, time) &*&
+            map_vec_chain_coherent(nm, nv, nch) &*&
+            result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 #endif //_EXPIRATOR_H_INCLUDED_
