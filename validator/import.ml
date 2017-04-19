@@ -1211,8 +1211,8 @@ let fixup_placeholder_ptrs_in_tterm tterm =
         | _, Some x -> Some x
         | Ptr ptee, None -> let dummy_value = allocate_dummy addr ptee in
           Some {v=Addr dummy_value; t}
-        | _ -> failwith ("Can not fix placeholder:" ^
-                        (render_tterm tterm))
+        | _ -> failwith ("Can not fixup placeholder:" ^
+                         (render_tterm tterm))
       end
     | _ -> None
   in
@@ -1223,8 +1223,20 @@ let fixup_placeholder_ptrs vars =
     {name;value=fixup_placeholder_ptrs_in_tterm value})
 
 let fixup_placeholder_ptrs_in_eq_cond {lhs;rhs} =
-  {lhs=fixup_placeholder_ptrs_in_tterm lhs;
-   rhs=fixup_placeholder_ptrs_in_tterm rhs}
+  lprintf "fixing pph in %s == %s\n" (render_tterm lhs) (render_tterm rhs);
+  match rhs.v with
+  | Utility (Ptr_placeholder addr) ->
+    begin match find_first_known_address addr with
+      | Some x -> {lhs=lhs; rhs=x}
+      | None ->
+        known_addresses :=
+          Int64.Map.add !known_addresses
+            ~key:addr ~data:[{value=lhs; callid=0; str_depth=0}];
+        {lhs=lhs;rhs=lhs}
+    end
+  | _ ->
+    {lhs=fixup_placeholder_ptrs_in_tterm lhs;
+     rhs=fixup_placeholder_ptrs_in_tterm rhs}
 
 let fixup_placeholder_ptrs_in_hist_calls hist_calls =
   let in_one_call {context;result} =
@@ -1277,9 +1289,9 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
   let free_vars = typed_vars_to_varspec free_vars in
-  let arguments = fixup_placeholder_ptrs arguments in
   let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
   let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
+  let arguments = fixup_placeholder_ptrs arguments in
   let tmps = !allocated_tmp_vals in
   (* Do not render the allocated_dummies *)
   {preamble;free_vars;arguments;tmps;

@@ -236,7 +236,19 @@ let fun_types =
                                       Fptr "vector_init_elem";
                                       Ptr (Ptr vector_struct)];
                          extra_ptr_types = [];
-                         lemmas_before = [];
+                         lemmas_before = [
+                           (fun args _ ->
+                              "/*@ //TODO: this hack should be \
+                               converted to a system \n\
+                               assume(sizeof(struct DynamicEntry) == " ^
+                              (List.nth_exn args 0) ^ ");\n@*/\n");
+                           tx_bl "produce_function_pointer_chunk \
+                                  vector_init_elem<dynenti>(init_nothing)\
+                                  (dynamic_entryp, sizeof(struct DynamicEntry))(a) \
+                                  {\
+                                  call();\
+                                  }";
+                         ];
                          lemmas_after = [];};
      "vector_borrow", {ret_type = Ptr Void;
                        arg_types = [Ptr vector_struct;

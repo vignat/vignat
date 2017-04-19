@@ -31,9 +31,11 @@ struct StaticFilterTable {
 /*@
   inductive ether_addri = eaddrc(int, int, int, int, int, int);
   inductive stat_keyi = stkc(int, ether_addri);
+  inductive dynenti = dynentc(int, ether_addri);
 
   predicate ether_addrp(void* ptr; ether_addri addr);
   predicate static_keyp(void* ptr; stat_keyi k);
+  predicate dynamic_entryp(void* ptr; dynenti de);
 
   fixpoint int ether_addr_hash(ether_addri ea);
 
@@ -76,7 +78,7 @@ void dyn_entry_retrieve_addr(void* entry, void* addr);
 /*@ ensures true; @*/
 
 void init_nothing(void* entry);
-/*@ requires true; @*/
-/*@ ensures true; @*/
+/*@ requires chars(entry, sizeof(struct DynamicEntry), _); @*/
+/*@ ensures dynamic_entryp(entry, _); @*/
 
 #endif//_BRIDGE_DATA_H_INCLUDED_

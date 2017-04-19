@@ -16,14 +16,17 @@ struct Vector;
                            void* entry);
   @*/
 
-typedef void vector_init_elem/*@ <t> (predicate (void*;t) entp) @*/
+typedef void vector_init_elem/*@ <t> (predicate (void*;t) entp,
+                                      int elem_size) @*/
                              (void* elem);
+/*@ requires chars(elem, elem_size, _); @*/
+/*@ ensures entp(elem, _); @*/
 
 int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
                                vector_init_elem* init_elem,
                                struct Vector** vector_out);
 /*@ requires 0 < elem_size &*& 0 < capacity &*&
-             [_]is_vector_init_elem(init_elem, ?entp) &*&
+             [_]is_vector_init_elem<t>(init_elem, ?entp, elem_size) &*&
              *vector_out |-> ?old_vo; @*/
 /*@ ensures result == 0 ?
             (*vector_out |-> old_vo) :
