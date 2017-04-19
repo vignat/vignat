@@ -4,7 +4,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = bridge
 
 # sources
-SRCS-y := bridge_forward.c ../nf_main.c bridge_config.c \
+SRCS-y := bridge_forward.c ../nf_main.c bridge_config.c bridge_data.c \
           ../lib/containers/map.c ../lib/containers/vector.c \
           ../lib/nf_time.c \
           ../lib/nf_util.c ../lib/containers/map-impl.c \
@@ -37,12 +37,12 @@ verify:
 		../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
-    bridge_forward.c bridge_config.c \
+    bridge_forward.c bridge_config.c bridge_data.c \
 		../nf_main.c \
 		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow \
 		-fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc \
-		rte_stubs.bc bridge_forward.bc \
+		rte_stubs.bc bridge_forward.bc bridge_data.bc \
 		nf_main.bc nf_util.bc bridge_config.bc \
 		my-time-stub.bc expirator-stub.bc \
 		map-stub.bc double-chain-stub.bc vector-stub.bc \
@@ -64,4 +64,5 @@ verifast:
 		../lib/coherence.c \
 		../lib/expirator.c \
 		../lib/containers/vector.c \
-		../lib/containers/map.c
+		../lib/containers/map.c \
+		bridge_data.c

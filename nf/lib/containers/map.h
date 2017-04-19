@@ -25,6 +25,7 @@ int map_allocate/*@ <t> @*/(map_keys_equality* keq,
 /*@ ensures result == 0 ?
               *map_out |-> old_mo :
               (*map_out |-> ?new_mo &*&
+               result == 1 &*&
                mapp(new_mo, kp, hsh, mapc(capacity, nil))); @*/
 
 int map_get/*@ <t> @*/(struct Map* map, void* key, int* value_out);

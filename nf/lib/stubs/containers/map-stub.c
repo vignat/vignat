@@ -28,9 +28,10 @@ int map_allocate(map_keys_equality* keq, map_key_hash* khash,
   klee_trace_param_fptr(khash, "khash");
   klee_trace_param_i32(capacity, "capacity");
   klee_trace_param_ptr(map_out, sizeof(struct Map*), "map_out");
-  //int allocation_succeeded = klee_int("map_allocation_succeeded");
-  *map_out = malloc(sizeof(struct Map));
-  if (*map_out != NULL) { //(allocation_succeeded) {
+  int allocation_succeeded = klee_int("map_allocation_succeeded");
+  if (allocation_succeeded) {
+    *map_out = malloc(sizeof(struct Map));
+    klee_assume(*map_out != NULL);
     klee_make_symbolic((*map_out), sizeof(struct Map), "map");
     klee_assert((*map_out) != NULL);
     (*map_out)->entry_claimed = 0;

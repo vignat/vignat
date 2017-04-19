@@ -26,6 +26,7 @@
 #include "lib/nf_util.h"
 #include "lib/nf_log.h"
 #include "bridge_config.h"
+#include "bridge_data.h"
 
 #include "lib/containers/double-chain.h"
 #include "lib/containers/map.h"
@@ -34,64 +35,8 @@
 
 struct bridge_config config;
 
-struct StaticKey {
-  struct ether_addr addr;
-  uint8_t device;
-};
-
-struct DynamicEntry {
-  struct ether_addr addr;
-  uint8_t device;
-};
-
-struct DynamicFilterTable {
-  struct Map* map;
-  struct DoubleChain* heap;
-  struct Vector* entries;
-};
-
-struct StaticFilterTable {
-  struct Map* map;
-  struct Vector* keys;
-};
-
 struct StaticFilterTable static_ft;
 struct DynamicFilterTable dynamic_ft;
-
-int ether_addr_eq(void* k1, void* k2) {
-  struct ether_addr* a = (struct ether_addr*)k1;
-  struct ether_addr* b = (struct ether_addr*)k2;
-  return 0 == memcmp(a->addr_bytes,
-                     b->addr_bytes,
-                     6);
-}
-
-int static_key_eq(void* k1, void* k2) {
-  struct StaticKey* a = (struct StaticKey*) k1;
-  struct StaticKey* b = (struct StaticKey*) k2;
-  return a->device == b->device && ether_addr_eq(&a->addr, &b->addr);
-
-}
-
-int ether_addr_hash(void* k) {
-  struct ether_addr* addr = (struct ether_addr*)k;
-  return (int)((*(uint32_t*)addr->addr_bytes) ^
-               (*(uint32_t*)(addr->addr_bytes + 2)));
-}
-
-int static_key_hash(void* key) {
-  struct StaticKey *k = (struct StaticKey*)key;
-  return (ether_addr_hash(&k->addr) << 2) ^ k->device;
-}
-
-void dyn_entry_get_addr(void* entry,
-                        void** addr_out) {
-  *((struct ether_addr**)addr_out) = &((struct DynamicEntry*)entry)->addr;
-}
-
-void dyn_entry_retrieve_addr(void* entry, void* addr) {
-  /* do nothing */
-}
 
 int bridge_expire_entries(uint32_t time) {
   if (time < config.expiration_time) return 0;
@@ -156,11 +101,9 @@ void bridge_put_update_entry(struct ether_addr* src,
   }
 }
 
-void init_nothing(void* entry) {
-  /* do nothing */
-}
-
 void allocate_static_ft(int capacity) {
+  assert(0 < capacity);
+  assert(capacity < CAPACITY_UPPER_LIMIT);
   int happy = map_allocate(static_key_eq, static_key_hash,
                            capacity, &static_ft.map);
 
@@ -198,7 +141,8 @@ struct str_field_descr dynamic_vector_entry_fields[] = {
 //TODO: this function must appear in the traces.
 // let's see if we notice that it does not
 void read_static_ft_from_file() {
-  allocate_static_ft(klee_int("static_capacity"));
+  int static_capacity = klee_range(1, CAPACITY_UPPER_LIMIT, "static_capacity");
+  allocate_static_ft(static_capacity);
   map_set_layout(static_ft.map, static_map_key_fields,
                  sizeof(static_map_key_fields)/sizeof(static_map_key_fields[0]));
   vector_set_layout(static_ft.keys, static_vector_entry_fields,
@@ -232,6 +176,10 @@ void read_static_ft_from_file() {
   // Make sure the hash table is occupied only by 50%
   int capacity = number_of_lines * 2;
   rewind(cfg_file);
+  if (CAPACITY_UPPER_LIMIT <= capacity) {
+    rte_exit(EXIT_FAILURE, "Too many static rules (%d), max: %d",
+             number_of_lines, CAPACITY_UPPER_LIMIT/2);
+  }
   allocate_static_ft(capacity);
   int count = 0;
 

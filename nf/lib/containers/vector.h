@@ -28,6 +28,7 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
 /*@ ensures result == 0 ?
             (*vector_out |-> old_vo) :
             (*vector_out |-> ?new_vo &*&
+             result == 1 &*&
              vectorp(new_vo, entp, _)); @*/
 
 void* vector_borrow/*@ <t> @*/(struct Vector* vector, int index);

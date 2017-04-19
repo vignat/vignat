@@ -340,6 +340,7 @@ let allocated_complex_vals : var_spec String.Map.t ref = ref String.Map.empty
 
 let tmp_val_name_gen = name_gen "tmp"
 let allocated_tmp_vals = ref String.Map.empty
+let allocated_dummies = ref []
 
 let get_sint_in_bounds v =
   (*Special case for 64bit -1, for now,
@@ -422,10 +423,10 @@ let find_first_known_address addr =
   Option.map (Int64.Map.find !known_addresses addr)
     ~f:(fun lst -> (List.hd_exn lst).value)
 
-let find_first_known_address_or_dummy addr =
+let find_first_known_address_or_dummy addr t =
   match find_first_known_address addr with
   | Some tt -> tt
-  | None -> {v=Utility (Ptr_placeholder addr); t=Unknown}
+  | None -> {v=Utility (Ptr_placeholder addr); t=Ptr t}
 
 let rec get_sexp_value exp t =
   let exp = expand_shorted_sexp exp in
@@ -449,7 +450,7 @@ let rec get_sexp_value exp t =
           else
             match t with
             | Ptr x ->
-              find_first_known_address_or_dummy addr
+              find_first_known_address_or_dummy addr x
             | _ -> {v=Int (int_of_string v);t}
         else {v=Id v;t}
     end
@@ -1189,12 +1190,30 @@ let typed_vars_to_varspec free_vars =
         String.Map.add acc ~key:vname
           ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
 
+let allocate_dummy addr t =
+  let name = ("dummy_" ^ (Int64.to_string addr)) in
+  allocated_dummies := {vname=name; t={w=Noidea;
+                                       s=Noidea;
+                                       precise=t}}::!allocated_dummies;
+  known_addresses :=
+    Int64.Map.add !known_addresses
+      ~key:addr ~data:[{value={v=Id name;t}; callid=0; str_depth=0}];
+  {v=Id name;t}
+
 let fixup_placeholder_ptrs_in_tterm tterm =
   let replace_placeholder = function
     | {v=Utility (Ptr_placeholder addr);
-       t=_} ->
+       t} ->
       lprintf "fixing placeholder for %Ld\n" addr;
-      find_first_known_address addr
+      begin match t, find_first_known_address addr with
+        | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
+                                  (render_tterm tterm))
+        | _, Some x -> Some x
+        | Ptr ptee, None -> let dummy_value = allocate_dummy addr ptee in
+          Some {v=Addr dummy_value; t}
+        | _ -> failwith ("Can not fix placeholder:" ^
+                        (render_tterm tterm))
+      end
     | _ -> None
   in
   call_recursively_on_tterm replace_placeholder tterm
@@ -1255,13 +1274,14 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets in
-  let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
   let free_vars = typed_vars_to_varspec free_vars in
   let arguments = fixup_placeholder_ptrs arguments in
   let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
   let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
+  let tmps = !allocated_tmp_vals in
+  (* Do not render the allocated_dummies *)
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing;

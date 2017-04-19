@@ -7,6 +7,8 @@
 #ifndef RTE_STUBS_H
 #define RTE_STUBS_H
 
+#include "lib/custom_ether_addr_def.h"
+
 #define IPV4_HDR_IHL_MASK 0x0f
 
 #define TAILQ_ENTRY(type)                                               \
@@ -138,12 +140,6 @@ struct rte_mbuf {
     /** Timesync flags for use with IEEE1588. */
     uint16_t timesync;
 } __rte_cache_aligned;
-
-#define ETHER_ADDR_LEN  6 /**< Length of Ethernet address. */
-
-struct ether_addr {
-    uint8_t addr_bytes[ETHER_ADDR_LEN]; /**< Address bytes in transmission order */
-} __attribute__((__packed__));
 
 struct ether_hdr {
     struct ether_addr d_addr; /**< Destination address. */

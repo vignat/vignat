@@ -67,7 +67,7 @@ let fun_types =
                       lemmas_before = [];
                       lemmas_after = [
                         (fun params ->
-                        "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
+                           "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
@@ -160,7 +160,19 @@ let fun_types =
                                    Sint32;
                                    Ptr (Ptr map_struct)];
                       extra_ptr_types = [];
-                      lemmas_before = [];
+                      lemmas_before = [
+                        tx_bl "produce_function_pointer_chunk \
+                               map_keys_equality<stat_keyi>(static_key_eq)\
+                               (static_keyp)(a, b) \
+                               {\
+                               call();\
+                               }";
+                        tx_bl "produce_function_pointer_chunk \
+                               map_key_hash<stat_keyi>(static_key_hash)\
+                               (static_keyp, st_key_hash)(a) \
+                               {\
+                               call();\
+                               }";];
                       lemmas_after = [];};
      "map_get", {ret_type = Sint32;
                  arg_types = [Ptr map_struct;

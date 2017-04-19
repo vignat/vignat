@@ -4,7 +4,7 @@
 #define CAPACITY_UPPER_LIMIT 140000
 
 typedef int map_key_hash/*@ <K>(predicate (void*; K) keyp,
-                          fixpoint (K,int) hash) @*/(void* k1);
+                                fixpoint (K,int) hash) @*/(void* k1);
 //@ requires [?fr]keyp(k1, ?kk1);
 //@ ensures [fr]keyp(k1, kk1) &*& result == hash(kk1);
 
