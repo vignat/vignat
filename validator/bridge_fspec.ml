@@ -161,19 +161,65 @@ let fun_types =
                                    Ptr (Ptr map_struct)];
                       extra_ptr_types = [];
                       lemmas_before = [
-                        tx_bl "produce_function_pointer_chunk \
-                               map_keys_equality<stat_keyi>(static_key_eq)\
-                               (static_keyp)(a, b) \
-                               {\
-                               call();\
-                               }";
-                        tx_bl "produce_function_pointer_chunk \
-                               map_key_hash<stat_keyi>(static_key_hash)\
-                               (static_keyp, st_key_hash)(a) \
-                               {\
-                               call();\
-                               }";];
-                      lemmas_after = [];};
+                        (fun args tmp ->
+                           "/*@ if (" ^ (List.nth_exn args 0) ^
+                           " == static_key_eq) {\n" ^
+                           "produce_function_pointer_chunk \
+                            map_keys_equality<stat_keyi>(static_key_eq)\
+                            (static_keyp)(a, b) \
+                            {\
+                            call();\
+                            }\n\
+                            produce_function_pointer_chunk \
+                            map_key_hash<stat_keyi>(static_key_hash)\
+                            (static_keyp, st_key_hash)(a) \
+                            {\
+                            call();\
+                            }\n\
+                            } else {\n\
+                            produce_function_pointer_chunk \
+                            map_keys_equality<ether_addri>(ether_addr_eq)\
+                            (ether_addrp)(a, b) \
+                            {\
+                            call();\
+                            }\n\
+                            produce_function_pointer_chunk \
+                            map_key_hash<ether_addri>(ether_addr_hash)\
+                            (ether_addrp, eth_addr_hash)(a) \
+                            {\
+                            call();\
+                            }\n\
+                            } @*/ \n");];
+                      lemmas_after = [
+                        (fun params ->
+                           "/*@ if (" ^ (List.nth_exn params.args 0) ^
+                           " == static_key_eq) {\n\
+                            assert [?" ^ (params.tmp_gen "imkest") ^
+                           "]is_map_keys_equality(static_key_eq,\
+                            static_keyp);\n\
+                            close [" ^ (params.tmp_gen "imkest") ^
+                           "]hide_is_map_keys_equality(static_key_eq, \
+                            static_keyp);\n\
+                            assert [?" ^ (params.tmp_gen "imkhst") ^
+                           "]is_map_key_hash(static_key_hash,\
+                            static_keyp, st_key_hash);\n\
+                            close [" ^ (params.tmp_gen "imkhst") ^
+                           "]hide_is_map_key_hash(static_key_hash, \
+                            static_keyp, st_key_hash);\n\
+                            } else {\n\
+                            assert [?" ^ (params.tmp_gen "imkedy") ^
+                           "]is_map_keys_equality(ether_addr_eq,\
+                            ether_addrp);\n\
+                            close [" ^ (params.tmp_gen "imkedy") ^
+                           "]hide_is_map_keys_equality(ether_addr_eq, \
+                            ether_addrp);\n\
+                            assert [?" ^ (params.tmp_gen "imkhdy") ^
+                           "]is_map_key_hash(ether_addr_hash,\
+                            ether_addrp, eth_addr_hash);\n\
+                            close [" ^ (params.tmp_gen "imkhdy") ^
+                           "]hide_is_map_key_hash(ether_addr_hash, \
+                            ether_addrp, eth_addr_hash);\n\
+                            } @*/")];};
      "map_get", {ret_type = Sint32;
                  arg_types = [Ptr map_struct;
                               Ptr Void;
@@ -236,19 +282,7 @@ let fun_types =
                                       Fptr "vector_init_elem";
                                       Ptr (Ptr vector_struct)];
                          extra_ptr_types = [];
-                         lemmas_before = [
-                           (fun args _ ->
-                              "/*@ //TODO: this hack should be \
-                               converted to a system \n\
-                               assume(sizeof(struct DynamicEntry) == " ^
-                              (List.nth_exn args 0) ^ ");\n@*/\n");
-                           tx_bl "produce_function_pointer_chunk \
-                                  vector_init_elem<dynenti>(init_nothing)\
-                                  (dynamic_entryp, sizeof(struct DynamicEntry))(a) \
-                                  {\
-                                  call();\
-                                  }";
-                         ];
+                         lemmas_before = [];
                          lemmas_after = [];};
      "vector_borrow", {ret_type = Ptr Void;
                        arg_types = [Ptr vector_struct;
@@ -282,6 +316,19 @@ struct
                   uint8_t sent_on_port;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
+                 ^
+                 "/*@ //TODO: this hack should be \
+                  converted to a system \n\
+                  assume(sizeof(struct DynamicEntry) == 7);\n@*/\n"
+                 ^
+                 "/*@ assume(ether_addr_eq != static_key_eq); @*/\n"
+                 ^
+                 "/*@ produce_function_pointer_chunk \
+                  vector_init_elem<dynenti>(init_nothing)\
+                  (dynamic_entryp, sizeof(struct DynamicEntry))(a) \
+                  {\
+                  call();\
+                  } @*/\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"

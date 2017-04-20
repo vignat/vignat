@@ -47,3 +47,14 @@ ensures 0 == (0&x);
   assume(false);//TODO
 }
 @*/
+
+/*@ predicate hide_is_map_keys_equality<t>(map_keys_equality* fun,
+                                           predicate (void*;t) keyp) =
+      is_map_keys_equality<t>(fun, keyp);
+ @*/
+
+/*@ predicate hide_is_map_key_hash<t>(map_key_hash* fun,
+                                      predicate (void*;t) keyp,
+                                      fixpoint (t,int) hsh) =
+      is_map_key_hash<t>(fun, keyp, hsh);
+ @*/

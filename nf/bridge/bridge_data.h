@@ -37,7 +37,7 @@ struct StaticFilterTable {
   predicate static_keyp(void* ptr; stat_keyi k);
   predicate dynamic_entryp(void* ptr; dynenti de);
 
-  fixpoint int ether_addr_hash(ether_addri ea);
+  fixpoint int eth_addr_hash(ether_addri ea);
 
   fixpoint int st_key_hash(stat_keyi k);
   @*/
@@ -61,7 +61,7 @@ int static_key_eq(void* k1, void* k2);
 int ether_addr_hash(void* k);
 /*@ requires [?fr]ether_addrp(k, ?ea); @*/
 /*@ ensures [fr]ether_addrp(k, ea) &*&
-            result == ether_addr_hash(ea); @*/
+            result == eth_addr_hash(ea); @*/
 
 int static_key_hash(void* key);
 /*@ requires [?fr]static_keyp(key, ?sk); @*/
