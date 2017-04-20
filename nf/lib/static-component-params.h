@@ -41,11 +41,13 @@
 #  include <rte_string_fns.h>
 #else //_NO_VERIFAST_
 
+#include "lib/custom_ether_addr_def.h"
+
 struct rte_mempool {};
 
 struct ether_hdr {
-  //struct ether_addr d_addr; /**< Destination address. */
-  //struct ether_addr s_addr; /**< Source address. */
+  struct ether_addr d_addr; /**< Destination address. */
+  struct ether_addr s_addr; /**< Source address. */
   uint16_t ether_type;      /**< Frame type. */
 };
 

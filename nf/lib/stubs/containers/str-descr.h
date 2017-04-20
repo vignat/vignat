@@ -14,4 +14,12 @@ struct nested_field_descr {
   char *name;
 };
 
+struct nested_nested_field_descr {
+  int base_base_offset;
+  int base_offset;
+  int offset;
+  int width;
+  char *name;
+};
+
 #endif//_STR_DESCR_H_INCLUDED_

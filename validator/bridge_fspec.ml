@@ -20,7 +20,12 @@ let capture_chain ch_name ptr_num args tmp =
 let map_struct = Ir.Str ("Map", [])
 let vector_struct = Ir.Str ( "Vector", [] )
 let dchain_struct = Ir.Str ( "DoubleChain", [] )
-let ether_addr_struct = Ir.Str ( "ether_addr", [])
+let ether_addr_struct = Ir.Str ( "ether_addr", ["a", Uint8;
+                                                "b", Uint8;
+                                                "c", Uint8;
+                                                "d", Uint8;
+                                                "e", Uint8;
+                                                "f", Uint8;])
 let static_key_struct = Ir.Str ( "StaticKey", ["addr", ether_addr_struct;
                                                "device", Uint8] )
 let dynamic_entry_struct = Ir.Str ( "DynamicEntry", ["addr", ether_addr_struct;
@@ -28,7 +33,34 @@ let dynamic_entry_struct = Ir.Str ( "DynamicEntry", ["addr", ether_addr_struct;
 let ether_hdr_struct = Ir.Str ("ether_hdr", ["d_addr", ether_addr_struct;
                                              "s_addr", ether_addr_struct;
                                              "ether_type", Uint16;])
-let user_buf_struct = Ir.Str ("user_buf", ["ether", ether_hdr_struct;])
+
+let ipv4_hdr_struct = Ir.Str ("ipv4_hdr", ["version_ihl", Uint8;
+                                           "type_of_service", Uint8;
+                                           "total_length", Uint16;
+                                           "packet_id", Uint16;
+                                           "fragment_offset", Uint16;
+                                           "time_to_live", Uint8;
+                                           "next_proto_id", Uint8;
+                                           (* Too difficult to check
+                                              "hdr_checksum", Uint16; *)
+                                           "src_addr", Uint32;
+                                           "dst_addr", Uint32;])
+let tcp_hdr_struct = Ir.Str ("tcp_hdr", ["src_port", Uint16;
+                                         "dst_port", Uint16;
+                                         "sent_seq", Uint32;
+                                         "recv_ack", Uint32;
+                                         "data_off", Uint8;
+                                         "tcp_flags", Uint8;
+                                         "rx_win", Uint16;
+                                         (* too difficult to check
+                                            "cksum", Uint16; *)
+                                         "tcp_urp", Uint16;])
+(* FIXME: for bridge only ether_hdr is needed, the other two are here,
+   just because rte_stubs.c dumps them for the other NF (NAT), and validator
+   ensures we read everything dumped.*)
+let user_buf_struct = Ir.Str ("user_buf", ["ether", ether_hdr_struct;
+                                           "ipv4", ipv4_hdr_struct;
+                                           "tcp", tcp_hdr_struct;])
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                ["buf_addr", Ptr user_buf_struct;
                                 "buf_physaddr", Uint64;

@@ -50,6 +50,9 @@ struct str_field_descr mbuf_descrs[] = {
 };
 
 struct nested_field_descr user_buf_nested[] = {
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, ether_type), sizeof(uint16_t), "ether_type"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), sizeof(struct ether_addr), "d_addr"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), sizeof(struct ether_addr), "s_addr"},
   {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, version_ihl), sizeof(uint8_t), "version_ihl"},
   {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, type_of_service), sizeof(uint8_t), "type_of_service"},
   {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, total_length), sizeof(uint16_t), "total_length"},
@@ -80,6 +83,21 @@ struct nested_field_descr user_buf_nested[] = {
   {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, tcp_urp), sizeof(uint16_t), "tcp_urp"},
 };
 
+struct nested_nested_field_descr user_buf_n2[] = {
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 0, sizeof(uint8_t), "a"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 1, sizeof(uint8_t), "b"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 2, sizeof(uint8_t), "c"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 3, sizeof(uint8_t), "d"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 4, sizeof(uint8_t), "e"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 5, sizeof(uint8_t), "f"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 0, sizeof(uint8_t), "a"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 1, sizeof(uint8_t), "b"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 2, sizeof(uint8_t), "c"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 3, sizeof(uint8_t), "d"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 4, sizeof(uint8_t), "e"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 5, sizeof(uint8_t), "f"},
+};
+
 #define KLEE_TRACE_MBUF(m_ptr)                                          \
   klee_trace_param_ptr(m_ptr, sizeof(*m_ptr), #m_ptr);                  \
   klee_trace_param_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
@@ -97,16 +115,21 @@ struct nested_field_descr user_buf_nested[] = {
                              sizeof(struct ipv4_hdr), "ipv4");          \
   klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, tcp), \
                              sizeof(struct tcp_hdr), "tcp");            \
-  klee_trace_extra_ptr_nested_field(m_ptr->buf_addr,                    \
-                                    offsetof(struct user_buf, ether),   \
-                                    offsetof(struct ether_hdr, ether_type), \
-                                    sizeof(uint16_t), "ether_type");    \
   for (int i = 0; i < sizeof(user_buf_nested)/sizeof(user_buf_nested[0]); ++i) {\
     klee_trace_extra_ptr_nested_field(m_ptr->buf_addr,                  \
                                       user_buf_nested[i].base_offset,   \
                                       user_buf_nested[i].offset,        \
                                       user_buf_nested[i].width,         \
                                       user_buf_nested[i].name);         \
+  }                                                                     \
+  for (int i = 0; i < sizeof(user_buf_n2)/sizeof(user_buf_n2[0]); ++i) { \
+    klee_trace_extra_ptr_nested_nested_field                            \
+      (m_ptr->buf_addr,                                                 \
+       user_buf_n2[i].base_base_offset,                                 \
+       user_buf_n2[i].base_offset,                                      \
+       user_buf_n2[i].offset,                                           \
+       user_buf_n2[i].width,                                            \
+       user_buf_n2[i].name);                                            \
   }
 
 // " <-- work around a bug in nano with string syntax coloring caused by the macro above
