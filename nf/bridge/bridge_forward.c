@@ -117,11 +117,17 @@ void allocate_static_ft(int capacity) {
 
 struct str_field_descr static_map_key_fields[] = {
   {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
+  //TODO: nested fields for ether_addr: a,b,c,d,e,f
   {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
 };
 
 struct str_field_descr dynamic_map_key_fields[] = {
-  {0, sizeof(struct ether_addr), "value"}
+  {0, sizeof(uint8_t), "a"},
+  {1, sizeof(uint8_t), "b"},
+  {2, sizeof(uint8_t), "c"},
+  {3, sizeof(uint8_t), "d"},
+  {4, sizeof(uint8_t), "e"},
+  {5, sizeof(uint8_t), "f"}
 };
 
 struct str_field_descr static_vector_entry_fields[] = {

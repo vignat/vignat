@@ -101,7 +101,7 @@ let fun_types =
                         (fun params ->
                            "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
      "dchain_allocate", {ret_type = Sint32;
-                         arg_types = [Sint32; Ptr (Ptr dchain_struct)];
+                         arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
                          lemmas_before = [];
                          lemmas_after = [
@@ -110,7 +110,7 @@ let fun_types =
                                 <int_k,ext_k,flw>(65536);";
                            tx_l "index_range_of_empty(65536, 0);";];};
      "dchain_allocate_new_index", {ret_type = Sint32;
-                                   arg_types = [Ptr dchain_struct; Ptr Sint32; Uint32;];
+                                   arg_types = stt [Ptr dchain_struct; Ptr Sint32; Uint32;];
                                    extra_ptr_types = [];
                                    lemmas_before = [
                                      capture_chain "cur_ch" 0;
@@ -138,7 +138,8 @@ let fun_types =
                                         (List.nth_exn params.args 1) ^ ";\n");
                                    ];};
      "dchain_rejuvenate_index", {ret_type = Sint32;
-                                 arg_types = [Ptr dchain_struct; Sint32; Uint32;];
+                                 arg_types = stt [Ptr dchain_struct;
+                                                  Sint32; Uint32;];
                                  extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
@@ -177,20 +178,20 @@ let fun_types =
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
      "expire_items_single_map", {ret_type = Sint32;
-                                 arg_types = [Ptr dchain_struct;
-                                              Ptr vector_struct;
-                                              Ptr map_struct;
-                                              Fptr "entry_extract_key";
-                                              Fptr "entry_pack_key";
-                                             Uint32];
+                                 arg_types = stt [Ptr dchain_struct;
+                                                  Ptr vector_struct;
+                                                  Ptr map_struct;
+                                                  Fptr "entry_extract_key";
+                                                  Fptr "entry_pack_key";
+                                                  Uint32];
                                  extra_ptr_types = [];
                                  lemmas_before = [];
                                  lemmas_after = [];};
      "map_allocate", {ret_type = Sint32;
-                      arg_types = [Fptr "map_keys_equality";
-                                   Fptr "map_key_hash";
-                                   Sint32;
-                                   Ptr (Ptr map_struct)];
+                      arg_types = stt [Fptr "map_keys_equality";
+                                       Fptr "map_key_hash";
+                                       Sint32;
+                                       Ptr (Ptr map_struct)];
                       extra_ptr_types = [];
                       lemmas_before = [
                         (fun args tmp ->
@@ -253,21 +254,22 @@ let fun_types =
                             ether_addrp, eth_addr_hash);\n\
                             } @*/")];};
      "map_get", {ret_type = Sint32;
-                 arg_types = [Ptr map_struct;
-                              Ptr Void;
-                              Ptr Sint32];
+                 arg_types = [Static (Ptr map_struct);
+                              Dynamic [Ptr ether_addr_struct;
+                                       Ptr static_key_struct];
+                              Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [];
                  lemmas_after = [];};
      "map_put", {ret_type = Void;
-                 arg_types = [Ptr map_struct;
-                              Ptr Void;
-                              Sint32];
+                 arg_types = stt [Ptr map_struct;
+                                  Ptr Void;
+                                  Sint32];
                  extra_ptr_types = [];
                  lemmas_before = [];
                  lemmas_after = [];};
      "received_packet", {ret_type = Void;
-                         arg_types = [Ir.Uint8; Ptr rte_mbuf_struct;];
+                         arg_types = stt [Ir.Uint8; Ptr rte_mbuf_struct;];
                          extra_ptr_types = ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
@@ -283,12 +285,12 @@ let fun_types =
                                             recv_pkt ^ ")->packet_type;");
                                            ];};
      "rte_pktmbuf_free", {ret_type = Void;
-                          arg_types = [Ptr rte_mbuf_struct;];
+                          arg_types = stt [Ptr rte_mbuf_struct;];
                           extra_ptr_types = [];
                           lemmas_before = [];
                           lemmas_after = [];};
      "send_single_packet", {ret_type = Ir.Sint32;
-                            arg_types = [Ptr rte_mbuf_struct; Ir.Uint8];
+                            arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
                             extra_ptr_types = ["user_buf_addr", user_buf_struct];
                             lemmas_before = [];
                             lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
@@ -309,23 +311,23 @@ let fun_types =
                     lemmas_before = [];
                     lemmas_after = [];};
      "vector_allocate", {ret_type = Sint32;
-                         arg_types = [Sint32;
-                                      Sint32;
-                                      Fptr "vector_init_elem";
-                                      Ptr (Ptr vector_struct)];
+                         arg_types = stt [Sint32;
+                                          Sint32;
+                                          Fptr "vector_init_elem";
+                                          Ptr (Ptr vector_struct)];
                          extra_ptr_types = [];
                          lemmas_before = [];
                          lemmas_after = [];};
      "vector_borrow", {ret_type = Ptr Void;
-                       arg_types = [Ptr vector_struct;
-                                    Sint32];
+                       arg_types = stt [Ptr vector_struct;
+                                        Sint32];
                        extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};
      "vector_return", {ret_type = Void;
-                       arg_types = [Ptr vector_struct;
-                                    Sint32;
-                                    Ptr Void];
+                       arg_types = stt [Ptr vector_struct;
+                                        Sint32;
+                                        Ptr Void];
                        extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};]

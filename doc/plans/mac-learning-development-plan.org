@@ -58,6 +58,8 @@
    :END:
 ** Validator plugin
    :LOGBOOK:
+   CLOCK: [2017-04-20 Don 14:06]--[2017-04-20 Don 14:09] =>  0:03
+   CLOCK: [2017-04-20 Don 13:49]--[2017-04-20 Don 14:00] =>  0:11
    CLOCK: [2017-04-20 Don 12:10]--[2017-04-20 Don 12:27] =>  0:17
    CLOCK: [2017-04-20 Don 11:56]--[2017-04-20 Don 12:03] =>  0:07
    CLOCK: [2017-04-20 Don 11:17]--[2017-04-20 Don 11:51] =>  0:34
@@ -71,3 +73,10 @@
    CLOCK: [2017-04-18 Die 17:25]--[2017-04-18 Die 17:49] =>  0:24
    CLOCK: [2017-04-18 Die 16:16]--[2017-04-18 Die 16:42] =>  0:26
    :END:
+*** Improve validator itself
+**** Enable type-guessing for void* arguments
+     :LOGBOOK:
+     CLOCK: [2017-04-21 Fre 11:32]
+     CLOCK: [2017-04-20 Don 16:20]--[2017-04-20 Don 17:46] =>  1:26
+     CLOCK: [2017-04-20 Don 15:56]--[2017-04-20 Don 15:59] =>  0:03
+     :END:

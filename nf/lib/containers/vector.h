@@ -32,17 +32,17 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
             (*vector_out |-> old_vo) :
             (*vector_out |-> ?new_vo &*&
              result == 1 &*&
-             vectorp(new_vo, entp, _)); @*/
+             vectorp<t>(new_vo, entp, _)); @*/
 
 void* vector_borrow/*@ <t> @*/(struct Vector* vector, int index);
-/*@ requires vectorp(vector, ?entp, ?values) &*&
+/*@ requires vectorp<t>(vector, ?entp, ?values) &*&
              0 <= index &*& index < length(values); @*/
-/*@ ensures vector_accp(vector, entp, values, index, result) &*&
+/*@ ensures vector_accp<t>(vector, entp, values, index, result) &*&
             entp(result, nth(index, values)); @*/
 
 void vector_return/*@ <t> @*/(struct Vector* vector, int index, void* value);
-/*@ requires vector_accp(vector, ?entp, ?values, index, value) &*&
+/*@ requires vector_accp<t>(vector, ?entp, ?values, index, value) &*&
              entp(value, ?v); @*/
-/*@ ensures vectorp(vector, entp, update(index, v, values)); @*/
+/*@ ensures vectorp<t>(vector, entp, update(index, v, values)); @*/
 
 #endif//_VECTOR_H_INCLUDED_

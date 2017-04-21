@@ -127,17 +127,24 @@ let expand_shorted_sexp sexp =
   end;
   (fst (expand_exp (remove_defs sexp) defs))
 
-let get_fun_arg_type ftype_of fun_name arg_num =
-  List.nth_exn (ftype_of fun_name).arg_types arg_num
+let get_fun_arg_type (ftype_of,type_guesses) call arg_num =
+  match List.nth_exn (ftype_of call.fun_name).arg_types arg_num with
+  | Static t -> t
+  | Dynamic ts -> List.nth_exn ts (Int.Map.find_exn
+                                     (Int.Map.find_exn type_guesses call.id)
+                                     arg_num)
 
-let get_fun_extra_ptr_type ftype_of fun_name exptr_name =
-  match List.Assoc.find (ftype_of fun_name).extra_ptr_types
+let get_fun_extra_ptr_type (ftype_of,_) call exptr_name =
+  match List.Assoc.find (ftype_of call.fun_name).extra_ptr_types
           ~equal:String.equal exptr_name with
   | Some t -> t
   | None -> failwith ("Could not find extra_ptr " ^ exptr_name ^
-                      " type for function " ^ fun_name)
+                      " type for function " ^ call.fun_name)
 
-let get_fun_ret_type ftype_of fun_name = (ftype_of fun_name).ret_type
+let get_fun_ret_type (ftype_of, _) call = (ftype_of call.fun_name).ret_type
+
+let get_num_args (ftype_of, _) call =
+  List.length (ftype_of call.fun_name).arg_types
 
 let to_symbol str =
   let no_spaces = String.substr_replace_all str ~pattern:" " ~with_:"_" in
@@ -646,26 +653,25 @@ let get_basic_vars ftype_of tpref =
         end
         else get_arg_pointee_vars ptee ptee_type acc
     in
-    if (List.length call.args <>
-        List.length (ftype_of call.fun_name).arg_types) then
+    if (List.length call.args <> get_num_args ftype_of call) then
       failwith ("Wrong number of arguments in the plugin for function " ^
                 call.fun_name);
     let arg_vars = List.foldi call.args ~init:known_vars
         ~f:(fun i acc arg ->
-            let arg_type = get_fun_arg_type ftype_of call.fun_name i in
+            let arg_type = get_fun_arg_type ftype_of call i in
             complex_value_vars arg.value arg.ptr arg_type false acc)
     in
     let extra_ptr_vars = List.fold call.extra_ptrs ~init:arg_vars
         ~f:(fun acc {pname;value;ptee} ->
             let ptee_type =
-              get_fun_extra_ptr_type ftype_of call.fun_name pname in
+              get_fun_extra_ptr_type ftype_of call pname in
           get_extra_ptr_pointee_vars ptee ptee_type acc)
     in
     let ret_vars = match call.ret with
       | Some ret ->
         complex_value_vars
           ret.value ret.ptr
-          (get_fun_ret_type ftype_of call.fun_name) true extra_ptr_vars
+          (get_fun_ret_type ftype_of call) true extra_ptr_vars
       | None -> extra_ptr_vars in
     let add_vars_from_ctxt vars ctxt =
       map_set_n_update_alist vars
@@ -686,7 +692,7 @@ let get_basic_vars ftype_of tpref =
 
 let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
   let alloc_dummy_for_call (rets, acc_dummies) call =
-    let ret_type = get_fun_ret_type ftype_of call.fun_name in
+    let ret_type = get_fun_ret_type ftype_of call in
     let add_the_dummy_to_tables value =
       let name = (Int.Map.find_exn rets call.id).name in
       let dummy_name = "tip_ret_dummy"^(Int.to_string call.id) in
@@ -708,7 +714,7 @@ let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
 
 let allocate_rets ftype_of tpref =
   let alloc_call_ret acc_rets call =
-    let ret_type = get_fun_ret_type ftype_of call.fun_name in
+    let ret_type = get_fun_ret_type ftype_of call in
     match call.ret with
     | Some {value;ptr;} ->
       let name = "ret"^(Int.to_string call.id) in
@@ -764,7 +770,7 @@ let allocate_extra_ptrs ftype_of tpref =
     in
     List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
         let addr = value in
-        let ptee_type = get_fun_extra_ptr_type ftype_of call.fun_name pname in
+        let ptee_type = get_fun_extra_ptr_type ftype_of call pname in
         match ptee with
         | Opening _ ->
           alloc_extra_ptr (pname ^ call.fun_name)
@@ -824,12 +830,12 @@ let allocate_args ftype_of tpref arg_name_gen =
         | Funptr _ -> None
         | Apathptr ->
           let addr = Int64.of_string (Sexp.to_string value) in
-          let t = get_fun_arg_type ftype_of call.fun_name i in
+          let t = get_fun_arg_type ftype_of call i in
           let ptee_type = get_pointee t in
           alloc_arg addr {full=None;break_down=[]} {v=Undef;t=ptee_type;}
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
-          let t = get_fun_arg_type ftype_of call.fun_name i in
+          let t = get_fun_arg_type ftype_of call i in
           let ptee_type = get_pointee t in
           let ptee_ptr_val = Option.map ptee.before.full
               ~f:(fun expr -> get_sexp_value expr ptee_type)
@@ -841,8 +847,11 @@ let allocate_args ftype_of tpref arg_name_gen =
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
 
+let get_lemmas_before (ftype_of,_) call =
+  (ftype_of call.fun_name).lemmas_before
+
 let compose_fcall_preamble ftype_of call args tmp_gen =
-  (List.map (ftype_of call.fun_name).lemmas_before ~f:(fun l -> l args tmp_gen))
+  (List.map (get_lemmas_before ftype_of call) ~f:(fun l -> l args tmp_gen))
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
@@ -855,7 +864,7 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   in
   List.mapi call.args
     ~f:(fun i arg ->
-        let a_type = get_fun_arg_type ftype_of call.fun_name i in
+        let a_type = get_fun_arg_type ftype_of call i in
         match arg.ptr with
         | Nonptr -> get_sexp_value arg.value a_type
         | Funptr fname -> {v=Fptr fname;t=a_type}
@@ -886,13 +895,16 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
           | _ ->
             get_allocated_arg arg a_type)
 
+let get_lemmas_after (ftype_of, _) call =
+  (ftype_of call.fun_name).lemmas_after
+
 let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
   let ret_spec = match ret_spec with
     | Some ret_spec -> ret_spec
     | None -> {name="";value={v=Undef;t=Unknown}}
   in
   let result = render_tterm ret_spec.value in
-  List.map (ftype_of call.fun_name).lemmas_after
+  List.map (get_lemmas_after ftype_of call)
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
                     args;tmp_gen;is_tip})
 
@@ -1010,7 +1022,7 @@ let take_arg_ptrs_into_account (args : Trace_prefix.arg list) callid =
 let extract_common_call_context
     ~is_tip ftype_of call ret_spec args unique_postfix =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
-  let ret_type = get_fun_ret_type ftype_of call.fun_name in
+  let ret_type = get_fun_ret_type ftype_of call in
   let arg_names = List.map args ~f:render_tterm in
   let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
   let application = simplify_term (Apply (call.fun_name,args)) in
@@ -1258,6 +1270,40 @@ let fixup_placeholder_ptrs_in_tip_call tip_call =
   {tip_call with results = List.map tip_call.results
                      ~f:in_one_result}
 
+let guess_dynamic_types basic_ftype_of pref =
+  let type_match t arg =
+    match t, arg with
+    | Ptr (Str (_, fields)), {aname=_; value=_; ptr=Curioptr ptee}
+      when List.length fields = List.length ptee.before.break_down ->
+      List.for_all2_exn fields ptee.before.break_down
+        ~f:(fun (name,t) {fname;value;addr=_} ->
+            String.equal name fname
+            (* One level introspection should be enough *))
+    | _ -> false
+  in
+  List.fold (pref.history @ pref.tip_calls)
+    ~init:(Int.Map.empty:int Int.Map.t Int.Map.t) ~f:(fun acc call ->
+        let arg_types = (basic_ftype_of call.fun_name).arg_types in
+        let fun_map =
+        List.foldi (List.zip_exn call.args arg_types) ~init:Int.Map.empty
+          ~f:(fun (n:int) (acc:int Int.Map.t) ((arg:Trace_prefix.arg), (t:arg_type)) ->
+              match t with
+              | Static _ -> acc
+              | Dynamic ts ->
+                  match List.findi ts ~f:(fun _ t -> type_match t arg) with
+                    | Some (num, tt) -> lprintf "guessed %s(%d) for %s/%d#%d\n"
+                                          (ttype_to_str tt) num
+                                          call.fun_name call.id n;
+                      Int.Map.add acc ~key:n ~data:num
+                  | None -> failwith
+                              ("Can not guess a dynamic type for " ^
+                               call.fun_name ^ "/" ^ Int.to_string call.id ^
+                               " argument # " ^
+                               Int.to_string n))
+        in
+        if Int.Map.is_empty fun_map then acc
+        else Int.Map.add acc ~key:call.id ~data:fun_map)
+
 let build_ir fun_types fin preamble boundary_fun finishing_fun
   eventproc_iteration_begin eventproc_iteration_end =
   let ftype_of fun_name =
@@ -1271,6 +1317,8 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   in
   lprintf "inside_iteration: %s\n" (if inside_iteration then "true" else "false");
   let pref = distribute_ids pref in
+  let guessed_dyn_types = guess_dynamic_types ftype_of pref in
+  let ftype_of = (ftype_of,guessed_dyn_types) in
   let finishing_iteration =
     is_the_last_function_finishing pref eventproc_iteration_end
   in

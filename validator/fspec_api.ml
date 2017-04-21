@@ -36,7 +36,12 @@ let deep_copy (var : var_spec) =
                              rhs=var.value}) ^
   "\n"
 
-type fun_spec = {ret_type: ttype; arg_types: ttype list;
+type arg_type = Static of ttype | Dynamic of ttype list
+
+let stt types =
+  List.map types ~f:(fun t -> Static t)
+
+type fun_spec = {ret_type: ttype; arg_types: arg_type list;
                  extra_ptr_types: (string * ttype) list;
                  lemmas_before: blemma list; lemmas_after: lemma list;}
 
