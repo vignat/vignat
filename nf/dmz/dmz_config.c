@@ -38,7 +38,20 @@ dmz_config_parse_int(const char* str, const char* name, int base, char next) {
 	return result;
 }
 
-void dmz_config_init(struct nat_config* config,
+static uint32_t
+dmz_config_parse_ipv4(const char* str, const char* name) {
+	struct cmdline_token_ipaddr tk;
+	tk.ipaddr_data.flags = CMDLINE_IPADDR_V4;
+
+	struct cmdline_ipaddr res;
+	if (cmdline_parse_ipaddr((cmdline_parse_token_hdr_t*) &tk, str, &res, sizeof(res)) < 0) {
+		PARSE_ERROR("Error while parsing '%s': %s\n", name, str);
+	}
+
+	return res.addr.ipv4.s_addr;
+}
+
+void dmz_config_init(struct dmz_config* config,
                      int argc, char** argv)
 {
 	unsigned nb_devices = rte_eth_dev_count();
@@ -65,11 +78,53 @@ void dmz_config_init(struct nat_config* config,
 	}
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "m:e:t:i:l:f:p:s:w:", long_options, NULL)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "a:b:c:d:e:f:g:h:i:j:k:l:", long_options, NULL)) != EOF) {
 		unsigned device;
 		switch (opt) {
-			case 'm':
-				device = nat_config_parse_int(optarg, "eth-dest device", 10, ',');
+			case 'a':
+				config->internet_device = dmz_config_parse_int(optarg, "internet device", 10, '\0');
+				if (config->internet_device >= nb_devices) {
+					PARSE_ERROR("internet device: %d >= nb_devices (%d)\n", config->internet_device, nb_devices);
+				}
+				break;
+
+			case 'b':
+				config->dmz_device = dmz_config_parse_int(optarg, "dmz device", 10, '\0');
+				if (config->dmz_device >= nb_devices) {
+					PARSE_ERROR("dmz device: %d >= nb_devices (%d)\n", config->dmz_device, nb_devices);
+				}
+				break;
+
+			case 'c':
+				config->intranet_device = dmz_config_parse_int(optarg, "intranet device", 10, '\0');
+				if (config->intranet_device >= nb_devices) {
+					PARSE_ERROR("intranet device: %d >= nb_devices (%d)\n", config->intranet_device, nb_devices);
+				}
+				break;
+
+			case 'd':
+				config->internet_block_addr = dmz_config_parse_ipv4(optarg, "internet addr");
+				break;
+			case 'e':
+				config->internet_block_mask = dmz_config_parse_ipv4(optarg, "internet mask");
+				break;
+
+			case 'f':
+				config->dmz_block_addr = dmz_config_parse_ipv4(optarg, "dmz addr");
+				break;
+			case 'g':
+				config->dmz_block_mask = dmz_config_parse_ipv4(optarg, "dmz mask");
+				break;
+
+			case 'h':
+				config->intranet_block_addr = dmz_config_parse_ipv4(optarg, "intranet addr");
+				break;
+			case 'i':
+				config->intranet_block_mask = dmz_config_parse_ipv4(optarg, "intranet mask");
+				break;
+
+			case 'j':
+				device = dmz_config_parse_int(optarg, "eth-dest device", 10, ',');
 				if (device >= nb_devices) {
 					PARSE_ERROR("eth-dest: device %d >= nb_devices (%d)\n", device, nb_devices);
 				}
@@ -80,47 +135,17 @@ void dmz_config_init(struct nat_config* config,
 				}
 				break;
 
-			case 't':
-				config->expiration_time = nat_config_parse_int(optarg, "exp-time", 10, '\0');
+			case 'k':
+				config->expiration_time = dmz_config_parse_int(optarg, "exp-time", 10, '\0');
 				if (config->expiration_time == 0) {
 					PARSE_ERROR("Expiration time must be strictly positive.\n");
 				}
 				break;
 
-			case 'i':;
-				struct cmdline_token_ipaddr tk;
-				tk.ipaddr_data.flags = CMDLINE_IPADDR_V4;
-
-				struct cmdline_ipaddr res;
-				if (cmdline_parse_ipaddr((cmdline_parse_token_hdr_t*) &tk, optarg, &res, sizeof(res)) < 0) {
-					PARSE_ERROR("Invalid external IP address: %s\n", optarg);
-				}
-
-				config->external_addr = res.addr.ipv4.s_addr;
-				break;
-
-			case 'l':
-				config->lan_main_device = nat_config_parse_int(optarg, "lan-dev", 10, '\0');
-				if (config->lan_main_device >= nb_devices) {
-					PARSE_ERROR("Main LAN device does not exist.\n");
-				}
-				break;
-
 			case 'f':
-				config->max_flows = nat_config_parse_int(optarg, "max-flows", 10, '\0');
+				config->max_flows = dmz_config_parse_int(optarg, "max-flows", 10, '\0');
 				if (config->max_flows <= 0) {
 					PARSE_ERROR("Flow table size must be strictly positive.\n");
-				}
-				break;
-
-			case 's':
-				config->start_port = nat_config_parse_int(optarg, "start-port", 10, '\0');
-				break;
-
-			case 'w':
-				config->wan_device = nat_config_parse_int(optarg, "wan-dev", 10, '\0');
-				if (config->wan_device >= nb_devices) {
-					PARSE_ERROR("WAN device does not exist.\n");
 				}
 				break;
 		}
