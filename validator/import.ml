@@ -789,18 +789,20 @@ let allocate_extra_ptrs ftype_of tpref =
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
     let alloc_arg addr str_value tterm =
-      lprintf "looking for *%Ld\n" addr;
+      lprintf "looking for *%Ld :" addr;
       match Int64.Map.find !known_addresses addr with
       | Some spec -> known_addresses :=
           Int64.Map.add !known_addresses
             ~key:addr ~data:(List.map spec ~f:(fun spec ->
                 {spec with value=update_tterm spec.value tterm}));
+        lprintf "found some, adding\n";
         None
       | None -> let p_name = arg_name_gen#generate in
         add_to_known_addresses
           {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
           str_value.break_down
           addr call.id 0;
+        lprintf "found none, inserting\n";
         Some {name=p_name;value=tterm}
     in
     let alloc_dummy_nested_ptr ptr_addr ptee_addr ptee_t =
@@ -840,10 +842,23 @@ let allocate_args ftype_of tpref arg_name_gen =
           let ptee_ptr_val = Option.map ptee.before.full
               ~f:(fun expr -> get_sexp_value expr ptee_type)
           in
+          let ptee_ptr_val_after = Option.map ptee.after.full
+              ~f:(fun expr -> get_sexp_value expr ptee_type)
+          in
           match ptee_type, ptee_ptr_val with
-          | Ptr ptee_ptee_t, Some {v=(Int x);t=_} when x <> 0 ->
-            alloc_dummy_nested_ptr addr (Int64.of_int x) ptee_ptee_t
-          | _ -> alloc_arg addr ptee.before (get_struct_val_value ptee.before ptee_type))
+            | Ptr ptee_ptee_t, Some {v=(Int x);t=_} when x <> 0 ->
+              alloc_dummy_nested_ptr addr (Int64.of_int x) ptee_ptee_t
+            | Ptr ptee_ptee_t, Some {v=Utility (Ptr_placeholder x);t=_}
+              when x <> 0L ->
+              alloc_dummy_nested_ptr addr x ptee_ptee_t
+            | _ -> match ptee_type, ptee_ptr_val_after with
+              | Ptr ptee_ptee_t, Some {v=(Int x);t=_} when x <> 0 ->
+                alloc_dummy_nested_ptr addr (Int64.of_int x) ptee_ptee_t
+              | Ptr ptee_ptee_t, Some {v=Utility (Ptr_placeholder x);t=_}
+                when x <> 0L ->
+                alloc_dummy_nested_ptr addr x ptee_ptee_t
+              | _ -> alloc_arg addr ptee.before (get_struct_val_value
+                                                   ptee.before ptee_type))
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
 
