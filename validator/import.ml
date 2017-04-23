@@ -865,8 +865,9 @@ let allocate_args ftype_of tpref arg_name_gen =
 let get_lemmas_before (ftype_of,_) call =
   (ftype_of call.fun_name).lemmas_before
 
-let compose_fcall_preamble ftype_of call args tmp_gen =
-  (List.map (get_lemmas_before ftype_of call) ~f:(fun l -> l args tmp_gen))
+let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
+  (List.map (get_lemmas_before ftype_of call) ~f:(fun l ->
+       l {args;tmp_gen;is_tip;arg_types}))
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
@@ -913,7 +914,7 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
 let get_lemmas_after (ftype_of, _) call =
   (ftype_of call.fun_name).lemmas_after
 
-let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
+let compose_post_lemmas ~is_tip ftype_of call ret_spec args arg_types tmp_gen =
   let ret_spec = match ret_spec with
     | Some ret_spec -> ret_spec
     | None -> {name="";value={v=Undef;t=Unknown}}
@@ -921,7 +922,7 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args tmp_gen =
   let result = render_tterm ret_spec.value in
   List.map (get_lemmas_after ftype_of call)
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
-                    args;tmp_gen;is_tip})
+                    args;tmp_gen;is_tip;arg_types})
 
 let deref_tterm {v;t} =
   {v = simplify_term (Deref {v;t});
@@ -1039,7 +1040,10 @@ let extract_common_call_context
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call in
   let arg_names = List.map args ~f:render_tterm in
-  let pre_lemmas = compose_fcall_preamble ftype_of call arg_names tmp_gen in
+  let arg_types = List.map args ~f:(fun {t;v=_} -> t) in
+  let pre_lemmas =
+    compose_fcall_preamble ftype_of call arg_names arg_types tmp_gen is_tip
+  in
   let application = simplify_term (Apply (call.fun_name,args)) in
   let extra_pre_conditions =
     (take_extra_ptrs_into_account call.extra_ptrs call.id)@
@@ -1047,7 +1051,7 @@ let extract_common_call_context
   in
   let post_lemmas =
     compose_post_lemmas
-      ~is_tip ftype_of call ret_spec arg_names tmp_gen
+      ~is_tip ftype_of call ret_spec arg_names arg_types tmp_gen
   in
   let ret_name = match ret_spec with
     | Some ret_spec -> Some ret_spec.name

@@ -3,14 +3,16 @@ open Ir
 
 type lemma_params = {ret_name: string; ret_val: string;
                      args: string list; tmp_gen: string -> string;
-                     is_tip: bool}
+                     is_tip: bool; arg_types: ttype list}
 
-(* Args: return variable name, return value, args, tmpemporary name generator. *)
+type blemma_params = {args: string list; tmp_gen: string -> string;
+                      is_tip: bool; arg_types: ttype list}
+
 type lemma = (lemma_params -> string)
-type blemma = (string list -> (string -> string) -> string)
+type blemma = (blemma_params -> string)
 
 let tx_l str = (fun _ -> "/*@ " ^ str ^ " @*/" )
-let tx_bl str = (fun _ _ -> "/*@ " ^ str ^ " @*/" )
+let tx_bl str = (fun _ -> "/*@ " ^ str ^ " @*/" )
 
 
 let on_rez_nonzero str = (fun params ->

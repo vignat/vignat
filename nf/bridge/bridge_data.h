@@ -33,7 +33,16 @@ struct StaticFilterTable {
   inductive stat_keyi = stkc(int, ether_addri);
   inductive dynenti = dynentc(int, ether_addri);
 
-  predicate ether_addrp(void* ptr; ether_addri addr);
+  predicate ether_addrp(struct ether_addr* ptr; ether_addri addr) =
+    struct_ether_addr_padding(ptr) &*&
+    ptr->a |-> ?a &*&
+    ptr->b |-> ?b &*&
+    ptr->c |-> ?c &*&
+    ptr->d |-> ?d &*&
+    ptr->e |-> ?e &*&
+    ptr->f |-> ?f &*&
+    addr == eaddrc(a, b, c, d, e, f);
+
   predicate static_keyp(void* ptr; stat_keyi k);
   predicate dynamic_entryp(void* ptr; dynenti de);
 

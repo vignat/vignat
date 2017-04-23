@@ -19,26 +19,26 @@ let gen_get_fp map_name =
   | Int-> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
   | Ext -> "dmap_get_k2_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
 
-let capture_map map_name ptr_num args tmp =
-  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
+let capture_map map_name ptr_num {args;tmp_gen;_} =
+  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp_gen map_name) ^
   ",_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args ptr_num) ^ ");\n"
 
-let capture_map_after map_name ptr_num args =
-  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (args.tmp_gen map_name) ^
-  ",_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn args.args ptr_num) ^ ");\n"
+let capture_map_after map_name ptr_num (params:lemma_params) =
+  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (params.tmp_gen map_name) ^
+  ",_,_,_,_,_,_,_,_,_,_,_,_," ^ (List.nth_exn params.args ptr_num) ^ ");\n"
 
-let capture_chain_after ch_name ptr_num args =
-  "//@ assert double_chainp(?" ^ (args.tmp_gen ch_name) ^ ", " ^
-  (List.nth_exn args.args ptr_num) ^ ");\n"
+let capture_chain_after ch_name ptr_num (params:lemma_params) =
+  "//@ assert double_chainp(?" ^ (params.tmp_gen ch_name) ^ ", " ^
+  (List.nth_exn params.args ptr_num) ^ ");\n"
 
-let capture_map_ex map_name vk1 vk2 ptr_num args tmp =
-  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp map_name) ^
-  ",_,_,_,_,_,_,_,_,?" ^ (tmp vk1) ^ ",?" ^ (tmp vk2) ^
+let capture_map_ex map_name vk1 vk2 ptr_num {args;tmp_gen} =
+  "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp_gen map_name) ^
+  ",_,_,_,_,_,_,_,_,?" ^ (tmp_gen vk1) ^ ",?" ^ (tmp_gen vk2) ^
   ",_,_," ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
-let capture_chain ch_name ptr_num args tmp =
-  "//@ assert double_chainp(?" ^ (tmp ch_name) ^ ", " ^
+let capture_chain ch_name ptr_num {args;tmp_gen;_} =
+  "//@ assert double_chainp(?" ^ (tmp_gen ch_name) ^ ", " ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
 let dmap_struct = Ir.Str ( "DoubleMap", [] )
@@ -208,7 +208,7 @@ let fun_types =
                                 {\
                                 call();\
                                 }";
-                         (fun args _ ->
+                         (fun {args;_} ->
                             "/*@\
                              assume(sizeof(struct flow) == " ^
                             (List.nth_exn args 4) ^ ");\n@*/ " ^
@@ -224,7 +224,7 @@ let fun_types =
                                            ekc(0,0,0,0,0,0),\
                                            0,0,0,0,0,0,0,0,0));";
                          tx_bl "close dmap_record_property1(nat_int_fp);";
-                         (fun _ _ -> "int start_port;\n");
+                         (fun _ -> "int start_port;\n");
                          tx_bl "close dmap_record_property2\
                                 ((nat_ext_fp)(start_port));"];
                        lemmas_after = [
@@ -253,10 +253,10 @@ let fun_types =
                                              Sint32];
                                 extra_ptr_types = [];
                                 lemmas_before = [
-                                  (fun args _ ->
+                                  (fun {args;_} ->
                                      "//@ assume(start_port == " ^
                                      List.nth_exn args 5 ^");");
-                                  (fun args _ ->
+                                  (fun {args;_} ->
                                      "/*@ close evproc_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
                                      List.nth_exn args 1 ^ ", " ^
@@ -275,7 +275,7 @@ let fun_types =
                                              Sint32];
                                 extra_ptr_types = [];
                                 lemmas_before = [
-                                  (fun _ _ ->
+                                  (fun _ ->
                                      "int start_port;\n");];
                                 lemmas_after = [
                                   (fun params ->
@@ -301,7 +301,7 @@ let fun_types =
                     extra_ptr_types = [];
                     lemmas_before = [
                       capture_map "cur_map" 0;
-                      (fun args _ ->
+                      (fun {args;_} ->
                          last_device_id :=
                            "(" ^ List.nth_exn args 1 ^ ")->ext_device_id";
                          "/*@ close ext_k_p(" ^ List.nth_exn args 1 ^
@@ -367,7 +367,7 @@ let fun_types =
                     extra_ptr_types = [];
                     lemmas_before = [
                       capture_map "cur_map" 0;
-                      (fun args _ ->
+                      (fun {args;_} ->
                          last_device_id :=
                            "(" ^ List.nth_exn args 1 ^ ")->int_device_id";
                          "/*@ close int_k_p(" ^ List.nth_exn args 1 ^
@@ -430,15 +430,15 @@ let fun_types =
                   extra_ptr_types = [];
                   lemmas_before = [
                     capture_map_ex "cur_map" "vk1" "vk2" 0;
-                    (fun args _ -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
+                    (fun {args;_} -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
                     ".ik, ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
                      user_buf0_30, " ^
                            !last_device_id ^
                            ", user_buf0_23));@*/");
-                    (fun args _ -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
+                    (fun {args;_} -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
                     ".ek, ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
                      1, user_buf0_23));@*/");
-                    (fun args _ -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
+                    (fun {args;_} -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
                     ", flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26, user_buf0_30,\
                      " ^
                            !last_device_id ^
@@ -447,48 +447,48 @@ let fun_types =
                      external_ip, user_buf0_30, " ^
                            !last_device_id ^
                            ", 1, user_buf0_23));@*/");
-                    (fun args tmp ->
+                    (fun {args;tmp_gen;_} ->
                        "/*@{\n\
                         assert dmap_dchain_coherent(" ^
-                         (tmp "cur_map") ^
+                         (tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
                         ext_k ek = ekc(new_index_2_0, user_buf0_36,\
                         external_ip, user_buf0_30, 1, user_buf0_23);\n\
-                        if (dmap_has_k2_fp(" ^ (tmp "cur_map") ^
+                        if (dmap_has_k2_fp(" ^ (tmp_gen "cur_map") ^
                        ", ek)) {\n\
-                        int index = dmap_get_k2_fp(" ^ (tmp "cur_map") ^
+                        int index = dmap_get_k2_fp(" ^ (tmp_gen "cur_map") ^
                        ", ek);\n\
-                        dmap_get_k2_limits(" ^ (tmp "cur_map") ^
+                        dmap_get_k2_limits(" ^ (tmp_gen "cur_map") ^
                        ", ek);\n\
-                        flw value = dmap_get_val_fp(" ^ (tmp "cur_map") ^
+                        flw value = dmap_get_val_fp(" ^ (tmp_gen "cur_map") ^
                        ", index);\n\
-                        dmap_get_by_index_rp(" ^ (tmp "cur_map") ^
+                        dmap_get_by_index_rp(" ^ (tmp_gen "cur_map") ^
                        ", index);\n\
-                        dmap_get_by_k2_invertible(" ^ (tmp "cur_map") ^
+                        dmap_get_by_k2_invertible(" ^ (tmp_gen "cur_map") ^
                        ", ek);\n\
                         assert(index == " ^ (List.nth_exn args 2) ^ ");\n\
-                        assert(true == dmap_index_used_fp(" ^ (tmp "cur_map") ^
+                        assert(true == dmap_index_used_fp(" ^ (tmp_gen "cur_map") ^
                        ", " ^ (List.nth_exn args 2) ^ "));\n\
-                        coherent_dmap_used_dchain_allocated(" ^ (tmp "cur_map") ^
+                        coherent_dmap_used_dchain_allocated(" ^ (tmp_gen "cur_map") ^
                        ", cur_ch, " ^ (List.nth_exn args 2) ^ ");\n\
                         assert(true == dchain_allocated_index_fp(" ^
-                       (tmp "cur_map") ^
+                       (tmp_gen "cur_map") ^
                        ", " ^ (List.nth_exn args 2) ^ "));\n\
                         assert(false);\n\
                         }\n\
                         }@*/");
-                    (fun args tmp ->
+                    (fun {args;tmp_gen;_} ->
                        "/*@{\n\
-                        assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
+                        assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
-                        if (dmap_index_used_fp(" ^ (tmp "cur_map") ^
+                        if (dmap_index_used_fp(" ^ (tmp_gen "cur_map") ^
                        ", " ^ (List.nth_exn args 2) ^ ")) {\n\
-                        coherent_dmap_used_dchain_allocated(" ^ (tmp "cur_map") ^
+                        coherent_dmap_used_dchain_allocated(" ^ (tmp_gen "cur_map") ^
                        ", cur_ch, " ^ (List.nth_exn args 2) ^ ");\n\
                         }\n\
                         }@*/");
-                    (fun args tmp ->
-                       "/*@ dmap_put_preserves_cap(" ^ (tmp "cur_map") ^
+                    (fun {args;tmp_gen;_} ->
+                       "/*@ dmap_put_preserves_cap(" ^ (tmp_gen "cur_map") ^
                        ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, " ^
                            !last_device_id ^
@@ -499,8 +499,8 @@ let fun_types =
                         external_ip, user_buf0_30, " ^
                            !last_device_id ^
                            ", 1, user_buf0_23)," ^
-                       (tmp "vk1") ^ ", " ^ (tmp "vk2") ^ "); @*/");
-                    (fun _ _ ->
+                       (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^ "); @*/");
+                    (fun _ ->
                        "/*@ flw the_inserted_flow = " ^
                        " flwc(ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, " ^
@@ -512,9 +512,9 @@ let fun_types =
                         external_ip, user_buf0_30, " ^
                        !last_device_id ^
                        ", 1, user_buf0_23);@*/");
-                    (fun args tmp ->
+                    (fun {args;tmp_gen;_} ->
                       "/*@ {\n\
-                       assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
+                       assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
                       ", ?ch);\n\
                        int_k ik = ikc(user_buf0_34, user_buf0_36,\
                         user_buf0_26, user_buf0_30, " ^
@@ -524,16 +524,16 @@ let fun_types =
                        external_ip, user_buf0_30,\
                        1, user_buf0_23);\n\
                        coherent_dchain_non_out_of_space_map_nonfull(" ^
-                      (tmp "cur_map") ^ ", ch);\n" ^
+                      (tmp_gen "cur_map") ^ ", ch);\n" ^
                       "contains_ext_k_abstract(" ^
-                      (tmp "cur_map") ^
+                      (tmp_gen "cur_map") ^
                       ", ch, ek);\n" ^
                       "flw the_flow_to_insert = flwc(ik, ek,\n\
                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
                        external_ip, user_buf0_30, " ^
                        !last_device_id ^
                       ", 1, user_buf0_23);\n" ^
-                       "add_flow_abstract(" ^ (tmp "cur_map") ^
+                       "add_flow_abstract(" ^ (tmp_gen "cur_map") ^
                        ", ch, the_flow_to_insert, " ^
                        (List.nth_exn args 2) ^ ", " ^
                        !last_time_for_index_alloc ^ ");\n} @*/");];
@@ -591,14 +591,14 @@ let fun_types =
                         extra_ptr_types = [];
                         lemmas_before = [
                           capture_map "cur_map" 0;
-                          (fun _ tmp ->
+                          (fun {tmp_gen;_} ->
                              "/*@ {\
-                              assert dmap_dchain_coherent(" ^ (tmp "cur_map") ^
+                              assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
                              ", ?cur_ch);\n\
-                              coherent_same_cap(" ^ (tmp "cur_map") ^
+                              coherent_same_cap(" ^ (tmp_gen "cur_map") ^
                              ", cur_ch);\n\
                               }@*/");
-                          (fun args _ ->
+                          (fun {args;_} ->
                              "//@ open_struct(" ^
                              (List.nth_exn args 2) ^ ");")];
                         lemmas_after = [
@@ -634,63 +634,63 @@ let fun_types =
                       lemmas_before = [
                         capture_chain "cur_ch" 0;
                         capture_map_ex "cur_map" "vk1" "vk2" 1;
-                        (fun args tmp ->
+                        (fun {args;tmp_gen;_} ->
                            if String.equal !last_index_gotten "" then ""
                            else
                            "/*@ { \n\
                             dmap_erase_all_has_trans(" ^
-                           (tmp "cur_map") ^
+                           (tmp_gen "cur_map") ^
                            ", ikc(user_buf0_34,\
                             user_buf0_36, user_buf0_26, user_buf0_30, " ^
                            !last_device_id ^
                            ", user_buf0_23),\n\
                             dchain_get_expired_indexes_fp(" ^
-                           (tmp "cur_ch") ^ ", " ^
+                           (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
-                           "), " ^ (tmp "vk1") ^ ", " ^ (tmp "vk2") ^
+                           "), " ^ (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^
                            ");\n\
                             coherent_same_cap(" ^
-                           (tmp "cur_map") ^ ", " ^ (tmp "cur_ch") ^
+                           (tmp_gen "cur_map") ^ ", " ^ (tmp_gen "cur_ch") ^
                            ");\n } @*/");
-                        (fun args tmp ->
-                           "//@ expire_flows_abstract(" ^ (tmp "cur_map") ^
-                           ", " ^ (tmp "cur_ch") ^
+                        (fun {args;tmp_gen;_} ->
+                           "//@ expire_flows_abstract(" ^ (tmp_gen "cur_map") ^
+                           ", " ^ (tmp_gen "cur_ch") ^
                            ", " ^ (List.nth_exn args 2) ^ ");");
-                        (fun args tmp ->
+                        (fun {args;tmp_gen;_} ->
                            "/*@ {\n\
                             expire_preserves_index_range(" ^
-                           (tmp "cur_ch") ^ ", " ^
+                           (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
                            ");\n
                            length_nonnegative(\
                             dchain_get_expired_indexes_fp(" ^
-                           (tmp "cur_ch") ^ ", " ^
+                           (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
                            "));\n\
                             if (length(dchain_get_expired_indexes_fp(" ^
-                           (tmp "cur_ch") ^ ", " ^
+                           (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
                            ")) > 0 ) {\n\
                             expire_old_dchain_nonfull\
                             (" ^ (List.nth_exn args 0) ^ ", " ^
-                           (tmp "cur_ch") ^ ", " ^
+                           (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
                            ");\n\
                             }} @*/");
-                        (fun args tmp ->
+                        (fun {args;tmp_gen;_} ->
                            "/*@ dmap_erase_all_preserves_cap(" ^
-                           (tmp "cur_map") ^ ", " ^
+                           (tmp_gen "cur_map") ^ ", " ^
                            "dchain_get_expired_indexes_fp(" ^
-                           (tmp "cur_ch") ^
+                           (tmp_gen "cur_ch") ^
                            ", " ^ (List.nth_exn args 2) ^
-                           "), " ^ (tmp "vk1") ^ ", " ^
-                           (tmp "vk2") ^ "); @*/");
-                        (fun _ tmp ->
+                           "), " ^ (tmp_gen "vk1") ^ ", " ^
+                           (tmp_gen "vk2") ^ "); @*/");
+                        (fun {tmp_gen} ->
                            "/*@ coherent_same_cap(" ^
-                           (tmp "cur_map") ^ ", " ^ (tmp "cur_ch") ^ ");@*/\n");
-                        (fun args tmp ->
+                           (tmp_gen "cur_map") ^ ", " ^ (tmp_gen "cur_ch") ^ ");@*/\n");
+                        (fun {args;tmp_gen} ->
                            "//@ expire_olds_keeps_high_bounded(" ^
-                           (tmp "cur_ch") ^
+                           (tmp_gen "cur_ch") ^
                            ", " ^ (List.nth_exn args 2) ^
                            ");\n");
                         ];
@@ -740,22 +740,22 @@ let fun_types =
                                  extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
-                                   (fun args tmp ->
+                                   (fun {args;tmp_gen} ->
                                       "/*@ {\n\
                                        assert dmap_dchain_coherent(?cur_map, " ^
-                                      (tmp "cur_ch") ^
+                                      (tmp_gen "cur_ch") ^
                                       ");\n coherent_same_cap(cur_map, " ^
-                                      (tmp "cur_ch") ^ ");\n" ^
+                                      (tmp_gen "cur_ch") ^ ");\n" ^
                                       "rejuvenate_flow_abstract(cur_map," ^
-                                      (tmp "cur_ch") ^ ", " ^
+                                      (tmp_gen "cur_ch") ^ ", " ^
                                       "dmap_get_val_fp(cur_map, " ^
                                       (List.nth_exn args 1) ^ ")," ^
                                       (List.nth_exn args 1) ^ ", " ^
                                       (List.nth_exn args 2) ^ ");\n" ^
                                       "} @*/");
-                                   (fun args tmp ->
+                                   (fun {args;tmp_gen} ->
                                       "//@ rejuvenate_keeps_high_bounded(" ^
-                                      (tmp "cur_ch") ^
+                                      (tmp_gen "cur_ch") ^
                                       ", " ^ (List.nth_exn args 1) ^
                                       ", " ^ (List.nth_exn args 2) ^
                                       ");\n");];

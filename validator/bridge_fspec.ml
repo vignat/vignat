@@ -13,8 +13,8 @@ let last_device_id = ref ""
 let last_time_for_index_alloc = ref ""
 let the_array_lcc_is_local = ref true
 
-let capture_chain ch_name ptr_num args tmp =
-  "//@ assert double_chainp(?" ^ (tmp ch_name) ^ ", " ^
+let capture_chain ch_name ptr_num {args;tmp_gen} =
+  "//@ assert double_chainp(?" ^ (tmp_gen ch_name) ^ ", " ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
 let map_struct = Ir.Str ("Map", [])
@@ -143,22 +143,22 @@ let fun_types =
                                  extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
-                                   (fun args tmp ->
+                                   (fun {args;tmp_gen} ->
                                       "/*@ {\n\
                                        assert dmap_dchain_coherent(?cur_map, " ^
-                                      (tmp "cur_ch") ^
+                                      (tmp_gen "cur_ch") ^
                                       ");\n coherent_same_cap(cur_map, " ^
-                                      (tmp "cur_ch") ^ ");\n" ^
+                                      (tmp_gen "cur_ch") ^ ");\n" ^
                                       "rejuvenate_flow_abstract(cur_map," ^
-                                      (tmp "cur_ch") ^ ", " ^
+                                      (tmp_gen "cur_ch") ^ ", " ^
                                       "dmap_get_val_fp(cur_map, " ^
                                       (List.nth_exn args 1) ^ ")," ^
                                       (List.nth_exn args 1) ^ ", " ^
                                       (List.nth_exn args 2) ^ ");\n" ^
                                       "} @*/");
-                                   (fun args tmp ->
+                                   (fun {args;tmp_gen} ->
                                       "//@ rejuvenate_keeps_high_bounded(" ^
-                                      (tmp "cur_ch") ^
+                                      (tmp_gen "cur_ch") ^
                                       ", " ^ (List.nth_exn args 1) ^
                                       ", " ^ (List.nth_exn args 2) ^
                                       ");\n");];
@@ -194,7 +194,7 @@ let fun_types =
                                        Ptr (Ptr map_struct)];
                       extra_ptr_types = [];
                       lemmas_before = [
-                        (fun args tmp ->
+                        (fun {args} ->
                            "/*@ if (" ^ (List.nth_exn args 0) ^
                            " == static_key_eq) {\n" ^
                            "produce_function_pointer_chunk \

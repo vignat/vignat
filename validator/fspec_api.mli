@@ -4,11 +4,18 @@ type lemma_params = {
   args : bytes list;
   tmp_gen : bytes -> bytes;
   is_tip : bool;
+  arg_types : Ir.ttype list;
+}
+type blemma_params = {
+  args : bytes list;
+  tmp_gen : bytes -> bytes;
+  is_tip : bool;
+  arg_types : Ir.ttype list;
 }
 type lemma = lemma_params -> bytes
-type blemma = bytes list -> (bytes -> bytes) -> bytes
+type blemma = blemma_params -> bytes
 val tx_l : bytes -> 'a -> bytes
-val tx_bl : bytes -> 'a -> 'b -> bytes
+val tx_bl : bytes -> 'a -> bytes
 val on_rez_nonzero : bytes -> lemma_params -> bytes
 val on_rez_nz : (lemma_params -> bytes) -> lemma_params -> bytes
 val render_deep_assignment : Ir.eq_condition -> bytes
