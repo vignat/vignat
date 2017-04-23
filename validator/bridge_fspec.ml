@@ -259,7 +259,23 @@ let fun_types =
                                        Ptr static_key_struct];
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
-                 lemmas_before = [];
+                 lemmas_before = [
+                   (fun {arg_types;tmp_gen} ->
+                      match List.nth_exn arg_types 1 with
+                      | Ptr (Str ("ether_addr", _)) ->
+                        "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
+                        ", _, _, _);\n\
+                         //@ close hide_mapp<stat_keyi>(" ^
+                        (tmp_gen "stm_ptr") ^
+                        ");"
+                      | Ptr (Str ("StaticKey", _)) ->
+                        "//@ assert mapp<ether_addri>(?" ^ (tmp_gen "eam_ptr") ^
+                        ", _, _, _);\n\
+                         //@ close hide_mapp<ether_addri>(" ^
+                        (tmp_gen "eam_ptr") ^
+                        ");"
+                      | _ -> "#error unexpected key type");
+                 ];
                  lemmas_after = [];};
      "map_put", {ret_type = Void;
                  arg_types = stt [Ptr map_struct;
