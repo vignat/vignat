@@ -32,7 +32,8 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
             (*vector_out |-> old_vo) :
             (*vector_out |-> ?new_vo &*&
              result == 1 &*&
-             vectorp<t>(new_vo, entp, _)); @*/
+             vectorp<t>(new_vo, entp, ?contents) &*&
+             length(contents) == capacity); @*/
 
 void* vector_borrow/*@ <t> @*/(struct Vector* vector, int index);
 /*@ requires vectorp<t>(vector, ?entp, ?values) &*&

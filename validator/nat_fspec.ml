@@ -31,7 +31,7 @@ let capture_chain_after ch_name ptr_num (params:lemma_params) =
   "//@ assert double_chainp(?" ^ (params.tmp_gen ch_name) ^ ", " ^
   (List.nth_exn params.args ptr_num) ^ ");\n"
 
-let capture_map_ex map_name vk1 vk2 ptr_num {args;tmp_gen} =
+let capture_map_ex map_name vk1 vk2 ptr_num {args;tmp_gen;_} =
   "//@ assert dmappingp<int_k,ext_k,flw>(?" ^ (tmp_gen map_name) ^
   ",_,_,_,_,_,_,_,_,?" ^ (tmp_gen vk1) ^ ",?" ^ (tmp_gen vk2) ^
   ",_,_," ^
@@ -685,10 +685,10 @@ let fun_types =
                            ", " ^ (List.nth_exn args 2) ^
                            "), " ^ (tmp_gen "vk1") ^ ", " ^
                            (tmp_gen "vk2") ^ "); @*/");
-                        (fun {tmp_gen} ->
+                        (fun {tmp_gen;_} ->
                            "/*@ coherent_same_cap(" ^
                            (tmp_gen "cur_map") ^ ", " ^ (tmp_gen "cur_ch") ^ ");@*/\n");
-                        (fun {args;tmp_gen} ->
+                        (fun {args;tmp_gen;_} ->
                            "//@ expire_olds_keeps_high_bounded(" ^
                            (tmp_gen "cur_ch") ^
                            ", " ^ (List.nth_exn args 2) ^
@@ -740,7 +740,7 @@ let fun_types =
                                  extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
-                                   (fun {args;tmp_gen} ->
+                                   (fun {args;tmp_gen;_} ->
                                       "/*@ {\n\
                                        assert dmap_dchain_coherent(?cur_map, " ^
                                       (tmp_gen "cur_ch") ^
@@ -753,7 +753,7 @@ let fun_types =
                                       (List.nth_exn args 1) ^ ", " ^
                                       (List.nth_exn args 2) ^ ");\n" ^
                                       "} @*/");
-                                   (fun {args;tmp_gen} ->
+                                   (fun {args;tmp_gen;_} ->
                                       "//@ rejuvenate_keeps_high_bounded(" ^
                                       (tmp_gen "cur_ch") ^
                                       ", " ^ (List.nth_exn args 1) ^

@@ -45,6 +45,10 @@ struct StaticFilterTable {
 
   predicate static_keyp(void* ptr; stat_keyi k);
   predicate dynamic_entryp(void* ptr; dynenti de);
+  predicate dynamic_entry_barep(void* ptr, dynenti de);
+
+  fixpoint bool dynentry_right_offsets(void* ptr, void* eaddr);
+  fixpoint ether_addri dynentry_get_addr_fp(dynenti de);
 
   fixpoint int eth_addr_hash(ether_addri ea);
 
@@ -79,15 +83,25 @@ int static_key_hash(void* key);
 
 void dyn_entry_get_addr(void* entry,
                         void** addr_out);
-/*@ requires true; @*/
-/*@ ensures true; @*/
+/*@ requires [?fr]dynamic_entryp(entry, ?de) &*&
+             *addr_out |-> _; @*/
+/*@ ensures [fr]dynamic_entry_barep(entry, de) &*&
+            *addr_out |-> ?ao &*&
+            [fr]ether_addrp(ao, dynentry_get_addr_fp(de)) &*&
+            true == dynentry_right_offsets(entry, ao); @*/
 
 void dyn_entry_retrieve_addr(void* entry, void* addr);
-/*@ requires true; @*/
-/*@ ensures true; @*/
+/*@ requires [?fr]dynamic_entry_barep(entry, ?de) &*&
+             [fr]ether_addrp(addr, dynentry_get_addr_fp(de)) &*&
+             true == dynentry_right_offsets(entry, addr); @*/
+/*@ ensures [fr]dynamic_entryp(entry, de); @*/
 
 void init_nothing(void* entry);
 /*@ requires chars(entry, sizeof(struct DynamicEntry), _); @*/
 /*@ ensures dynamic_entryp(entry, _); @*/
+
+void init_nothing_st(void* entry);
+/*@ requires chars(entry, sizeof(struct StaticKey), _); @*/
+/*@ ensures static_keyp(entry, _); @*/
 
 #endif//_BRIDGE_DATA_H_INCLUDED_

@@ -13,7 +13,7 @@ let last_device_id = ref ""
 let last_time_for_index_alloc = ref ""
 let the_array_lcc_is_local = ref true
 
-let capture_chain ch_name ptr_num {args;tmp_gen} =
+let capture_chain ch_name ptr_num {args;tmp_gen;_} =
   "//@ assert double_chainp(?" ^ (tmp_gen ch_name) ^ ", " ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
@@ -106,8 +106,11 @@ let fun_types =
                          lemmas_before = [];
                          lemmas_after = [
                            on_rez_nonzero
-                               "empty_dmap_dchain_coherent\
-                                <int_k,ext_k,flw>(65536);";
+                             "{\n\
+                              assert vectorp<dynenti>(_, _, ?allocated_vector);\n\
+                              empty_map_vec_dchain_coherent<ether_addri,\
+                              dynenti>(allocated_vector);\n\
+                              }";
                            tx_l "index_range_of_empty(65536, 0);";];};
      "dchain_allocate_new_index", {ret_type = Sint32;
                                    arg_types = stt [Ptr dchain_struct; Ptr Sint32; Uint32;];
@@ -143,7 +146,7 @@ let fun_types =
                                  extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
-                                   (fun {args;tmp_gen} ->
+                                   (fun {args;tmp_gen;_} ->
                                       "/*@ {\n\
                                        assert dmap_dchain_coherent(?cur_map, " ^
                                       (tmp_gen "cur_ch") ^
@@ -156,7 +159,7 @@ let fun_types =
                                       (List.nth_exn args 1) ^ ", " ^
                                       (List.nth_exn args 2) ^ ");\n" ^
                                       "} @*/");
-                                   (fun {args;tmp_gen} ->
+                                   (fun {args;tmp_gen;_} ->
                                       "//@ rejuvenate_keeps_high_bounded(" ^
                                       (tmp_gen "cur_ch") ^
                                       ", " ^ (List.nth_exn args 1) ^
@@ -185,7 +188,36 @@ let fun_types =
                                                   Fptr "entry_pack_key";
                                                   Uint32];
                                  extra_ptr_types = [];
-                                 lemmas_before = [];
+                                 lemmas_before = [
+                                   tx_bl
+                                     "produce_function_pointer_chunk \
+                                      entry_extract_key<ether_addri,\
+                                      dynenti>(dyn_entry_get_addr)\
+                                      (ether_addrp,dynamic_entryp,\
+                                      dynamic_entry_barep,\
+                                      dynentry_right_offsets,\
+                                      dynentry_get_addr_fp)(a, b) \
+                                      {\
+                                      call();\
+                                      }";
+                                   tx_bl
+                                     "produce_function_pointer_chunk \
+                                      entry_pack_key<ether_addri,\
+                                      dynenti>(dyn_entry_retrieve_addr)\
+                                      (ether_addrp,dynamic_entryp,\
+                                      dynamic_entry_barep,\
+                                      dynentry_right_offsets,\
+                                      dynentry_get_addr_fp)(a, b) \
+                                      {\
+                                      call();\
+                                      }\n\
+                                     ";
+                                   (fun {tmp_gen;_} ->
+                                      "//@ assert mapp<stat_keyi>(?" ^
+                                      (tmp_gen "stmp") ^ ", _, _, _);\n" ^
+                                      "//@ close hide_mapp<stat_keyi>(" ^
+                                      (tmp_gen "stmp") ^ ");\n");
+                                 ];
                                  lemmas_after = [];};
      "map_allocate", {ret_type = Sint32;
                       arg_types = stt [Fptr "map_keys_equality";
@@ -194,7 +226,7 @@ let fun_types =
                                        Ptr (Ptr map_struct)];
                       extra_ptr_types = [];
                       lemmas_before = [
-                        (fun {args} ->
+                        (fun {args;_} ->
                            "/*@ if (" ^ (List.nth_exn args 0) ^
                            " == static_key_eq) {\n" ^
                            "produce_function_pointer_chunk \
@@ -260,7 +292,7 @@ let fun_types =
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [
-                   (fun {arg_types;tmp_gen} ->
+                   (fun {arg_types;tmp_gen;_} ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
@@ -332,8 +364,28 @@ let fun_types =
                                           Fptr "vector_init_elem";
                                           Ptr (Ptr vector_struct)];
                          extra_ptr_types = [];
-                         lemmas_before = [];
-                         lemmas_after = [];};
+                         lemmas_before = [
+                           tx_bl
+                             "if (stat_vec_allocated) {\n\
+                              produce_function_pointer_chunk \
+                              vector_init_elem<dynenti>(init_nothing)\
+                              (dynamic_entryp, sizeof(struct DynamicEntry))(a) \
+                              {\
+                              call();\
+                              }\n
+                              } else {\n\
+                              produce_function_pointer_chunk \
+                              vector_init_elem<stat_keyi>(init_nothing_st)\
+                              (static_keyp, sizeof(struct StaticKey))(a) \
+                              {\
+                              call();\
+                              }\n\
+                              }";
+                         ];
+                         lemmas_after = [
+                           (fun _ ->
+                              "if (!stat_vec_allocated)\
+                               stat_vec_allocated = true;");];};
      "vector_borrow", {ret_type = Ptr Void;
                        arg_types = stt [Ptr vector_struct;
                                         Sint32];
@@ -369,16 +421,13 @@ struct
                  ^
                  "/*@ //TODO: this hack should be \
                   converted to a system \n\
-                  assume(sizeof(struct DynamicEntry) == 7);\n@*/\n"
+                  assume(sizeof(struct DynamicEntry) == 7);\n@*/\n\
+                  /*@\
+                  assume(sizeof(struct StaticKey) == 7);\n@*/\n"
                  ^
                  "/*@ assume(ether_addr_eq != static_key_eq); @*/\n"
                  ^
-                 "/*@ produce_function_pointer_chunk \
-                  vector_init_elem<dynenti>(init_nothing)\
-                  (dynamic_entryp, sizeof(struct DynamicEntry))(a) \
-                  {\
-                  call();\
-                  } @*/\n"
+                 "bool stat_vec_allocated = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "loop_invariant_produce"

@@ -105,23 +105,23 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
   //@ destroy_dchain_nodups(expire_n_indexes(ch, time, count));
 }
 
-int expire_items_single_map(struct DoubleChain* chain,
-                            struct Vector* vector,
-                            struct Map* map,
-                            entry_extract_key* eek,
-                            entry_pack_key* epk,
-                            uint32_t time)
-/*@ requires mapp(map, ?kp, ?hsh, mapc(?cap, ?m)) &*&
-             [_]is_entry_extract_key(eek, kp, ?fep, ?bep, ?roffs, ?ek) &*&
-             [_]is_entry_pack_key(epk, kp, fep, bep, roffs, ek) &*&
-             vectorp(vector, ?entp, ?v) &*&
+int expire_items_single_map/*@ <vt,kt> @*/(struct DoubleChain* chain,
+                                           struct Vector* vector,
+                                           struct Map* map,
+                                           entry_extract_key* eek,
+                                           entry_pack_key* epk,
+                                           uint32_t time)
+/*@ requires mapp<kt>(map, ?kp, ?hsh, mapc(?cap, ?m)) &*&
+             [_]is_entry_extract_key<kt,vt>(eek, kp, ?fep, ?bep, ?roffs, ?ek) &*&
+             [_]is_entry_pack_key<kt,vt>(epk, kp, fep, bep, roffs, ek) &*&
+             vectorp<vt>(vector, ?entp, ?v) &*&
              double_chainp(?ch, chain) &*&
-             map_vec_chain_coherent(m, v, ch); @*/
-/*@ ensures mapp(map, kp, hsh, mapc(cap, ?nm)) &*&
-            vectorp(vector, entp, ?nv) &*&
+             map_vec_chain_coherent<kt,vt>(m, v, ch); @*/
+/*@ ensures mapp<kt>(map, kp, hsh, mapc(cap, ?nm)) &*&
+            vectorp<vt>(vector, entp, ?nv) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
-            map_vec_chain_coherent(nm, nv, nch) &*&
+            map_vec_chain_coherent<kt,vt>(nm, nv, nch) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 {
   int count = 0;

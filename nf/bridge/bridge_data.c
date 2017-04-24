@@ -31,6 +31,10 @@ void init_nothing(void* entry) {
   /* do nothing */
 }
 
+void init_nothing_st(void* entry) {
+  /* do nothing */
+}
+
 void dyn_entry_get_addr(void* entry,
                         void** addr_out) {
   *((struct ether_addr**)addr_out) = &((struct DynamicEntry*)entry)->addr;

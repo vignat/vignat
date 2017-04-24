@@ -58,3 +58,5 @@ ensures 0 == (0&x);
                                       fixpoint (t,int) hsh) =
       is_map_key_hash<t>(fun, keyp, hsh);
  @*/
+
+/*@ predicate hide_mapp<t>(struct Map* p) = mapp<t>(p, _, _, _); @*/

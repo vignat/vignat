@@ -11,7 +11,15 @@
   @*/
 
 /*@
-  predicate map_vec_chain_coherent<kt,vt>(list<pair<kt, int> > m, list<vt> v, dchain ch);
+  predicate map_vec_chain_coherent<kt,vt>(list<pair<kt, int> > m,
+                                          list<vt> v, dchain ch);
+  @*/
+
+/*@
+  lemma void empty_map_vec_dchain_coherent<kt,vt>(list<vt> vec);
+  requires vec != nil;
+  ensures map_vec_chain_coherent<kt,vt>(nil, vec,
+                                        empty_dchain_fp(length(vec), 0));
   @*/
 
 /*@

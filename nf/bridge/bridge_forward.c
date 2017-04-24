@@ -109,7 +109,7 @@ void allocate_static_ft(int capacity) {
 
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating static map");
   happy = vector_allocate(sizeof(struct StaticKey), capacity,
-                          init_nothing,
+                          init_nothing_st,
                           &static_ft.keys);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating static array");
 }
@@ -276,12 +276,12 @@ void nf_core_init(void) {
   int happy = map_allocate(ether_addr_eq, ether_addr_hash,
                            capacity, &dynamic_ft.map);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic map");
-  happy = dchain_allocate(capacity, &dynamic_ft.heap);
-  if (!happy) rte_exit(EXIT_FAILURE, "error allocating heap");
   happy = vector_allocate(sizeof(struct DynamicEntry), capacity,
                           init_nothing,
                           &dynamic_ft.entries);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic array");
+  happy = dchain_allocate(capacity, &dynamic_ft.heap);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating heap");
 
 #ifdef KLEE_VERIFICATION
   map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
