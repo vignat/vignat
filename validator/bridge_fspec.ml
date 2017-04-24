@@ -159,8 +159,6 @@ let fun_types =
                            on_rez_nonzero
                              "{\n\
                               assert vectorp<dynenti>(_, _, ?allocated_vector);\n\
-                              empty_map_vec_dchain_coherent<ether_addri,\
-                              dynenti>(allocated_vector);\n\
                               }";
                            tx_l "index_range_of_empty(65536, 0);";];};
      "dchain_allocate_new_index", {ret_type = Sint32;
@@ -199,17 +197,16 @@ let fun_types =
                                    capture_chain "cur_ch" 0;
                                    (fun {args;tmp_gen;_} ->
                                       "/*@ {\n\
-                                       assert dmap_dchain_coherent(?cur_map, " ^
+                                        assert map_vec_chain_coherent<\
+                                       ether_addri,dynenti>(?" ^
+                                      (tmp_gen "cur_map") ^ ", ?" ^
+                                      (tmp_gen "cur_vec") ^ ", " ^
                                       (tmp_gen "cur_ch") ^
-                                      ");\n coherent_same_cap(cur_map, " ^
-                                      (tmp_gen "cur_ch") ^ ");\n" ^
-                                      "rejuvenate_flow_abstract(cur_map," ^
-                                      (tmp_gen "cur_ch") ^ ", " ^
-                                      "dmap_get_val_fp(cur_map, " ^
-                                      (List.nth_exn args 1) ^ ")," ^
-                                      (List.nth_exn args 1) ^ ", " ^
-                                      (List.nth_exn args 2) ^ ");\n" ^
-                                      "} @*/");
+                                      ");\n\
+                                       mvc_coherent_same_len(" ^
+                                      (tmp_gen "cur_map") ^ ", " ^
+                                      (tmp_gen "cur_vec") ^ ", " ^
+                                      (tmp_gen "cur_ch") ^ ");\n} @*/");
                                    (fun {args;tmp_gen;_} ->
                                       "//@ rejuvenate_keeps_high_bounded(" ^
                                       (tmp_gen "cur_ch") ^
@@ -220,11 +217,13 @@ let fun_types =
                                    (fun params ->
                                       "/*@ if (" ^ params.ret_name ^
                                       " != 0) { \n" ^
-                                      "assert dmap_dchain_coherent(?cur_map,?ch);\n" ^
-                                      "rejuvenate_preserves_coherent(cur_map, ch, " ^
+                                      "assert map_vec_chain_coherent<ether_addri,\
+                                       dynenti>(?cur_map,?cur_vec,?cur_ch);\n" ^
+                                      "mvc_rejuvenate_preserves_coherent(cur_map,\
+                                       cur_vec, cur_ch, " ^
                                       (List.nth_exn params.args 1) ^ ", "
                                       ^ (List.nth_exn params.args 2) ^ ");\n\
-                                       rejuvenate_preserves_index_range(ch," ^
+                                       rejuvenate_preserves_index_range(cur_ch," ^
                                       (List.nth_exn params.args 1) ^ ", " ^
                                       (List.nth_exn params.args 2) ^ ");\n}@*/");
                                    (fun params ->

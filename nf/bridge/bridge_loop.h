@@ -25,6 +25,7 @@
     0 < capacity &*&
     length(dv) == capacity &*&
     map_vec_chain_coherent<ether_addri, dynenti>(dm, dv, dh) &*&
+    dchain_high_fp(dh) <= time &*&
     last_time(time);
   @*/
 

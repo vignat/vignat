@@ -23,7 +23,27 @@
            true == map_has_fp(m, k);
   ensures 0 <= map_get_fp(m, k) &*& map_get_fp(m, k) < length(v) &*&
           dchain_index_range_fp(ch) == length(v) &*&
-          map_vec_chain_coherent<kt,vt>(m, v, ch);
+          map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+          true == dchain_allocated_fp(ch, map_get_fp(m, k));
+  @*/
+
+/*@
+  lemma void mvc_rejuvenate_preserves_coherent<kt,vt>(list<pair<kt, int> > m,
+                                                      list<vt> v, dchain ch,
+                                                      int index, uint32_t time);
+  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+           true == dchain_allocated_fp(ch, index);
+  ensures map_vec_chain_coherent<kt, vt>(m, v, dchain_rejuvenate_fp(ch,
+                                                                    index,
+                                                                    time));
+  @*/
+
+/*@
+  lemma void mvc_coherent_same_len<kt,vt>(list<pair<kt, int> > m,
+                                          list<vt> v, dchain ch);
+  requires map_vec_chain_coherent<kt,vt>(m, v, ch);
+  ensures map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+          length(v) == dchain_index_range_fp(ch);
   @*/
 
 /*@
