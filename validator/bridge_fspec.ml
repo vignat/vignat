@@ -132,7 +132,16 @@ let fun_types =
                                             Ptr Uint32];
                                        extra_ptr_types = [];
                                        lemmas_before = [];
-                                       lemmas_after = [];};
+                                       lemmas_after = [
+                                         (fun {args;_} ->
+                                            "/*@ open bridge_loop_invariant (*" ^
+                                            (List.nth_exn args 0) ^ ", *" ^
+                                            (List.nth_exn args 1) ^ ", *" ^
+                                            (List.nth_exn args 2) ^ ", *" ^
+                                            (List.nth_exn args 3) ^ ", *" ^
+                                            (List.nth_exn args 4) ^ ", " ^
+                                            (List.nth_exn args 5) ^ ", *" ^
+                                            (List.nth_exn args 6) ^ "); @*/");];};
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
