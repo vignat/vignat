@@ -38,11 +38,13 @@ verify:
 		../lib/stubs/expirator-stub.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
     bridge_forward.c bridge_config.c bridge_data.c \
+		bridge_loop.c \
 		../nf_main.c \
 		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow \
 		-fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc \
 		rte_stubs.bc bridge_forward.bc bridge_data.bc \
+		bridge_loop.bc \
 		nf_main.bc nf_util.bc bridge_config.bc \
 		my-time-stub.bc expirator-stub.bc \
 		map-stub.bc double-chain-stub.bc vector-stub.bc \

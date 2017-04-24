@@ -10,6 +10,8 @@
 #  include "lib/stubs/containers/double-chain-stub-control.h"
 #  include "lib/stubs/containers/vector-stub-control.h"
 #  include "lib/stubs/rte-stubs-control.h"
+
+#  include "bridge_loop.h"
 #else//KLEE_VERIFICATION
 #  include <assert.h>
 #  include <errno.h>
@@ -331,24 +333,32 @@ void nf_print_config() {
 
 void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
-  rte_reset();
-  dchain_reset(dynamic_ft.heap, config.dyn_capacity);
-  /* map_reset(dynamic_ft.map); */
-  /* vector_reset(dynamic_ft.entries); */
-  /* map_reset(static_ft.map); */
+  bridge_loop_iteration_begin(&dynamic_ft.heap,
+                              &dynamic_ft.map,
+                              &dynamic_ft.entries,
+                              &static_ft.map,
+                              &static_ft.keys,
+                              config.dyn_capacity);
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        uint32_t time) {
-  rte_reset();
-  dchain_reset(dynamic_ft.heap, config.dyn_capacity);
-  map_reset(dynamic_ft.map);
-  vector_reset(dynamic_ft.entries);
-  map_reset(static_ft.map);
+  bridge_loop_iteration_assumptions(&dynamic_ft.heap,
+                                    &dynamic_ft.map,
+                                    &dynamic_ft.entries,
+                                    &static_ft.map,
+                                    &static_ft.keys,
+                                    config.dyn_capacity);
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,
                            uint32_t time) {
+  bridge_loop_iteration_end(&dynamic_ft.heap,
+                            &dynamic_ft.map,
+                            &dynamic_ft.entries,
+                            &static_ft.map,
+                            &static_ft.keys,
+                            config.dyn_capacity);
 }
 
 #endif//KLEE_VERIFICATION
