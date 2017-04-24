@@ -17,6 +17,15 @@ let capture_chain ch_name ptr_num {args;tmp_gen;_} =
   "//@ assert double_chainp(?" ^ (tmp_gen ch_name) ^ ", " ^
   (List.nth_exn args ptr_num) ^ ");\n"
 
+let capture_a_chain name {tmp_gen;_} =
+  "//@ assert double_chainp(?" ^ (tmp_gen name) ^", _);\n"
+
+let capture_a_map t name {tmp_gen;_} =
+  "//@ assert mapp<" ^ t ^ ">(_, _, _, mapc(_,?" ^ (tmp_gen name) ^ "));\n"
+
+let capture_a_vector t name {tmp_gen;_} =
+  "//@ assert vectorp<" ^ t ^ ">(_, _, ?" ^ (tmp_gen name) ^ ");\n"
+
 let map_struct = Ir.Str ("Map", [])
 let vector_struct = Ir.Str ( "Vector", [] )
 let dchain_struct = Ir.Str ( "DoubleChain", [] )
@@ -334,14 +343,16 @@ let fun_types =
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [
-                   (fun {arg_types;tmp_gen;_} ->
+                   (fun {arg_types;tmp_gen;args;_} ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
                         ", _, _, _);\n\
                          //@ close hide_mapp<stat_keyi>(" ^
                         (tmp_gen "stm_ptr") ^
-                        ");"
+                        ");\n" ^
+                        "//@ assert ether_addrp(" ^ (List.nth_exn args 1) ^
+                        ", ?" ^ (tmp_gen "dk") ^ ");"
                       | Ptr (Str ("StaticKey", _)) ->
                         "//@ assert mapp<ether_addri>(?" ^ (tmp_gen "eam_ptr") ^
                         ", _, _, _);\n\
@@ -349,8 +360,24 @@ let fun_types =
                         (tmp_gen "eam_ptr") ^
                         ");"
                       | _ -> "#error unexpected key type");
+                   capture_a_chain "dh";
+                   capture_a_map "ether_addri" "dm";
+                   capture_a_vector "dynenti" "dv";
                  ];
-                 lemmas_after = [];};
+                 lemmas_after = [
+                   (fun {ret_name;arg_types;tmp_gen;_} ->
+                      match List.nth_exn arg_types 1 with
+                      | Ptr (Str ("ether_addr", _)) ->
+                        "/*@ if (" ^ ret_name ^
+                        " != 0) {\n\
+                         mvc_coherent_map_get_bounded(" ^
+                        (tmp_gen "dm") ^ ", " ^
+                        (tmp_gen "dv") ^ ", " ^
+                        (tmp_gen "dh") ^ ", " ^
+                        (tmp_gen "dk") ^
+                        ");\n\
+                         } @*/"
+                      | _ -> "");];};
      "map_put", {ret_type = Void;
                  arg_types = stt [Ptr map_struct;
                                   Ptr Void;

@@ -16,6 +16,17 @@
   @*/
 
 /*@
+  lemma void mvc_coherent_map_get_bounded<kt,vt>(list<pair<kt, int> > m,
+                                                 list<vt> v, dchain ch,
+                                                 kt k);
+  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+           true == map_has_fp(m, k);
+  ensures 0 <= map_get_fp(m, k) &*& map_get_fp(m, k) < length(v) &*&
+          dchain_index_range_fp(ch) == length(v) &*&
+          map_vec_chain_coherent<kt,vt>(m, v, ch);
+  @*/
+
+/*@
   lemma void empty_map_vec_dchain_coherent<kt,vt>(list<vt> vec);
   requires vec != nil;
   ensures map_vec_chain_coherent<kt,vt>(nil, vec,
