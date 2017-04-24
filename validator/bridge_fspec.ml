@@ -100,6 +100,39 @@ let fun_types =
                       lemmas_after = [
                         (fun params ->
                            "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
+     "bridge_loop_invariant_consume", {ret_type = Void;
+                                       arg_types = stt
+                                           [Ptr (Ptr dchain_struct);
+                                            Ptr (Ptr map_struct);
+                                            Ptr (Ptr vector_struct);
+                                            Ptr (Ptr map_struct);
+                                            Ptr (Ptr vector_struct);
+                                            Uint32;
+                                            Uint32];
+                                       extra_ptr_types = [];
+                                       lemmas_before = [
+                                         (fun {args;_} ->
+                                            "/*@ close bridge_loop_invariant(*" ^
+                                            (List.nth_exn args 0) ^ ", *" ^
+                                            (List.nth_exn args 1) ^ ", *" ^
+                                            (List.nth_exn args 2) ^ ", *" ^
+                                            (List.nth_exn args 3) ^ ", *" ^
+                                            (List.nth_exn args 4) ^ ", " ^
+                                            (List.nth_exn args 5) ^ ", " ^
+                                            (List.nth_exn args 6) ^ "); @*/");];
+                                       lemmas_after = [];};
+     "bridge_loop_invariant_produce", {ret_type = Void;
+                                       arg_types = stt
+                                           [Ptr (Ptr dchain_struct);
+                                            Ptr (Ptr map_struct);
+                                            Ptr (Ptr vector_struct);
+                                            Ptr (Ptr map_struct);
+                                            Ptr (Ptr vector_struct);
+                                            Uint32;
+                                            Ptr Uint32];
+                                       extra_ptr_types = [];
+                                       lemmas_before = [];
+                                       lemmas_after = [];};
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
@@ -430,10 +463,10 @@ struct
                  "bool stat_vec_allocated = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
-  let boundary_fun = "loop_invariant_produce"
-  let finishing_fun = "loop_invariant_consume"
-  let eventproc_iteration_begin = "loop_invariant_produce"
-  let eventproc_iteration_end = "loop_invariant_consume"
+  let boundary_fun = "bridge_loop_invariant_produce"
+  let finishing_fun = "bridge_loop_invariant_consume"
+  let eventproc_iteration_begin = "bridge_loop_invariant_produce"
+  let eventproc_iteration_end = "bridge_loop_invariant_consume"
   let user_check_for_complete_iteration =
     "" (*In_channel.read_all "forwarding_property.tmpl"*)
 end

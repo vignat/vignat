@@ -338,7 +338,8 @@ void nf_loop_iteration_begin(unsigned lcore_id,
                               &dynamic_ft.entries,
                               &static_ft.map,
                               &static_ft.keys,
-                              config.dyn_capacity);
+                              config.dyn_capacity,
+                              time);
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
@@ -348,7 +349,8 @@ void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                     &dynamic_ft.entries,
                                     &static_ft.map,
                                     &static_ft.keys,
-                                    config.dyn_capacity);
+                                    config.dyn_capacity,
+                                    time);
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,
@@ -358,7 +360,8 @@ void nf_loop_iteration_end(unsigned lcore_id,
                             &dynamic_ft.entries,
                             &static_ft.map,
                             &static_ft.keys,
-                            config.dyn_capacity);
+                            config.dyn_capacity,
+                            time);
 }
 
 #endif//KLEE_VERIFICATION
