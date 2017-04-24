@@ -123,6 +123,15 @@ struct str_field_descr static_map_key_fields[] = {
   {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
 };
 
+struct nested_field_descr static_map_key_nested_fields[] = {
+  {offsetof(struct StaticKey, addr), 0, sizeof(uint8_t), "a"},
+  {offsetof(struct StaticKey, addr), 1, sizeof(uint8_t), "b"},
+  {offsetof(struct StaticKey, addr), 2, sizeof(uint8_t), "c"},
+  {offsetof(struct StaticKey, addr), 3, sizeof(uint8_t), "d"},
+  {offsetof(struct StaticKey, addr), 4, sizeof(uint8_t), "e"},
+  {offsetof(struct StaticKey, addr), 5, sizeof(uint8_t), "f"},
+};
+
 struct str_field_descr dynamic_map_key_fields[] = {
   {0, sizeof(uint8_t), "a"},
   {1, sizeof(uint8_t), "b"},
@@ -152,7 +161,10 @@ void read_static_ft_from_file() {
   int static_capacity = klee_range(1, CAPACITY_UPPER_LIMIT, "static_capacity");
   allocate_static_ft(static_capacity);
   map_set_layout(static_ft.map, static_map_key_fields,
-                 sizeof(static_map_key_fields)/sizeof(static_map_key_fields[0]));
+                 sizeof(static_map_key_fields)/sizeof(static_map_key_fields[0]),
+                 static_map_key_nested_fields,
+                 sizeof(static_map_key_nested_fields)/
+                 sizeof(static_map_key_nested_fields[0]));
   vector_set_layout(static_ft.keys, static_vector_entry_fields,
                     sizeof(static_vector_entry_fields)/
                     sizeof(static_vector_entry_fields[0]));
@@ -287,7 +299,8 @@ void nf_core_init(void) {
 
 #ifdef KLEE_VERIFICATION
   map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
-                 sizeof(dynamic_map_key_fields)/sizeof(dynamic_map_key_fields[0]));
+                 sizeof(dynamic_map_key_fields)/sizeof(dynamic_map_key_fields[0]),
+                 NULL, 0);
   vector_set_layout(dynamic_ft.entries, dynamic_vector_entry_fields,
                     sizeof(dynamic_vector_entry_fields)/
                     sizeof(dynamic_vector_entry_fields[0]));

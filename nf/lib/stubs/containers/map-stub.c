@@ -16,7 +16,9 @@ struct Map {
   int has_layout;
   int key_size;
   int key_field_count;
+  int nested_key_field_count;
   struct str_field_descr key_fields[PREALLOC_SIZE];
+  struct nested_field_descr key_nests[PREALLOC_SIZE];
   map_keys_equality* keq;
 };
 
@@ -70,16 +72,41 @@ int calculate_str_size(struct str_field_descr* descr, int len) {
 
 void map_set_layout(struct Map* map,
                     struct str_field_descr* key_fields,
-                    int key_fields_count) {
+                    int key_fields_count,
+                    struct nested_field_descr* key_nests,
+                    int nested_key_fields_count) {
   //Do not trace. This function is an internal knob of the model.
   klee_assert(key_fields_count < PREALLOC_SIZE);
+  klee_assert(nested_key_fields_count < PREALLOC_SIZE);
   memcpy(map->key_fields, key_fields,
          sizeof(struct str_field_descr)*key_fields_count);
+  if (0 < nested_key_fields_count) {
+    memcpy(map->key_nests, key_nests,
+           sizeof(struct nested_field_descr)*nested_key_fields_count);
+  }
   map->key_field_count = key_fields_count;
+  map->nested_key_field_count = nested_key_fields_count;
   map->key_size = calculate_str_size(key_fields,
                                      key_fields_count);
   map->has_layout = 1;
 }
+
+#define TRACE_KEY_FIELDS(key, map)                                      \
+  {                                                                     \
+    for (int i = 0; i < map->key_field_count; ++i) {                    \
+      klee_trace_param_ptr_field(key,                                   \
+                                 map->key_fields[i].offset,             \
+                                 map->key_fields[i].width,              \
+                                 map->key_fields[i].name);              \
+    }                                                                   \
+    for (int i = 0; i < map->nested_key_field_count; ++i) {            \
+      klee_trace_param_ptr_nested_field(key,                            \
+                                        map->key_nests[i].base_offset,  \
+                                        map->key_nests[i].offset,       \
+                                        map->key_nests[i].width,        \
+                                        map->key_nests[i].name);        \
+    }                                                                   \
+  }
 
 int map_get(struct Map* map, void* key, int* value_out) {
   klee_trace_ret();
@@ -89,14 +116,7 @@ int map_get(struct Map* map, void* key, int* value_out) {
   klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(key, map->key_size, "key");
   klee_trace_param_ptr(value_out, sizeof(int), "value_out");
-  {
-    for (int i = 0; i < map->key_field_count; ++i) {
-      klee_trace_param_ptr_field(key,
-                                 map->key_fields[i].offset,
-                                 map->key_fields[i].width,
-                                 map->key_fields[i].name);
-    }
-  }
+  TRACE_KEY_FIELDS(key, map);
   if (map->has_this_key) {
     klee_assert(!map->entry_claimed);
     map->entry_claimed = 1;
@@ -114,14 +134,7 @@ void map_put(struct Map* map, void* key, int value) {
   klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(key, map->key_size, "key");
   klee_trace_param_i32(value, "value");
-  {
-    for (int i = 0; i < map->key_field_count; ++i) {
-      klee_trace_param_ptr_field(key,
-                                 map->key_fields[i].offset,
-                                 map->key_fields[i].width,
-                                 map->key_fields[i].name);
-    }
-  }
+  TRACE_KEY_FIELDS(key, map);
   if (map->entry_claimed) {
     klee_assert(map->allocated_index == value);
   }
@@ -137,14 +150,7 @@ void map_erase(struct Map* map, void* key, void** trash) {
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_ptr(key, map->key_size, "key");
-  {
-    for (int i = 0; i < map->key_field_count; ++i) {
-      klee_trace_param_ptr_field(key,
-                                 map->key_fields[i].offset,
-                                 map->key_fields[i].width,
-                                 map->key_fields[i].name);
-    }
-  }
+  TRACE_KEY_FIELDS(key, map);
   klee_trace_param_ptr(trash, sizeof(void*), "trash");
   klee_assert(0); //no support for erasing staff for the moment
 }
