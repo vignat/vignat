@@ -17,6 +17,14 @@ struct dmz_config config;
 
 void nf_core_init(void)
 {
+        if (!allocate_flowmanager(rte_eth_dev_count(),
+	                          0,
+                                  0,
+                                  0,
+                                  config.expiration_time,
+                                  config.max_flows)) {
+                rte_exit(EXIT_FAILURE, "Could not allocate flow manager");
+        }
 }
 
 uint8_t nf_core_process(uint8_t device,
