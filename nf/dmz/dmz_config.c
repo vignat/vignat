@@ -16,8 +16,8 @@
 #include <cmdline_parse_ipaddr.h>
 
 #include "dmz_config.h"
-#include "nf_util.h"
-#include "nf_log.h"
+#include "../lib/nf_util.h"
+#include "../lib/nf_log.h"
 
 
 #define PARSE_ERROR(format, ...) \
@@ -142,7 +142,7 @@ void dmz_config_init(struct dmz_config* config,
 				}
 				break;
 
-			case 'f':
+			case 'l':
 				config->max_flows = dmz_config_parse_int(optarg, "max-flows", 10, '\0');
 				if (config->max_flows <= 0) {
 					PARSE_ERROR("Flow table size must be strictly positive.\n");
@@ -172,12 +172,12 @@ void dmz_print_config(struct dmz_config* config)
 {
 	NF_INFO("\n--- DMZ Config ---\n");
 
-	NF_INFO("Internet device: %" PRIu8, config->inter_device);
+	NF_INFO("Internet device: %" PRIu8, config->internet_device);
 	NF_INFO("DMZ device: %" PRIu8, config->dmz_device);
-	NF_INFO("Intranet device: %" PRIu8, config->intra_device);
+	NF_INFO("Intranet device: %" PRIu8, config->intranet_device);
 
-	char* inter_addr_str = nf_ipv4_to_str(config->inter_block_addr);
-	char* inter_mask_str = nf_ipv4_to_str(config->inter_block_mask);
+	char* inter_addr_str = nf_ipv4_to_str(config->internet_block_addr);
+	char* inter_mask_str = nf_ipv4_to_str(config->internet_block_mask);
 	NF_INFO("Internet block address: %s", inter_addr_str);
 	NF_INFO("Internet block mask: %s", inter_mask_str);
 	free(inter_addr_str);
@@ -190,8 +190,8 @@ void dmz_print_config(struct dmz_config* config)
 	free(dmz_addr_str);
 	free(dmz_mask_str);
 
-	char* intra_addr_str = nf_ipv4_to_str(config->intra_block_addr);
-	char* intra_mask_str = nf_ipv4_to_str(config->intra_block_mask);
+	char* intra_addr_str = nf_ipv4_to_str(config->intranet_block_addr);
+	char* intra_mask_str = nf_ipv4_to_str(config->intranet_block_mask);
 	NF_INFO("Intranet block address: %s", intra_addr_str);
 	NF_INFO("Intranet block mask: %s", intra_mask_str);
 	free(intra_addr_str);

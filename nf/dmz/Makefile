@@ -4,7 +4,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = dmz
 
 # sources
-SRCS-y := dmz_main.c ../nf_main.c ../lib/nf_time.c ../lib/nf_util.c
+SRCS-y := dmz_main.c dmz_config.c ../nf_main.c ../lib/nf_time.c ../lib/nf_util.c
 
 # gcc flags
 CFLAGS += -O3
