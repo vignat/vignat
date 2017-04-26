@@ -151,6 +151,11 @@ struct str_field_descr dynamic_vector_entry_fields[] = {
   {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
 };
 
+int stat_map_condition(void* key, int index) {
+  // Do not trace the model service function
+  return 0 <= index & index < rte_eth_dev_count();
+}
+
 #endif//KLEE_VERIFICATION
 
 #ifdef KLEE_VERIFICATION
@@ -165,6 +170,7 @@ void read_static_ft_from_file() {
                  static_map_key_nested_fields,
                  sizeof(static_map_key_nested_fields)/
                  sizeof(static_map_key_nested_fields[0]));
+  map_set_entry_condition(static_ft.map, stat_map_condition);
   vector_set_layout(static_ft.keys, static_vector_entry_fields,
                     sizeof(static_vector_entry_fields)/
                     sizeof(static_vector_entry_fields[0]));
@@ -352,7 +358,8 @@ void nf_loop_iteration_begin(unsigned lcore_id,
                               &static_ft.map,
                               &static_ft.keys,
                               config.dyn_capacity,
-                              time);
+                              time,
+                              rte_eth_dev_count());
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
@@ -374,7 +381,8 @@ void nf_loop_iteration_end(unsigned lcore_id,
                             &static_ft.map,
                             &static_ft.keys,
                             config.dyn_capacity,
-                            time);
+                            time,
+                            rte_eth_dev_count());
 }
 
 #endif//KLEE_VERIFICATION

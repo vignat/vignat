@@ -114,7 +114,7 @@ correct host.
 ** Never fail to drop
 If the static config orders the bridge to drop packets from a certain interface
 for a certain destination, it will always do.
-** No arbitriness
+** No arbitrariness
 If there is a static rule for a specific interface and a specific destination
 address bridge will follow it unconditionally.
 ** Learn and improve

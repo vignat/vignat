@@ -117,7 +117,8 @@ let fun_types =
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
                                             Uint32;
-                                            Uint32];
+                                            Uint32;
+                                            Uint8];
                                        extra_ptr_types = [];
                                        lemmas_before = [
                                          (fun {args;_} ->
@@ -128,7 +129,8 @@ let fun_types =
                                             (List.nth_exn args 3) ^ ", *" ^
                                             (List.nth_exn args 4) ^ ", " ^
                                             (List.nth_exn args 5) ^ ", " ^
-                                            (List.nth_exn args 6) ^ "); @*/");];
+                                            (List.nth_exn args 6) ^ ", " ^
+                                            (List.nth_exn args 7) ^ "); @*/");];
                                        lemmas_after = [];};
      "bridge_loop_invariant_produce", {ret_type = Void;
                                        arg_types = stt
@@ -138,7 +140,8 @@ let fun_types =
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
                                             Uint32;
-                                            Ptr Uint32];
+                                            Ptr Uint32;
+                                            Uint8];
                                        extra_ptr_types = [];
                                        lemmas_before = [];
                                        lemmas_after = [
@@ -150,7 +153,8 @@ let fun_types =
                                             (List.nth_exn args 3) ^ ", *" ^
                                             (List.nth_exn args 4) ^ ", " ^
                                             (List.nth_exn args 5) ^ ", *" ^
-                                            (List.nth_exn args 6) ^ "); @*/");];};
+                                            (List.nth_exn args 6) ^ ", " ^
+                                            (List.nth_exn args 7) ^ "); @*/");];};
      "dchain_allocate", {ret_type = Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
@@ -159,6 +163,8 @@ let fun_types =
                            on_rez_nonzero
                              "{\n\
                               assert vectorp<dynenti>(_, _, ?allocated_vector);\n\
+                              empty_map_vec_dchain_coherent\
+                              <ether_addri,dynenti>(allocated_vector);\n\
                               }";
                            tx_l "index_range_of_empty(65536, 0);";];};
      "dchain_allocate_new_index", {ret_type = Sint32;
@@ -264,9 +270,11 @@ let fun_types =
                                      ";
                                    (fun {tmp_gen;_} ->
                                       "//@ assert mapp<stat_keyi>(?" ^
-                                      (tmp_gen "stmp") ^ ", _, _, _);\n" ^
+                                      (tmp_gen "stmp") ^ ", _, _, ?stm);\n" ^
                                       "//@ close hide_mapp<stat_keyi>(" ^
-                                      (tmp_gen "stmp") ^ ");\n");
+                                      (tmp_gen "stmp") ^ ", static_keyp,\
+                                                          st_key_hash,\
+                                                          stm);\n");
                                  ];
                                  lemmas_after = [];};
      "map_allocate", {ret_type = Sint32;
@@ -342,29 +350,42 @@ let fun_types =
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [
-                   (fun {arg_types;tmp_gen;args;_} ->
+                   (fun ({arg_types;tmp_gen;args;_} as params) ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
-                        ", _, _, _);\n\
+                        ", _, _, ?" ^ (tmp_gen "stm") ^ ");\n\
                          //@ close hide_mapp<stat_keyi>(" ^
                         (tmp_gen "stm_ptr") ^
-                        ");\n" ^
+                        ", static_keyp, st_key_hash, " ^ (tmp_gen "stm") ^ ");\n" ^
                         "//@ assert ether_addrp(" ^ (List.nth_exn args 1) ^
-                        ", ?" ^ (tmp_gen "dk") ^ ");"
+                        ", ?" ^ (tmp_gen "dk") ^ ");\n" ^
+                        (capture_a_chain "dh" params ^
+                         capture_a_map "ether_addri" "dm" params ^
+                         capture_a_vector "dynenti" "dv" params);
                       | Ptr (Str ("StaticKey", _)) ->
                         "//@ assert mapp<ether_addri>(?" ^ (tmp_gen "eam_ptr") ^
-                        ", _, _, _);\n\
+                        ", _, _, ?" ^ (tmp_gen "dym") ^ ");\n\
                          //@ close hide_mapp<ether_addri>(" ^
                         (tmp_gen "eam_ptr") ^
-                        ");"
+                        ", ether_addrp, eth_addr_hash, " ^ (tmp_gen "dym") ^
+                        ");\n" ^
+                        (capture_a_map "stat_keyi" "stm" params)
                       | _ -> "#error unexpected key type");
-                   capture_a_chain "dh";
-                   capture_a_map "ether_addri" "dm";
-                   capture_a_vector "dynenti" "dv";
                  ];
                  lemmas_after = [
-                   (fun {ret_name;arg_types;tmp_gen;_} ->
+                   (fun {arg_types;tmp_gen;args;_} ->
+                      match List.nth_exn arg_types 1 with
+                      | Ptr (Str ("ether_addr", _)) ->
+                        "//@ open hide_mapp<stat_keyi>(" ^
+                        (tmp_gen "stm_ptr") ^ ", static_keyp, st_key_hash, " ^
+                        (tmp_gen "stm") ^ ");\n"
+                      | Ptr (Str ("StaticKey", _)) ->
+                        "//@ open hide_mapp<ether_addri>(" ^
+                        (tmp_gen "eam_ptr") ^ ", ether_addrp, eth_addr_hash, " ^
+                        (tmp_gen "dym") ^ ");"
+                      | _ -> "#error unexpected key type");
+                   (fun {args;ret_name;arg_types;tmp_gen;_} ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         "/*@ if (" ^ ret_name ^
@@ -375,6 +396,17 @@ let fun_types =
                         (tmp_gen "dh") ^ ", " ^
                         (tmp_gen "dk") ^
                         ");\n\
+                         } @*/"
+                      | Ptr (Str ("StaticKey", _)) ->
+                        "/*@ if (" ^ ret_name ^
+                        " != 0) {\n\
+                         assert static_keyp(" ^ (List.nth_exn args 1) ^
+                        ", ?stkey);\n\
+                         map_get_mem(" ^ (tmp_gen "stm") ^
+                        ", stkey);\n\
+                         forall_mem(pair(stkey, *" ^ (List.nth_exn args 2) ^
+                        "), " ^ (tmp_gen "stm") ^
+                        ", (st_entry_bound)(2));\n\
                          } @*/"
                       | _ -> "");];};
      "map_put", {ret_type = Void;

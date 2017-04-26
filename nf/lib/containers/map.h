@@ -15,6 +15,12 @@ struct Map;
                     mapi<t> map);
   @*/
 
+/*@
+  lemma void map_get_mem<t>(list<pair<t, int> > m, t k);
+  requires true == map_has_fp(m, k);
+  ensures true == mem(pair(k, map_get_fp(m, k)), m);
+  @*/
+
 int map_allocate/*@ <t> @*/(map_keys_equality* keq,
                             map_key_hash* khash, int capacity,
                             struct Map** map_out);

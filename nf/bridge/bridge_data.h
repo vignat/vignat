@@ -43,7 +43,12 @@ struct StaticFilterTable {
     ptr->f |-> ?f &*&
     addr == eaddrc(a, b, c, d, e, f);
 
-  predicate static_keyp(void* ptr; stat_keyi k);
+  predicate static_keyp(struct StaticKey* ptr; stat_keyi k) =
+    struct_StaticKey_padding(ptr) &*&
+    ptr->device |-> ?device &*&
+    ether_addrp(&ptr->addr, ?addr) &*&
+    k == stkc(device, addr);
+
   predicate dynamic_entryp(void* ptr; dynenti de);
   predicate dynamic_entry_barep(void* ptr, dynenti de);
 
