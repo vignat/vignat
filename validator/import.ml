@@ -904,7 +904,7 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
                     | Some n -> n
                     | None -> failwith ("nested pointer to unknown: " ^
                                         (Int.to_string x) ^ " -> " ^
-                                          (Sexp.to_string arg.value))
+                                        (Sexp.to_string arg.value))
                 end
               | x -> get_allocated_arg arg a_type
             end
@@ -1034,9 +1034,27 @@ let take_arg_ptrs_into_account (args : Trace_prefix.arg list) callid =
             | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
         end)
 
+let insert_type_casts (free_vars:var_spec String.Map.t) = function
+  | {v=Id name; t} -> begin
+      match String.Map.find free_vars name with
+      | Some v_spec ->
+        if v_spec.value.t <> t then begin
+          lprintf "add type cast %s -> %s for %s\n"
+            (ttype_to_str v_spec.value.t)
+            (ttype_to_str t)
+            (render_tterm v_spec.value);
+          Some {v=Cast (t, {v=Id name;t=v_spec.value.t});t=t}
+        end else None
+      | _ -> None
+    end
+  | _ -> None
 
 let extract_common_call_context
-    ~is_tip ftype_of call ret_spec args unique_postfix =
+    ~is_tip ftype_of call ret_spec args unique_postfix
+    (free_vars:var_spec String.Map.t) =
+  let args =
+    List.map args ~f:(call_recursively_on_tterm (insert_type_casts free_vars))
+  in
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call in
   let arg_names = List.map args ~f:render_tterm in
@@ -1059,7 +1077,7 @@ let extract_common_call_context
   in
   {extra_pre_conditions;pre_lemmas;application;post_lemmas;ret_name;ret_type}
 
-let extract_hist_call ftype_of call rets =
+let extract_hist_call ftype_of call rets free_vars =
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call in
   let args_post_conditions = (compose_extra_ptrs_post_conditions call)@
@@ -1069,11 +1087,13 @@ let extract_hist_call ftype_of call rets =
   match Int.Map.find rets call.id with
   | Some ret ->
     {context=extract_common_call_context
-         ~is_tip:false ftype_of call (Some ret) args uniq;
+         ~is_tip:false ftype_of call (Some ret) args uniq
+         free_vars;
      result={args_post_conditions;ret_val=ret.value}}
   | None ->
     {context=extract_common_call_context
-         ~is_tip:false ftype_of call None args uniq;
+         ~is_tip:false ftype_of call None args uniq
+         free_vars;
      result={args_post_conditions;ret_val={t=Unknown;v=Undef;}}}
 
 let convert_ctxt_list l = List.map l ~f:(fun e ->
@@ -1085,11 +1105,12 @@ let split_common_assumptions a1 a2 =
   List.partition_tf as1 ~f:(fun assumption ->
       List.exists as2 ~f:(fun other -> other = assumption))
 
-let extract_tip_calls ftype_of calls rets =
+let extract_tip_calls ftype_of calls rets free_vars =
   let call = List.hd_exn calls in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context
       ~is_tip:true ftype_of call (Int.Map.find rets call.id) args "tip"
+      free_vars
   in
   let get_ret_val call =
     match Int.Map.find rets call.id with
@@ -1125,12 +1146,12 @@ let extract_tip_calls ftype_of calls rets =
   lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
 
-let extract_calls_info ftype_of tpref rets =
+let extract_calls_info ftype_of tpref rets (free_vars:var_spec String.Map.t) =
   let hist_funs =
     (List.map tpref.history ~f:(fun call ->
-         extract_hist_call ftype_of call rets))
+         extract_hist_call ftype_of call rets free_vars))
   in
-  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets in
+  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets free_vars in
   hist_funs, tip_calls
 
 let collect_context pref =
@@ -1348,14 +1369,14 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let preamble = preamble in
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
+  let free_vars = typed_vars_to_varspec free_vars in
   let arguments = allocate_args ftype_of pref (name_gen "arg") in
   let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
-  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets in
+  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
-  let free_vars = typed_vars_to_varspec free_vars in
   let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
   let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
   let arguments = fixup_placeholder_ptrs arguments in

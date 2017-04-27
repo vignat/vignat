@@ -185,10 +185,11 @@ let apply_assignments assignments terms =
 
 let render_assumptions assumptions  =
   String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
-      "//@ assume(" ^ (match t.v with
-      | Id x -> "0 != " ^ x
-      | Bop (Bit_and,_,_) -> "0 != " ^ (render_tterm t)
-      | _ -> (render_tterm t)) ^
+      "//@ assume(" ^
+      (match t.v with
+       | Id x -> "0 != " ^ x
+       | Bop (Bit_and,_,_) -> "0 != " ^ (render_tterm t)
+       | _ -> (render_tterm t)) ^
       ");")) ^ "\n"
 
 let render_input_assumptions terms =
