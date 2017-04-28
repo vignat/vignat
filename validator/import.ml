@@ -22,7 +22,7 @@ type type_guess = {w:t_width confidence;
 
 type typed_var = {vname:string; t: type_guess;}
 
-type address_spec = {value:tterm; callid:int; str_depth:int}
+type address_spec = {value:tterm; callid:int; str_depth:int; tt:ttype}
 
 let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
@@ -425,13 +425,22 @@ let rec guess_type_l exps t =
     end
   | [] -> Unknown
 
-let find_first_known_address addr =
+let find_first_known_address addr tt =
   lprintf "looking for first *%Ld\n" addr;
   Option.map (Int64.Map.find !known_addresses addr)
-    ~f:(fun lst -> (List.hd_exn lst).value)
+    ~f:(fun lst ->
+        (List.hd_exn
+           (List.filter lst ~f:(fun x ->
+                match x.tt, tt with
+                | _, Unknown -> true
+                | t1, t2 ->
+                  if (t1 <> t2) then
+                    lprintf "discarding: %s != %s\n"
+                      (ttype_to_str t1) (ttype_to_str t2);
+                  t1 = t2))).value)
 
 let find_first_known_address_or_dummy addr t =
-  match find_first_known_address addr with
+  match find_first_known_address addr t with
   | Some tt -> tt
   | None -> {v=Utility (Ptr_placeholder addr); t=Ptr t}
 
@@ -563,6 +572,13 @@ let rec get_struct_val_value valu t =
        left somewhere *)
       lprintf "Destruct: %s; Need %d fields got %d fields.\n" strname
         (List.length fields) (List.length valu.break_down);
+      if List.length valu.break_down <>
+         List.length fields then begin
+        lprintf "%s expects %d fields but found only %d"
+          strname (List.length fields) (List.length valu.break_down);
+        failwith ("Break down of " ^ strname ^
+                  " does not correspond to its type.");
+      end;
       let fields = List.map2_exn valu.break_down fields
           ~f:(fun {fname;value;_} (name,t) ->
               assert(String.equal name fname);
@@ -584,7 +600,7 @@ let update_ptee_variants nval older =
 
 let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
   begin match base_value.t with
-  | Ptr (Str (_,fields)) ->
+  | Ptr (Str (_,fields) as ptee_type) ->
     let fields = List.fold fields ~init:String.Map.empty
         ~f:(fun fields (name,t) ->
             String.Map.add fields ~key:name ~data:t)
@@ -595,7 +611,7 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
         in
         let b_value = {t=Ptr ftype;
                        v=Addr {t=ftype;
-                               v=Str_idx ({t=get_pointee base_value.t;
+                               v=Str_idx ({t=ptee_type;
                                            v=Deref base_value},fname)}}
         in
         add_to_known_addresses b_value value.break_down addr callid (depth+1))
@@ -614,7 +630,8 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
   in
   known_addresses := Int64.Map.add !known_addresses
       ~key:addr ~data:(update_ptee_variants
-                         {value=base_value; callid; str_depth=depth}
+                         {value=base_value; callid; str_depth=depth;
+                          tt=get_pointee base_value.t}
                          prev)
 
 let get_basic_vars ftype_of tpref =
@@ -751,22 +768,38 @@ let allocate_rets ftype_of tpref =
           let ret = Int.Map.find_exn rets call.id in
           Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"})
 
+let alloc_or_update_address addr name str_value (tterm:tterm) call_id =
+  lprintf "looking for *%Ld\n" addr;
+  match Int64.Map.find !known_addresses addr with
+  | Some specs -> begin
+      known_addresses := Int64.Map.remove !known_addresses addr;
+      match List.find specs ~f:(fun spec -> spec.tt = tterm.t) with
+      | Some spec ->
+        add_to_known_addresses (update_tterm spec.value tterm)
+          str_value.break_down addr call_id 0;
+        None
+      | None -> (* The existing spec does not contain a piece of the type tterm.t
+                   this means it is inferior to tterm, and if we add tterm, it will
+                   also re-add the inferior parts.
+                   TODO: there may be a problem in relating the added tterm to the
+                   spec that was there before. *)
+        add_to_known_addresses
+          {v=Addr {v=Id name;t=tterm.t};t=Ptr tterm.t}
+          str_value.break_down
+          addr call_id 0;
+        Some {name=name;value=tterm}
+    end
+  | None ->
+    add_to_known_addresses
+      {v=Addr {v=Id name;t=tterm.t};t=Ptr tterm.t}
+      str_value.break_down
+      addr call_id 0;
+    Some {name=name;value=tterm}
+
 let allocate_extra_ptrs ftype_of tpref =
   let alloc_call_extra_ptrs call =
     let alloc_extra_ptr p_name addr str_value tterm =
-      lprintf "looking for *%Ld\n" addr;
-      match Int64.Map.find !known_addresses addr with
-      | Some spec -> known_addresses :=
-          Int64.Map.add !known_addresses
-            ~key:addr ~data:(List.map spec ~f:(fun spec ->
-                {spec with value=update_tterm spec.value tterm}));
-        None
-      | None ->
-        add_to_known_addresses
-          {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
-          str_value.break_down
-          addr call.id 0;
-        Some {name=p_name;value=tterm}
+      alloc_or_update_address addr p_name str_value tterm call.id
     in
     List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
         let addr = value in
@@ -780,6 +813,8 @@ let allocate_extra_ptrs ftype_of tpref =
                            (Int64.to_string addr)) addr x
             (get_struct_val_value x ptee_type)
         | Changing (x,_) ->
+          lprintf "allocating extra ptr: %s addr %Ld : %s\n"
+            pname addr (ttype_to_str ptee_type);
           alloc_extra_ptr (pname ^ "_" ^ call.fun_name ^
                            (Int64.to_string addr)) addr x
             (get_struct_val_value x ptee_type))
@@ -871,9 +906,11 @@ let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
-    let arg_var = find_first_known_address
-        (Int64.of_string (Sexp.to_string arg.value)) in
     let ptee_t = get_pointee arg_type in
+    let arg_var = find_first_known_address
+        (Int64.of_string (Sexp.to_string arg.value))
+        ptee_t
+    in
     match arg_var with
     | Some n -> n
     | None -> {v=Addr {v=(Id "arg??");t=ptee_t};t=arg_type}
@@ -896,10 +933,11 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
                   get_allocated_arg arg a_type
                 else begin
                   let key = Int64.of_int x in
-                  match find_first_known_address key with
+                  match find_first_known_address key t with
                   | Some n -> {v=Addr n; t=Ptr t}
                   | None -> match find_first_known_address
                                     (Int64.of_string (Sexp.to_string arg.value))
+                                    t
                     with
                     | Some n -> n
                     | None -> failwith ("nested pointer to unknown: " ^
@@ -928,15 +966,16 @@ let deref_tterm {v;t} =
   {v = simplify_term (Deref {v;t});
    t = get_pointee t}
 
-let compose_args_post_conditions (call:Trace_prefix.call_node) =
-  List.filter_map call.args ~f:(fun arg ->
+let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
+  List.filter_mapi call.args ~f:(fun i arg ->
       match arg.ptr with
       | Nonptr -> None
       | Funptr _ -> None
       | Apathptr -> None
       | Curioptr ptee ->
         let key = Int64.of_string (Sexp.to_string arg.value) in
-        match find_first_known_address key with
+        let arg_type = (get_fun_arg_type ftype_of call i) in
+        match find_first_known_address key (get_pointee arg_type) with
         | Some out_arg ->
           begin match get_struct_val_value
               ptee.after (get_pointee out_arg.t) with
@@ -950,8 +989,10 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) =
         | None -> None (* The variable is not allocated,
                           because it is a 2-layer pointer.*))
 
-let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node) =
+let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node)
+  ftype_of =
   let gen_post_condition_of_struct_val (val_before : Ir.tterm) val_now =
+    lprintf "postconditions for %s: %s\n" call.fun_name (ttype_to_str val_before.t);
     match get_struct_val_value
             val_now (get_pointee val_before.t) with
     | {v=Int _;t=_} -> None
@@ -963,7 +1004,8 @@ let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node) =
   in
   List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
       let key = value in
-      match find_first_known_address key with
+      match find_first_known_address key
+              (get_fun_extra_ptr_type ftype_of call pname) with
       | Some extra_ptee ->
         begin match ptee with
           | Opening x -> gen_post_condition_of_struct_val extra_ptee x
@@ -988,36 +1030,48 @@ let find_last_known_address_before_call addr call_id =
                else
                  (max_el,max_id)))
 
-let find_last_known_whole_address_before_call addr call_id =
+let find_last_known_whole_address_before_call addr call_id tt =
   lprintf "looking for last whole *%Ld\n" addr;
   Option.map (Int64.Map.find !known_addresses addr)
     ~f:(fun lst ->
-        List.fold lst ~init:({v=Undef;t=Unknown},-1)
-          ~f:(fun (max_el,max_id)
-               spec ->
-               if spec.str_depth = 0 && spec.callid <= call_id && max_id < spec.callid then
-                 (spec.value,spec.callid)
+        List.fold lst ~init:({v=Undef;t=Unknown},-1,Int.max_value)
+          ~f:(fun (max_el,max_id,min_depth) spec ->
+              lprintf "for %Ld considering %s : %s (%s) -:- %s\n"
+                addr (render_tterm spec.value)
+                (ttype_to_str spec.tt)
+                (ttype_to_str spec.value.t)
+                (ttype_to_str tt);
+               if (tt = Unknown ||
+                   tt = spec.tt) &&
+                  spec.str_depth < min_depth &&
+                  (* spec.callid <= call_id && *)
+                  max_id < spec.callid
+               then
+                 (spec.value,spec.callid,spec.str_depth)
                else
-                 (max_el,max_id)))
+                 (max_el,max_id,min_depth)))
 
-let take_extra_ptrs_into_account ptrs callid =
+let take_extra_ptrs_into_account ptrs call ftype_of =
   let gen_eq_by_struct_val (var_ptr : Ir.tterm) value_now =
     match get_struct_val_value value_now (get_pointee var_ptr.t) with
     | {v=Undef;t=_} -> None
     | y -> Some {lhs=deref_tterm var_ptr;rhs=y}
   in
-
   List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
-      match find_last_known_whole_address_before_call value callid with
+      match find_last_known_whole_address_before_call
+              value call.id
+              (get_fun_extra_ptr_type ftype_of call pname) with
       | None -> None
-      | Some (x,_) ->
+      | Some (x,_,_) ->
+        lprintf "settled on %s : %s\n"
+          (render_tterm x) (ttype_to_str x.t);
         match ptee with
         | Opening o -> gen_eq_by_struct_val x o
         | Closing _ -> None
         | Changing (o,_) -> gen_eq_by_struct_val x o)
 
-let take_arg_ptrs_into_account (args : Trace_prefix.arg list) callid =
-  List.filter_map args ~f:(fun arg ->
+let take_arg_ptrs_into_account (args : Trace_prefix.arg list) call ftype_of =
+  List.filter_mapi args ~f:(fun i arg ->
       match arg.ptr with
       | Nonptr -> None
       | Funptr _ -> None
@@ -1026,9 +1080,13 @@ let take_arg_ptrs_into_account (args : Trace_prefix.arg list) callid =
                                See also take_extra_ptrs_into_account for the
                                same issue.*)
           let addr = Int64.of_string (Sexp.to_string arg.value) in
-          match find_last_known_whole_address_before_call addr callid with
+          match find_last_known_whole_address_before_call
+                  addr call.id
+                  (get_pointee (get_fun_arg_type ftype_of call i)) with
           | None -> None
-          | Some (x,_) ->
+          | Some (x,_,_) ->
+            lprintf "arg. settled on %s : %s\n"
+              (render_tterm x) (ttype_to_str x.t);
             match get_struct_val_value ptee.before (get_pointee x.t) with
             | {v=Undef;t=_} -> None
             | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
@@ -1064,8 +1122,8 @@ let extract_common_call_context
   in
   let application = simplify_term (Apply (call.fun_name,args)) in
   let extra_pre_conditions =
-    (take_extra_ptrs_into_account call.extra_ptrs call.id)@
-    (take_arg_ptrs_into_account call.args call.id)
+    (take_extra_ptrs_into_account call.extra_ptrs call ftype_of)@
+    (take_arg_ptrs_into_account call.args call ftype_of)
   in
   let post_lemmas =
     compose_post_lemmas
@@ -1079,9 +1137,10 @@ let extract_common_call_context
 
 let extract_hist_call ftype_of call rets free_vars =
   let args = extract_fun_args ftype_of call in
-  let args_post_conditions = compose_args_post_conditions call in
-  let args_post_conditions = (compose_extra_ptrs_post_conditions call)@
-                             args_post_conditions
+  let args_post_conditions = compose_args_post_conditions call ftype_of in
+  let args_post_conditions =
+    (compose_extra_ptrs_post_conditions call ftype_of)@
+    args_post_conditions
   in
   let uniq = string_of_int call.id in
   match Int.Map.find rets call.id with
@@ -1121,13 +1180,13 @@ let extract_tip_calls ftype_of calls rets free_vars =
     match calls with
     | [] -> failwith "There must be at least one tip call."
     | tip :: [] ->
-      let args_post_conditions = compose_args_post_conditions tip in
+      let args_post_conditions = compose_args_post_conditions tip ftype_of in
       [{args_post_conditions;
         ret_val=get_ret_val tip;
         post_statements=convert_ctxt_list tip.ret_context;}]
     | tip1 :: tip2 :: [] ->
-      let args_post_conditions1 = compose_args_post_conditions tip1 in
-      let args_post_conditions2 = compose_args_post_conditions tip2 in
+      let args_post_conditions1 = compose_args_post_conditions tip1 ftype_of in
+      let args_post_conditions2 = compose_args_post_conditions tip2 ftype_of in
       [{args_post_conditions=args_post_conditions1;
         ret_val=get_ret_val tip1;
         post_statements=convert_ctxt_list tip1.ret_context;};
@@ -1136,7 +1195,7 @@ let extract_tip_calls ftype_of calls rets free_vars =
         post_statements=convert_ctxt_list tip2.ret_context;}]
     | _ ->
       List.map calls ~f:(fun tip ->
-          {args_post_conditions = compose_args_post_conditions tip;
+          {args_post_conditions = compose_args_post_conditions tip ftype_of;
            ret_val = get_ret_val tip;
            post_statements = convert_ctxt_list tip.ret_context})
       (* failwith ("More than two tip calls (" ^ *)
@@ -1249,23 +1308,23 @@ let allocate_dummy addr t =
                                        precise=t}}::!allocated_dummies;
   known_addresses :=
     Int64.Map.add !known_addresses
-      ~key:addr ~data:[{value={v=Id name;t}; callid=0; str_depth=0}];
+      ~key:addr ~data:[{value={v=Id name;t}; callid=0; str_depth=0; tt=t}];
   {v=Id name;t}
 
 let fixup_placeholder_ptrs_in_tterm tterm =
   let replace_placeholder = function
-    | {v=Utility (Ptr_placeholder addr);
-       t} ->
+    | {v=Utility (Ptr_placeholder addr); t=Ptr ptee_t} ->
       lprintf "fixing placeholder for %Ld\n" addr;
-      begin match t, find_first_known_address addr with
+      begin match ptee_t, find_first_known_address addr ptee_t with
         | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
                                   (render_tterm tterm))
         | _, Some x -> Some x
-        | Ptr ptee, None -> let dummy_value = allocate_dummy addr ptee in
-          Some {v=Addr dummy_value; t}
-        | _ -> failwith ("Can not fixup placeholder:" ^
-                         (render_tterm tterm))
+        | _, None -> let dummy_value = allocate_dummy addr ptee_t in
+          Some {v=Addr dummy_value; t=Ptr ptee_t}
       end
+    | {v=Utility _;t} ->
+      failwith ("Ptr placeholder type is not a pointer:" ^
+                (render_tterm tterm) ^ " : " ^ (ttype_to_str t))
     | _ -> None
   in
   call_recursively_on_tterm replace_placeholder tterm
@@ -1278,12 +1337,12 @@ let fixup_placeholder_ptrs_in_eq_cond {lhs;rhs} =
   lprintf "fixing pph in %s == %s\n" (render_tterm lhs) (render_tterm rhs);
   match rhs.v with
   | Utility (Ptr_placeholder addr) ->
-    begin match find_first_known_address addr with
+    begin match find_first_known_address addr rhs.t with
       | Some x -> {lhs=lhs; rhs=x}
       | None ->
         known_addresses :=
           Int64.Map.add !known_addresses
-            ~key:addr ~data:[{value=lhs; callid=0; str_depth=0}];
+            ~key:addr ~data:[{value=lhs; callid=0; str_depth=0; tt=rhs.t}];
         {lhs=lhs;rhs=lhs}
     end
   | _ ->
