@@ -3,10 +3,14 @@ open Ir
 
 type lemma_params = {ret_name: string; ret_val: string;
                      args: string list; tmp_gen: string -> string;
-                     is_tip: bool; arg_types: ttype list}
+                     is_tip: bool; arg_types: ttype list;
+                     exptr_types: ttype String.Map.t;
+                     ret_type: ttype}
 
 type blemma_params = {args: string list; tmp_gen: string -> string;
-                      is_tip: bool; arg_types: ttype list}
+                      is_tip: bool; arg_types: ttype list;
+                      exptr_types: ttype String.Map.t;
+                      ret_type: ttype}
 
 type lemma = (lemma_params -> string)
 type blemma = (blemma_params -> string)
@@ -38,13 +42,16 @@ let deep_copy (var : var_spec) =
                              rhs=var.value}) ^
   "\n"
 
-type arg_type = Static of ttype | Dynamic of ttype list
+type type_set = Static of ttype | Dynamic of ttype list
 
 let stt types =
   List.map types ~f:(fun t -> Static t)
 
-type fun_spec = {ret_type: ttype; arg_types: arg_type list;
-                 extra_ptr_types: (string * ttype) list;
+let estt ex_ptrs =
+  List.map ex_ptrs ~f:(fun (name,t) -> (name,Static t))
+
+type fun_spec = {ret_type: type_set; arg_types: type_set list;
+                 extra_ptr_types: (string * type_set) list;
                  lemmas_before: blemma list; lemmas_after: lemma list;}
 
 module type Spec =

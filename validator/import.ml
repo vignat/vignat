@@ -24,6 +24,10 @@ type typed_var = {vname:string; t: type_guess;}
 
 type address_spec = {value:tterm; callid:int; str_depth:int; tt:ttype}
 
+type guessed_types = {ret_type: ttype;
+                      arg_types: ttype list;
+                      extra_ptr_types: ttype String.Map.t}
+
 let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
 let infer_signed_type w =
@@ -128,22 +132,17 @@ let expand_shorted_sexp sexp =
   (fst (expand_exp (remove_defs sexp) defs))
 
 let get_fun_arg_type (ftype_of,type_guesses) call arg_num =
-  match List.nth_exn (ftype_of call.fun_name).arg_types arg_num with
-  | Static t -> t
-  | Dynamic ts -> List.nth_exn ts (Int.Map.find_exn
-                                     (Int.Map.find_exn type_guesses call.id)
-                                     arg_num)
+  List.nth_exn (Int.Map.find_exn type_guesses call.id).arg_types arg_num
 
-let get_fun_extra_ptr_type (ftype_of,_) call exptr_name =
-  match List.Assoc.find (ftype_of call.fun_name).extra_ptr_types
-          ~equal:String.equal exptr_name with
-  | Some t -> t
-  | None -> failwith ("Could not find extra_ptr " ^ exptr_name ^
-                      " type for function " ^ call.fun_name)
+let get_fun_extra_ptr_type (ftype_of,type_guesses) call exptr_name =
+  String.Map.find_exn
+    (Int.Map.find_exn type_guesses call.id).extra_ptr_types
+    exptr_name
 
-let get_fun_ret_type (ftype_of, _) call = (ftype_of call.fun_name).ret_type
+let get_fun_ret_type (ftype_of, type_guesses) call =
+  (Int.Map.find_exn type_guesses call.id).ret_type
 
-let get_num_args (ftype_of, _) call =
+let get_num_args ((ftype_of:string->fun_spec), _) call =
   List.length (ftype_of call.fun_name).arg_types
 
 let to_symbol str =
@@ -900,9 +899,14 @@ let allocate_args ftype_of tpref arg_name_gen =
 let get_lemmas_before (ftype_of,_) call =
   (ftype_of call.fun_name).lemmas_before
 
+let get_fun_exptr_types (ftype_of,guessed_types) call =
+  (Int.Map.find_exn guessed_types call.id).extra_ptr_types
+
 let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
   (List.map (get_lemmas_before ftype_of call) ~f:(fun l ->
-       l {args;tmp_gen;is_tip;arg_types}))
+       l {args;tmp_gen;is_tip;arg_types;
+          exptr_types=get_fun_exptr_types ftype_of call;
+          ret_type=get_fun_ret_type ftype_of call}))
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
@@ -960,7 +964,9 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args arg_types tmp_gen =
   let result = render_tterm ret_spec.value in
   List.map (get_lemmas_after ftype_of call)
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
-                    args;tmp_gen;is_tip;arg_types})
+                    args;tmp_gen;is_tip;arg_types;
+                    exptr_types=get_fun_exptr_types ftype_of call;
+                    ret_type=get_fun_ret_type ftype_of call})
 
 let deref_tterm {v;t} =
   {v = simplify_term (Deref {v;t});
@@ -1369,39 +1375,82 @@ let fixup_placeholder_ptrs_in_tip_call tip_call =
   {tip_call with results = List.map tip_call.results
                      ~f:in_one_result}
 
-let guess_dynamic_types basic_ftype_of pref =
-  let type_match t arg =
-    match t, arg with
-    | Ptr (Str (_, fields)), {aname=_; value=_; ptr=Curioptr ptee}
-      when List.length fields = List.length ptee.before.break_down ->
-      List.for_all2_exn fields ptee.before.break_down
+let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
+  let type_match t str_val =
+    match t with
+    | Ptr (Str (_, fields))
+      when List.length fields = List.length str_val.break_down ->
+      List.for_all2_exn fields str_val.break_down
         ~f:(fun (name,t) {fname;value;addr=_} ->
             String.equal name fname
             (* One level introspection should be enough *))
     | _ -> false
   in
+  let find_type_match ts str_val val_name call =
+    match List.find ts ~f:(fun t -> type_match t str_val) with
+    | Some tt -> lprintf "guessed %s for %s/%d#%s\n"
+                   (ttype_to_str tt)
+                   call.fun_name call.id val_name;
+      tt
+    | None -> failwith
+                ("Can not guess a dynamic type for " ^
+                 call.fun_name ^ "/" ^ Int.to_string call.id ^
+                 " " ^ val_name)
+  in
+  let guess_type ts str_val val_name call =
+    match ts with
+    | Static t -> t
+    | Dynamic ts -> find_type_match ts str_val val_name call
+  in
   List.fold (pref.history @ pref.tip_calls)
-    ~init:(Int.Map.empty:int Int.Map.t Int.Map.t) ~f:(fun acc call ->
-        let arg_types = (basic_ftype_of call.fun_name).arg_types in
-        let fun_map =
-        List.foldi (List.zip_exn call.args arg_types) ~init:Int.Map.empty
-          ~f:(fun (n:int) (acc:int Int.Map.t) ((arg:Trace_prefix.arg), (t:arg_type)) ->
-              match t with
-              | Static _ -> acc
-              | Dynamic ts ->
-                  match List.findi ts ~f:(fun _ t -> type_match t arg) with
-                    | Some (num, tt) -> lprintf "guessed %s(%d) for %s/%d#%d\n"
-                                          (ttype_to_str tt) num
-                                          call.fun_name call.id n;
-                      Int.Map.add acc ~key:n ~data:num
-                  | None -> failwith
-                              ("Can not guess a dynamic type for " ^
-                               call.fun_name ^ "/" ^ Int.to_string call.id ^
-                               " argument # " ^
-                               Int.to_string n))
+    ~init:(Int.Map.empty:guessed_types Int.Map.t) ~f:(fun acc call ->
+        let arg_decl_types = (basic_ftype_of call.fun_name).arg_types in
+        let arg_type_guesses =
+          List.foldi (List.rev (List.zip_exn call.args arg_decl_types))
+            ~init:[]
+            ~f:(fun (n:int) (acc:ttype list) ((arg:Trace_prefix.arg),
+                                              (ts:type_set)) ->
+                 match ts, arg with
+                 | Dynamic ts, {aname=_; value=_; ptr=Curioptr ptee} ->
+                   (find_type_match ts ptee.before
+                      ("argument # " ^ Int.to_string n)
+                      call)::acc
+                 | Static t, _ -> t::acc
+                 | Dynamic _, _ -> failwith ("Only a structure types can \
+                                              be guessed. Arg " ^ arg.aname ^
+                                             " of " ^ call.fun_name ^
+                                             " is not a structure."))
         in
-        if Int.Map.is_empty fun_map then acc
-        else Int.Map.add acc ~key:call.id ~data:fun_map)
+        let ex_ptr_type_guesses =
+          let ex_ptr_decl_types =
+            String.Map.of_alist_exn (basic_ftype_of call.fun_name).extra_ptr_types
+          in
+          List.fold call.extra_ptrs
+            ~init:String.Map.empty
+            ~f:(fun acc {pname;value=_;ptee} ->
+                let ts = String.Map.find_exn ex_ptr_decl_types pname in
+                match ptee with
+                | Opening x
+                | Closing x
+                | Changing (x,_) ->
+                  String.Map.add acc ~key:pname
+                    ~data:(guess_type ts x ("ex_ptr: " ^ pname) call))
+        in
+        let ret_type_guess =
+          let ret_type_spec = (basic_ftype_of call.fun_name).ret_type in
+          match call.ret, ret_type_spec with
+          | Some {value=_;ptr=Curioptr ptee}, _ ->
+            guess_type ret_type_spec ptee.before "ret_val" call
+          | Some {value=_;ptr=_}, Dynamic _ ->
+            failwith ("Can not guess nonstructural type for\
+                       return value of " ^ call.fun_name)
+          | _, Static t -> t
+          | None,_ -> Void
+        in
+        Int.Map.add acc ~key:call.id
+          ~data:{ret_type=ret_type_guess;
+                 arg_types=arg_type_guesses;
+                 extra_ptr_types=ex_ptr_type_guesses})
 
 let build_ir fun_types fin preamble boundary_fun finishing_fun
   eventproc_iteration_begin eventproc_iteration_end =

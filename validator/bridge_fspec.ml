@@ -102,14 +102,14 @@ let copy_user_buf var_name ptr =
 
 let fun_types =
   String.Map.of_alist_exn
-    ["current_time", {ret_type = Uint32;
+    ["current_time", {ret_type = Static Uint32;
                       arg_types = [];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [
                         (fun params ->
                            "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
-     "bridge_loop_invariant_consume", {ret_type = Void;
+     "bridge_loop_invariant_consume", {ret_type = Static Void;
                                        arg_types = stt
                                            [Ptr (Ptr dchain_struct);
                                             Ptr (Ptr map_struct);
@@ -132,7 +132,7 @@ let fun_types =
                                             (List.nth_exn args 6) ^ ", " ^
                                             (List.nth_exn args 7) ^ "); @*/");];
                                        lemmas_after = [];};
-     "bridge_loop_invariant_produce", {ret_type = Void;
+     "bridge_loop_invariant_produce", {ret_type = Static Void;
                                        arg_types = stt
                                            [Ptr (Ptr dchain_struct);
                                             Ptr (Ptr map_struct);
@@ -155,7 +155,7 @@ let fun_types =
                                             (List.nth_exn args 5) ^ ", *" ^
                                             (List.nth_exn args 6) ^ ", " ^
                                             (List.nth_exn args 7) ^ "); @*/");];};
-     "dchain_allocate", {ret_type = Sint32;
+     "dchain_allocate", {ret_type = Static Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
                          lemmas_before = [];
@@ -167,7 +167,7 @@ let fun_types =
                               <ether_addri,dynenti>(allocated_vector);\n\
                               }";
                            tx_l "index_range_of_empty(65536, 0);";];};
-     "dchain_allocate_new_index", {ret_type = Sint32;
+     "dchain_allocate_new_index", {ret_type = Static Sint32;
                                    arg_types = stt [Ptr dchain_struct; Ptr Sint32; Uint32;];
                                    extra_ptr_types = [];
                                    lemmas_before = [
@@ -195,7 +195,7 @@ let fun_types =
                                         "int the_index_allocated = *" ^
                                         (List.nth_exn params.args 1) ^ ";\n");
                                    ];};
-     "dchain_rejuvenate_index", {ret_type = Sint32;
+     "dchain_rejuvenate_index", {ret_type = Static Sint32;
                                  arg_types = stt [Ptr dchain_struct;
                                                   Sint32; Uint32;];
                                  extra_ptr_types = [];
@@ -236,7 +236,7 @@ let fun_types =
                                       "int the_index_rejuvenated = " ^
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
-     "expire_items_single_map", {ret_type = Sint32;
+     "expire_items_single_map", {ret_type = Static Sint32;
                                  arg_types = stt [Ptr dchain_struct;
                                                   Ptr vector_struct;
                                                   Ptr map_struct;
@@ -277,7 +277,7 @@ let fun_types =
                                                           stm);\n");
                                  ];
                                  lemmas_after = [];};
-     "map_allocate", {ret_type = Sint32;
+     "map_allocate", {ret_type = Static Sint32;
                       arg_types = stt [Fptr "map_keys_equality";
                                        Fptr "map_key_hash";
                                        Sint32;
@@ -343,7 +343,7 @@ let fun_types =
                            "]hide_is_map_key_hash(ether_addr_hash, \
                             ether_addrp, eth_addr_hash);\n\
                             } @*/")];};
-     "map_get", {ret_type = Sint32;
+     "map_get", {ret_type = Static Sint32;
                  arg_types = [Static (Ptr map_struct);
                               Dynamic [Ptr ether_addr_struct;
                                        Ptr static_key_struct];
@@ -409,16 +409,16 @@ let fun_types =
                         ", (st_entry_bound)(2));\n\
                          } @*/"
                       | _ -> "");];};
-     "map_put", {ret_type = Void;
+     "map_put", {ret_type = Static Void;
                  arg_types = stt [Ptr map_struct;
                                   Ptr Void;
                                   Sint32];
                  extra_ptr_types = [];
                  lemmas_before = [];
                  lemmas_after = [];};
-     "received_packet", {ret_type = Void;
+     "received_packet", {ret_type = Static Void;
                          arg_types = stt [Ir.Uint8; Ptr rte_mbuf_struct;];
-                         extra_ptr_types = ["user_buf_addr", user_buf_struct];
+                         extra_ptr_types = estt ["user_buf_addr", user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
@@ -432,14 +432,15 @@ let fun_types =
                                             "received_packet_type = (" ^
                                             recv_pkt ^ ")->packet_type;");
                                            ];};
-     "rte_pktmbuf_free", {ret_type = Void;
+     "rte_pktmbuf_free", {ret_type = Static Void;
                           arg_types = stt [Ptr rte_mbuf_struct;];
                           extra_ptr_types = [];
                           lemmas_before = [];
                           lemmas_after = [];};
-     "send_single_packet", {ret_type = Ir.Sint32;
+     "send_single_packet", {ret_type = Static Ir.Sint32;
                             arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
-                            extra_ptr_types = ["user_buf_addr", user_buf_struct];
+                            extra_ptr_types = estt ["user_buf_addr",
+                                                    user_buf_struct];
                             lemmas_before = [];
                             lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
                                             (fun params ->
@@ -453,12 +454,28 @@ let fun_types =
                                                ";\n" ^
                                                "sent_packet_type = (" ^
                                                sent_pkt ^ ")->packet_type;");];};
-     "start_time", {ret_type = Uint32;
+     "flood", {ret_type = Static Ir.Sint32;
+               arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8; Ir.Uint8];
+               extra_ptr_types = estt ["user_buf_addr", user_buf_struct];
+               lemmas_before = [];
+               lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
+                               (fun params ->
+                                  let sent_pkt =
+                                    (List.nth_exn params.args 0)
+                                  in
+                                  (copy_user_buf "sent_packet"
+                                     sent_pkt) ^ "\n" ^
+                                  "flooded_except_port = " ^
+                                  (List.nth_exn params.args 1) ^
+                                  ";\n" ^
+                                  "sent_packet_type = (" ^
+                                  sent_pkt ^ ")->packet_type;");];};
+     "start_time", {ret_type = Static Uint32;
                     arg_types = [];
                     extra_ptr_types = [];
                     lemmas_before = [];
                     lemmas_after = [];};
-     "vector_allocate", {ret_type = Sint32;
+     "vector_allocate", {ret_type = Static Sint32;
                          arg_types = stt [Sint32;
                                           Sint32;
                                           Fptr "vector_init_elem";
@@ -486,13 +503,26 @@ let fun_types =
                            (fun _ ->
                               "if (!stat_vec_allocated)\
                                stat_vec_allocated = true;");];};
-     "vector_borrow", {ret_type = Ptr Void;
+     "vector_borrow", {ret_type = Static Void;
                        arg_types = stt [Ptr vector_struct;
-                                        Sint32];
-                       extra_ptr_types = [];
-                       lemmas_before = [];
-                       lemmas_after = [];};
-     "vector_return", {ret_type = Void;
+                                        Sint32;
+                                        Ptr (Ptr Void)];
+                       extra_ptr_types = ["borrowed_cell",
+                                          Dynamic [static_key_struct;
+                                                   dynamic_entry_struct]];
+                       lemmas_before = [
+                           tx_bl
+                             "if (dyn_vec_borrowed) {\n\
+                              close hide_vector<dynenti>(_);\n\
+                              } else {\n\
+                              close hide_vector<stat_keyi>(_);\n\
+                              }";
+                       ];
+                       lemmas_after = [
+                         (fun _ ->
+                            "if (!dyn_vec_borrowed)\
+                             dyn_vec_borrowed = true;")];};
+     "vector_return", {ret_type = Static Void;
                        arg_types = stt [Ptr vector_struct;
                                         Sint32;
                                         Ptr Void];
@@ -516,6 +546,7 @@ struct
                   bool a_packet_received = false;\n\
                   struct user_buf sent_packet;\n\
                   uint8_t sent_on_port;\n\
+                  uint8_t flooded_except_port;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
                  ^
@@ -528,6 +559,8 @@ struct
                  "/*@ assume(ether_addr_eq != static_key_eq); @*/\n"
                  ^
                  "bool stat_vec_allocated = false;\n"
+                 ^
+                 "bool dyn_vec_borrowed = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "bridge_loop_invariant_produce"

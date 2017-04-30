@@ -136,19 +136,19 @@ let copy_user_buf var_name ptr =
 
 let fun_types =
   String.Map.of_alist_exn
-    ["current_time", {ret_type = Uint32;
+    ["current_time", {ret_type = Static Uint32;
                       arg_types = [];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [
                         (fun params ->
                         "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
-     "start_time", {ret_type = Uint32;
+     "start_time", {ret_type = Static Uint32;
                     arg_types = [];
                     extra_ptr_types = [];
                     lemmas_before = [];
                     lemmas_after = [];};
-     "dmap_allocate", {ret_type = Sint32;
+     "dmap_allocate", {ret_type = Static Sint32;
                        arg_types = stt
                          [Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
                           Ptr (Ctm "map_keys_equality"); Ptr (Ctm "map_key_hash");
@@ -230,12 +230,12 @@ let fun_types =
                        lemmas_after = [
                          tx_l "empty_dmap_cap\
                                <int_k,ext_k,flw>(65536);";];};
-     "dmap_set_entry_condition", {ret_type = Void;
+     "dmap_set_entry_condition", {ret_type = Static Void;
                                   arg_types = stt [Ptr (Ctm "entry_condition")];
                                   extra_ptr_types = [];
                                   lemmas_before = [];
                                   lemmas_after = [];};
-     "dchain_allocate", {ret_type = Sint32;
+     "dchain_allocate", {ret_type = Static Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
                          lemmas_before = [];
@@ -244,7 +244,7 @@ let fun_types =
                                "empty_dmap_dchain_coherent\
                                 <int_k,ext_k,flw>(65536);";
                            tx_l "index_range_of_empty(65536, 0);";];};
-     "loop_invariant_consume", {ret_type = Void;
+     "loop_invariant_consume", {ret_type = Static Void;
                                 arg_types = stt [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Uint32;
@@ -266,7 +266,7 @@ let fun_types =
                                      List.nth_exn args 5 ^ "); @*/");
                                 ];
                                 lemmas_after = [];};
-     "loop_invariant_produce", {ret_type = Void;
+     "loop_invariant_produce", {ret_type = Static Void;
                                 arg_types = stt [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Ptr Uint32;
@@ -296,7 +296,7 @@ let fun_types =
                                   tx_l "dmap<int_k,ext_k,flw> initial_double_map = map;";
                                   tx_l "dchain initial_double_chain = chain;"
                                 ];};
-     "dmap_get_b", {ret_type = Sint32;
+     "dmap_get_b", {ret_type = Static Sint32;
                     arg_types = stt [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
                     extra_ptr_types = [];
                     lemmas_before = [
@@ -362,7 +362,7 @@ let fun_types =
                          last_indexing_succ_ret_var := params.ret_name;
                          "");
                     ];};
-     "dmap_get_a", {ret_type = Sint32;
+     "dmap_get_a", {ret_type = Static Sint32;
                     arg_types = stt [Ptr dmap_struct; Ptr int_key_struct; Ptr Sint32;];
                     extra_ptr_types = [];
                     lemmas_before = [
@@ -425,7 +425,7 @@ let fun_types =
                          last_indexing_succ_ret_var := params.ret_name;
                          "");
                     ];};
-     "dmap_put", {ret_type = Sint32;
+     "dmap_put", {ret_type = Static Sint32;
                   arg_types = stt [Ptr dmap_struct; Ptr flw_struct; Sint32;];
                   extra_ptr_types = [];
                   lemmas_before = [
@@ -586,7 +586,7 @@ let fun_types =
                       ", " ^ (params.tmp_gen "vk1") ^ ", " ^
                       (params.tmp_gen "vk2") ^ ");\n}@*/");
                   ];};
-     "dmap_get_value", {ret_type = Void;
+     "dmap_get_value", {ret_type = Static Void;
                         arg_types = stt [Ptr dmap_struct; Sint32; Ptr flw_struct;];
                         extra_ptr_types = [];
                         lemmas_before = [
@@ -626,7 +626,7 @@ let fun_types =
                           tx_l "open int_k_p(_,_);";
                           tx_l "open ext_k_p(_,_);";
                         ];};
-     "expire_items", {ret_type = Sint32;
+     "expire_items", {ret_type = Static Sint32;
                       arg_types = stt [Ptr dchain_struct;
                                    Ptr dmap_struct;
                                    Uint32;];
@@ -707,7 +707,7 @@ let fun_types =
                            "dchain chain_after_expiration = " ^
                            (params.tmp_gen "ch_after_exp") ^ ";";);
                       ];};
-     "dchain_allocate_new_index", {ret_type = Sint32;
+     "dchain_allocate_new_index", {ret_type = Static Sint32;
                                    arg_types = stt [Ptr dchain_struct; Ptr Sint32; Uint32;];
                                    extra_ptr_types = [];
                                    lemmas_before = [
@@ -735,7 +735,7 @@ let fun_types =
                                         "int the_index_allocated = *" ^
                                         (List.nth_exn params.args 1) ^ ";\n");
                                    ];};
-     "dchain_rejuvenate_index", {ret_type = Sint32;
+     "dchain_rejuvenate_index", {ret_type = Static Sint32;
                                  arg_types = stt [Ptr dchain_struct; Sint32; Uint32;];
                                  extra_ptr_types = [];
                                  lemmas_before = [
@@ -774,22 +774,22 @@ let fun_types =
                                       "int the_index_rejuvenated = " ^
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
-     "array_bat_init", {ret_type = Void;
+     "array_bat_init", {ret_type = Static Void;
                         arg_types = stt [Ptr arr_bat_struct;];
                         extra_ptr_types = [];
                         lemmas_before = [];
                         lemmas_after = [];};
-     "array_bat_begin_access", {ret_type = Ptr batcher_struct;
+     "array_bat_begin_access", {ret_type = Static (Ptr batcher_struct);
                                 arg_types = stt [Ptr arr_bat_struct; Sint32;];
                                 extra_ptr_types = [];
                                 lemmas_before = [];
                                 lemmas_after = [];};
-     "array_bat_end_access", {ret_type = Void;
+     "array_bat_end_access", {ret_type = Static Void;
                               arg_types = stt [Ptr arr_bat_struct;];
                               extra_ptr_types = [];
                               lemmas_before = [];
                               lemmas_after = [];};
-     "array_lcc_init", {ret_type = Void;
+     "array_lcc_init", {ret_type = Static Void;
                         arg_types = stt [Ptr arr_lcc_struct;];
                         extra_ptr_types = [];
                         lemmas_before = [];
@@ -797,7 +797,7 @@ let fun_types =
                           (fun params ->
                              the_array_lcc_is_local := true;
                              "");];};
-     "array_lcc_begin_access", {ret_type = Ptr lcore_conf_struct;
+     "array_lcc_begin_access", {ret_type = Static (Ptr lcore_conf_struct);
                                 arg_types = stt [Ptr arr_lcc_struct; Sint32;];
                                 extra_ptr_types = [];
                                 lemmas_before = [];
@@ -812,15 +812,15 @@ let fun_types =
                                      if params.is_tip then "" else
                                        "//@ open lcore_confp(_, last_lcc);");
                                 ];};
-     "array_lcc_end_access", {ret_type = Void;
+     "array_lcc_end_access", {ret_type = Static Void;
                               arg_types = stt [Ptr arr_lcc_struct;];
-                              extra_ptr_types = ["returned_cell",
-                                                lcore_conf_struct];
+                              extra_ptr_types = estt ["returned_cell",
+                                                      lcore_conf_struct];
                               lemmas_before = [
                                tx_bl "close lcore_confp(_, last_lcc);";
                               ];
                               lemmas_after = [];};
-     "array_rq_begin_access", {ret_type = Ptr lcore_rx_queue_struct;
+     "array_rq_begin_access", {ret_type = Static (Ptr lcore_rx_queue_struct);
                                arg_types = stt [Ptr arr_rq_struct; Sint32;];
                                extra_ptr_types = [];
                                lemmas_before = [];
@@ -830,15 +830,15 @@ let fun_types =
                                  (fun params ->
                                     "//@ open rx_queuep(_, last_rq);");
                                ];};
-     "array_rq_end_access", {ret_type = Void;
+     "array_rq_end_access", {ret_type = Static Void;
                              arg_types = stt [Ptr arr_rq_struct;];
-                             extra_ptr_types = ["returned_rq_cell",
-                                                lcore_rx_queue_struct];
+                             extra_ptr_types = estt ["returned_rq_cell",
+                                                     lcore_rx_queue_struct];
                              lemmas_before = [
                                tx_bl "close rx_queuep(_, last_rq);";
                              ];
                              lemmas_after = [];};
-     "array_u16_begin_access", {ret_type = Ptr Uint16;
+     "array_u16_begin_access", {ret_type = Static (Ptr Uint16);
                                 arg_types = stt [Ptr arr_u16_struct; Sint32;];
                                 extra_ptr_types = [];
                                 lemmas_before = [];
@@ -851,42 +851,43 @@ let fun_types =
                                      if params.is_tip then
                                        "//@ close some_u16p(" ^ params.ret_name ^ ");"
                                      else "")];};
-     "array_u16_end_access", {ret_type = Void;
+     "array_u16_end_access", {ret_type = Static Void;
                               arg_types = stt [Ptr arr_u16_struct;];
-                              extra_ptr_types = ["returned_u16_cell",
-                                                 Uint16];
+                              extra_ptr_types = estt ["returned_u16_cell",
+                                                      Uint16];
                               lemmas_before = [];
                               lemmas_after = [];};
-     "batcher_push", {ret_type = Void;
+     "batcher_push", {ret_type = Static Void;
                       arg_types = stt [Ptr batcher_struct; Ptr rte_mbuf_struct;];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [];};
-     "batcher_take_all", {ret_type = Void;
+     "batcher_take_all", {ret_type = Static Void;
                           arg_types = stt [Ptr batcher_struct;
                                        Ptr (Ptr (Ptr rte_mbuf_struct));
                                        Ptr Sint32];
                           extra_ptr_types = [];
                           lemmas_before = [];
                           lemmas_after = [];};
-     "batcher_empty", {ret_type = Void;
+     "batcher_empty", {ret_type = Static Void;
                        arg_types = stt [Ptr batcher_struct;];
                        extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};
-     "batcher_full", {ret_type = Sint32;
+     "batcher_full", {ret_type = Static Sint32;
                       arg_types = stt [Ptr batcher_struct;];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [];};
-     "batcher_is_empty", {ret_type = Sint32;
+     "batcher_is_empty", {ret_type = Static Sint32;
                           arg_types = stt [Ptr batcher_struct;];
                           extra_ptr_types = [];
                           lemmas_before = [];
                           lemmas_after = [];};
-     "received_packet", {ret_type = Void;
+     "received_packet", {ret_type = Static Void;
                          arg_types = stt [Ir.Uint8; Ptr rte_mbuf_struct;];
-                         extra_ptr_types = ["user_buf_addr", user_buf_struct];
+                         extra_ptr_types = estt ["user_buf_addr",
+                                                 user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
@@ -900,9 +901,10 @@ let fun_types =
                                             "received_packet_type = (" ^
                                             recv_pkt ^ ")->packet_type;");
                                            ];};
-     "send_single_packet", {ret_type = Ir.Sint32;
+     "send_single_packet", {ret_type = Static Ir.Sint32;
                             arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
-                            extra_ptr_types = ["user_buf_addr", user_buf_struct];
+                            extra_ptr_types = estt ["user_buf_addr",
+                                                    user_buf_struct];
                             lemmas_before = [];
                             lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
                                             (fun params ->
@@ -916,7 +918,7 @@ let fun_types =
                                                ";\n" ^
                                                "sent_packet_type = (" ^
                                                sent_pkt ^ ")->packet_type;");];};
-     "rte_pktmbuf_free", {ret_type = Void;
+     "rte_pktmbuf_free", {ret_type = Static Void;
                           arg_types = stt [Ptr rte_mbuf_struct;];
                           extra_ptr_types = [];
                           lemmas_before = [];

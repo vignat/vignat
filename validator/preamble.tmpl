@@ -31,6 +31,11 @@ int send_single_packet(struct rte_mbuf *m, uint8_t port);
 //@ requires a_packet(m);
 //@ ensures result != 0 ? true : a_packet(m);
 
+void flood(struct rte_mbuf *m, uint8_t skip_device,
+           uint8_t nb_devices);
+//@ requires a_packet(m);
+//@ ensures true;
+
 void received_packet(uint8_t portid,
                      struct rte_mbuf *mbuf);
 //@ requires true;
@@ -64,3 +69,5 @@ ensures 0 == (0&x);
                            predicate (void*;t) kp,
                            fixpoint (t,int) hsh,
                            mapi<t> m) = mapp<t>(p, kp, hsh, m); @*/
+
+/*@ predicate hide_vector<t>(struct Vector* p) = vectorp<t>(p, _, _); @*/
