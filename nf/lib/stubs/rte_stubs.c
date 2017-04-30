@@ -332,3 +332,12 @@ struct rte_mbuf* rte_pktmbuf_clone(struct rte_mbuf *md,
   printf("rte_pktmbuf_clone is not implemented");
   return NULL;
 }
+
+void flood(struct rte_mbuf* frame,
+           uint8_t skip_device,
+           uint8_t nb_devices) {
+  klee_trace_ret();
+  KLEE_TRACE_MBUF(frame);
+  klee_trace_param_i32(skip_device, "skip_device");
+  klee_trace_param_i32(nb_devices, "nb_devices");
+}

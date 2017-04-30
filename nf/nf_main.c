@@ -115,15 +115,7 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
   return 0;
 }
 
-#ifdef KLEE_VERIFICATION
-
-void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
-  // do nothing for now.
-  // TODO: we do not trace this call, which is wrong.
-  // let us see at which point Vigor discovers that.
-}
-
-#else //KLEE_VERIFICATION
+#ifndef KLEE_VERIFICATION
 
 void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
   for (uint8_t device = 0; device < nb_devices; device++) {
@@ -141,7 +133,7 @@ void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
   rte_pktmbuf_free(frame);
 }
 
-#endif//KLEE_VERIFICATION
+#endif//!KLEE_VERIFICATION
 
 // --- Per-core work ---
 

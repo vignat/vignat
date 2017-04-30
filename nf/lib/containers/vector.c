@@ -39,13 +39,15 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
   return 1;
 }
 
-void* vector_borrow/*@ <t> @*/(struct Vector* vector, int index)
+void vector_borrow/*@ <t> @*/(struct Vector* vector, int index, void** val_out)
 /*@ requires vectorp(vector, ?entp, ?values) &*&
-             0 <= index &*& index < length(values); @*/
+             0 <= index &*& index < length(values) &*&
+             *val_out |-> _; @*/
 /*@ ensures vector_accp(vector, entp, values, index, result) &*&
-            entp(result, nth(index, values)); @*/
+            *val_out |-> ?vo &*&
+            entp(vo, nth(index, values)); @*/
 {
-  return vector->data + index*vector->elem_size;
+  *val_out = vector->data + index*vector->elem_size;
 }
 
 void vector_return/*@ <t> @*/(struct Vector* vector, int index, void* value)

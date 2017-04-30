@@ -38,14 +38,17 @@ int vector_allocate(int elem_size, int capacity,
   (*vector_out)->elem_size = elem_size;
   (*vector_out)->capacity = capacity;
   (*vector_out)->elem_claimed = 0;
+  klee_forbid_access((*vector_out)->data, elem_size, "private state");
   return 1;
 }
 
 void vector_reset(struct Vector* vector) {
   //Do not trace. This function is an internal knob of the model.
   //TODO: reallocate vector->data to avoid having the same pointer?
+  klee_allow_access(vector->data, vector->elem_size);
   klee_make_symbolic(vector->data, vector->elem_size, "vector_data_reset");
   vector->elem_claimed = 0;
+  klee_forbid_access(vector->data, vector->elem_size, "private state");
 }
 
 void vector_set_layout(struct Vector* vector,
@@ -58,15 +61,26 @@ void vector_set_layout(struct Vector* vector,
   vector->field_count = field_count;
 }
 
-void* vector_borrow(struct Vector* vector, int index) {
+void vector_borrow(struct Vector* vector, int index, void** val_out) {
   klee_trace_ret();
   //Avoid dumpting the actual contents of vector.
   klee_trace_param_i32((uint32_t)vector, "vector");
   klee_trace_param_i32(index, "index");
+  klee_trace_param_ptr(val_out, sizeof(void*), "val_out");
+  klee_trace_extra_ptr(vector->data, vector->elem_size, "borrowed_cell");
+  {
+    for (int i = 0; i < vector->field_count; ++i) {
+      klee_trace_extra_ptr_field(vector->data,
+                                 vector->fields[i].offset,
+                                 vector->fields[i].width,
+                                 vector->fields[i].name);
+    }
+  }
   klee_assert(!vector->elem_claimed);
   vector->elem_claimed = 1;
   vector->index_claimed = index;
-  return vector->data;
+  klee_allow_access(vector->data, vector->elem_size);
+  *val_out = vector->data;
 }
 
 void vector_return(struct Vector* vector, int index, void* value) {
@@ -86,4 +100,5 @@ void vector_return(struct Vector* vector, int index, void* value) {
   klee_assert(vector->elem_claimed);
   klee_assert(vector->index_claimed == index);
   klee_assert(vector->data == value);
+  klee_forbid_access(vector->data, vector->elem_size, "private state");
 }

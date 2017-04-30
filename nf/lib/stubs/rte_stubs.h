@@ -814,6 +814,9 @@ struct user_buf {
 
 
 uint16_t rte_eth_tx_burst(uint8_t port, uint16_t queueid, struct rte_mbuf **tx_pkts, uint16_t n);
+void flood(struct rte_mbuf* frame,
+           uint8_t skip_device,
+           uint8_t nb_devices);
 void rte_pktmbuf_free(struct rte_mbuf *mbufp);
 uint64_t rte_get_tsc_hz();
 unsigned rte_lcore_id();
