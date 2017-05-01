@@ -121,7 +121,6 @@ void allocate_static_ft(int capacity) {
 
 struct str_field_descr static_map_key_fields[] = {
   {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
-  //TODO: nested fields for ether_addr: a,b,c,d,e,f
   {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
 };
 
@@ -149,8 +148,17 @@ struct str_field_descr static_vector_entry_fields[] = {
 };
 
 struct str_field_descr dynamic_vector_entry_fields[] = {
-  {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
-  {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
+  {offsetof(struct DynamicEntry, addr), sizeof(struct ether_addr), "addr"},
+  {offsetof(struct DynamicEntry, device), sizeof(uint8_t), "device"},
+};
+
+struct nested_field_descr dynamic_vector_entry_nested_fields[] = {
+  {offsetof(struct DynamicEntry, addr), 0, sizeof(uint8_t), "a"},
+  {offsetof(struct DynamicEntry, addr), 1, sizeof(uint8_t), "b"},
+  {offsetof(struct DynamicEntry, addr), 2, sizeof(uint8_t), "c"},
+  {offsetof(struct DynamicEntry, addr), 3, sizeof(uint8_t), "d"},
+  {offsetof(struct DynamicEntry, addr), 4, sizeof(uint8_t), "e"},
+  {offsetof(struct DynamicEntry, addr), 5, sizeof(uint8_t), "f"},
 };
 
 int stat_map_condition(void* key, int index) {
@@ -175,7 +183,11 @@ void read_static_ft_from_file() {
   map_set_entry_condition(static_ft.map, stat_map_condition);
   vector_set_layout(static_ft.keys, static_vector_entry_fields,
                     sizeof(static_vector_entry_fields)/
-                    sizeof(static_vector_entry_fields[0]));
+                    sizeof(static_vector_entry_fields[0]),
+                    static_map_key_nested_fields,
+                    sizeof(static_map_key_nested_fields)/
+                    sizeof(static_map_key_nested_fields[0]),
+                    "StaticKey");
 }
 
 #else//KLEE_VERIFICATION
@@ -310,9 +322,14 @@ void nf_core_init(void) {
   map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
                  sizeof(dynamic_map_key_fields)/sizeof(dynamic_map_key_fields[0]),
                  NULL, 0);
-  vector_set_layout(dynamic_ft.entries, dynamic_vector_entry_fields,
+  vector_set_layout(dynamic_ft.entries,
+                    dynamic_vector_entry_fields,
                     sizeof(dynamic_vector_entry_fields)/
-                    sizeof(dynamic_vector_entry_fields[0]));
+                    sizeof(dynamic_vector_entry_fields[0]),
+                    dynamic_vector_entry_nested_fields,
+                    sizeof(dynamic_vector_entry_nested_fields)/
+                    sizeof(dynamic_vector_entry_nested_fields[0]),
+                    "DynamicEntry");
 #endif//KLEE_VERIFICATION
 }
 

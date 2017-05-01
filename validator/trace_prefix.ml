@@ -5,7 +5,9 @@ open Sexplib.Conv
 type expr = Core.Std.Sexp.t with sexp
 
 type field = {fname: string; value: struct_val; addr: int64}
-and struct_val = {full: expr option; break_down: field list;} with sexp
+and struct_val = {sname: string option;
+                  full: expr option;
+                  break_down: field list;} with sexp
 
 type ptee = {before: struct_val; after: struct_val;} with sexp
 

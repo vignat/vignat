@@ -108,7 +108,8 @@ struct nested_nested_field_descr user_buf_n2[] = {
                                mbuf_descrs[i].width,                    \
                                mbuf_descrs[i].name);                    \
   }                                                                     \
-  klee_trace_extra_ptr(m_ptr->buf_addr, sizeof(struct user_buf), "user_buf_addr"); \
+  klee_trace_extra_ptr(m_ptr->buf_addr, sizeof(struct user_buf),        \
+                       "user_buf_addr", "");                            \
   klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, ether), \
                              sizeof(struct ether_hdr), "ether");        \
   klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, ipv4), \

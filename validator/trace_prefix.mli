@@ -3,7 +3,11 @@ val __expr_of_sexp__ : expr -> expr
 val expr_of_sexp : expr -> expr
 val sexp_of_expr : expr -> expr
 type field = { fname : bytes; value : struct_val; addr : int64; }
-and struct_val = { full : expr option; break_down : field list; }
+and struct_val = {
+  sname : bytes option;
+  full : expr option;
+  break_down : field list;
+}
 val __field_of_sexp__ : expr -> field
 val field_of_sexp : expr -> field
 val __struct_val_of_sexp__ : expr -> struct_val

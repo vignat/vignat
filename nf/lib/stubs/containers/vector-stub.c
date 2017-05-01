@@ -14,7 +14,10 @@ struct Vector {
   int elem_claimed;
   int index_claimed;
   struct str_field_descr fields[PREALLOC_SIZE];
+  struct nested_field_descr nest_fields[PREALLOC_SIZE];
   int field_count;
+  int nested_field_count;
+  char* cell_type;
 };
 
 int vector_allocate(int elem_size, int capacity,
@@ -38,6 +41,8 @@ int vector_allocate(int elem_size, int capacity,
   (*vector_out)->elem_size = elem_size;
   (*vector_out)->capacity = capacity;
   (*vector_out)->elem_claimed = 0;
+  (*vector_out)->field_count = 0;
+  (*vector_out)->nested_field_count = 0;
   klee_forbid_access((*vector_out)->data, elem_size, "private state");
   return 1;
 }
@@ -53,12 +58,23 @@ void vector_reset(struct Vector* vector) {
 
 void vector_set_layout(struct Vector* vector,
                        struct str_field_descr* value_fields,
-                       int field_count) {
+                       int field_count,
+                       struct nested_field_descr* val_nest_fields,
+                       int nest_field_count,
+                       char* type_tag) {
   //Do not trace. This function is an internal knob of the model.
   klee_assert(field_count < PREALLOC_SIZE);
   memcpy(vector->fields, value_fields,
          sizeof(struct str_field_descr)*field_count);
   vector->field_count = field_count;
+
+  if (0 < nest_field_count) {
+    klee_assert(nest_field_count < PREALLOC_SIZE);
+    memcpy(vector->nest_fields, val_nest_fields,
+           sizeof(struct nested_field_descr)*nest_field_count);
+  }
+  vector->nested_field_count = nest_field_count;
+  vector->cell_type = type_tag;
 }
 
 void vector_borrow(struct Vector* vector, int index, void** val_out) {
@@ -67,13 +83,21 @@ void vector_borrow(struct Vector* vector, int index, void** val_out) {
   klee_trace_param_i32((uint32_t)vector, "vector");
   klee_trace_param_i32(index, "index");
   klee_trace_param_ptr(val_out, sizeof(void*), "val_out");
-  klee_trace_extra_ptr(vector->data, vector->elem_size, "borrowed_cell");
+  klee_trace_extra_ptr(vector->data, vector->elem_size,
+                       "borrowed_cell", vector->cell_type);
   {
     for (int i = 0; i < vector->field_count; ++i) {
       klee_trace_extra_ptr_field(vector->data,
                                  vector->fields[i].offset,
                                  vector->fields[i].width,
                                  vector->fields[i].name);
+    }
+    for (int i = 0; i < vector->nested_field_count; ++i) {
+      klee_trace_extra_ptr_nested_field(vector->data,
+                                        vector->nest_fields[i].base_offset,
+                                        vector->nest_fields[i].offset,
+                                        vector->nest_fields[i].width,
+                                        vector->nest_fields[i].name);
     }
   }
   klee_assert(!vector->elem_claimed);
@@ -95,6 +119,13 @@ void vector_return(struct Vector* vector, int index, void* value) {
                                  vector->fields[i].offset,
                                  vector->fields[i].width,
                                  vector->fields[i].name);
+    }
+    for (int i = 0; i < vector->nested_field_count; ++i) {
+      klee_trace_param_ptr_nested_field(vector->data,
+                                        vector->nest_fields[i].base_offset,
+                                        vector->nest_fields[i].offset,
+                                        vector->nest_fields[i].width,
+                                        vector->nest_fields[i].name);
     }
   }
   klee_assert(vector->elem_claimed);

@@ -806,7 +806,7 @@ let allocate_extra_ptrs ftype_of tpref =
         match ptee with
         | Opening _ ->
           alloc_extra_ptr (pname ^ call.fun_name)
-            addr {full=None;break_down=[]} {v=Undef;t=ptee_type}
+            addr {full=None;sname=None;break_down=[]} {v=Undef;t=ptee_type}
         | Closing x ->
           alloc_extra_ptr (pname ^ "_" ^ call.fun_name ^
                            (Int64.to_string addr)) addr x
@@ -868,7 +868,7 @@ let allocate_args ftype_of tpref arg_name_gen =
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call i in
           let ptee_type = get_pointee t in
-          alloc_arg addr {full=None;break_down=[]} {v=Undef;t=ptee_type;}
+          alloc_arg addr {full=None;sname=None;break_down=[]} {v=Undef;t=ptee_type;}
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call i in

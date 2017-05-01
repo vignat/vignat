@@ -127,7 +127,8 @@ int expire_items_single_map/*@ <vt,kt> @*/(struct DoubleChain* chain,
   int count = 0;
   int index = -1;
   while (dchain_expire_one_index(chain, &index, time)) {
-    void* entry = vector_borrow(vector, index);
+    void* entry;
+    vector_borrow(vector, index, &entry);
     void* key;
     eek(entry, &key);
     map_erase(map, key, &entry);
