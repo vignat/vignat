@@ -432,6 +432,12 @@ let find_first_known_address addr tt =
            (List.filter lst ~f:(fun x ->
                 match x.tt, tt with
                 | _, Unknown -> true
+                | _, Void -> true
+                (* TODO: should not really occur.
+                   but left here for the sake of void** output pointers,
+                   that are not concretized yet. *)
+                (* failwith ("Searching for a void instantiation of addr" ^ *)
+                (*         (Int64.to_string addr)) *)
                 | t1, t2 ->
                   if (t1 <> t2) then
                     lprintf "discarding: %s != %s\n"
@@ -1376,19 +1382,29 @@ let fixup_placeholder_ptrs_in_tip_call tip_call =
                      ~f:in_one_result}
 
 let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
-  let type_match t str_val =
+  let type_match tag t str_val =
     match t with
-    | Ptr (Str (_, fields))
-      when List.length fields = List.length str_val.break_down ->
-      List.for_all2_exn fields str_val.break_down
-        ~f:(fun (name,t) {fname;value;addr=_} ->
-            String.equal name fname
-            (* One level introspection should be enough *))
+    | Ptr (Str (struct_name, fields)) ->
+      begin match str_val.sname with
+        | Some sname ->
+          if String.equal sname struct_name then begin
+            assert (List.for_all str_val.break_down
+                      ~f:(fun {fname;value;addr=_} ->
+                          List.exists fields ~f:(fun (name,_) ->
+                              String.equal name fname)));
+            true
+          end else false
+      | None ->
+        List.for_all str_val.break_down
+          ~f:(fun {fname;value;addr=_} ->
+              List.exists fields ~f:(fun (name,_) -> String.equal name fname)
+              (* One level introspection should be enough *))
+      end
     | _ -> false
   in
   let find_type_match ts str_val val_name call =
-    match List.find ts ~f:(fun t -> type_match t str_val) with
-    | Some tt -> lprintf "guessed %s for %s/%d#%s\n"
+    match List.find ts ~f:(fun (tag,t) -> type_match tag t str_val) with
+    | Some (tag,tt) -> lprintf "guessed %s for %s/%d#%s\n"
                    (ttype_to_str tt)
                    call.fun_name call.id val_name;
       tt
@@ -1425,6 +1441,11 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
           let ex_ptr_decl_types =
             String.Map.of_alist_exn (basic_ftype_of call.fun_name).extra_ptr_types
           in
+          let all_ptrs = function Static t -> Static (Ptr t)
+                                | Dynamic ts ->
+                                  Dynamic (List.map ts ~f:(fun (tag,t) ->
+                                      (tag, Ptr t)))
+          in
           List.fold call.extra_ptrs
             ~init:String.Map.empty
             ~f:(fun acc {pname;value=_;ptee} ->
@@ -1434,7 +1455,9 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
                 | Closing x
                 | Changing (x,_) ->
                   String.Map.add acc ~key:pname
-                    ~data:(guess_type ts x ("ex_ptr: " ^ pname) call))
+                    ~data:(get_pointee
+                             (guess_type
+                                (all_ptrs ts) x ("ex_ptr: " ^ pname) call)))
         in
         let ret_type_guess =
           let ret_type_spec = (basic_ftype_of call.fun_name).ret_type in

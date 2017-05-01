@@ -42,7 +42,7 @@ let deep_copy (var : var_spec) =
                              rhs=var.value}) ^
   "\n"
 
-type type_set = Static of ttype | Dynamic of ttype list
+type type_set = Static of ttype | Dynamic of (string*ttype) list
 
 let stt types =
   List.map types ~f:(fun t -> Static t)

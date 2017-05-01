@@ -24,7 +24,7 @@ val on_rez_nonzero : bytes -> lemma_params -> bytes
 val on_rez_nz : (lemma_params -> bytes) -> lemma_params -> bytes
 val render_deep_assignment : Ir.eq_condition -> bytes
 val deep_copy : Ir.var_spec -> bytes
-type type_set = Static of Ir.ttype | Dynamic of Ir.ttype list
+type type_set = Static of Ir.ttype | Dynamic of (bytes * Ir.ttype) list
 val stt : Ir.ttype list -> type_set list
 val estt : ('a * Ir.ttype) list -> ('a * type_set) list
 type fun_spec = {

@@ -142,11 +142,6 @@ struct str_field_descr dynamic_map_key_fields[] = {
   {5, sizeof(uint8_t), "f"}
 };
 
-struct str_field_descr static_vector_entry_fields[] = {
-  {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
-  {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
-};
-
 struct str_field_descr dynamic_vector_entry_fields[] = {
   {offsetof(struct DynamicEntry, addr), sizeof(struct ether_addr), "addr"},
   {offsetof(struct DynamicEntry, device), sizeof(uint8_t), "device"},
@@ -179,11 +174,12 @@ void read_static_ft_from_file() {
                  sizeof(static_map_key_fields)/sizeof(static_map_key_fields[0]),
                  static_map_key_nested_fields,
                  sizeof(static_map_key_nested_fields)/
-                 sizeof(static_map_key_nested_fields[0]));
+                 sizeof(static_map_key_nested_fields[0]),
+                 "StaticKey");
   map_set_entry_condition(static_ft.map, stat_map_condition);
-  vector_set_layout(static_ft.keys, static_vector_entry_fields,
-                    sizeof(static_vector_entry_fields)/
-                    sizeof(static_vector_entry_fields[0]),
+  vector_set_layout(static_ft.keys, static_map_key_fields,
+                    sizeof(static_map_key_fields)/
+                    sizeof(static_map_key_fields[0]),
                     static_map_key_nested_fields,
                     sizeof(static_map_key_nested_fields)/
                     sizeof(static_map_key_nested_fields[0]),
@@ -321,7 +317,7 @@ void nf_core_init(void) {
 #ifdef KLEE_VERIFICATION
   map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
                  sizeof(dynamic_map_key_fields)/sizeof(dynamic_map_key_fields[0]),
-                 NULL, 0);
+                 NULL, 0, "ether_addr");
   vector_set_layout(dynamic_ft.entries,
                     dynamic_vector_entry_fields,
                     sizeof(dynamic_vector_entry_fields)/

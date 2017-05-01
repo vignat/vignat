@@ -20,6 +20,7 @@ struct Map {
   map_entry_condition* ent_cond;
   struct str_field_descr key_fields[PREALLOC_SIZE];
   struct nested_field_descr key_nests[PREALLOC_SIZE];
+  char* key_type;
   map_keys_equality* keq;
 };
 
@@ -72,7 +73,8 @@ void map_set_layout(struct Map* map,
                     struct str_field_descr* key_fields,
                     int key_fields_count,
                     struct nested_field_descr* key_nests,
-                    int nested_key_fields_count) {
+                    int nested_key_fields_count,
+                    char* key_type) {
   //Do not trace. This function is an internal knob of the model.
   klee_assert(key_fields_count < PREALLOC_SIZE);
   klee_assert(nested_key_fields_count < PREALLOC_SIZE);
@@ -87,6 +89,7 @@ void map_set_layout(struct Map* map,
   map->key_size = calculate_str_size(key_fields,
                                      key_fields_count);
   map->has_layout = 1;
+  map->key_type = key_type;
 }
 
 void map_set_entry_condition(struct Map* map, map_entry_condition* cond) {
@@ -94,7 +97,7 @@ void map_set_entry_condition(struct Map* map, map_entry_condition* cond) {
 }
 
 
-#define TRACE_KEY_FIELDS(key, map)              \
+#define TRACE_KEY_FIELDS(key, map)                                      \
   {                                                                     \
     for (int i = 0; i < map->key_field_count; ++i) {                    \
       klee_trace_param_ptr_field(key,                                   \
@@ -117,7 +120,7 @@ int map_get(struct Map* map, void* key, int* value_out) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_ptr(key, map->key_size, "key");
+  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type);
   klee_trace_param_ptr(value_out, sizeof(int), "value_out");
   TRACE_KEY_FIELDS(key, map);
   if (map->has_this_key) {
@@ -138,7 +141,7 @@ void map_put(struct Map* map, void* key, int value) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_ptr(key, map->key_size, "key");
+  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type);
   klee_trace_param_i32(value, "value");
   TRACE_KEY_FIELDS(key, map);
   if (map->ent_cond) {
@@ -158,7 +161,7 @@ void map_erase(struct Map* map, void* key, void** trash) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_ptr(key, map->key_size, "key");
+  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type);
   TRACE_KEY_FIELDS(key, map);
   klee_trace_param_ptr(trash, sizeof(void*), "trash");
   klee_assert(0); //no support for erasing staff for the moment

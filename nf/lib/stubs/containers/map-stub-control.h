@@ -8,7 +8,8 @@ void map_set_layout(struct Map* map,
                     struct str_field_descr* key_fields,
                     int key_fields_count,
                     struct nested_field_descr* key_nests,
-                    int nested_key_fields_count);
+                    int nested_key_fields_count,
+                    char* key_type);
 
 typedef int map_entry_condition(void* key, int index);
 

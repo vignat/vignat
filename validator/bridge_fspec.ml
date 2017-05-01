@@ -345,8 +345,8 @@ let fun_types =
                             } @*/")];};
      "map_get", {ret_type = Static Sint32;
                  arg_types = [Static (Ptr map_struct);
-                              Dynamic [Ptr ether_addr_struct;
-                                       Ptr static_key_struct];
+                              Dynamic ["ether_addr", Ptr ether_addr_struct;
+                                       "StaticKey", Ptr static_key_struct];
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [
@@ -418,7 +418,8 @@ let fun_types =
                  lemmas_after = [];};
      "received_packet", {ret_type = Static Void;
                          arg_types = stt [Ir.Uint8; Ptr rte_mbuf_struct;];
-                         extra_ptr_types = estt ["user_buf_addr", user_buf_struct];
+                         extra_ptr_types = estt ["user_buf_addr",
+                                                 user_buf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
@@ -456,7 +457,8 @@ let fun_types =
                                                sent_pkt ^ ")->packet_type;");];};
      "flood", {ret_type = Static Ir.Sint32;
                arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8; Ir.Uint8];
-               extra_ptr_types = estt ["user_buf_addr", user_buf_struct];
+               extra_ptr_types = estt ["user_buf_addr",
+                                       user_buf_struct];
                lemmas_before = [];
                lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
                                (fun params ->
@@ -508,7 +510,9 @@ let fun_types =
                                         Sint32;
                                         Ptr (Ptr Void)];
                        extra_ptr_types = ["borrowed_cell",
-                                          Dynamic [static_key_struct;
+                                          Dynamic ["StaticKey",
+                                                   static_key_struct;
+                                                   "DynamicEntry",
                                                    dynamic_entry_struct]];
                        lemmas_before = [
                            tx_bl
