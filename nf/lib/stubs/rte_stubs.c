@@ -8,6 +8,9 @@ int rte_errno;
 void rte_pktmbuf_free(struct rte_mbuf *mbufp){
   klee_trace_ret();
   klee_trace_param_just_ptr(mbufp, sizeof(*mbufp), "mbufp");
+  klee_forbid_access(mbufp->buf_addr,
+                     sizeof(struct user_buf),
+                     "pkt freed");
   return;
 }
 
@@ -141,12 +144,20 @@ received_packet(uint8_t device, struct rte_mbuf* mbuf)
 	klee_trace_ret();
 	klee_trace_param_i32(device, "received_packet_device");
 	KLEE_TRACE_MBUF(mbuf);
+  klee_allow_access(mbuf->buf_addr, sizeof(struct user_buf));
 }
 
 struct user_buf user_buf;
 
 struct rte_mbuf incoming_package; //for two ports
 int incoming_package_allocated;
+
+void init_symbolic_user_buf() {
+  void* array = malloc(sizeof(struct user_buf));
+  klee_make_symbolic(array, sizeof(struct user_buf), "user_buf");
+  memcpy(&user_buf, array, sizeof(struct user_buf));
+  user_buf.ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+}
 
 uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
                           struct rte_mbuf** pkts_burst, int max_burst){
@@ -157,11 +168,8 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
     struct rte_mbuf * in_package;
     klee_assert(!incoming_package_allocated);
     void* array = malloc(sizeof(struct rte_mbuf));
-    klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package0");
+    klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package");
     memcpy(&incoming_package, array, sizeof(struct rte_mbuf));
-    array = malloc(sizeof(struct user_buf));
-    klee_make_symbolic(array, sizeof(struct user_buf), "user_buf0");
-    memcpy(&user_buf, array, sizeof(struct user_buf));
     in_package = &incoming_package;
     incoming_package_allocated = 1;
     in_package->buf_addr = &user_buf;
@@ -171,8 +179,7 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
     in_package->pool = NULL;
     in_package->next = NULL;
     in_package->pkt_len = sizeof(struct user_buf);
-    in_package->data_len = 0; // what is the right value???
-    user_buf.ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+    in_package->data_len = 0; // what is the correct value???
     pkts_burst[0] = in_package;
     received_packet(portid, pkts_burst[0]);
     return 1;
@@ -187,7 +194,12 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
   klee_trace_ret();
   KLEE_TRACE_MBUF(m);
   klee_trace_param_i32(port, "portid");
-  return klee_int("packet_sent");
+  int packet_sent = klee_int("packet_sent");
+  if (packet_sent) {
+    klee_forbid_access(m->buf_addr, sizeof(struct user_buf),
+                       "pkt sent");
+  }
+  return packet_sent;
 }
 
 uint16_t rte_eth_tx_burst(uint8_t port, uint16_t queueid,
@@ -226,7 +238,11 @@ void rte_delay_ms(unsigned ms){
 }
 
 int rte_eal_init(int argc, char ** argv){
-    return 0;
+  init_symbolic_user_buf();
+  klee_forbid_access(&user_buf,
+                     sizeof(struct user_buf),
+                     "pkt is yet to be received");
+  return 0;
 }
 
 uint8_t rte_eth_dev_count(){
@@ -341,4 +357,6 @@ void flood(struct rte_mbuf* frame,
   KLEE_TRACE_MBUF(frame);
   klee_trace_param_i32(skip_device, "skip_device");
   klee_trace_param_i32(nb_devices, "nb_devices");
+  klee_forbid_access(frame->buf_addr, sizeof(struct user_buf),
+                     "pkt sent");
 }

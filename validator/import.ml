@@ -774,7 +774,7 @@ let allocate_rets ftype_of tpref =
           Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"})
 
 let alloc_or_update_address addr name str_value (tterm:tterm) call_id =
-  lprintf "looking for *%Ld\n" addr;
+  lprintf "looking for *%Ld /name:%s\n" addr name;
   match Int64.Map.find !known_addresses addr with
   | Some specs -> begin
       known_addresses := Int64.Map.remove !known_addresses addr;
@@ -829,7 +829,7 @@ let allocate_extra_ptrs ftype_of tpref =
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
     let alloc_arg addr str_value tterm =
-      lprintf "looking for *%Ld :" addr;
+      lprintf "aa: looking for *%Ld :\n" addr;
       match Int64.Map.find !known_addresses addr with
       | Some spec -> known_addresses :=
           Int64.Map.add !known_addresses
@@ -838,11 +838,11 @@ let allocate_args ftype_of tpref arg_name_gen =
         lprintf "found some, adding\n";
         None
       | None -> let p_name = arg_name_gen#generate in
+        lprintf "found none, inserting\n";
         add_to_known_addresses
           {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
           str_value.break_down
           addr call.id 0;
-        lprintf "found none, inserting\n";
         Some {name=p_name;value=tterm}
     in
     let alloc_dummy_nested_ptr ptr_addr ptee_addr ptee_t =
@@ -990,7 +990,7 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
         match find_first_known_address key (get_pointee arg_type) with
         | Some out_arg ->
           begin match get_struct_val_value
-              ptee.after (get_pointee out_arg.t) with
+                        ptee.after (get_pointee out_arg.t) with
           | {v=Int _;t=_} -> None
             (* Skip the two layer pointer.
                TODO: maybe be allow special case of Zeroptr here.*)
@@ -1501,8 +1501,9 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let export_point = "export_point" in
   let free_vars = get_basic_vars ftype_of pref in
   let free_vars = typed_vars_to_varspec free_vars in
-  let arguments = allocate_args ftype_of pref (name_gen "arg") in
-  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
+  (* let double_ptr_args = get_double_ptr_args ftype_of pref in *)
+  let arguments = (allocate_extra_ptrs ftype_of pref) in
+  let arguments = (allocate_args ftype_of pref (name_gen "arg"))@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in

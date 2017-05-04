@@ -189,8 +189,8 @@ void lcore_main(void)
             }
           }
         }
-
       }
+
 // TODO benchmark, consider batching
 //      struct rte_mbuf* bufs[BATCH_SIZE];
 //      uint16_t bufs_len = rte_eth_rx_burst(device, 0, bufs, BATCH_SIZE);
