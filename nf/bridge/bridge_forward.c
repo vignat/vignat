@@ -71,7 +71,7 @@ int bridge_get_device(struct ether_addr* dst,
   hash = ether_addr_hash(dst);
   present = map_get(dynamic_ft.map, dst, &index);
   if (present) {
-    struct DynamicEntry* entry;
+    struct DynamicEntry* entry = 0;
     vector_borrow(dynamic_ft.entries, index, (void**)&entry);
     device = entry->device;
     vector_return(dynamic_ft.entries, index, entry);
@@ -96,7 +96,7 @@ void bridge_put_update_entry(struct ether_addr* src,
       NF_INFO("No more space in the dynamic table");
       return;
     }
-    struct DynamicEntry* entry;
+    struct DynamicEntry* entry = 0;
     vector_borrow(dynamic_ft.entries, index, (void**)&entry);
     memcpy(&entry->addr, src, sizeof(struct ether_addr));
     entry->device = src_device;
@@ -260,7 +260,7 @@ void read_static_ft_from_file() {
     int device_from;
     int device_to;
     char* temp;
-    struct StaticKey* key;
+    struct StaticKey* key = 0;
     vector_borrow(static_ft.keys, count, (void**)&key);
 
     // Ouff... the strings are extracted, now let's parse them.

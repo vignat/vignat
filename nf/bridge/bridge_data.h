@@ -49,8 +49,17 @@ struct StaticFilterTable {
     ether_addrp(&ptr->addr, ?addr) &*&
     k == stkc(device, addr);
 
-  predicate dynamic_entryp(void* ptr; dynenti de);
-  predicate dynamic_entry_barep(void* ptr, dynenti de);
+  predicate dynamic_entryp(struct DynamicEntry* ptr; dynenti de) =
+    struct_DynamicEntry_padding(ptr) &*&
+    ptr->device |-> ?device &*&
+    ether_addrp(&ptr->addr, ?addr) &*&
+    de == dynentc(device, addr);
+
+  predicate dynamic_entry_barep(struct DynamicEntry* ptr, dynenti de) =
+    struct_DynamicEntry_padding(ptr) &*&
+    switch(de) { case dynentc(device,addr):
+      return ptr->device |-> device;
+    };
 
   fixpoint bool dynentry_right_offsets(void* ptr, void* eaddr);
   fixpoint ether_addri dynentry_get_addr_fp(dynenti de);
