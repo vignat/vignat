@@ -64,6 +64,7 @@
    :END:
 ** Validator plugin
    :LOGBOOK:
+   CLOCK: [2017-05-04 Don 17:41]
    CLOCK: [2017-05-01 Mon 10:55]--[2017-05-01 Mon 10:57] =>  0:02
    CLOCK: [2017-04-30 Son 11:44]--[2017-04-30 Son 11:47] =>  0:03
    CLOCK: [2017-04-28 Fre 17:49]--[2017-04-28 Fre 17:53] =>  0:04
@@ -137,8 +138,14 @@
      :END:
 **** Double pointer output arguments 
      :LOGBOOK:
-     CLOCK: [2017-05-04 Don 11:50]
+     CLOCK: [2017-05-04 Don 17:09]--[2017-05-04 Don 17:41] =>  0:32
+     CLOCK: [2017-05-04 Don 11:50]--[2017-05-04 Don 12:51] =>  1:01
      CLOCK: [2017-05-04 Don 10:19]--[2017-05-04 Don 11:33] =>  1:14
+     :END:
+**** Unidirectional argument pointer tracing
+     :LOGBOOK:
+     CLOCK: [2017-05-04 Don 17:09]--[2017-05-04 Don 17:09] =>  0:00
+     CLOCK: [2017-05-04 Don 15:22]--[2017-05-04 Don 16:36] =>  1:14
      :END:
 
 

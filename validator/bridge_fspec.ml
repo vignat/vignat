@@ -94,9 +94,11 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "timesync", Uint16] )
 
 let copy_user_buf var_name ptr =
+  ("struct user_buf* tmp_ub_ptr" ^ var_name ^
+   " = (*" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
-     Ir.value={v=Deref {v=Ir.Id ("((" ^ ptr ^ ")->buf_addr)");
+     Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
                         t=Ptr user_buf_struct};
                t=user_buf_struct}}
 
@@ -417,21 +419,23 @@ let fun_types =
                  lemmas_before = [];
                  lemmas_after = [];};
      "received_packet", {ret_type = Static Void;
-                         arg_types = stt [Ir.Uint8; Ptr rte_mbuf_struct;];
+                         arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];
                          extra_ptr_types = estt ["user_buf_addr",
-                                                 user_buf_struct];
+                                                 user_buf_struct;
+                                                 "incoming_package",
+                                                 rte_mbuf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
                                             let recv_pkt =
                                               (List.nth_exn params.args 1)
                                             in
-                                            (copy_user_buf "the_received_packet"
-                                               recv_pkt) ^ "\n" ^
-                                            "received_on_port = (" ^
+                                            "received_on_port = (*" ^
                                             recv_pkt ^ ")->port;\n" ^
-                                            "received_packet_type = (" ^
-                                            recv_pkt ^ ")->packet_type;");
+                                            "received_packet_type = (*" ^
+                                            recv_pkt ^ ")->packet_type;" ^
+                                            (copy_user_buf "the_received_packet"
+                                               recv_pkt) ^ "\n");
                                            ];};
      "rte_pktmbuf_free", {ret_type = Static Void;
                           arg_types = stt [Ptr rte_mbuf_struct;];

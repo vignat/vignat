@@ -101,26 +101,17 @@ struct nested_nested_field_descr user_buf_n2[] = {
   {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 5, sizeof(uint8_t), "f"},
 };
 
-#define KLEE_TRACE_MBUF(m_ptr)                                          \
-  klee_trace_param_ptr(m_ptr, sizeof(*m_ptr), #m_ptr);                  \
-  klee_trace_param_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
-                             sizeof(struct user_buf*), "buf_addr");     \
-  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) { \
-    klee_trace_param_ptr_field(m_ptr,                                   \
-                               mbuf_descrs[i].offset,                   \
-                               mbuf_descrs[i].width,                    \
-                               mbuf_descrs[i].name);                    \
-  }                                                                     \
-  klee_trace_extra_ptr(m_ptr->buf_addr, sizeof(struct user_buf),        \
+#define KLEE_TRACE_USER_BUF(u_ptr)                            \
+  klee_trace_extra_ptr(u_ptr, sizeof(struct user_buf),                  \
                        "user_buf_addr", "");                            \
-  klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, ether), \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct user_buf, ether),   \
                              sizeof(struct ether_hdr), "ether");        \
-  klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, ipv4), \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct user_buf, ipv4),    \
                              sizeof(struct ipv4_hdr), "ipv4");          \
-  klee_trace_extra_ptr_field(m_ptr->buf_addr, offsetof(struct user_buf, tcp), \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct user_buf, tcp),     \
                              sizeof(struct tcp_hdr), "tcp");            \
   for (int i = 0; i < sizeof(user_buf_nested)/sizeof(user_buf_nested[0]); ++i) {\
-    klee_trace_extra_ptr_nested_field(m_ptr->buf_addr,                  \
+    klee_trace_extra_ptr_nested_field(u_ptr,                  \
                                       user_buf_nested[i].base_offset,   \
                                       user_buf_nested[i].offset,        \
                                       user_buf_nested[i].width,         \
@@ -128,7 +119,7 @@ struct nested_nested_field_descr user_buf_n2[] = {
   }                                                                     \
   for (int i = 0; i < sizeof(user_buf_n2)/sizeof(user_buf_n2[0]); ++i) { \
     klee_trace_extra_ptr_nested_nested_field                            \
-      (m_ptr->buf_addr,                                                 \
+      (u_ptr,                                                 \
        user_buf_n2[i].base_base_offset,                                 \
        user_buf_n2[i].base_offset,                                      \
        user_buf_n2[i].offset,                                           \
@@ -136,21 +127,62 @@ struct nested_nested_field_descr user_buf_n2[] = {
        user_buf_n2[i].name);                                            \
   }
 
-// " <-- work around a bug in nano with string syntax coloring caused by the macro above
+#define KLEE_TRACE_MBUF(m_ptr, dir)                                     \
+  klee_trace_param_ptr_directed(m_ptr, sizeof(*m_ptr), #m_ptr, dir);        \
+  klee_trace_param_ptr_field_directed(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
+                                      sizeof(struct user_buf*), "buf_addr", \
+                                      dir);                             \
+  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) { \
+    klee_trace_param_ptr_field_directed(m_ptr,                          \
+                                        mbuf_descrs[i].offset,          \
+                                        mbuf_descrs[i].width,           \
+                                        mbuf_descrs[i].name,            \
+                                        dir);                           \
+  }
 
-static void
-received_packet(uint8_t device, struct rte_mbuf* mbuf)
-{
-	klee_trace_ret();
-	klee_trace_param_i32(device, "received_packet_device");
-	KLEE_TRACE_MBUF(mbuf);
-  klee_allow_access(mbuf->buf_addr, sizeof(struct user_buf));
-}
+#define KLEE_TRACE_MBUF_EPTR(m_ptr, pname)                               \
+  klee_trace_extra_ptr(m_ptr, sizeof(*m_ptr), pname, "");                \
+  klee_trace_extra_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
+                             sizeof(struct user_buf*), "buf_addr");     \
+  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) { \
+    klee_trace_extra_ptr_field(m_ptr,                                   \
+                               mbuf_descrs[i].offset,                   \
+                               mbuf_descrs[i].width,                    \
+                               mbuf_descrs[i].name);                    \
+  }
+
+// " <-- work around a bug in nano with string syntax coloring caused by the macro above
 
 struct user_buf user_buf;
 
 struct rte_mbuf incoming_package; //for two ports
 int incoming_package_allocated;
+
+static void
+received_packet(uint8_t device, struct rte_mbuf** mbuf)
+{
+	klee_trace_ret();
+	klee_trace_param_i32(device, "received_packet_device");
+  klee_trace_param_ptr(mbuf, sizeof(struct rte_mbuf*), "mbuf");
+	KLEE_TRACE_MBUF_EPTR(&incoming_package, "incoming_package");
+  KLEE_TRACE_USER_BUF(&user_buf);
+
+  klee_allow_access(&user_buf, sizeof(struct user_buf));
+  klee_assert(!incoming_package_allocated);
+  void* array = malloc(sizeof(struct rte_mbuf));
+  klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package");
+  memcpy(&incoming_package, array, sizeof(struct rte_mbuf));
+  *mbuf = &incoming_package;
+  incoming_package_allocated = 1;
+  (*mbuf)->buf_addr = &user_buf;
+  (*mbuf)->data_off = 0;//100;
+  (*mbuf)->port = device;
+  (*mbuf)->userdata = NULL;
+  (*mbuf)->pool = NULL;
+  (*mbuf)->next = NULL;
+  (*mbuf)->pkt_len = sizeof(struct user_buf);
+  (*mbuf)->data_len = 0; // what is the correct value???
+}
 
 void init_symbolic_user_buf() {
   void* array = malloc(sizeof(struct user_buf));
@@ -165,23 +197,7 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
   int receive_one;
   klee_make_symbolic(&receive_one, sizeof(int), "receive_one");
   if (receive_one) {
-    struct rte_mbuf * in_package;
-    klee_assert(!incoming_package_allocated);
-    void* array = malloc(sizeof(struct rte_mbuf));
-    klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package");
-    memcpy(&incoming_package, array, sizeof(struct rte_mbuf));
-    in_package = &incoming_package;
-    incoming_package_allocated = 1;
-    in_package->buf_addr = &user_buf;
-    in_package->data_off = 0;//100;
-    in_package->port = portid;
-    in_package->userdata = NULL;
-    in_package->pool = NULL;
-    in_package->next = NULL;
-    in_package->pkt_len = sizeof(struct user_buf);
-    in_package->data_len = 0; // what is the correct value???
-    pkts_burst[0] = in_package;
-    received_packet(portid, pkts_burst[0]);
+    received_packet(portid, &pkts_burst[0]);
     return 1;
   } else {
     return 0;
@@ -192,7 +208,8 @@ static int
 send_single_packet(struct rte_mbuf *m, uint8_t port)
 {
   klee_trace_ret();
-  KLEE_TRACE_MBUF(m);
+  KLEE_TRACE_MBUF(m, TD_IN);
+  KLEE_TRACE_USER_BUF(m->buf_addr);
   klee_trace_param_i32(port, "portid");
   int packet_sent = klee_int("packet_sent");
   if (packet_sent) {
@@ -354,7 +371,8 @@ void flood(struct rte_mbuf* frame,
            uint8_t skip_device,
            uint8_t nb_devices) {
   klee_trace_ret();
-  KLEE_TRACE_MBUF(frame);
+  KLEE_TRACE_MBUF(frame, TD_IN);
+  KLEE_TRACE_USER_BUF(frame->buf_addr);
   klee_trace_param_i32(skip_device, "skip_device");
   klee_trace_param_i32(nb_devices, "nb_devices");
   klee_forbid_access(frame->buf_addr, sizeof(struct user_buf),
