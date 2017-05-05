@@ -11,6 +11,8 @@ void rte_pktmbuf_free(struct rte_mbuf *mbufp){
   klee_forbid_access(mbufp->buf_addr,
                      sizeof(struct user_buf),
                      "pkt freed");
+  klee_forbid_access(mbufp, sizeof(struct rte_mbuf),
+                     "pkt freed");
   return;
 }
 
@@ -168,6 +170,7 @@ received_packet(uint8_t device, struct rte_mbuf** mbuf)
   KLEE_TRACE_USER_BUF(&user_buf);
 
   klee_allow_access(&user_buf, sizeof(struct user_buf));
+  klee_allow_access(&incoming_package, sizeof(struct rte_mbuf));
   klee_assert(!incoming_package_allocated);
   void* array = malloc(sizeof(struct rte_mbuf));
   klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package");
@@ -215,6 +218,7 @@ send_single_packet(struct rte_mbuf *m, uint8_t port)
   if (packet_sent) {
     klee_forbid_access(m->buf_addr, sizeof(struct user_buf),
                        "pkt sent");
+    klee_forbid_access(m, sizeof(struct rte_mbuf), "pkt sent");
   }
   return packet_sent;
 }
@@ -258,6 +262,9 @@ int rte_eal_init(int argc, char ** argv){
   init_symbolic_user_buf();
   klee_forbid_access(&user_buf,
                      sizeof(struct user_buf),
+                     "pkt is yet to be received");
+  klee_forbid_access(&incoming_package,
+                     sizeof(struct rte_mbuf),
                      "pkt is yet to be received");
   return 0;
 }
@@ -376,5 +383,8 @@ void flood(struct rte_mbuf* frame,
   klee_trace_param_i32(skip_device, "skip_device");
   klee_trace_param_i32(nb_devices, "nb_devices");
   klee_forbid_access(frame->buf_addr, sizeof(struct user_buf),
-                     "pkt sent");
+                     "pkt flooded");
+  klee_forbid_access(frame,
+                     sizeof(struct rte_mbuf),
+                     "pkt flooded");
 }
