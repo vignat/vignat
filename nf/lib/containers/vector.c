@@ -3,6 +3,7 @@
 #include "vector.h"
 
 //@ #include "arith.gh"
+//@ #include "stdex.gh"
 
 struct Vector {
   char* data;
@@ -55,6 +56,7 @@ struct Vector {
     vector_basep<t>(vector, ?el_size, ?cap, ?data) &*&
     cap == length(values) &*&
     0 <= accessed_idx &*& accessed_idx < cap &*&
+    entry == data + el_size*accessed_idx &*&
     entsp(data, el_size, entp, accessed_idx, take(accessed_idx, values)) &*&
     entsp(data + el_size*(accessed_idx + 1), el_size, entp,
           cap - accessed_idx - 1, drop(accessed_idx + 1, values));
@@ -203,10 +205,35 @@ void vector_borrow/*@ <t> @*/(struct Vector* vector, int index, void** val_out)
   //@ close vector_accp<t>(vector, entp, values, index, *val_out);
 }
 
+/*@
+  lemma void glue_by_index<t>(char* data, int idx, list<t> lst)
+  requires 0 <= idx &*& idx < length(lst) &*&
+           entsp<t>(data, ?el_size, ?entp, idx, take(idx, lst)) &*&
+           entp(data + el_size*idx, nth(idx, lst)) &*&
+           entsp<t>(data + el_size*(idx + 1), el_size, entp,
+                    length(lst) - idx - 1, drop(idx + 1, lst));
+  ensures entsp<t>(data, el_size, entp, length(lst), lst);
+  {
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        open entsp<t>(data, el_size, entp, idx, take(idx, lst));
+        if (idx != 0) {
+          glue_by_index(data + el_size, idx - 1, t);
+        }
+        close entsp<t>(data, el_size, entp, length(lst), lst);
+    }
+  }
+  @*/
+
 void vector_return/*@ <t> @*/(struct Vector* vector, int index, void* value)
 /*@ requires vector_accp<t>(vector, ?entp, ?values, index, value) &*&
              entp(value, ?v); @*/
 /*@ ensures vectorp(vector, entp, update(index, v, values)); @*/
 {
-  /* do nothing */
+  //@ open vector_accp<t>(vector, entp, values, index, value);
+  //@ take_update_unrelevant(index, index, v, values);
+  //@ drop_update_unrelevant(index + 1, index, v, values);
+  //@ glue_by_index(vector->data, index, update(index, v, values));
+  //@ close vectorp<t>(vector, entp, update(index, v, values));
 }
