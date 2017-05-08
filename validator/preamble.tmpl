@@ -74,14 +74,15 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       tcp_hdrp(&buf->tcp, ?tcp) &*&
       ub == user_bufc(hdr, ipv4, tcp);
 
-    inductive rte_mbufi = rte_mbufc(user_bufi, int, int);
+    inductive rte_mbufi = rte_mbufc(user_bufi, int, int, int);
 
     predicate mbufp(struct rte_mbuf *mbuf; rte_mbufi val) =
       mbuf->buf_addr |-> ?ba &*&
       mbuf->port |-> ?port &*&
       mbuf->packet_type |-> ?ptype &*&
+      mbuf->data_off |-> ?doff &*&
       user_bufferp(ba, ?ub) &*&
-      val == rte_mbufc(ub, port, ptype);
+      val == rte_mbufc(ub, port, ptype, doff);
 @*/
 
 int send_single_packet(struct rte_mbuf *m, uint8_t port);

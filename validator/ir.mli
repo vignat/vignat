@@ -67,6 +67,7 @@ type fun_call_context = {
   post_lemmas : bytes list;
   ret_name : bytes option;
   ret_type : ttype;
+  call_id : int;
 }
 val __fun_call_context_of_sexp__ : Sexp.t -> fun_call_context
 val fun_call_context_of_sexp : Sexp.t -> fun_call_context

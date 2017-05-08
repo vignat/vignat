@@ -72,6 +72,7 @@ type fun_call_context = {
   post_lemmas:string list;
   ret_name:string option;
   ret_type:ttype;
+  call_id:int;
 } with sexp
 
 type hist_call_result = {

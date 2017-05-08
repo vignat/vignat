@@ -433,7 +433,7 @@ let fun_types =
                                             "received_on_port = (*" ^
                                             recv_pkt ^ ")->port;\n" ^
                                             "received_packet_type = (*" ^
-                                            recv_pkt ^ ")->packet_type;" ^
+                                            recv_pkt ^ ")->packet_type;\n" ^
                                             (copy_user_buf "the_received_packet"
                                                recv_pkt) ^ "\n");
                                            ];};
