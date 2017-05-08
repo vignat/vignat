@@ -1459,7 +1459,7 @@ int find_empty/*@ <kt> @*/(int* busybits, int* chns, int start, int capacity)
 void map_impl_init/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
                                void** keyps, int* khs, int* chns,
                                int* vals, int capacity)
-/*@ requires map_key_type<kt>(_) &*& map_key_hash<kt>(?hash) &*&
+/*@ requires map_key_type<kt>() &*& map_key_hash<kt>(?hash) &*&
              [?fr]is_map_keys_equality<kt>(eq, ?keyp) &*&
              map_record_property<kt>(?recp) &*&
              ints(busybits, capacity, ?bbs) &*&
@@ -1478,7 +1478,7 @@ void map_impl_init/*@ <kt> @*/(int* busybits, map_keys_equality* eq,
   IGNORE(keyps);
   IGNORE(khs);
   IGNORE(vals);
-  //@ open map_key_type(_);
+  //@ open map_key_type();
   //@ open map_key_hash<kt>(_);
   //@ open map_record_property(_);
   int i = 0;

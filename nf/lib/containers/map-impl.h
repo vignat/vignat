@@ -90,7 +90,7 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
   @*/
 
 /*@
-  predicate map_key_type<kt>(kt k) = true;
+  predicate map_key_type<kt>() = true;
   predicate map_key_hash<kt>(fixpoint (kt,int) hsh) = true;
   predicate map_record_property<kt>(fixpoint(kt,int,bool) prop) = true;
   @*/
@@ -105,7 +105,7 @@ typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, voi
 void map_impl_init/*@ <kt> @*/ (int* busybits, map_keys_equality* cmp,
                                 void** keyps, int* khs, int* chns,
                                 int* vals, int capacity);
-/*@ requires map_key_type<kt>(_) &*& map_key_hash<kt>(?hash) &*&
+/*@ requires map_key_type<kt>() &*& map_key_hash<kt>(?hash) &*&
              [?fr]is_map_keys_equality<kt>(cmp, ?keyp) &*&
              map_record_property<kt>(?recp) &*&
              ints(busybits, capacity, ?bbs) &*&

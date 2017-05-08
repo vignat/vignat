@@ -454,14 +454,14 @@ int dmap_allocate/*@ <K1,K2,V> @*/
   (*map_out)->capacity = capacity;
   (*map_out)->keys_capacity = keys_capacity;
 
-  //@ close map_key_type(def_k1);
+  //@ close map_key_type();
   //@ close map_key_hash(hsh1);
   //@ close map_record_property(recp1);
   map_impl_init((*map_out)->bbs_a, (*map_out)->eq_a,
                 (*map_out)->kps_a, (*map_out)->khs_a, (*map_out)->chns_a,
                 (*map_out)->inds_a,
                 (*map_out)->keys_capacity);
-  //@ close map_key_type(def_k2);
+  //@ close map_key_type();
   //@ close map_key_hash(hsh2);
   //@ close map_record_property(recp2);
   map_impl_init((*map_out)->bbs_b, (*map_out)->eq_b,
