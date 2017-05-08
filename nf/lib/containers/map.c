@@ -158,6 +158,7 @@ int map_get/*@ <t> @*/(struct Map* map, void* key, int* value_out)
                       hash,
                       value_out,
                       map->capacity);
+  //@ close mapp<t>(map, kp, hsh, recp, mapc(capacity, contents, addrs));
 }
 
 void map_put/*@ <t> @*/(struct Map* map, void* key, int value)
@@ -171,7 +172,9 @@ void map_put/*@ <t> @*/(struct Map* map, void* key, int value)
                     mapc(capacity, map_put_fp(contents, k, value),
                          map_put_fp(addrs, k, key))); @*/
 {
-  int hash = map->khash(key);
+  //@ open mapp<t>(map, kp, hsh, recp, mapc(capacity, contents, addrs));
+  map_key_hash* khash = map->khash;
+  int hash = khash(key);
   map_impl_put(map->busybits,
                map->keyps,
                map->khs,
@@ -180,7 +183,41 @@ void map_put/*@ <t> @*/(struct Map* map, void* key, int value)
                key, hash, value,
                map->capacity);
   ++map->size;
+  /*@ close mapp<t>(map, kp, hsh, recp, mapc(capacity,
+                                             map_put_fp(contents, k, value),
+                                             map_put_fp(addrs, k, key)));
+  @*/
 }
+
+/*@
+  lemma void map_erase_decrement_len<kt, vt>(list<pair<kt, vt> > m, kt k)
+  requires true == map_has_fp(m, k);
+  ensures length(m) == 1 + length(map_erase_fp(m, k));
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key,val):
+          if (key != k) map_erase_decrement_len(t, k);
+        }
+    }
+  }
+  @*/
+
+/*@
+  lemma void map_get_mem<t>(list<pair<t, int> > m, t k)
+  requires true == map_has_fp(m, k);
+  ensures true == mem(pair(k, map_get_fp(m, k)), m);
+  {
+    switch(m) {
+      case nil:
+      case cons(h,t):
+        switch(h) { case pair(key, val):
+          if (key != k) map_get_mem(t, k);
+        }
+    }
+  }
+  @*/
 
 void map_erase/*@ <t> @*/(struct Map* map, void* key, void** trash)
 /*@ requires mapp<t>(map, ?kp, ?hsh, ?recp,
@@ -195,7 +232,9 @@ void map_erase/*@ <t> @*/(struct Map* map, void* key, void** trash)
             *trash |-> ?k_out &*&
             [0.5]kp(k_out, k); @*/
 {
-  int hash = map->khash(key);
+  //@ open mapp<t>(map, kp, hsh, recp, mapc(capacity, contents, addrs));
+  map_key_hash* khash = map->khash;
+  int hash = khash(key);
   map_impl_erase(map->busybits,
                  map->keyps,
                  map->khs,
@@ -206,6 +245,12 @@ void map_erase/*@ <t> @*/(struct Map* map, void* key, void** trash)
                  map->capacity,
                  trash);
   --map->size;
+  //@ map_erase_decrement_len(contents, k);
+  /*@
+    close mapp<t>(map, kp, hsh, recp, mapc(capacity,
+                                           map_erase_fp(contents, k),
+                                           map_erase_fp(addrs, k)));
+    @*/
 }
 
 int map_size/*@ <t> @*/(struct Map* map)
@@ -215,5 +260,7 @@ int map_size/*@ <t> @*/(struct Map* map)
                     mapc(capacity, contents, addrs)) &*&
             result == length(contents); @*/
 {
+  //@ open mapp<t>(map, kp, hsh, recp, mapc(capacity, contents, addrs));
   return map->size;
+  //@ close mapp<t>(map, kp, hsh, recp, mapc(capacity, contents, addrs));
 }
