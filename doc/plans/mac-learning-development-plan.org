@@ -34,6 +34,11 @@
    CLOCK: [2017-04-03 Mon 15:36]--[2017-04-03 Mon 15:37] =>  0:01
    :END:
 * Verification
+** datastructures sertification
+*** vector
+    :LOGBOOK:
+    CLOCK: [2017-05-08 Mon 13:23]--[2017-05-08 Mon 15:10] =>  1:47
+    :END:
 ** symbolic models
    :LOGBOOK:
    CLOCK: [2017-05-01 Mon 17:58]--[2017-05-01 Mon 18:04] =>  0:06
