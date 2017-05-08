@@ -26,19 +26,38 @@ struct Vector {
                      t);
     };
 
+  predicate vector_basep<t>(struct Vector* vector;
+                            int el_size,
+                            int cap,
+                            char* data) =
+    malloc_block_Vector(vector) &*&
+    vector->data |-> data &*&
+    vector->elem_size |-> el_size &*&
+    0 < el_size &*& el_size < 4096 &*&
+    vector->capacity |-> cap &*&
+    0 <= cap &*& cap < VECTOR_CAPACITY_UPPER_LIMIT &*&
+    malloc_block(data, el_size*cap) &*&
+    data + el_size*cap <= (void*)UINTPTR_MAX;
+
+
   predicate vectorp<t>(struct Vector* vector,
                        predicate (void*;t) entp,
                        list<t> values) =
-    malloc_block_Vector(vector) &*&
-    vector->data |-> ?data &*&
-    vector->elem_size |-> ?el_size &*&
-    0 < el_size &*& el_size < 4096 &*&
-    vector->capacity |-> ?cap &*&
-    0 <= cap &*& cap < VECTOR_CAPACITY_UPPER_LIMIT &*&
+    vector_basep<t>(vector, ?el_size, ?cap, ?data) &*&
     cap == length(values) &*&
-    malloc_block(data, el_size*cap) &*&
-    data + el_size*cap <= (void*)UINTPTR_MAX &*&
     entsp(data, el_size, entp, cap, values);
+
+  predicate vector_accp<t>(struct Vector* vector,
+                           predicate (void*;t) entp,
+                           list<t> values,
+                           int accessed_idx,
+                           void* entry) =
+    vector_basep<t>(vector, ?el_size, ?cap, ?data) &*&
+    cap == length(values) &*&
+    0 <= accessed_idx &*& accessed_idx < cap &*&
+    entsp(data, el_size, entp, accessed_idx, take(accessed_idx, values)) &*&
+    entsp(data + el_size*(accessed_idx + 1), el_size, entp,
+          cap - accessed_idx - 1, drop(accessed_idx + 1, values));
   @*/
 
 /*@ predicate ptrs_eq(char* p1, int l, char* p2) = p1 == p2 + l;
@@ -114,19 +133,14 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
     /*@
       invariant 0 <= i &*& i <= capacity &*&
                 *vector_out |-> ?vec &*&
-                vec->data |-> ?data &*&
+                vector_basep<t>(vec, elem_size, capacity, ?data) &*&
                 true == ((char *)0 <= (data + elem_size*i)) &*&
                 upperbounded_ptr(data + elem_size*i) &*&
                 length(elems) == i &*&
                 entsp(data, elem_size, entp, i, elems) &*&
                 chars((data + elem_size*i),
                       elem_size*(capacity - i), _) &*&
-                [_]is_vector_init_elem<t>(init_elem, entp, elem_size) &*&
-                malloc_block_Vector(vec) &*&
-                vec->elem_size |-> elem_size &*&
-                vec->capacity |-> capacity &*&
-                malloc_block(data, elem_size*capacity) &*&
-                data + elem_size*capacity <= (void*)UINTPTR_MAX;
+                [_]is_vector_init_elem<t>(init_elem, entp, elem_size);
       @*/
     //@ decreases (capacity - i);
   {
@@ -150,6 +164,29 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
   return 1;
 }
 
+/*@
+  lemma void extract_by_index<t>(char* data, int idx)
+  requires entsp<t>(data, ?el_size, ?entp, ?cap, ?lst) &*&
+           0 <= idx &*& idx < cap;
+  ensures entsp<t>(data, el_size, entp, idx, take(idx, lst)) &*&
+          entp(data + el_size*idx, nth(idx, lst)) &*&
+          entsp<t>(data + el_size*(idx + 1), el_size, entp,
+                   cap - idx - 1, drop(idx + 1, lst));
+  {
+    open entsp<t>(data, el_size, entp, cap, lst);
+    switch(lst) {
+      case nil:
+      case cons(h,t):
+        if (idx == 0) {
+          close entsp<t>(data, el_size, entp, 0, nil);
+        } else {
+          extract_by_index<t>(data + el_size, idx - 1);
+          close entsp<t>(data, el_size, entp, idx, take(idx, lst));
+        }
+    }
+  }
+  @*/
+
 void vector_borrow/*@ <t> @*/(struct Vector* vector, int index, void** val_out)
 /*@ requires vectorp<t>(vector, ?entp, ?values) &*&
              0 <= index &*& index < length(values) &*&
@@ -158,7 +195,12 @@ void vector_borrow/*@ <t> @*/(struct Vector* vector, int index, void** val_out)
             vector_accp<t>(vector, entp, values, index, vo) &*&
             entp(vo, nth(index, values)); @*/
 {
+  //@ open vectorp<t>(vector, entp, values);
+  //@ extract_by_index<t>(vector->data, index);
+  //@ mul_mono_strict(index, length(values), vector->elem_size);
+  //@ mul_bounds(index, length(values), vector->elem_size, 4096);
   *val_out = vector->data + index*vector->elem_size;
+  //@ close vector_accp<t>(vector, entp, values, index, *val_out);
 }
 
 void vector_return/*@ <t> @*/(struct Vector* vector, int index, void* value)

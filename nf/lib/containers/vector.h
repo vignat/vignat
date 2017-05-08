@@ -12,7 +12,7 @@ struct Vector;
   predicate vector_accp<t>(struct Vector* vector,
                            predicate (void*;t) entp,
                            list<t> values,
-                           int accecced_idx,
+                           int accessed_idx,
                            void* entry);
   @*/
 
