@@ -179,12 +179,12 @@ received_packet(uint8_t device, struct rte_mbuf** mbuf)
   incoming_package_allocated = 1;
   (*mbuf)->buf_addr = &user_buf;
   (*mbuf)->data_off = 0;//100;
-  (*mbuf)->port = device;
-  (*mbuf)->userdata = NULL;
-  (*mbuf)->pool = NULL;
-  (*mbuf)->next = NULL;
-  (*mbuf)->pkt_len = sizeof(struct user_buf);
-  (*mbuf)->data_len = 0; // what is the correct value???
+  /* (*mbuf)->port = device; */
+  /* (*mbuf)->userdata = NULL; */
+  /* (*mbuf)->pool = NULL; */
+  /* (*mbuf)->next = NULL; */
+  /* (*mbuf)->pkt_len = sizeof(struct user_buf); */
+  /* (*mbuf)->data_len = 0; // what is the correct value??? */
 }
 
 void init_symbolic_user_buf() {
