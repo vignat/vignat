@@ -126,6 +126,7 @@ ensures 0 == (0&x);
 /*@ predicate hide_mapp<t>(struct Map* p,
                            predicate (void*;t) kp,
                            fixpoint (t,int) hsh,
-                           mapi<t> m) = mapp<t>(p, kp, hsh, m); @*/
+                           fixpoint (t,int,bool) recp,
+                           mapi<t> m) = mapp<t>(p, kp, hsh, recp, m); @*/
 
 /*@ predicate hide_vector<t>(struct Vector* p) = vectorp<t>(p, _, _); @*/

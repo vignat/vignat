@@ -68,13 +68,13 @@ int expire_items_single_map/*@ <vt,kt> @*/(struct DoubleChain* chain,
                                            entry_extract_key* eek,
                                            entry_pack_key* epk,
                                            uint32_t time);
-/*@ requires mapp<kt>(map, ?kp, ?hsh, mapc(?cap, ?m)) &*&
+/*@ requires mapp<kt>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
              [_]is_entry_extract_key<kt,vt>(eek, kp, ?fep, ?bep, ?roffs, ?ek) &*&
              [_]is_entry_pack_key<kt,vt>(epk, kp, fep, bep, roffs, ek) &*&
              vectorp<vt>(vector, ?entp, ?v) &*&
              double_chainp(?ch, chain) &*&
              map_vec_chain_coherent<kt,vt>(m, v, ch); @*/
-/*@ ensures mapp<kt>(map, kp, hsh, mapc(cap, ?nm)) &*&
+/*@ ensures mapp<kt>(map, kp, hsh, recp, mapc(cap, ?nm, ?naddrs)) &*&
             vectorp<vt>(vector, entp, ?nv) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
