@@ -439,7 +439,8 @@ let fun_types =
                                            ];};
      "rte_pktmbuf_free", {ret_type = Static Void;
                           arg_types = stt [Ptr rte_mbuf_struct;];
-                          extra_ptr_types = [];
+                          extra_ptr_types = estt ["user_buf_addr",
+                                                  user_buf_struct];
                           lemmas_before = [];
                           lemmas_after = [];};
      "send_single_packet", {ret_type = Static Ir.Sint32;

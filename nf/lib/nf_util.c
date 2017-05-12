@@ -27,7 +27,9 @@ struct ipv4_hdr*
 nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
 {
 	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
-	if (!RTE_ETH_IS_IPV4_HDR(mbuf->packet_type) && !(mbuf->packet_type == 0 && ether_header->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+	if (!RTE_ETH_IS_IPV4_HDR(mbuf->packet_type) &&
+      !(mbuf->packet_type == 0 &&
+        ether_header->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
 		return NULL;
 	}
 
@@ -37,7 +39,8 @@ nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
 struct tcpudp_hdr*
 nf_get_ipv4_tcpudp_header(struct ipv4_hdr* header)
 {
-	if (header->next_proto_id != IPPROTO_TCP && header->next_proto_id != IPPROTO_UDP) {
+	if (header->next_proto_id != IPPROTO_TCP &&
+      header->next_proto_id != IPPROTO_UDP) {
 		return NULL;
 	}
 

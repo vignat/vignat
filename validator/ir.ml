@@ -155,7 +155,7 @@ let rec render_tterm (t:tterm) =
   | Struct (_,fields) ->
     "{" ^ (String.concat ~sep:", "
              (List.map fields ~f:(fun {name;value} ->
-                  name ^ " = " ^ (render_tterm value)))) ^
+                  "." ^ name ^ " = " ^ (render_tterm value)))) ^
     "}"
   | Int 0 -> if (t.t = Boolean) then "false" else ("0"^ (int_type_postfix t.t))
   | Int 1 -> if (t.t = Boolean) then "true" else ("1"^ (int_type_postfix t.t))

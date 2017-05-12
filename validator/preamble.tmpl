@@ -49,7 +49,9 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       // no checksum
       hdr->src_addr |-> ?saddr &*&
       hdr->dst_addr |-> ?daddr &*&
-      val == ipv4_hdrc(vihl, tos, len, pid, foff, ttl, npid, saddr, daddr);
+      val == ipv4_hdrc(vihl, tos, len, pid, foff, ttl, npid, saddr, daddr) &*&
+      len == 10240;
+      //FIXME: ^^ generalize for all values
 
     inductive tcp_hdri =
       tcp_hdrc(int, int, int, int, int, int, int, int);

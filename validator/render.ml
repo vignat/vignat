@@ -10,10 +10,9 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
       {v=Deref out_arg;t=get_pointee out_arg.t}
       ptee
   | Struct (_, fields) ->
-    (*TODO: check that the types of Str (_,fts)
-      are the same as in fields*)
+    assert(out_val.t = out_arg.t);
     String.concat (List.map fields ~f:(fun {name;value} ->
-        render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=Unknown} value))
+        render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
   | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 
@@ -46,52 +45,8 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
 
 let rec render_assignment {lhs;rhs;} =
   match rhs.v with
-  | Struct (_, fvals) ->
-    String.concat ~sep: "\n"
-      (List.map fvals
-         ~f:(fun {name;value} ->
-             render_assignment
-               {lhs={v=Str_idx (lhs, name);t=Unknown};
-                rhs=value;}))
   | Undef -> "";
   | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
-
-let render_extra_pre_conditions context =
-  String.concat ~sep:"\n"
-    (List.map context.extra_pre_conditions ~f:(fun eq_cond ->
-         (render_assignment eq_cond)))
-
-let render_hist_fun_call {context;result} =
-  (render_extra_pre_conditions context) ^
-  (render_fcall_with_lemmas context) ^
-  (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
-  match result.ret_val.t with
-  | Ptr _ -> (if result.ret_val.v = Zeroptr then
-                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
-                " == " ^ "0);\n"
-              else
-                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
-                " != " ^ "0);\n") ^
-             "/* Do not render the return ptee assumption for hist calls */\n"
-  | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
-
-let find_known_complementaries (sttmts:tterm list) =
-  List.filter_map sttmts ~f:(fun sttmt ->
-      match sttmt.v with
-      | Bop (Eq,{v=Bool false;t=_},rhs) -> Some (sttmt,rhs)
-      | Bop (Eq,{v=Int 0;t=_}, rhs) -> Some (sttmt,rhs)
-      | _ -> None)
-
-let find_complementary_sttmts sttmts1 sttmts2 =
-  let find_from_left sttmts1 (sttmts2:tterm list) =
-    List.find_map (find_known_complementaries sttmts1) ~f:(fun (orig,complement) ->
-        if List.exists sttmts2 ~f:(fun sttmt2 -> term_eq complement.v sttmt2.v) then
-          Some (orig,complement)
-        else None)
-  in
-  match find_from_left sttmts1 sttmts2 with
-  | Some (st1,st2) -> Some (st1,st2)
-  | None -> find_from_left sttmts2 sttmts1
 
 let rec gen_plain_equalities {lhs;rhs} =
   match rhs.t, rhs.v with
@@ -150,6 +105,45 @@ let rec gen_plain_equalities {lhs;rhs} =
                    (ttype_to_str rhs.t) ^
                    " : " ^
                    (render_tterm rhs))
+
+let render_extra_pre_conditions context =
+  String.concat ~sep:"\n"
+    (List.map
+       (List.join (List.map context.extra_pre_conditions ~f:gen_plain_equalities))
+       ~f:(fun eq_cond ->
+           (render_assignment eq_cond)))
+
+let render_hist_fun_call {context;result} =
+  (render_extra_pre_conditions context) ^
+  (render_fcall_with_lemmas context) ^
+  (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
+  match result.ret_val.t with
+  | Ptr _ -> (if result.ret_val.v = Zeroptr then
+                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
+                " == " ^ "0);\n"
+              else
+                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
+                " != " ^ "0);\n") ^
+             "/* Do not render the return ptee assumption for hist calls */\n"
+  | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
+
+let find_known_complementaries (sttmts:tterm list) =
+  List.filter_map sttmts ~f:(fun sttmt ->
+      match sttmt.v with
+      | Bop (Eq,{v=Bool false;t=_},rhs) -> Some (sttmt,rhs)
+      | Bop (Eq,{v=Int 0;t=_}, rhs) -> Some (sttmt,rhs)
+      | _ -> None)
+
+let find_complementary_sttmts sttmts1 sttmts2 =
+  let find_from_left sttmts1 (sttmts2:tterm list) =
+    List.find_map (find_known_complementaries sttmts1) ~f:(fun (orig,complement) ->
+        if List.exists sttmts2 ~f:(fun sttmt2 -> term_eq complement.v sttmt2.v) then
+          Some (orig,complement)
+        else None)
+  in
+  match find_from_left sttmts1 sttmts2 with
+  | Some (st1,st2) -> Some (st1,st2)
+  | None -> find_from_left sttmts2 sttmts1
 
 
 let gen_ret_equalities ret_val ret_name ret_type =
@@ -269,7 +263,7 @@ let guess_support_assignments constraints symbs =
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          if (String.equal x "reset_arr21_52") then
+          if (String.equal x "reset_arr23_52") then
               ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
           else
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)
@@ -461,9 +455,13 @@ let render_export_point name =
 
 let render_assignments args =
   String.concat ~sep:"\n"
-    (List.map args ~f:(fun arg ->
-         render_assignment {lhs={v=Id arg.name;t=Unknown;};
-                            rhs=arg.value}))
+    (List.join
+       (List.map args ~f:(fun arg ->
+            List.map (if arg.value.v = Undef then []
+                      else
+                        gen_plain_equalities {lhs={v=Id arg.name;t=arg.value.t;};
+                                              rhs=arg.value})
+              ~f:render_assignment)))
 
 let render_equality_assumptions args =
   String.concat ~sep:"\n"

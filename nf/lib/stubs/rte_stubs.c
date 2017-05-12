@@ -5,18 +5,6 @@
 
 int rte_errno;
 
-void rte_pktmbuf_free(struct rte_mbuf *mbufp){
-  klee_trace_ret();
-  klee_trace_param_just_ptr(mbufp, sizeof(*mbufp), "mbufp");
-  klee_forbid_access(mbufp->buf_addr,
-                     sizeof(struct user_buf),
-                     "pkt freed");
-  klee_forbid_access(mbufp, sizeof(struct rte_mbuf),
-                     "pkt freed");
-  return;
-}
-
-
 uint64_t rte_get_tsc_hz(){
     return 0;
 }
@@ -172,26 +160,30 @@ received_packet(uint8_t device, struct rte_mbuf** mbuf)
   klee_allow_access(&user_buf, sizeof(struct user_buf));
   klee_allow_access(&incoming_package, sizeof(struct rte_mbuf));
   klee_assert(!incoming_package_allocated);
-  void* array = malloc(sizeof(struct rte_mbuf));
-  klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package");
-  memcpy(&incoming_package, array, sizeof(struct rte_mbuf));
   *mbuf = &incoming_package;
   incoming_package_allocated = 1;
-  (*mbuf)->buf_addr = &user_buf;
-  (*mbuf)->data_off = 0;//100;
-  /* (*mbuf)->port = device; */
-  /* (*mbuf)->userdata = NULL; */
-  /* (*mbuf)->pool = NULL; */
-  /* (*mbuf)->next = NULL; */
-  /* (*mbuf)->pkt_len = sizeof(struct user_buf); */
-  /* (*mbuf)->data_len = 0; // what is the correct value??? */
 }
 
 void init_symbolic_user_buf() {
   void* array = malloc(sizeof(struct user_buf));
   klee_make_symbolic(array, sizeof(struct user_buf), "user_buf");
   memcpy(&user_buf, array, sizeof(struct user_buf));
-  user_buf.ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+  user_buf.ipv4.total_length =
+    rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+}
+
+void init_symbolic_inc_pkt() {
+  void* array = malloc(sizeof(struct rte_mbuf));
+  klee_make_symbolic(array, sizeof(struct rte_mbuf), "incoming_package");
+  memcpy(&incoming_package, array, sizeof(struct rte_mbuf));
+  incoming_package.buf_addr = &user_buf;
+  incoming_package.data_off = 0;// TODO: symbolic
+  /* (*mbuf)->port = device; */
+  /* (*mbuf)->userdata = NULL; */
+  /* (*mbuf)->pool = NULL; */
+  /* (*mbuf)->next = NULL; */
+  /* (*mbuf)->pkt_len = sizeof(struct user_buf); */
+  /* (*mbuf)->data_len = 0; // what is the correct value??? */
 }
 
 uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
@@ -205,6 +197,18 @@ uint16_t rte_eth_rx_burst(uint8_t portid, uint8_t queueid,
   } else {
     return 0;
   }
+}
+
+void rte_pktmbuf_free(struct rte_mbuf *mbufp){
+  klee_trace_ret();
+  KLEE_TRACE_MBUF(mbufp, TD_IN);
+  KLEE_TRACE_USER_BUF(mbufp->buf_addr);
+  klee_forbid_access(mbufp->buf_addr,
+                     sizeof(struct user_buf),
+                     "pkt freed");
+  klee_forbid_access(mbufp, sizeof(struct rte_mbuf),
+                     "pkt freed");
+  return;
 }
 
 static int
@@ -260,6 +264,7 @@ void rte_delay_ms(unsigned ms){
 
 int rte_eal_init(int argc, char ** argv){
   init_symbolic_user_buf();
+  init_symbolic_inc_pkt();
   klee_forbid_access(&user_buf,
                      sizeof(struct user_buf),
                      "pkt is yet to be received");
