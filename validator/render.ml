@@ -283,6 +283,15 @@ let simplify_assignments assignments =
           {lhs;rhs = replace_term_in_tterm
                    assignment.lhs.v assignment.rhs.v rhs}))
 
+let fix_mistyped_tip_ret tterm =
+  match tterm.v with
+  | Id name when String.equal name "tip_ret"
+    -> {v=Not {v=Bop (Eq,{v=Int 0;t=Sint32},tterm);
+               t=Boolean};
+        t=Boolean}
+  | _ -> tterm
+
+
 let render_output_check
     ret_val ret_name ret_type model_constraints
     hist_symbs args_post_conditions cmplxs
@@ -337,7 +346,7 @@ let render_output_check
   "// Model constraints: \n" ^
   (String.concat ~sep:"\n"
      (List.map upd_model_constraints ~f:(fun constr ->
-          "/*@ assert(" ^ (render_tterm constr) ^ "); @*/")))
+          "/*@ assert(" ^ (render_tterm (fix_mistyped_tip_ret constr)) ^ "); @*/")))
 
 let tterm_list_to_string tterms =
   String.concat ~sep:"\n" (List.map tterms ~f:render_tterm)

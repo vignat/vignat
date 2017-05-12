@@ -95,7 +95,7 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
 
 let copy_user_buf var_name ptr =
   ("struct user_buf* tmp_ub_ptr" ^ var_name ^
-   " = (*" ^ ptr ^ ")->buf_addr;\n") ^
+   " = (" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
      Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
@@ -428,7 +428,7 @@ let fun_types =
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
                                             let recv_pkt =
-                                              (List.nth_exn params.args 1)
+                                              "*" ^ (List.nth_exn params.args 1)
                                             in
                                             "received_on_port = " ^
                                             (List.nth_exn params.args 0) ^ ";\n" ^
@@ -447,36 +447,36 @@ let fun_types =
                             arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
                             extra_ptr_types = estt ["user_buf_addr",
                                                     user_buf_struct];
-                            lemmas_before = [];
-                            lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                                            (fun params ->
-                                               let sent_pkt =
-                                                 (List.nth_exn params.args 0)
-                                               in
-                                               (copy_user_buf "sent_packet"
-                                                  sent_pkt) ^ "\n" ^
-                                               "sent_on_port = " ^
-                                               (List.nth_exn params.args 1) ^
-                                               ";\n" ^
-                                               "sent_packet_type = (" ^
-                                               sent_pkt ^ ")->packet_type;");];};
+                            lemmas_before = [
+                              (fun params ->
+                                 let sent_pkt =
+                                   (List.nth_exn params.args 0)
+                                 in
+                                 (copy_user_buf "sent_packet"
+                                    sent_pkt) ^ "\n" ^
+                                 "sent_on_port = " ^
+                                 (List.nth_exn params.args 1) ^
+                                 ";\n" ^
+                                 "sent_packet_type = (" ^
+                                 sent_pkt ^ ")->packet_type;")];
+                            lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];};
      "flood", {ret_type = Static Ir.Sint32;
                arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8; Ir.Uint8];
                extra_ptr_types = estt ["user_buf_addr",
                                        user_buf_struct];
-               lemmas_before = [];
-               lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                               (fun params ->
-                                  let sent_pkt =
-                                    (List.nth_exn params.args 0)
-                                  in
-                                  (copy_user_buf "sent_packet"
-                                     sent_pkt) ^ "\n" ^
-                                  "flooded_except_port = " ^
-                                  (List.nth_exn params.args 1) ^
-                                  ";\n" ^
-                                  "sent_packet_type = (" ^
-                                  sent_pkt ^ ")->packet_type;");];};
+               lemmas_before = [
+               (fun params ->
+                 let sent_pkt =
+                   (List.nth_exn params.args 0)
+                 in
+                 (copy_user_buf "sent_packet"
+                    sent_pkt) ^ "\n" ^
+                 "flooded_except_port = " ^
+                 (List.nth_exn params.args 1) ^
+                 ";\n" ^
+                 "sent_packet_type = (" ^
+                 sent_pkt ^ ")->packet_type;")];
+               lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];};
      "start_time", {ret_type = Static Uint32;
                     arg_types = [];
                     extra_ptr_types = [];

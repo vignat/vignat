@@ -138,7 +138,7 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
 
 let copy_user_buf var_name ptr =
   ("struct user_buf* tmp_ub_ptr" ^ var_name ^
-   " = (*" ^ ptr ^ ")->buf_addr;\n") ^
+   " = (" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
      Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
@@ -410,29 +410,29 @@ let fun_types =
                   lemmas_before = [
                     capture_map_ex "cur_map" "vk1" "vk2" 0;
                     (fun {args;_} -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ik, ikc(user_buf0_34, user_buf0_36, user_buf0_26,\
-                     user_buf0_30, " ^
+                    ".ik, ikc(reset_arr20_34, reset_arr20_36, reset_arr20_26,\
+                     reset_arr20_30, " ^
                            !last_device_id ^
-                           ", user_buf0_23));@*/");
+                           ", user_buf_23));@*/");
                     (fun {args;_} -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ek, ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
-                     1, user_buf0_23));@*/");
+                    ".ek, ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                     1, user_buf_23));@*/");
                     (fun {args;_} -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
-                    ", flwc(ikc(user_buf0_34, user_buf0_36, user_buf0_26, user_buf0_30,\
+                    ", flwc(ikc(reset_arr20_34, reset_arr20_36, reset_arr20_26, reset_arr20_30,\
                      " ^
                            !last_device_id ^
-                           ", user_buf0_23), ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
-                     1, user_buf0_23), user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\
-                     external_ip, user_buf0_30, " ^
+                           ", user_buf_23), ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                     1, user_buf_23), reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\
+                     external_ip, reset_arr20_30, " ^
                            !last_device_id ^
-                           ", 1, user_buf0_23));@*/");
+                           ", 1, user_buf_23));@*/");
                     (fun {args;tmp_gen;_} ->
                        "/*@{\n\
                         assert dmap_dchain_coherent(" ^
                          (tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
-                        ext_k ek = ekc(new_index_2_0, user_buf0_36,\
-                        external_ip, user_buf0_30, 1, user_buf0_23);\n\
+                        ext_k ek = ekc(new_index_2_0, reset_arr20_36,\
+                        external_ip, reset_arr20_30, 1, user_buf_23);\n\
                         if (dmap_has_k2_fp(" ^ (tmp_gen "cur_map") ^
                        ", ek)) {\n\
                         int index = dmap_get_k2_fp(" ^ (tmp_gen "cur_map") ^
@@ -468,50 +468,50 @@ let fun_types =
                         }@*/");
                     (fun {args;tmp_gen;_} ->
                        "/*@ dmap_put_preserves_cap(" ^ (tmp_gen "cur_map") ^
-                       ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, " ^
+                       ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(reset_arr20_34, reset_arr20_36,\
+                        reset_arr20_26, reset_arr20_30, " ^
                            !last_device_id ^
-                           ", user_buf0_23),\n\
-                        ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
-                        1, user_buf0_23),\n\
-                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
-                        external_ip, user_buf0_30, " ^
+                           ", user_buf_23),\n\
+                        ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                        1, user_buf_23),\n\
+                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
+                        external_ip, reset_arr20_30, " ^
                            !last_device_id ^
-                           ", 1, user_buf0_23)," ^
+                           ", 1, user_buf_23)," ^
                        (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^ "); @*/");
                     (fun _ ->
                        "/*@ flw the_inserted_flow = " ^
-                       " flwc(ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, " ^
+                       " flwc(ikc(reset_arr20_34, reset_arr20_36,\
+                        reset_arr20_26, reset_arr20_30, " ^
                        !last_device_id ^
-                       ", user_buf0_23),\n\
-                        ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
-                        1, user_buf0_23),\n\
-                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
-                        external_ip, user_buf0_30, " ^
+                       ", user_buf_23),\n\
+                        ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                        1, user_buf_23),\n\
+                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
+                        external_ip, reset_arr20_30, " ^
                        !last_device_id ^
-                       ", 1, user_buf0_23);@*/");
+                       ", 1, user_buf_23);@*/");
                     (fun {args;tmp_gen;_} ->
                       "/*@ {\n\
                        assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
                       ", ?ch);\n\
-                       int_k ik = ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, " ^
+                       int_k ik = ikc(reset_arr20_34, reset_arr20_36,\
+                        reset_arr20_26, reset_arr20_30, " ^
                        !last_device_id ^
-                       ", user_buf0_23);\n\
-                       ext_k ek = ekc(new_index_2_0, user_buf0_36,\
-                       external_ip, user_buf0_30,\
-                       1, user_buf0_23);\n\
+                       ", user_buf_23);\n\
+                       ext_k ek = ekc(new_index_2_0, reset_arr20_36,\
+                       external_ip, reset_arr20_30,\
+                       1, user_buf_23);\n\
                        coherent_dchain_non_out_of_space_map_nonfull(" ^
                       (tmp_gen "cur_map") ^ ", ch);\n" ^
                       "contains_ext_k_abstract(" ^
                       (tmp_gen "cur_map") ^
                       ", ch, ek);\n" ^
                       "flw the_flow_to_insert = flwc(ik, ek,\n\
-                       user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
-                       external_ip, user_buf0_30, " ^
+                       reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
+                       external_ip, reset_arr20_30, " ^
                        !last_device_id ^
-                      ", 1, user_buf0_23);\n" ^
+                      ", 1, user_buf_23);\n" ^
                        "add_flow_abstract(" ^ (tmp_gen "cur_map") ^
                        ", ch, the_flow_to_insert, " ^
                        (List.nth_exn args 2) ^ ", " ^
@@ -526,16 +526,16 @@ let fun_types =
                         dmap_put_get(" ^
                        (params.tmp_gen "cur_map") ^
                        "," ^ (List.nth_exn params.args 2) ^ ",\
-                        flwc(ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, " ^
+                        flwc(ikc(reset_arr20_34, reset_arr20_36,\
+                        reset_arr20_26, reset_arr20_30, " ^
                        !last_device_id ^
-                           ", user_buf0_23),\n\
-                        ekc(new_index_2_0, user_buf0_36, external_ip, user_buf0_30,\
-                        1, user_buf0_23),\n\
-                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
-                        external_ip, user_buf0_30, " ^
+                           ", user_buf_23),\n\
+                        ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                        1, user_buf_23),\n\
+                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
+                        external_ip, reset_arr20_30, " ^
                            !last_device_id ^
-                           ", 1, user_buf0_23),\n" ^
+                           ", 1, user_buf_23),\n" ^
                        (params.tmp_gen "vk1") ^ ", " ^
                        (params.tmp_gen "vk2") ^ ");\n}@*/");
                     (fun params ->
@@ -544,18 +544,18 @@ let fun_types =
                         assert dmap_dchain_coherent(" ^
                        (params.tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
-                       int_k ik = ikc(user_buf0_34, user_buf0_36,\
-                        user_buf0_26, user_buf0_30, " ^
+                       int_k ik = ikc(reset_arr20_34, reset_arr20_36,\
+                        reset_arr20_26, reset_arr20_30, " ^
                        !last_device_id ^
-                       ", user_buf0_23);\n\
-                        ext_k ek = ekc(new_index_2_0, user_buf0_36,\
-                        external_ip, user_buf0_30,\
-                        1, user_buf0_23);\n\
+                       ", user_buf_23);\n\
+                        ext_k ek = ekc(new_index_2_0, reset_arr20_36,\
+                        external_ip, reset_arr20_30,\
+                        1, user_buf_23);\n\
                         flw the_flow_to_insert = flwc(ik, ek,\n\
-                        user_buf0_34, new_index_2_0, user_buf0_36, user_buf0_26,\n\
-                        external_ip, user_buf0_30, " ^
+                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
+                        external_ip, reset_arr20_30, " ^
                        !last_device_id ^
-                       ", 1, user_buf0_23);\n" ^
+                       ", 1, user_buf_23);\n" ^
                       "coherent_put_allocated_preserves_coherent\n(" ^
                       (params.tmp_gen "cur_map") ^
                       ", cur_ch, ik , ek,\
@@ -619,10 +619,10 @@ let fun_types =
                            "/*@ { \n\
                             dmap_erase_all_has_trans(" ^
                            (tmp_gen "cur_map") ^
-                           ", ikc(user_buf0_34,\
-                            user_buf0_36, user_buf0_26, user_buf0_30, " ^
+                           ", ikc(reset_arr20_34,\
+                            reset_arr20_36, reset_arr20_26, reset_arr20_30, " ^
                            !last_device_id ^
-                           ", user_buf0_23),\n\
+                           ", user_buf_23),\n\
                             dchain_get_expired_indexes_fp(" ^
                            (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
@@ -873,11 +873,11 @@ let fun_types =
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
                                             let recv_pkt =
-                                              (List.nth_exn params.args 1)
+                                              "*" ^ (List.nth_exn params.args 1)
                                             in
                                             "received_on_port = " ^
                                             (List.nth_exn params.args 0) ^ ";\n" ^
-                                            "received_packet_type = (*" ^
+                                            "received_packet_type = (" ^
                                             recv_pkt ^ ")->packet_type;\n" ^
                                             (copy_user_buf "the_received_packet"
                                                recv_pkt));
@@ -886,19 +886,21 @@ let fun_types =
                             arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
                             extra_ptr_types = estt ["user_buf_addr",
                                                     user_buf_struct];
-                            lemmas_before = [];
+                            lemmas_before = [
+                              (fun params ->
+                                 let sent_pkt =
+                                   (List.nth_exn params.args 0)
+                                 in
+                                 (copy_user_buf "sent_packet"
+                                    sent_pkt) ^ "\n" ^
+                                 "sent_on_port = " ^
+                                 (List.nth_exn params.args 1) ^
+                                 ";\n" ^
+                                 "sent_packet_type = (" ^
+                                 sent_pkt ^ ")->packet_type;")
+                            ];
                             lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                                            (fun params ->
-                                               let sent_pkt =
-                                                 (List.nth_exn params.args 0)
-                                               in
-                                               (copy_user_buf "sent_packet"
-                                                  sent_pkt) ^ "\n" ^
-                                               "sent_on_port = " ^
-                                               (List.nth_exn params.args 1) ^
-                                               ";\n" ^
-                                               "sent_packet_type = (" ^
-                                               sent_pkt ^ ")->packet_type;");];};
+                                            ];};
      "rte_pktmbuf_free", {ret_type = Static Void;
                           arg_types = stt [Ptr rte_mbuf_struct;];
                           extra_ptr_types = estt ["user_buf_addr",
