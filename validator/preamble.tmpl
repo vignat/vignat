@@ -78,29 +78,48 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
     predicate mbufp(struct rte_mbuf *mbuf; rte_mbufi val) =
       mbuf->buf_addr |-> ?ba &*&
-      mbuf->port |-> ?port &*&
-      mbuf->packet_type |-> ?ptype &*&
+      mbuf->buf_physaddr |-> ?bfa &*&
+      mbuf->buf_len |-> ?bl &*&
       mbuf->data_off |-> ?doff &*&
+      mbuf->refcnt |-> ?rcnt &*&
+      mbuf->nb_segs |-> ?nbsegs &*&
+      mbuf->port |-> ?port &*&
+      mbuf->ol_flags |-> ?olflags &*&
+      mbuf->packet_type |-> ?ptype &*&
+      mbuf->pkt_len |-> ?pktlen &*&
+      mbuf->data_len |-> ?dlen &*&
+      mbuf->vlan_tci |-> ?vlantci &*&
+      mbuf->hash |-> ?hash &*&
+      mbuf->seqn |-> ?seqn &*&
+      mbuf->vlan_tci_outer |-> ?vtcio &*&
+      mbuf->udata64 |-> ?udata64 &*&
+      mbuf->pool |-> ?pool &*&
+      mbuf->next |-> ?next &*&
+      mbuf->tx_offload |-> ?txoff &*&
+      mbuf->priv_size |-> ?psize &*&
+      mbuf->timesync |-> ?ts &*&
       user_bufferp(ba, ?ub) &*&
-      val == rte_mbufc(ub, port, ptype, doff);
+      val == rte_mbufc(ub, port, ptype, doff) &*&
+      doff == 0;
+      //TODO: ^^^ is it really always so?
 @*/
 
 int send_single_packet(struct rte_mbuf *m, uint8_t port);
-//@ requires a_packet(m);
-//@ ensures result != 0 ? true : a_packet(m);
+//@ requires a_packet(m) &*& mbufp(m, _);
+//@ ensures result != 0 ? true : (a_packet(m) &*& mbufp(m, _));
 
 void flood(struct rte_mbuf *m, uint8_t skip_device,
            uint8_t nb_devices);
-//@ requires a_packet(m);
+//@ requires a_packet(m) &*& mbufp(m, _);
 //@ ensures true;
 
 void received_packet(uint8_t portid,
                      struct rte_mbuf **mbuf);
-//@ requires true;
+//@ requires *mbuf |-> _;
 //@ ensures *mbuf |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
 
 void rte_pktmbuf_free(struct rte_mbuf *mbuf);
-//@ requires a_packet(mbuf);
+//@ requires a_packet(mbuf) &*& mbufp(mbuf, _);
 //@ ensures true;
 
 /*@

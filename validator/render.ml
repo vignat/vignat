@@ -4,6 +4,11 @@ open Ir
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
   match out_val.v with
+  | Addr ptee ->
+    render_eq_sttmt
+      ~is_assert
+      {v=Deref out_arg;t=get_pointee out_arg.t}
+      ptee
   | Struct (_, fields) ->
     (*TODO: check that the types of Str (_,fts)
       are the same as in fields*)
@@ -264,7 +269,7 @@ let guess_support_assignments constraints symbs =
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          if (String.equal x "reset_arr20_52") then
+          if (String.equal x "reset_arr21_52") then
               ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
           else
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)

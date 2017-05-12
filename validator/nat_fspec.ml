@@ -78,7 +78,16 @@ let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
 let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
                                                         "queue_id", Uint8;])
 
-let ether_hdr_struct = Ir.Str ("ether_hdr", ["ether_type", Uint16;])
+let ether_addr_struct = Ir.Str ( "ether_addr", ["a", Uint8;
+                                                "b", Uint8;
+                                                "c", Uint8;
+                                                "d", Uint8;
+                                                "e", Uint8;
+                                                "f", Uint8;])
+
+let ether_hdr_struct = Ir.Str ("ether_hdr", ["d_addr", ether_addr_struct;
+                                             "s_addr", ether_addr_struct;
+                                             "ether_type", Uint16;])
 let ipv4_hdr_struct = Ir.Str ("ipv4_hdr", ["version_ihl", Uint8;
                                            "type_of_service", Uint8;
                                            "total_length", Uint16;
@@ -128,9 +137,11 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "timesync", Uint16] )
 
 let copy_user_buf var_name ptr =
+  ("struct user_buf* tmp_ub_ptr" ^ var_name ^
+   " = (*" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
-     Ir.value={v=Deref {v=Ir.Id ("((" ^ ptr ^ ")->buf_addr)");
+     Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
                         t=Ptr user_buf_struct};
                t=user_buf_struct}}
 
@@ -305,10 +316,7 @@ let fun_types =
                          last_device_id :=
                            "(" ^ List.nth_exn args 1 ^ ")->ext_device_id";
                          "/*@ close ext_k_p(" ^ List.nth_exn args 1 ^
-                         ", ekc(user_buf0_36, user_buf0_34, " ^
-                         "user_buf0_30, user_buf0_26, (" ^ List.nth_exn args 1 ^
-                         ")->ext_device_id,\
-                          user_buf0_23)); @*/"); ];
+                         ", ?ext_key_dgb); @*/"); ];
                     lemmas_after = [
                       tx_l "open (ext_k_p(_,_));";
                       (fun params ->
@@ -317,36 +325,23 @@ let fun_types =
                          ", ?cur_ch);\n\
                           contains_ext_k_abstract(" ^
                          (params.tmp_gen "cur_map") ^
-                         ", cur_ch,\n ekc(user_buf0_36, user_buf0_34, " ^
-                         "user_buf0_30, user_buf0_26, (" ^
-                         List.nth_exn params.args 1 ^
-                         ")->ext_device_id,\
-                          user_buf0_23));\n}@*/");
+                         ", cur_ch,\n ext_key_dgb);\n}@*/");
                       on_rez_nz
                         (fun params ->
                            "{\n dmap_get_k2_limits(" ^
                            (params.tmp_gen "cur_map") ^
-                           ", ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, (" ^
-                           List.nth_exn params.args 1 ^
-                           ")->ext_device_id, user_buf0_23));\n}");
+                           ", ext_key_dgb);\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n dmap_get_k2_get_val(" ^
                            (params.tmp_gen "cur_map") ^
-                           ",ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, (" ^
-                           List.nth_exn params.args 1 ^
-                           ")->ext_device_id, user_buf0_23));\n}");
+                           ", ext_key_dgb);\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n assert dmap_dchain_coherent(" ^
                            (params.tmp_gen "cur_map") ^
                            ", ?cur_ch);\n" ^
-                           "ext_k ek = ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, (" ^
-                           List.nth_exn params.args 1 ^
-                           ")->ext_device_id, user_buf0_23);\n"^
+                           "ext_k ek = ext_key_dgb;\n"^
                            "get_flow_by_ext_abstract(" ^
                            (params.tmp_gen "cur_map") ^ ", cur_ch, ek);\n" ^
                            "coherent_dmap_used_dchain_allocated(" ^
@@ -354,10 +349,7 @@ let fun_types =
                            (params.tmp_gen "cur_map") ^ ", ek));\n}");
                       (fun params ->
                          last_index_gotten :=
-                           "ekc(user_buf0_36, user_buf0_34, \
-                            user_buf0_30, user_buf0_26, (" ^
-                           List.nth_exn params.args 1 ^
-                           ")->ext_device_id, user_buf0_23)";
+                           "ext_key_dgb";
                          last_index_key := Ext;
                          last_indexing_succ_ret_var := params.ret_name;
                          "");
@@ -371,9 +363,7 @@ let fun_types =
                          last_device_id :=
                            "(" ^ List.nth_exn args 1 ^ ")->int_device_id";
                          "/*@ close int_k_p(" ^ List.nth_exn args 1 ^
-                         ", ikc(user_buf0_34, user_buf0_36,\
-                          user_buf0_26, user_buf0_30, (" ^ List.nth_exn args 1 ^
-                         ")->int_device_id, user_buf0_23)); @*/"
+                         ", ?int_key_dga); @*/"
                       );];
                     lemmas_after = [
                       tx_l "open (int_k_p(_,_));";
@@ -383,30 +373,21 @@ let fun_types =
                          ", ?cur_ch);\n\
                           contains_int_k_abstract(" ^
                          (params.tmp_gen "cur_map") ^
-                         ", cur_ch,\n ikc(user_buf0_34, user_buf0_36, \
-                          user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
-                         ")->int_device_id, user_buf0_23));\n}@*/");
+                         ", cur_ch,\n int_key_dga);\n}@*/");
                       on_rez_nz
                         (fun params ->
                            "{\n dmap_get_k1_limits(" ^
                            (params.tmp_gen "cur_map") ^
-                           ", ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
-                           ")->int_device_id, user_buf0_23));\n}");
+                           ", int_key_dga);\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n dmap_get_k1_get_val(" ^
                            (params.tmp_gen "cur_map") ^
-                           ", ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
-                           ")->int_device_id, user_buf0_23));\n}");
+                           ", int_key_dga);\n}");
                       on_rez_nz
                         (fun params ->
                            "{\n" ^
-                           "int_k ik = ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, (" ^
-                           List.nth_exn params.args 1 ^
-                           ")->int_device_id, user_buf0_23);\n" ^
+                           "int_k ik = int_key_dga;\n" ^
                            " assert dmap_dchain_coherent(" ^
                            (params.tmp_gen "cur_map") ^ ", ?cur_ch);\n" ^
                            "get_flow_by_int_abstract(" ^
@@ -418,9 +399,7 @@ let fun_types =
                            ", ik));\n}");
                       (fun params ->
                          last_index_gotten :=
-                           "ikc(user_buf0_34, user_buf0_36, \
-                            user_buf0_26, user_buf0_30, (" ^ List.nth_exn params.args 1 ^
-                           ")->int_device_id, user_buf0_23)";
+                           "int_key_dga";
                          last_index_key := Int;
                          last_indexing_succ_ret_var := params.ret_name;
                          "");
@@ -885,21 +864,23 @@ let fun_types =
                           lemmas_before = [];
                           lemmas_after = [];};
      "received_packet", {ret_type = Static Void;
-                         arg_types = stt [Ir.Uint8; Ptr rte_mbuf_struct;];
+                         arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];
                          extra_ptr_types = estt ["user_buf_addr",
-                                                 user_buf_struct];
+                                                 user_buf_struct;
+                                                 "incoming_package",
+                                                 rte_mbuf_struct];
                          lemmas_before = [];
                          lemmas_after = [(fun _ -> "a_packet_received = true;\n");
                                          (fun params ->
                                             let recv_pkt =
                                               (List.nth_exn params.args 1)
                                             in
-                                            (copy_user_buf "the_received_packet"
-                                               recv_pkt) ^ "\n" ^
-                                            "received_on_port = (" ^
+                                            "received_on_port = (*" ^
                                             recv_pkt ^ ")->port;\n" ^
-                                            "received_packet_type = (" ^
-                                            recv_pkt ^ ")->packet_type;");
+                                            "received_packet_type = (*" ^
+                                            recv_pkt ^ ")->packet_type;\n" ^
+                                            (copy_user_buf "the_received_packet"
+                                               recv_pkt));
                                            ];};
      "send_single_packet", {ret_type = Static Ir.Sint32;
                             arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];

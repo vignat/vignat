@@ -434,8 +434,7 @@ let rec guess_type_l exps t =
     end
   | [] -> Unknown
 
-let find_first_known_address addr tt at =
-  lprintf "looking for first *%Ld\n" addr;
+let find_first_known_address_comply addr tt at property =
   let legit_candidates lst =
     List.filter lst ~f:(fun x ->
         (match x.callid, at with
@@ -455,7 +454,9 @@ let find_first_known_address addr tt at =
            if (t1 <> t2) then
              lprintf "discarding: %s != %s\n"
                (ttype_to_str t1) (ttype_to_str t2);
-           t1 = t2))
+           t1 = t2)
+        &&
+        (property x))
   in
   let find_the_earliest candidates =
     List.reduce ~f:(fun prev cand ->
@@ -473,6 +474,21 @@ let find_first_known_address addr tt at =
     (fun lst ->
        Option.map ~f:(fun addr_sp -> addr_sp.value)
          (find_the_earliest (legit_candidates lst)))
+
+let find_first_known_address addr tt at =
+  lprintf "looking for first *%Ld\n" addr;
+  find_first_known_address_comply addr tt at (fun _ -> true)
+
+let find_first_symbol_by_address addr tt at =
+  lprintf "looking for a first symbol at *%Ld\n" addr;
+  find_first_known_address_comply addr tt at
+    (fun candidate ->
+       match candidate.value with
+       | {v=Addr ({v=Id _;t=_});t=_} -> true
+       | {v=Id _;t=_} -> true
+       | _ ->
+         lprintf "rejecting: %s\n" (render_tterm candidate.value);
+         false)
 
 let find_first_known_address_or_dummy addr t at =
   match find_first_known_address addr t at with
@@ -978,10 +994,10 @@ let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
     let ptee_t = get_pointee arg_type in
-    let arg_var = find_first_known_address
+    let arg_var = find_first_symbol_by_address
         (Int64.of_string (Sexp.to_string arg.value))
         ptee_t
-        (After call.id)
+        (moment_before call.id)
     in
     match arg_var with
     | Some n -> n
@@ -1000,19 +1016,24 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
         | Curioptr ptee ->
           match a_type, ptee.before.full with
           | Ptr (Ptr t), Some addr ->
-            begin (* Workaround for 2-level pointers args.*)
+            begin
               let addr = get_sexp_value addr (Ptr t) in
               match addr with
               | {v=Int x;t=_} -> if (x = 0) then
                   get_allocated_arg arg a_type
                 else begin
                   let key = Int64.of_int x in
-                  match find_first_known_address key t (After call.id) with
+                  (* First look for the address (the value the argument point to),
+                     found in the pointee. *)
+                  match find_first_known_address key t (moment_before call.id) with
                   | Some n -> {v=Addr n; t=Ptr t}
-                  | None -> match find_first_known_address
-                                    (Int64.of_string (Sexp.to_string arg.value))
-                                    t
-                                    (After call.id)
+                  | None ->
+                    (* Next try to find the address of the argument itself.
+                       May be it was already allocated. *)
+                    match find_first_known_address
+                            (Int64.of_string (Sexp.to_string arg.value))
+                            t
+                            (moment_before call.id)
                     with
                     | Some n -> n
                     | None -> failwith ("nested pointer to unknown: " ^
@@ -1072,7 +1093,8 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
             end
           | {v=Int _;t=_} ->
             None
-            (* XXX: here, suck the value from the known_addresses to generate a complex post condition*)
+            (* XXX: here, suck the value from the known_addresses
+               to generate a complex post condition*)
             (* Skip the two layer pointer.
                TODO: maybe be allow special case of Zeroptr here.*)
           | value ->
@@ -1111,28 +1133,36 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
 
-let take_extra_ptrs_into_account ptrs call ftype_of =
+let take_extra_ptrs_into_pre_cond ptrs call ftype_of =
   let gen_eq_by_struct_val (var_ptr : Ir.tterm) value_now =
     match get_struct_val_value value_now (get_pointee var_ptr.t) with
     | {v=Undef;t=_} -> None
     | y -> Some {lhs=deref_tterm var_ptr;rhs=y}
   in
+  let moment_before = if 0 < call.id then
+      After (call.id - 1) else
+      Beginning
+  in
   List.filter_map ptrs ~f:(fun {pname;value;ptee} ->
       match find_first_known_address
               value
               (get_fun_extra_ptr_type ftype_of call pname)
-              (After call.id)
+              moment_before
                with
       | None -> None
       | Some x ->
         lprintf "settled on %s : %s\n"
           (render_tterm x) (ttype_to_str x.t);
         match ptee with
-        | Opening o -> gen_eq_by_struct_val x o
-        | Closing _ -> None
+        | Opening _ -> None
+        | Closing o -> gen_eq_by_struct_val x o
         | Changing (o,_) -> gen_eq_by_struct_val x o)
 
-let take_arg_ptrs_into_account (args : Trace_prefix.arg list) call ftype_of =
+let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
+  let moment_before = if 0 < call.id then
+      After (call.id - 1) else
+      Beginning
+  in
   List.filter_mapi args ~f:(fun i arg ->
       match arg.ptr with
       | Nonptr -> None
@@ -1143,7 +1173,7 @@ let take_arg_ptrs_into_account (args : Trace_prefix.arg list) call ftype_of =
           match find_first_known_address
                   addr
                   (get_pointee (get_fun_arg_type ftype_of call i))
-                  (After call.id)
+                  moment_before
           with
           | None -> None
           | Some x ->
@@ -1184,8 +1214,8 @@ let extract_common_call_context
   in
   let application = simplify_term (Apply (call.fun_name,args)) in
   let extra_pre_conditions =
-    (take_extra_ptrs_into_account call.extra_ptrs call ftype_of)@
-    (take_arg_ptrs_into_account call.args call ftype_of)
+    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of)@
+    (take_arg_ptrs_into_pre_cond call.args call ftype_of)
   in
   let post_lemmas =
     compose_post_lemmas
@@ -1510,7 +1540,12 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
           List.fold call.extra_ptrs
             ~init:String.Map.empty
             ~f:(fun acc {pname;value=_;ptee} ->
-                let ts = String.Map.find_exn ex_ptr_decl_types pname in
+                let ts =
+                  match String.Map.find ex_ptr_decl_types pname with
+                  | Some x -> x
+                  | None -> failwith ("Can not find extraptr declaration for " ^
+                                     pname ^ " in function " ^ call.fun_name)
+                in
                 match ptee with
                 | Opening x
                 | Closing x
