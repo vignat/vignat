@@ -1,0 +1,33 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+  config.vm.box = "bento/ubuntu-14.04"
+
+  config.vm.define :server do |srv|
+    srv.vm.hostname = "ext-serv"
+    srv.vm.network "private_network", ip: "192.168.33.10", :mac => "080027538b38"
+    srv.vm.provision "shell", path: "server.sh"
+    config.ssh.forward_x11 = true
+  end
+
+  config.vm.define :bridge do |bridge|
+    bridge.vm.hostname = "bridge"
+    bridge.vm.network "private_network", ip: "192.168.33.2", :mac => "080027004471"
+    bridge.vm.network "private_network", ip: "192.168.33.2", :mac => "080027004472"
+    bridge.vm.synced_folder "./src", "/nf"
+    bridge.vm.provision "shell", path: "bridge.sh"
+    config.ssh.forward_x11 = true
+    bridge.vm.provider "virtualbox" do |v|
+      v.memory = 2048
+    end
+  end
+
+  config.vm.define :client do |cl|
+    cl.vm.hostname = "int-clnt"
+    cl.vm.network "private_network", ip: "192.168.33.5", :mac => "080027c11347"
+    cl.vm.provision "shell", path: "client.sh"
+    config.ssh.forward_x11 = true
+  end
+
+end
