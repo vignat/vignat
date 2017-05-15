@@ -1,0 +1,61 @@
+
+* public bugs
+** Cisco Vault 7 bug:
+Cluster Management Protocol (CMP) - specific options in telnet let an attacker
+to rise privileges and control the router or reboot. Seems to be beyond Vigor
+scope
+** Cloudflare leak
+Buffer overrun (wrong condition - < instead of =) in HTML parser
+** Mirai subordinate routers
+Mirai attackers are hunting for DSL routers that have port 7547 open to launch
+attacks against the Simple Online Access Protocol - a.k.a. SOAP - service,
+Ullrich writes.
+
+That port is the entry point for strikes using the TR-069 or TR-064 protocols,
+which are used by network operators for remote management of devices such as
+routers and set-top boxes.
+
+Just as with webcams: default credentials or no authentication. 
+
+*** Another case:
+Earlier this month, an anonymous researcher - using the handle "kenzo2017" -
+penned a blog post warning of problems with Zyxel-made Eir D1000 modems, which
+at one time were distributed by the Irish telecoms operator Eir.
+
+The TR-064 protocol "is not supposed to be accessed from the WAN side of the
+modem but in the D1000 modem, we can send TR-064 commands to port 7547 on the
+WAN side," the researcher wrote." This allows us to 'configure' the modem from
+the internet."
+
+> Ullrich at the SANS Institute found 41 million devices across the internet that have port 7547 open.
+
+We might have ensured that the configuration port 7547 is not accessible from wan interface.
+
+** Black Nurse
+Disproportional performance impact with ICMP type 3 code 3 messages (port unreachable) on firewalls.
+Description, snort rule to prevent this (without signature):
+https://soc.tdc.dk/blacknurse/blacknurse.pdf
+
+** Another buffer overrun in Cisco firewall
+"An attacker could exploit this vulnerability by sending a crafted IKEv1 packet
+to an affected device configured to accept IKEv1 security negotiation requests,"
+the Cisco advisory says. "A successful exploit could allow the attacker to
+retrieve memory contents, which could lead to the disclosure of confidential
+information."
+
+https://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20160916-ikev1
+CVE-2016-6415
+
+-> check memory safety
+
+** BENIGNCETRAIN (Cisco)
+ crafted packet leads to a memory dump containing a VPN password
+http://securityaffairs.co/wordpress/50452/hacking/benigncertain-tool.html
+
+-> looks like another memory safety issue
+
+
+mac-learning
+public bugs
+CVE, bug databases
+RFCs
