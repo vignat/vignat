@@ -947,7 +947,7 @@ let allocate_args ftype_of tpref arg_name_gen =
       lprintf "adnp: looking for *%Ld\n" ptr_addr;
       match find_first_known_address
               ptr_addr
-              (Ptr (Ptr ptee_t))
+              (Ptr ptee_t)
               (moment_before call.id)
       with
       | Some _ -> None
@@ -955,7 +955,7 @@ let allocate_args ftype_of tpref arg_name_gen =
         lprintf "looking for *%Ld\n" ptee_addr;
         match find_first_known_address
                 ptee_addr
-                (Ptr ptee_t)
+                ptee_t
                 (moment_before call.id)
         with
         | Some _ -> None
