@@ -432,7 +432,7 @@ let fun_types =
                                             in
                                             "received_on_port = " ^
                                             (List.nth_exn params.args 0) ^ ";\n" ^
-                                            "received_packet_type = (*" ^
+                                            "received_packet_type = (" ^
                                             recv_pkt ^ ")->packet_type;\n" ^
                                             (copy_user_buf "the_received_packet"
                                                recv_pkt) ^ "\n");

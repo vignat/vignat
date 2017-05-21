@@ -27,7 +27,8 @@ type moment = Beginning | After of int
 type address_spec = {value:tterm;
                      callid:moment;
                      str_depth:int;
-                     tt:ttype}
+                     tt:ttype;
+                     breakdown:int64 String.Map.t}
 
 type guessed_types = {ret_type: ttype;
                       arg_types: ttype list;
@@ -495,18 +496,25 @@ let find_last_known_address addr tt at =
   lprintf "looking for last *%Ld\n" addr;
   find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:false
 
+let rec printable_tterm cand =
+  lprintf "checking for printability: %s\n" (render_tterm cand);
+  match cand with
+  | {v=Addr x;t=_} -> printable_tterm x
+  | {v=Id _;t=_} -> true
+  | {v=Str_idx (x,_);t=_} -> printable_tterm x
+  | {v=Deref x;t=_} -> printable_tterm x
+  | _ -> lprintf "nope\n";
+    false
+
+let moment_to_str = function
+  | Beginning -> "<|"
+  | After x -> ("> " ^ (string_of_int x))
+
 let find_first_symbol_by_address addr tt at =
-  lprintf "looking for a first symbol at *%Ld\n" addr;
-  let rec is_addressable cand =
-    match cand with
-    | {v=Addr ({v=Id _;t=_});t=_} -> true
-    | {v=Id _;t=_} -> true
-    | {v=Str_idx (x,_);t=_} -> is_addressable x
-    | _ ->
-      lprintf "rejecting: %s\n" (render_tterm cand);
-      false
-  in
-  find_first_known_address_comply addr tt at (fun candidate -> is_addressable candidate.value) ~earliest:true
+  lprintf "looking for a first symbol at *%Ld : %s at %s\n"
+    addr (ttype_to_str tt) (moment_to_str at);
+  find_first_known_address_comply addr tt at
+    (fun candidate -> printable_tterm candidate.value) ~earliest:true
 
 let find_first_known_address_or_dummy addr t at =
   match find_first_known_address addr t at with
@@ -670,11 +678,9 @@ let update_ptee_variants nval older =
     | [{value={t=Unknown;v=_};_}] -> [nval]
     | _ -> nval::older
 
-let moment_to_str = function
-  | Beginning -> "<|"
-  | After x -> ("> " ^ (string_of_int x))
-
-let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
+let rec add_to_known_addresses
+    (base_value: tterm) breakdown addr
+    callid depth =
   begin match base_value.t with
   | Ptr (Str (_,fields) as ptee_type) ->
     let fields = List.fold fields ~init:String.Map.empty
@@ -690,18 +696,9 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
                                v=Str_idx ({t=ptee_type;
                                            v=Deref base_value},fname)}}
         in
-        add_to_known_addresses b_value value.break_down addr callid (depth+1);
-        (* match ftype,value.full with *)
-        (* | Ptr _, Some (Sexp.Atom full_addr) -> *)
-        (*   lprintf "adding also %s->%s address: %s\n" *)
-        (*     (render_tterm base_value) fname full_addr; *)
-        (*   let addr = Int64.of_string full_addr in *)
-        (*   let b_value = {t=Ptr ftype; *)
-        (*                  v=Str_idx ({t=ptee_type; *)
-        (*                              v=Deref base_value},fname)} *)
-        (*   in *)
-        (*   add_to_known_addresses b_value [] addr callid depth *)
-        (* | _ -> () *))
+        add_to_known_addresses
+          b_value value.break_down
+          addr callid (depth+1);)
   | _ ->
     if (List.length breakdown) <> 0 then
       lprintf "%s : %s type with %d fields\n" (render_tterm base_value)
@@ -721,11 +718,61 @@ let rec add_to_known_addresses (base_value: tterm) breakdown addr callid depth =
     | Some value -> value
     | None -> []
   in
+  let breakdown =
+    List.fold breakdown ~init:String.Map.empty
+      ~f:(fun acc {fname;value=_;addr} ->
+          String.Map.add acc ~key:fname ~data:addr)
+  in
   known_addresses := Int64.Map.add !known_addresses
       ~key:addr ~data:(update_ptee_variants
-                         {value=base_value; callid; str_depth=depth;
-                          tt=get_pointee base_value.t}
+                         {value=base_value;
+                          callid;
+                          str_depth=depth;
+                          tt=get_pointee base_value.t;
+                          breakdown}
                          prev)
+
+let rec add_known_symbol_at_address (value: tterm) addr callid depth =
+  let prev = match Int64.Map.find !known_addresses addr with
+    | Some value -> value
+    | None -> []
+  in
+  lprintf "addr: %Ld looking for %s\n"
+    addr (ttype_to_str value.t);
+  List.iter prev ~f:(fun aspec ->
+      lprintf "addr: %Ld considering aspec: %s : %s\n"
+        addr (render_tterm aspec.value) (ttype_to_str aspec.tt);
+      match value.t,aspec.tt with
+      | Ptr (Str (strname,fields)),
+        Str (strname1,_)
+        when String.equal strname strname1 ->
+        lprintf "destruct\n";
+        List.iter fields ~f:(fun (fname,ftype) ->
+            match String.Map.find aspec.breakdown fname with
+            | Some addr ->
+              lprintf "recursing\n";
+              add_known_symbol_at_address {v=Str_idx ({v=Deref value;
+                                                       t=Str (strname,fields)},
+                                                      fname);
+                                           t=Ptr ftype}
+                addr callid (depth + 1)
+            | None ->
+              failwith (fname ^ " field not found in the known address " ^
+                        Int64.to_string addr ^ " : " ^
+                        (render_tterm aspec.value)))
+      | Ptr (Ptr ptee), _ -> begin
+          lprintf "ptr ptr %s\n"
+            (render_tterm (simplify_tterm aspec.value));
+          match (simplify_tterm aspec.value).v with
+          | Addr {v=Utility (Ptr_placeholder addr);t=_} ->
+            lprintf "recursing to %Ld\n" addr;
+            add_known_symbol_at_address {v=Deref value;
+                                         t=Ptr ptee}
+              addr callid (depth + 1)
+          | _ -> lprintf "nonplaceholder :/ nope\n"
+        end
+      | _ -> lprintf "nope\n";);
+  add_to_known_addresses value [] addr callid depth
 
 let get_basic_vars ftype_of tpref =
   let get_vars known_vars (call:Trace_prefix.call_node) =
@@ -889,16 +936,17 @@ let allocate_rets ftype_of tpref =
 (*       addr call_id 0; *)
 (*     Some {name=name;value=tterm} *)
 
+let moment_before call_id =
+  if 0 < call_id then After (call_id - 1) else Beginning
+
 let allocate_extra_ptrs ftype_of tpref =
   let alloc_call_extra_ptrs call =
     List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
         let addr = value in
         let ptee_type = get_fun_extra_ptr_type ftype_of call pname in
-        let previous_moment =
-          if 0 < call.id then After (call.id - 1)
-          else Beginning
-        in
         let mk_ptr value = {t=Ptr value.t;v = Addr value} in
+        lprintf "allocating extra ptr: %s addr %Ld : %s\n"
+          pname addr (ttype_to_str ptee_type);
         match ptee with
         | Opening x ->
           add_to_known_addresses (mk_ptr (get_struct_val_value x ptee_type))
@@ -906,22 +954,16 @@ let allocate_extra_ptrs ftype_of tpref =
           None
         | Closing x ->
           add_to_known_addresses (mk_ptr (get_struct_val_value x ptee_type))
-            x.break_down addr previous_moment 0;
+            x.break_down addr (moment_before call.id) 0;
           None
         | Changing (x,y) ->
-          lprintf "allocating extra ptr: %s addr %Ld : %s\n"
-            pname addr (ttype_to_str ptee_type);
-
           add_to_known_addresses (mk_ptr (get_struct_val_value x ptee_type))
             x.break_down addr (After call.id) 0;
           add_to_known_addresses (mk_ptr (get_struct_val_value y ptee_type))
-            y.break_down addr previous_moment 0;
+            y.break_down addr (moment_before call.id) 0;
           None)
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_extra_ptrs)
-
-let moment_before call_id =
-  if 0 < call_id then After (call_id - 1) else Beginning
 
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
@@ -964,13 +1006,11 @@ let allocate_args ftype_of tpref arg_name_gen =
           let moment = if 0 < call.id then After (call.id - 1) else Beginning in
           lprintf "allocating nested %Ld -> %s = &%Ld:%s\n"
             ptr_addr p_name ptee_addr (ttype_to_str (Ptr ptee_t));
-          add_to_known_addresses
+          add_known_symbol_at_address
             {v=Addr {v=Id p_name;t=Ptr ptee_t};t=Ptr (Ptr ptee_t)}
-          []
-          ptr_addr moment 0;
-          add_to_known_addresses
+            ptr_addr moment 0;
+          add_known_symbol_at_address
             {v=Id p_name;t=Ptr ptee_t}
-            []
             ptee_addr moment 0;
         Some {name=p_name;value={v=Undef;t=Ptr ptee_t}}
     in
@@ -1093,8 +1133,8 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args arg_types tmp_gen =
                     ret_type=get_fun_ret_type ftype_of call})
 
 let deref_tterm {v;t} =
-  {v = simplify_term (Deref {v;t});
-   t = get_pointee t}
+  simplify_tterm {v = Deref {v;t};
+                  t = get_pointee t}
 
 let rec is_empty_struct_val {sname;full;break_down} =
   full = None &&
@@ -1233,7 +1273,10 @@ let extract_common_call_context
   let pre_lemmas =
     compose_fcall_preamble ftype_of call arg_names arg_types tmp_gen is_tip
   in
-  let application = simplify_term (Apply (call.fun_name,args)) in
+  let application =
+    (simplify_tterm {v=Apply (call.fun_name,args);
+                     t=Unknown}).v
+  in
   let extra_pre_conditions =
     (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of)@
     (take_arg_ptrs_into_pre_cond call.args call ftype_of)
@@ -1410,7 +1453,9 @@ let allocate_dummy addr t =
                                        precise=t}}::!allocated_dummies;
   known_addresses :=
     Int64.Map.add !known_addresses
-      ~key:addr ~data:[{value={v=Id name;t}; callid=Beginning; str_depth=0; tt=t}];
+      ~key:addr ~data:[{value={v=Id name;t}; callid=Beginning;
+                        str_depth=0; tt=t;
+                        breakdown=String.Map.empty}];
   {v=Id name;t}
 
 let fixup_placeholder_ptrs_in_tterm moment tterm =
@@ -1450,7 +1495,9 @@ let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
       | None ->
         known_addresses :=
           Int64.Map.add !known_addresses
-            ~key:addr ~data:[{value=lhs; callid=moment; str_depth=0; tt=rhs.t}];
+            ~key:addr ~data:[{value=lhs; callid=moment;
+                              str_depth=0; tt=rhs.t;
+                              breakdown=String.Map.empty}];
         {lhs=lhs;rhs=lhs}
     end
   | _ ->

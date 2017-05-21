@@ -126,14 +126,6 @@ let render_bop = function
   | And -> "&&"
   | Bit_and -> "&"
 
-let rec simplify_term term =
-  match term with
-  | Apply (fname,args) -> Apply (fname, (List.map args ~f:(fun {v;t}->
-      {v=simplify_term v;t})))
-  | Deref {t=_;v=Addr x} -> simplify_term x.v
-  | Str_idx (x,fname) -> Str_idx ({v=simplify_term x.v;t=x.t}, fname)
-  | _ -> term
-
 let render_utility = function
   | Ptr_placeholder addr -> "?placeholder addr:" ^ (Int64.to_string addr)
 
@@ -245,6 +237,19 @@ let call_recursively_on_term (f:term -> term option) tterm =
   call_recursively_on_tterm (fun {v;t} -> match f v with
       | Some v -> Some {v;t}
       | None -> None) tterm
+
+let rec simplify_tterm tterm =
+  call_recursively_on_term (function
+      | Deref {t=_;v=Addr x} -> Some x.v
+      | Str_idx ({v=Struct (strname,fields);
+                  t=_},
+                 fname) ->
+        let field =
+          List.find_exn fields ~f:(fun {name;value=_} ->
+              String.equal name fname)
+        in
+        Some field.value.v
+      | _ -> None) tterm
 
 let rec replace_term_in_term old_t new_t term =
   let replace_in_utility old_t new_t = function
