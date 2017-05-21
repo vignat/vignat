@@ -2,12 +2,16 @@ open Core
 open Ir
 
 type lemma_params = {ret_name: string; ret_val: string;
-                     args: string list; tmp_gen: string -> string;
+                     args: string list;
+                     arg_exps: tterm list;
+                     tmp_gen: string -> string;
                      is_tip: bool; arg_types: ttype list;
                      exptr_types: ttype String.Map.t;
                      ret_type: ttype}
 
-type blemma_params = {args: string list; tmp_gen: string -> string;
+type blemma_params = {args: string list;
+                      arg_exps: tterm list;
+                      tmp_gen: string -> string;
                       is_tip: bool; arg_types: ttype list;
                       exptr_types: ttype String.Map.t;
                       ret_type: ttype}

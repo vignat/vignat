@@ -1077,7 +1077,8 @@ let get_fun_exptr_types (ftype_of,guessed_types)
 
 let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
   (List.map (get_lemmas_before ftype_of call) ~f:(fun l ->
-       l {args;tmp_gen;is_tip;arg_types;
+       l {args=List.map args ~f:render_tterm;
+          arg_exps=args;tmp_gen;is_tip;arg_types;
           exptr_types=get_fun_exptr_types ftype_of call;
           ret_type=get_fun_ret_type ftype_of call}))
 
@@ -1146,7 +1147,8 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args arg_types tmp_gen =
   let result = render_tterm ret_spec.value in
   List.map (get_lemmas_after ftype_of call)
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
-                    args;tmp_gen;is_tip;arg_types;
+                    args=List.map args ~f:render_tterm;
+                    arg_exps=args;tmp_gen;is_tip;arg_types;
                     exptr_types=get_fun_exptr_types ftype_of call;
                     ret_type=get_fun_ret_type ftype_of call})
 
@@ -1286,10 +1288,9 @@ let extract_common_call_context
     (free_vars:var_spec String.Map.t) =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call in
-  let arg_names = List.map args ~f:render_tterm in
   let arg_types = List.map args ~f:(fun {t;v=_} -> t) in
   let pre_lemmas =
-    compose_fcall_preamble ftype_of call arg_names arg_types tmp_gen is_tip
+    compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip
   in
   let application =
     (simplify_tterm {v=Apply (call.fun_name,args);
@@ -1301,7 +1302,7 @@ let extract_common_call_context
   in
   let post_lemmas =
     compose_post_lemmas
-      ~is_tip ftype_of call ret_spec arg_names arg_types tmp_gen
+      ~is_tip ftype_of call ret_spec args arg_types tmp_gen
   in
   let ret_name = match ret_spec with
     | Some ret_spec -> Some ret_spec.name

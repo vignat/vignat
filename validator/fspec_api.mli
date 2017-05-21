@@ -2,6 +2,7 @@ type lemma_params = {
   ret_name : bytes;
   ret_val : bytes;
   args : bytes list;
+  arg_exps: Ir.tterm list;
   tmp_gen : bytes -> bytes;
   is_tip : bool;
   arg_types : Ir.ttype list;
@@ -10,6 +11,7 @@ type lemma_params = {
 }
 type blemma_params = {
   args : bytes list;
+  arg_exps: Ir.tterm list;
   tmp_gen : bytes -> bytes;
   is_tip : bool;
   arg_types : Ir.ttype list;

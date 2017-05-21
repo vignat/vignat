@@ -21,10 +21,49 @@ let capture_a_chain name {tmp_gen;_} =
   "//@ assert double_chainp(?" ^ (tmp_gen name) ^", _);\n"
 
 let capture_a_map t name {tmp_gen;_} =
-  "//@ assert mapp<" ^ t ^ ">(_, _, _, mapc(_,?" ^ (tmp_gen name) ^ "));\n"
+  "//@ assert mapp<" ^ t ^ ">(_, _, _, _, mapc(_,?" ^ (tmp_gen name) ^ ", _));\n"
 
 let capture_a_vector t name {tmp_gen;_} =
   "//@ assert vectorp<" ^ t ^ ">(_, _, ?" ^ (tmp_gen name) ^ ");\n"
+
+let rec self_dereference tterm tmpgen =
+  match tterm.v with
+  | Id x -> ("//@ assert *&" ^ x ^ "|-> ?" ^
+             (tmpgen ("pp" ^ x) ^ ";"),
+             {v=Id (tmpgen ("pp" ^ x));t=tterm.t})
+  | Str_idx (x,fname) ->
+    let (binding, x) = self_dereference x tmpgen in
+    (binding,{v=Str_idx (x,fname);t=tterm.t})
+  | Addr x ->
+    let (binding, x) = self_dereference x tmpgen in
+    (binding,{v=Addr x;t=tterm.t})
+  | Deref x ->
+    let (binding, x) = self_dereference x tmpgen in
+    (binding,{v=Deref x;t=tterm.t})
+  | _ -> failwith ("unhandled in self_deref: " ^ (render_tterm tterm))
+
+let rec innermost_dereference tterm tmpgen =
+  match tterm.v with
+  | Str_idx ({v=Deref {v=Id x;t=_};t=_},fname) ->
+    let tmpname = (tmpgen ("stp" ^ x ^ "_" ^ fname)) in
+    ("//@ assert " ^ (render_tterm tterm) ^ " |-> ?" ^
+     tmpname ^ ";",
+     {v=Id tmpname;t=tterm.t})
+  | Addr x ->
+    let (binding, x) = innermost_dereference x tmpgen in
+    (binding, {v=Addr x;t=tterm.t})
+  | Deref x ->
+    let (binding, x) = innermost_dereference x tmpgen in
+    (binding, {v=Deref x;t=tterm.t})
+  | Str_idx (x,fname) ->
+    let (binding, x) = innermost_dereference x tmpgen in
+    (binding, {v=Str_idx (x,fname);t=tterm.t})
+  | _ -> failwith ("unhandled in inn_deref: " ^ (render_tterm tterm))
+
+let generate_2step_dereference tterm tmpgen =
+  let (binding1,x) = self_dereference tterm tmpgen in
+  let (binding2,x) = innermost_dereference x tmpgen in
+  ([binding1;binding2],x)
 
 let map_struct = Ir.Str ("Map", [])
 let vector_struct = Ir.Str ( "Vector", [] )
@@ -272,10 +311,11 @@ let fun_types =
                                      ";
                                    (fun {tmp_gen;_} ->
                                       "//@ assert mapp<stat_keyi>(?" ^
-                                      (tmp_gen "stmp") ^ ", _, _, ?stm);\n" ^
+                                      (tmp_gen "stmp") ^ ", _, _, _, ?stm);\n" ^
                                       "//@ close hide_mapp<stat_keyi>(" ^
                                       (tmp_gen "stmp") ^ ", static_keyp,\
                                                           st_key_hash,\
+                                                          _,\
                                                           stm);\n");
                                  ];
                                  lemmas_after = [];};
@@ -352,26 +392,33 @@ let fun_types =
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [
-                   (fun ({arg_types;tmp_gen;args;_} as params) ->
+                   (fun ({arg_types;tmp_gen;args;arg_exps;_} as params) ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
+                        let (bindings,expr) =
+                          generate_2step_dereference
+                            (List.nth_exn arg_exps 1) tmp_gen
+                        in
                         "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
                         ", _, _, _, ?" ^ (tmp_gen "stm") ^ ");\n\
                          //@ close hide_mapp<stat_keyi>(" ^
                         (tmp_gen "stm_ptr") ^
                         ", static_keyp, st_key_hash, _," ^
                         (tmp_gen "stm") ^ ");\n" ^
-                        "//@ assert ether_addrp(" ^ (List.nth_exn args 1) ^
+                        (String.concat ~sep:"\n" bindings) ^
+                        "\n" ^
+                        "//@ assert ether_addrp(" ^ (render_tterm expr) ^
                         ", ?" ^ (tmp_gen "dk") ^ ");\n" ^
                         (capture_a_chain "dh" params ^
                          capture_a_map "ether_addri" "dm" params ^
                          capture_a_vector "dynenti" "dv" params);
                       | Ptr (Str ("StaticKey", _)) ->
                         "//@ assert mapp<ether_addri>(?" ^ (tmp_gen "eam_ptr") ^
-                        ", _, _, ?" ^ (tmp_gen "dym") ^ ");\n\
+                        ", _, _, _, ?" ^ (tmp_gen "dym") ^ ");\n\
                          //@ close hide_mapp<ether_addri>(" ^
                         (tmp_gen "eam_ptr") ^
-                        ", ether_addrp, eth_addr_hash, " ^ (tmp_gen "dym") ^
+                        ", ether_addrp, eth_addr_hash, _, " ^
+                        (tmp_gen "dym") ^
                         ");\n" ^
                         (capture_a_map "stat_keyi" "stm" params)
                       | _ -> "#error unexpected key type");
@@ -381,11 +428,11 @@ let fun_types =
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         "//@ open hide_mapp<stat_keyi>(" ^
-                        (tmp_gen "stm_ptr") ^ ", static_keyp, st_key_hash, " ^
+                        (tmp_gen "stm_ptr") ^ ", static_keyp, st_key_hash, _," ^
                         (tmp_gen "stm") ^ ");\n"
                       | Ptr (Str ("StaticKey", _)) ->
                         "//@ open hide_mapp<ether_addri>(" ^
-                        (tmp_gen "eam_ptr") ^ ", ether_addrp, eth_addr_hash, " ^
+                        (tmp_gen "eam_ptr") ^ ", ether_addrp, eth_addr_hash, _," ^
                         (tmp_gen "dym") ^ ");"
                       | _ -> "#error unexpected key type");
                    (fun {args;ret_name;arg_types;tmp_gen;_} ->
