@@ -356,10 +356,11 @@ let fun_types =
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
-                        ", _, _, ?" ^ (tmp_gen "stm") ^ ");\n\
+                        ", _, _, _, ?" ^ (tmp_gen "stm") ^ ");\n\
                          //@ close hide_mapp<stat_keyi>(" ^
                         (tmp_gen "stm_ptr") ^
-                        ", static_keyp, st_key_hash, " ^ (tmp_gen "stm") ^ ");\n" ^
+                        ", static_keyp, st_key_hash, _," ^
+                        (tmp_gen "stm") ^ ");\n" ^
                         "//@ assert ether_addrp(" ^ (List.nth_exn args 1) ^
                         ", ?" ^ (tmp_gen "dk") ^ ");\n" ^
                         (capture_a_chain "dh" params ^

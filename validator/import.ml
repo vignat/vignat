@@ -678,6 +678,7 @@ let update_ptee_variants nval older =
     | [{value={t=Unknown;v=_};_}] -> [nval]
     | _ -> nval::older
 
+(* Takes a pointer, records the pointee into known_addresses *)
 let rec add_to_known_addresses
     (base_value: tterm) breakdown addr
     callid depth =
@@ -708,8 +709,6 @@ let rec add_to_known_addresses
         (ttype_to_str base_value.t);
     assert((List.length breakdown) = 0)
   end;
-  (* The order is important here, if we do not want to replace
-     the pointer to the base_value by a pointer to its field. *)
   lprintf "allocating *%Ld = %s at %s\n"
     addr
     (render_tterm base_value)
@@ -731,7 +730,8 @@ let rec add_to_known_addresses
                           tt=get_pointee base_value.t;
                           breakdown}
                          prev)
-
+(* Takes a symbolic expression and records
+   it as a pointee into known_addresses*)
 let rec add_known_symbol_at_address (value: tterm) addr callid depth =
   let prev = match Int64.Map.find !known_addresses addr with
     | Some value -> value
@@ -746,14 +746,32 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
       | Ptr (Str (strname,fields)),
         Str (strname1,_)
         when String.equal strname strname1 ->
+        lprintf "Pdestruct\n";
+        List.iter fields ~f:(fun (fname,ftype) ->
+            match String.Map.find aspec.breakdown fname with
+            | Some addr ->
+              lprintf "recursing\n";
+              add_known_symbol_at_address {v=Addr {v=Str_idx ({v=Deref value;
+                                                               t=Str (strname,fields)},
+                                                              fname);
+                                                   t=ftype};
+                                           t=Ptr ftype}
+                addr callid (depth + 1)
+            | None ->
+              failwith (fname ^ " field not found in the known address " ^
+                        Int64.to_string addr ^ " : " ^
+                        (render_tterm aspec.value)))
+      | Str (strname,fields),
+        Str (strname1,_)
+        when String.equal strname strname1 ->
         lprintf "destruct\n";
         List.iter fields ~f:(fun (fname,ftype) ->
             match String.Map.find aspec.breakdown fname with
             | Some addr ->
               lprintf "recursing\n";
-              add_known_symbol_at_address {v=Str_idx ({v=Deref value;
-                                                       t=Str (strname,fields)},
-                                                      fname);
+              add_known_symbol_at_address {v=Addr {v=Str_idx (value,
+                                                              fname);
+                                                   t=ftype};
                                            t=Ptr ftype}
                 addr callid (depth + 1)
             | None ->
@@ -772,7 +790,7 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
           | _ -> lprintf "nonplaceholder :/ nope\n"
         end
       | _ -> lprintf "nope\n";);
-  add_to_known_addresses value [] addr callid depth
+  add_to_known_addresses (simplify_tterm value) [] addr callid depth
 
 let get_basic_vars ftype_of tpref =
   let get_vars known_vars (call:Trace_prefix.call_node) =
