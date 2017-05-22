@@ -737,59 +737,56 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
     | Some value -> value
     | None -> []
   in
-  lprintf "addr: %Ld looking for %s\n"
-    addr (ttype_to_str value.t);
-  List.iter prev ~f:(fun aspec ->
-      lprintf "addr: %Ld considering aspec: %s : %s\n"
-        addr (render_tterm aspec.value) (ttype_to_str aspec.tt);
-      match value.t,aspec.tt with
-      | Ptr (Str (strname,fields)),
-        Str (strname1,_)
-        when String.equal strname strname1 ->
-        lprintf "Pdestruct\n";
-        List.iter fields ~f:(fun (fname,ftype) ->
-            match String.Map.find aspec.breakdown fname with
-            | Some addr ->
-              lprintf "recursing\n";
-              add_known_symbol_at_address {v=Addr {v=Str_idx ({v=Deref value;
-                                                               t=Str (strname,fields)},
-                                                              fname);
-                                                   t=ftype};
-                                           t=Ptr ftype}
-                addr callid (depth + 1)
-            | None ->
-              failwith (fname ^ " field not found in the known address " ^
-                        Int64.to_string addr ^ " : " ^
-                        (render_tterm aspec.value)))
-      | Str (strname,fields),
-        Str (strname1,_)
-        when String.equal strname strname1 ->
-        lprintf "destruct\n";
-        List.iter fields ~f:(fun (fname,ftype) ->
-            match String.Map.find aspec.breakdown fname with
-            | Some addr ->
-              lprintf "recursing\n";
-              add_known_symbol_at_address {v=Addr {v=Str_idx (value,
-                                                              fname);
-                                                   t=ftype};
-                                           t=Ptr ftype}
-                addr callid (depth + 1)
-            | None ->
-              failwith (fname ^ " field not found in the known address " ^
-                        Int64.to_string addr ^ " : " ^
-                        (render_tterm aspec.value)))
-      | Ptr (Ptr ptee), _ -> begin
-          lprintf "ptr ptr %s\n"
-            (render_tterm (simplify_tterm aspec.value));
-          match (simplify_tterm aspec.value).v with
-          | Addr {v=Utility (Ptr_placeholder addr);t=_} ->
-            lprintf "recursing to %Ld\n" addr;
-            add_known_symbol_at_address {v=Deref value;
-                                         t=Ptr ptee}
-              addr callid (depth + 1)
-          | _ -> lprintf "nonplaceholder :/ nope\n"
-        end
-      | _ -> lprintf "nope\n";);
+  let find_field_addr strname fieldname =
+    List.find_map prev ~f:(fun aspec ->
+        lprintf "addr: %Ld considering aspec: %s : %s\n"
+          addr (render_tterm aspec.value) (ttype_to_str aspec.tt);
+        match aspec.tt with
+        | Str (strname1,_) when String.equal strname strname1 ->
+          String.Map.find aspec.breakdown fieldname
+        | _ -> None)
+  in
+  lprintf "addr: %Ld looking for %s\n" addr (ttype_to_str value.t);
+  begin match value.t with
+  | Ptr (Str (strname,fields)) ->
+    lprintf "Pdestruct\n";
+    List.iter fields ~f:(fun (fname,ftype) ->
+        lprintf "for %s : %s\n" fname (ttype_to_str ftype);
+        let field_addr = match find_field_addr strname fname with
+          | Some fa -> fa
+          | None -> failwith ("failed to find field " ^ fname ^
+                              " at the address " ^ (Int64.to_string addr))
+        in
+        lprintf "recursing: %s\n" (render_tterm value);
+        add_known_symbol_at_address
+          {v=Addr {v=Str_idx ({v=Deref value; t=Str (strname,fields)}, fname);
+                   t=ftype};
+           t=Ptr ftype}
+          field_addr callid (depth + 1))
+  | Str (strname,fields) ->
+    lprintf "destruct\n";
+    List.iter fields ~f:(fun (fname,ftype) ->
+        let field_addr = match find_field_addr strname fname with
+          | Some fa -> fa
+          | None -> failwith ("failed to find field " ^ fname ^
+                              " at the address " ^ (Int64.to_string addr))
+        in
+        add_known_symbol_at_address
+          {v=Addr {v=Str_idx (value, fname); t=ftype}; t=Ptr ftype}
+          field_addr callid (depth + 1))
+  | Ptr (Ptr ptee) ->
+    List.iter prev ~f:(fun aspec ->
+        lprintf "ptr ptr %s\n"
+          (render_tterm (simplify_tterm aspec.value));
+        match (simplify_tterm aspec.value).v with
+        | Addr {v=Utility (Ptr_placeholder addr);t=_} ->
+          lprintf "recursing to %Ld\n" addr;
+          add_known_symbol_at_address {v=Deref value;
+                                       t=Ptr ptee}
+            addr callid (depth + 1)
+        | _ -> lprintf "nonplaceholder :/ nope\n")
+  | _ -> lprintf "nope\n";
+  end;
   add_to_known_addresses (simplify_tterm value) [] addr callid depth
 
 let get_basic_vars ftype_of tpref =
