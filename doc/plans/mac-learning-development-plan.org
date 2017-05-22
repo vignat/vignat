@@ -186,6 +186,10 @@
      CLOCK: [2017-05-21 Son 22:48]--[2017-05-21 Son 23:20] =>  0:32
      CLOCK: [2017-05-21 Son 17:14]--[2017-05-21 Son 17:15] =>  0:01
      :END:
+**** Arg-pointer postcondition handling
+     :LOGBOOK:
+     CLOCK: [2017-05-22 Mon 09:35]--[2017-05-22 Mon 09:38] =>  0:03
+     :END:
 
 
 

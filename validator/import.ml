@@ -1178,7 +1178,9 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
         | _ ->
             let key = Int64.of_string (Sexp.to_string arg.value) in
             let arg_type = (get_fun_arg_type ftype_of call i) in
-            match find_first_known_address key (get_pointee arg_type) (After call.id) with
+            match find_first_symbol_by_address
+                    key (get_pointee arg_type) (moment_before call.id)
+            with
             | Some out_arg ->
               lprintf "processing %s argptr: %s| strval: %s\n" 
                       arg.aname (ttype_to_str out_arg.t)
