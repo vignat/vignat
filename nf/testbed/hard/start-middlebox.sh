@@ -52,7 +52,7 @@ fi
 if [ "$MIDDLEBOX" = "netfilter" ]; then
     case $SCENARIO in
 	"mg-new-flows-latency")
-	    EXPIRATION_TIME=2
+	    EXPIRATION_TIME=1
 	    ;;
         "1p"|"loopback"|"mg-1p"|"mg-existing-flows-latency"|"rr"|"passthrough")
             EXPIRATION_TIME=60
