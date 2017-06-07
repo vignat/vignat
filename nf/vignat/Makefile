@@ -9,7 +9,8 @@ SRCS-y := nat_forward_vignat.c ../nf_main.c ../lib/nat_config.c \
           ../lib/flow.c ../lib/flow-log.c flowmanager.c flowtable.c \
           ../lib/expirator.c \
           ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c \
-          ../lib/containers/map-impl.c ../lib/containers/double-map.c
+          ../lib/containers/map-impl.c ../lib/containers/double-map.c \
+	  ../lib/containers/vector.c ../lib/containers/map.c
 
 # gcc flags
 CFLAGS += -O3
