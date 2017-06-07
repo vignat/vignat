@@ -1,7 +1,0 @@
-= Ring (queue)
- - 
-= Hash table
- - buckets, that means a need to formulate hash-function collisions in the spec
- - or: guarantee put only to a table with number of elements less than the size of a bucket.
- - ~500 LOC of implementation, excluding hash functions.
-= Longest Prefix Match table

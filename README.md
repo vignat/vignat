@@ -2,11 +2,9 @@
 
 Here is a brief description of the contents of the project, which is essentially a collection of weakly connected artifacts. Please, look also for README.md files in the subdirectories.
 
-* expiring_map.tex - specification of a sample network data structure - expiring map
-* vst/ - proofs for sample programs written in coq using the VST, including a trivial mod-based (int->int) map.
-* bench/ - a simple benchmark for the certified map implementation compating it with standard implementation: GNU g_hash_table and std::unordered_map.
-* dafny/ - an unfinished implementation of the same map in the Dafny framework.
-* frama-c/ - a Frama-C/WP partially-certified implementation.
-* verifast/ - A complete map implementation, certified with VeriFast.
-* nat/ - A sample DPDK nat-box implementation, as a use-case for a verified hash-map.
-
+* doc - contains all the documents/specs/justifications for Vigor approach
+* example - contains a small example that demonstrates the Vigor approach. It is a more complete version of the example used for our paper.
+* experiment - contains initial attempts of formal data structure verification with different proovers
+* nf - contains the library of the verifiec Vigor data structures and all the NF involved in the projects, some of them are verified some are not
+* validator - the validator, one of the steps in the Vigor approach.
+* verification-outdated.docker - an outdated Docker config file that contains all the dependencies
