@@ -1,0 +1,169 @@
+#ifndef STDEX_H
+#define STDEX_H
+
+lemma void length_0_nil<T>(list<T> lst)
+requires length(lst) == 0;
+ensures lst == nil;
+{
+    switch (lst) {
+    case nil: return;
+    case cons(h, t):
+        assert(length(lst) > length(t));
+        assert(length(t) == 0);
+        assert(length(lst) > 0);
+        assert(length(lst) == 0);
+        return;
+    }
+}
+
+  
+lemma void nth_0_head(list<int> lst)
+requires lst != nil;
+ensures nth(0, lst) == head(lst);
+{
+    switch(lst) {
+    case nil: return;
+    case cons(h, t): return;
+    }
+}
+  
+lemma void nth_cons<T>(int n, list<T> lst, T head)
+requires n > 0;
+ensures nth(n-1, lst) == nth(n, cons(head, lst));
+{
+    switch(lst) {
+    case nil: return;
+    case cons(h, t): return;
+    }
+}
+  
+lemma void nth_len_append_cons<T>(list<T> lst, T x)
+requires true;
+ensures nth(length(lst), append(lst, cons(x, nil))) == x;
+{
+    switch(lst) {
+    case nil: return;
+    case cons(h, t):
+        nth_len_append_cons(t, x);
+        return;
+    }
+}
+
+lemma void nth_less_append_cons<T>(int n, list<T> lst, T x)
+requires 0 <= n &*& n < length(lst);
+ensures nth(n, append(lst, cons(x, nil))) == nth(n, lst);
+{
+    switch(lst) {
+    case nil: return;
+    case cons(h, t):
+        if (n == 0) {
+            assert(h == nth(n, lst));
+            assert(h == nth(n, append(lst, cons(x, nil))));
+            return;
+        } else {
+            nth_less_append_cons(n - 1, t, x);
+            return;
+        }
+    }
+}
+  
+lemma void append_take_cons<T>(list<T> lst)
+requires lst != nil;
+ensures lst == append(take(length(lst) - 1, lst), cons(nth(length(lst) - 1, lst), nil));
+{
+    switch(lst) {
+    case nil: return;
+    case cons(h, t):
+        if (t == nil) {
+            assert(length(lst) == 1);
+            assert(take(length(lst) - 1, lst) == nil);
+            assert(cons(nth(length(lst) - 1, lst), nil) == lst);
+            assert(append(nil, lst) == lst);
+            return;
+        } else {
+            append_take_cons(t);
+            assert(take(length(lst) - 1, lst) == cons(h, take(length(t) - 1, t)));
+            assert(nth(length(lst) - 1, lst) == nth(length(t) - 1, t));
+            assert(append(take(length(lst) - 1, lst), cons(nth(length(lst) - 1, lst), nil)) ==
+                   cons(h, append(take(length(t) - 1, t), cons(nth(length(t) - 1, t), nil))));
+            return;
+        }
+    }
+}
+
+
+lemma void cons_take_take_cons<T>(T head, list<T> tail, int n)
+requires 0 <= n;
+ensures cons(head, take(n, tail)) == take(n + 1, cons(head, tail));
+{
+    switch(tail) {
+    case nil: return;
+    case cons(h, t):
+        return;
+    }
+}
+
+  
+lemma void cons_head_tail<T>(list<T> lst)
+requires lst != nil;
+ensures lst == cons(head(lst), tail(lst));
+{
+    switch(lst){
+    case nil: return;
+    case cons(h, t): return;
+    }
+}
+  
+lemma void length_tail<T>(list<T> lst)
+requires lst != nil;
+ensures length(lst) == 1 + length(tail(lst));
+{
+    switch(lst) {
+    case nil: return;
+    case cons(h,t): return;
+    }
+}
+
+lemma void update_tail_tail_update<T>(T lhead, list<T> ltail, int index, T val)
+requires index > 0;
+ensures tail(update(index, val, cons(lhead, ltail))) == update(index - 1, val, ltail);
+{
+  switch(ltail) {
+    case nil: return;
+    case cons(h, t):
+      if (index - 1 == 0) {
+      } else {
+        update_tail_tail_update(h, t, index - 1, val);
+        assert(update(index - 1, val, ltail) == cons(h, update(index - 2, val, t)));
+        assert(update(index, val, cons(lhead, ltail)) == cons(lhead, update(index - 1, val, ltail)));
+      }
+      return;
+  }
+}
+
+lemma void update_0_tail<T>(list<T> lst, T val)
+requires lst != nil;
+ensures tail(update(0, val, lst)) == tail(lst);
+{
+  switch(lst){
+    case nil: return;
+    case cons(h, t): return;
+  }
+}
+
+lemma void update_id<T>(int index, list<T> lst)
+requires true;
+ensures lst == update(index, nth(index, lst), lst);
+{
+  switch(lst){
+    case nil: return;
+    case cons(h, t):
+      if (index == 0) {
+      } else {
+        update_id(index - 1, t);
+      }
+      return;
+  }
+}
+
+#endif

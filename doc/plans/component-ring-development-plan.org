@@ -1,0 +1,52 @@
+* Design, implement and verify a ring.
+Circular array buffer: dynamic allocation, static capacity.
+** Design the API
+   :LOGBOOK:
+   CLOCK: [2016-10-17 18:21]--[2016-10-17 18:30] =>  0:09
+   :END:
+** Implement the API
+   :LOGBOOK:
+   CLOCK: [2016-10-17 18:30]--[2016-10-17 19:00] =>  0:00
+   :END:
+** Formalize the API with VeriFast contracts
+   :LOGBOOK:
+   CLOCK: [2016-10-23 Son 18:18]--[2016-10-23 Son 18:19] =>  0:01
+   CLOCK: [2016-10-23 Son 10:04]--[2016-10-23 Son 10:05] =>  0:01
+   CLOCK: [2016-10-20 Don 13:55]--[2016-10-20 Don 14:02] =>  0:07
+   CLOCK: [2016-10-17 19:00]--[2016-10-17 19:30] =>  0:00
+   :END:
+** Write a symbolic model
+   :LOGBOOK:
+   CLOCK: [2016-10-23 Son 21:10]--[2016-10-23 Son 21:12] =>  0:02
+   CLOCK: [2016-10-20 Don 15:03]--[2016-10-20 Don 15:24] =>  0:21
+   CLOCK: [2016-10-20 Don 13:43]--[2016-10-20 Don 13:54] =>  0:11
+   CLOCK: [2016-10-20 Don 13:03]--[2016-10-20 Don 13:14] =>  0:11
+   CLOCK: [2016-10-20 Don 11:43]--[2016-10-20 Don 11:52] =>  0:09
+   CLOCK: [2016-09-17 18:00]--[2016-09-17 19:00] =>  0:00
+   :END:
+** Write a validator plugin
+   :LOGBOOK:
+   CLOCK: [2016-10-23 Son 18:19]--[2016-10-23 Son 18:32] =>  0:13
+   CLOCK: [2016-10-23 Son 18:12]--[2016-10-23 Son 18:16] =>  0:04
+   CLOCK: [2016-10-23 Son 18:11]--[2016-10-23 Son 18:12] =>  0:01
+   CLOCK: [2016-10-23 Son 17:25]--[2016-10-23 Son 17:36] =>  0:11
+   CLOCK: [2016-10-20 Don 19:03]--[2016-10-20 Don 19:06] =>  0:03
+   CLOCK: [2016-10-20 Don 14:56]--[2016-10-20 Don 15:01] =>  0:05
+   CLOCK: [2016-10-20 Don 14:22]--[2016-10-20 Don 14:32] =>  0:10
+   CLOCK: [2016-10-20 Don 13:55]--[2016-10-20 Don 13:55] =>  0:00
+   CLOCK: [2016-10-20 Don 13:35]--[2016-10-20 Don 13:43] =>  0:08
+   :END:
+** Verify the implementation
+   - Note taken on [2016-10-19 Mit 21:01] \\
+     finished ring_push_back verification
+   :LOGBOOK:
+   CLOCK: [2016-10-20 Don 11:28]--[2016-10-20 Don 11:33] =>  0:05
+   CLOCK: [2016-10-20 Don 10:17]--[2016-10-20 Don 11:05] =>  0:48
+   CLOCK: [2016-10-20 Don 09:14]--[2016-10-20 Don 09:47] =>  0:33
+   CLOCK: [2016-10-20 Don 08:58]--[2016-10-20 Don 09:02] =>  0:04
+   CLOCK: [2016-10-19 Mit 20:17]--[2016-10-19 Mit 21:01] =>  0:44
+   CLOCK: [2016-10-19 Mit 19:09]--[2016-10-19 Mit 20:01] =>  0:52
+   CLOCK: [2016-10-18 Die 10:36]--[2016-10-18 Die 11:26] =>  0:50
+   CLOCK: [2016-10-18 Die 10:26]--[2016-10-18 Die 10:27] =>  0:01
+   CLOCK: [2016-10-17 19:30]--[2016-10-17 20:50] =>  0:00
+   :END:

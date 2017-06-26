@@ -1,0 +1,271 @@
+#ifndef STDEX_GH
+#define STDEX_GH
+
+#include <nat.gh>
+#include <listex.gh>
+#include "listexex.gh"
+#include "set.gh"
+#include "multiset.gh"
+#include "multisubset.gh"
+
+
+fixpoint t get_some<t>(option<t> x) {
+  switch(x) {
+    case none: return default_value<t>();
+    case some(v): return v;
+  }
+}
+
+lemma void some_get_some<t>(option<t> x)
+requires x != none;
+ensures some(get_some(x)) == x;
+{
+  switch(x) {
+    case none: break;
+    case some(v): break;
+  }
+}
+
+fixpoint bool no_dups<t>(list<t> l) {
+  switch(l) {
+    case nil: return true;
+    case cons(h,t):
+      return (!mem(h,t)) &&
+      no_dups(t);
+  }
+}
+
+
+fixpoint bool ge(int x, int y) { return x <= y; }
+
+fixpoint bool lt(int x, int y) { return y < x; }
+
+lemma void ge_le_ge(list<int> l, int i, int x)
+requires x <= i &*& true == forall(l, (ge)(i));
+ensures true == forall(l, (ge)(x));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      ge_le_ge(t, i, x);
+  }
+}
+
+fixpoint bool opt_no_dups<t>(list<option<t> > l) {
+  switch(l) {
+    case nil: return true;
+    case cons(h,t):
+      return opt_no_dups(t) && (h == none || !(mem(h, t)));
+  }
+}
+
+lemma void rem_preserves_opt_no_dups<kt>(list<option<kt> > ks, int i)
+requires true == opt_no_dups(ks) &*& 0 <= i;
+ensures true == opt_no_dups(update(i, none, ks));
+{
+  switch(ks) {
+    case nil: return;
+    case cons(h,t):
+      if (i == 0) {
+      } else {
+        rem_preserves_opt_no_dups(t, i-1);
+        if (h == none){
+        } else {
+          assert(false == mem(h, t));
+          some_get_some(h);
+          rem_preserves_no_mem(t, get_some(h), i-1);
+        }
+      }
+      return;
+  }
+}
+
+lemma void no_dups_same<kt>(list<option<kt> > ks, kt k, int n, int m)
+requires true == opt_no_dups(ks) &*& 0 <= n &*& n < length(ks) &*&
+         0 <= m &*& m < length(ks) &*&
+         nth(n, ks) == some(k) &*& nth(m, ks) == some(k);
+ensures n == m;
+{
+  switch(ks) {
+    case nil: return;
+    case cons(h,t):
+      if (n == 0) {
+        assert(h == some(k));
+        assert(!mem(h, t));
+      } else if (m == 0) {
+      } else {
+        assert(0<n);
+        assert(0<m);
+        no_dups_same(t, k, n-1, m-1);
+      }
+  }
+}
+
+lemma void less_and_not_eq_lesser(nat x, nat lim)
+requires int_of_nat(x) < int_of_nat(succ(lim)) &*&
+         x != lim;
+ensures int_of_nat(x) < int_of_nat(lim);
+{
+  switch(x) {
+    case zero:
+      switch(lim) {
+        case zero:
+        case succ(ln):
+      }
+    case succ(xn):
+      switch(lim) {
+        case zero:
+        case succ(ln):
+          less_and_not_eq_lesser(xn,ln);
+      }
+  }
+}
+
+fixpoint bool neq<t>(t x, t y) { return x != y; }
+
+fixpoint bool nat_ge(int x, nat y) { return x <= int_of_nat(y); }
+
+fixpoint bool nat_lt(int x, nat y) { return int_of_nat(y) < x; }
+
+fixpoint t3 sup<t1,t2,t3>(fixpoint (t2,t3) f1, fixpoint (t1,t2) f2, t1 x) {
+  return f1(f2(x));
+}
+
+lemma void forall_sup_map<t1,t2>(list<t1> l,
+                                 fixpoint (t2,bool) f1,
+                                 fixpoint (t1,t2) f2)
+requires true;
+ensures forall(l, (sup)(f1, f2)) == forall(map(f2, l), f1);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      forall_sup_map(t, f1, f2);
+  }
+}
+
+lemma void two_inequalities_give_eq(int a, int b)
+requires a <= b &*& b <= a;
+ensures a == b;
+{
+}
+
+fixpoint list<t> repeat_n<t>(nat len, t x) {
+  switch(len) {
+    case zero: return nil;
+    case succ(n): return cons(x, repeat_n(n, x));
+  }
+}
+
+lemma void repeat_n_length<t>(nat len, t x)
+requires true;
+ensures length(repeat_n(len, x)) == int_of_nat(len);
+{
+  switch(len) {
+    case zero:
+    case succ(n):
+      repeat_n_length(n, x);
+  }
+}
+
+lemma void lower_limit_ge_than<kt>(list<pair<kt, nat> > l, int lim)
+requires true;
+ensures true == forall(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                       (nat_ge)(lim));
+{
+  filter_forall((sup)((nat_ge)(lim), snd), l);
+  forall_sup_map(filter((sup)((nat_ge)(lim), snd), l), (nat_ge)(lim), snd);
+}
+
+lemma void upper_limit_nat_lt<kt>(list<pair<kt, nat> > l, int lim)
+requires true;
+ensures true == forall(map(snd, filter((sup)((nat_lt)(lim), snd), l)),
+                       (nat_lt)(lim));
+{
+  filter_forall((sup)((nat_lt)(lim), snd), l);
+  forall_sup_map(filter((sup)((nat_lt)(lim), snd), l), (nat_lt)(lim), snd);
+}
+
+lemma void nat_lt_and_ge_disjoint(list<nat> lst, int lim)
+requires true == forall(lst, (nat_lt)(lim)) &*&
+         true == forall(lst, (nat_ge)(lim));
+ensures lst == nil;
+{
+  switch(lst) {
+    case nil:
+    case cons(h,t):
+      assert true == nat_lt(lim, h);
+      assert true == nat_ge(lim, h);
+  }
+}
+
+lemma void lower_and_upper_limit_complement<kt>(list<pair<kt, nat> > l,
+                                                int lim)
+requires true;
+ensures true == multiset_eq(append(filter((sup)((nat_ge)(lim), snd), l),
+                                   filter((sup)((nat_lt)(lim), snd), l)), l) &*&
+        true == disjoint(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                         map(snd, filter((sup)((nat_lt)(lim), snd), l)));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      lower_and_upper_limit_complement(t, lim);
+      switch(h) {
+        case pair(key, dist):
+      }
+      if ((sup)((nat_ge)(lim), snd)(h)) {
+      } else {
+          cons_in_the_middle_multiset_eq
+          (filter((sup)((nat_ge)(lim), snd), t), filter((sup)((nat_lt)(lim), snd), t), h);
+          multiset_eq_trans(append(filter((sup)((nat_ge)(lim), snd), l),
+                                   filter((sup)((nat_lt)(lim), snd), l)),
+                            cons(h, append(filter((sup)((nat_ge)(lim), snd), t),
+                                           filter((sup)((nat_lt)(lim), snd), t))),
+                            l);
+      }
+      upper_limit_nat_lt(l, lim);
+      lower_limit_ge_than(l, lim);
+      intersection_subset(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                          map(snd, filter((sup)((nat_lt)(lim), snd), l)));
+      list<nat> inters =
+      intersection(map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                   map(snd, filter((sup)((nat_lt)(lim), snd), l)));
+      subset_forall(inters, map(snd, filter((sup)((nat_ge)(lim), snd), l)),
+                    (nat_ge)(lim));
+      subset_forall(inters, map(snd, filter((sup)((nat_lt)(lim), snd), l)),
+                    (nat_lt)(lim));
+      nat_lt_and_ge_disjoint(inters, lim);
+  }
+}//took 55m
+
+lemma void separated_by_bnd_disjoint(list<nat> l1, list<nat> l2, int bnd)
+requires true == forall(l1, (nat_lt)(bnd)) &*&
+         true == forall(l2, (nat_ge)(bnd));
+ensures true == disjoint(l1, l2);
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      if (mem(h, l1)) {
+        forall_mem(h, l1, (nat_lt)(bnd));
+        assert false;
+      }
+      separated_by_bnd_disjoint(l1, t, bnd);
+  }
+}//took 3m
+
+lemma void lt_and_ge_false(int x, int y)
+requires x < y &*& y <= x;
+ensures false;
+{
+}
+
+// Workaround for unmindful Redux solver.
+// See https://github.com/verifast/verifast/issues/19
+lemma void note(bool b)
+requires b;
+ensures b;
+{}
+
+#endif//STDEX_GH

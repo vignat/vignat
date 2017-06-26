@@ -1,0 +1,16 @@
+Last decade is marked by a second coming of virtualization. The birth of cloud
+put a great demand on systems to be portable and replaceable. Now entire
+networks follow computing nodes and become virtualizable. That is how the SDN
+was born. As it advances more and more originally hardware functions move to the
+portable and flexible software domain.
+
+However, the software development methods do not keep up with the raising
+responsibility. It is traditionally difficult to develop a reliable software
+implementation of an originally hardware component.
+
+On the other side, formal verification techniques have grown strong enough to
+certify complete and practical systems. Such systems as a compiler, an operating
+system kernel, a distributed key value store or a file system.
+
+We take advantage of network domain-specific features and formal methods
+achievements to guarantee the reliability of each component.

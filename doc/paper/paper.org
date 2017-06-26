@@ -1,0 +1,175 @@
+* Abstract
+* Introduction
+- Note taken on [2016-08-08 Mon 15:44] \\
+  Another possible running example: array
+- Note taken on [2016-08-02 Die 10:14] \\
+  Running example: batcher.
+** Problem Statement
+Software network applications lack dependability (why, how?).
+** Solution Overview
+- Note taken on [2016-08-10 Mit 20:03] \\
+  Idea for solution introduction: 
+  - model checking enumerates all the states, suffers from state explosion
+  - symbolic execution enumerates all paths, which group multiple states together,
+    suffers from path explosion, which happens on loops and symbolic pointers.
+  - our approach circumvent path explosion problem, by grouping states into a
+    small number of semantic groups, defined by the "symbolic models"
+*Optimistic* symbolic execution.
+Run symbolic execution with data structures approximated by specially crafted
+models, and loops reduced to a single iteration. This addresses infinite
+execution paths and symbolic pointer access problems.
+We offer a new approach to verify network applications. Specifically
+the applications that meet the following requirements:
+- no deep recursion
+- clear loops (limited repetition model)
+- clean state encapsulation into a set of well defined data structures
+- OS interaction strictly thourgh a well defined interface
+- Event processing model:
+  infinite loop, with short iterations dedicated to process a single event each
+  with short and simple data-structure and OS interaction patterns.
+- ...???
+** Contributions
+- Verification methodology
+- Crash-free, performant but basic software NAPT (anything else?)
+- Verification tool (validator)
+** Roadmap
+* Solution
+TODO functoin call overhead vs. load from a memory
+TODO dynamic memory allocatoin vs. static memory allocation
+Proposed methodology:
+1. Encapsulate all state (specifically: large or variable-length arrays; dynamic
+   index accessed memory (e.g. a port configuration stored into a single table,
+   and accessed during port enumeration)
+2. Implement and formally (very labour intensive) verify the data-structure
+   specifications
+3. Provide symbolic models, suitable for the use-case. Symbolic model is a
+   partial implementation that:
+   - exhibits at least as general behaviour as specified for a bounded sequence
+     of API calls
+   - utilizes a small statically defined amount of state
+4. Provide loop invariants for long loops (i.e. event loop and port-enumerating
+   loop). Invariants should be mostly a conjunction of the corresponding
+   invariants for the symbolic models.
+5. Run symbolic execution on the resulting application. Make sure it does not
+   report any bugs. False positives here may be caused by excess generality of
+   the models.
+6. Collect API call traces and validate with the help of the formal verification
+   engine. This step ensures the claim in the step #3 (the model is
+   general enough).
+Shortcoming: extra indirections, introduced for generality, may hurt
+performance. May be eliminated by static inlining, but C is a difficult language
+for that.
+** Language restrictions
+- The component-related memory may be accessed only through public API
+- No pointer comparison except the comparison with null
+- Domain-limited pointers: only predefined range (a single unit of the declared
+  type) may be accessed through a certain pointer
+- Time limited pointers. Access to an address is allowed only in certain
+  execution segments.
+** Model validation criteria
+To validate a model under certain circumstances is to ensure it behaves
+according to the spec or more general. Specifically, if to the given case the
+input *I*, the spec conditions the case output *O_s*, and the model produces the
+case output *O_m*, the model is correct if *O_m* contains *O_s*.
+- The case input :: is the sequence of calls to the model public API. The calls
+     include function names, function inputs for all the function in the
+     sequence and function outputs for all but the last call.
+- The case output :: is the output of the last function call.
+- The function input :: is the function arguments (possibly expressed as
+     symbolic formulas), and path-conditions limiting these arguments (namely
+     the transitive closure of all path-conditions involving the symbols
+     mentioned in the arguments). For any pointer argument (which must have a
+     concrete value -- practical limitation), the pointee must be considered
+     according to the section handling pointers. The numerical value of the
+     pointer itself is ignored, because we forbid pointer comparison with
+     anything but a null-pointer. 
+- The function output :: is its return value, and the output pointer arguments'
+     pointee values, as well as the path-conditions limiting all the symbols
+     involved (transitive closure, as above).
+
+This validation criteria guarantees that the formally verified implementation
+will do nothing that the model did not try. So any behaviour (and may be some
+more) were checked during the symbolic execution, and it is 1) allowed and 2)
+does not cause the business logic to crash.
+
+** Handling pointers
+While validating a model we care only about pointers passing the API boundary.
+
+An argument pointer may be:
+- The whole component state. This is an equivalent of "this" pointer for
+  C++/Java We do not inspect the memory by this pointer, we only note whether it
+  is equal or different from other pointers. The component owns this memory.
+- Output parameter. This memory is owned by the application. A double pointer
+  (X** p) set by an allocation function is an example of the output parameter.
+  The pointee (*p) is then traced, but the pointee of the pointee (**p) is not,
+  as it is the internal state of the component. Other cases of double and more
+  deep pointers are not supported (e.g. an output parameter to be set to point
+  to a piece of the internal state).
+
+A return pointer points to a piece of the internal state (e.g. an array cell).
+We trace the pointee, and also make sure it is not accessed when the ownership
+is returned to the component, as with array_end_access.
+
+In all of the above, the symbex engine may not actually trace the pointee, in
+which case we replace it with an unbounded value, thus overapproximating the
+execution.
+
+** Assumptions
+- Currently we trust the application developer to put loop invariant assumptions
+and assertions in correct order and into the right places; link the application
+correctly; use only verified components and interpret the verification result.
+- We trust the component developer to properly mark the interface functions.
+- We assume overapproximation of the symbolic environment model. Unfortunately,
+  we have no formal specificaiton, so we can not validate this assumption.
+- We assume correct hardware which does not crash on its own by a software
+  unrelated cause
+- We assume correct compiler that implements the same language semantics used by
+  our tools -- VeriFast and Klee(LLVM).
+*** TCB:
+- Klee (+patches);
+- VeriFast (+patches);
+- Solvers (metaSMT, STP, Z3, etc.)
+- Home-made validator, based on VeriFast
+- Verification driver
+- DPDK
+- OS
+* Prototype
+Patched Klee:
+- loop invariant support
+- API call trace prefix dump
+Patched VeriFast:
+- accumulated conditions dump
+Home-made validator: 
+1. Parse the Klee dumps
+2. Transform them into VeriFast tasks
+   - Narrow down the behaviour by searching the assignment for unbounded symbolic
+   variables.
+   - Insert helper lemmas to help formal verification.
+3. Run VeriFast to try out the spec in the place of the model, and verify the
+   behaviour.
+Shortcoming: TCB includes Klee + SMT solver + VeriFast + all our patches + our
+home-made Validator. The last two items are hardly tested.
+However, *TODO Note on the orthogonality of bugs*
+** Leaks
+VeriFast also provides control over memory ownership leaks. We pay attention to
+the leaks only at the points of the execution, where we loose control of them,
+specifically at the end of an iteration (where the state gets havoced) and at
+the end of the program (unreachable for the NAT-box).
+* Evaluation
+Consider different working areas:
+- empty table,
+- saturated table,
+- saturated hash,
+- overflow.
+** Throughput:
+*** uni-flow
+*** multi-flow
+** Latency:
+*** existing flow
+*** new flow
+
+* Related Work
+- Dobrescu stateles Click modules verification
+- Something about replication-based reliability
+* Conclusion
+* Acknolegements

@@ -1,0 +1,255 @@
+\documentclass{article}
+\usepackage{dsfont}
+\usepackage{amsmath}
+\usepackage[margin=1.5cm]{geometry}
+\renewcommand{\o}[1]{\ensuremath{\mathbf{#1}}}
+\newcommand{\p}[1]{\ensuremath{\mathit{#1}}}
+\newcommand{\s}[1]{\ensuremath{\mathsf{#1}}}
+\newcommand{\nintset}{\ensuremath{\mathds{Z}_{\ge 0}}}
+\newcommand{\moreset}[1]{\ensuremath{\mathds{Z}_{\ge #1}}}
+
+\begin{document}
+
+An ``expiring map'' $[K,V]$ is an abstraction that maps keys $k \in K$ to values $v \in V$ and allows individual mappings to expire at an indicated time.
+
+\paragraph{Abstract state $S$}
+\begin{itemize}
+   \item \s{mapping}: a set of entries $[k,v,t]$, with each entry mapping key $k$ to value $v$ until time $t$, after which the mapping expires
+   \item \s{size}: the number of unexpired keys in \s{mapping} (for now, we assume at most one entry per key)
+   \item \s{maxSize}: the maximum number of keys that the map can accommodate
+\end{itemize}
+
+\paragraph{Abstract operations}
+\begin{itemize}
+\item $\o{constructor}(s \in \nintset$) constructs the map that holds at most $s$ entries
+\item $p\gets \o{has}(k \in K)$ indicates whether key $k$ exists in the map or not
+\item $(v\in V, e\in \nintset)\gets \o{get}(k \in K)$ returns the pair of value $v$ to which $k$ is mapped and time $e$ until this mapping is kept. If the key $k$ is not present, can return $fail$.
+\item $x\gets \o{put}(k \in K, v \in V, e \in \nintset)$ adds to the map a mapping from $k$ to $v$ that is valid until time $e$. Returns boolean $x$ - whether the operation was successfull.
+\item $x\gets \o{erase}(k \in K)$ removes the entry from the map that maps $k$ to a value. Returns boolean $x$ - whether the operation was successfull.
+  %\item $\o{nop}$ does nothing, returns nothing.
+\end{itemize}
+
+We model the use of the map as a finite sequence
+$\tau = <o_0, o_1, ..., o_n>$
+of operations $o_t$ on the map indexed by time $t \in \nintset$.
+In our model, an operation completes fully before the next one commences (i.e., there is no concurrency).
+%A continuous subsequence $<o_a, o_{a+1}, ..., o_{b-1}, o_b> (0\le a\le b\le n)$ of $\tau$ is designated as $\tau_a^b$
+For simplicity, we assume that each operation takes exactly one unit of time.
+We use the shorthand $\o{operation}_t(...)$ to indicate the operation that occurs at time $t$.
+
+An execution is an interleaving of operations and ``snapshots'' of the abstract state
+$\epsilon = <o_0, S_0, o_1, S_1, ..., o_n, S_n>$, with
+each subsequence $<S_{i-1}, o_i, S_i>$ indicating that operation $o_i$ transforms abstract state $S_{i-1}$ into $S_i$.
+An accessor does not mutate state, so it leaves the abstract state unchanged, but the state can change due to continuous expiration process.
+We use the shorthand $\s{component}_t$ to indicate the value of \s{component} of the state $S$ immediately after $o_t$ completes and before $o_{t+1}$ commences.
+
+{\it Note:} Symbol $\simeq$ in the following context: $o_t\simeq ...$ means that lefthand {\it operation} ($o_t$) can be equal to the righthand operation. E.g. $\forall k \in K o_t\simeq \o{has}_t(k) \Leftrightarrow \p{const}_t$ means, that the operation number t ($o_t$) may be the $\o{has}(k)$ call (not the result of it) if and only if holds $\p{const}_t$. \underline{Attention}: $x=\o{has}_t(k)$ has different meaning then $o_t=\o{has}_t(k)$.
+
+By default, if symbols $e, k, v, t$ are used in a formula, and not mentioned before in that formula, the universal quantifier $\forall$ is implied: $\forall k \in K, v\in V, e\in \nintset, t\in \nintset$.
+
+\paragraph{Helper predicates}
+\begin{itemize}
+\item An ``empty'' map is one without any keys \\
+  $\p{empty}_t \Leftrightarrow [k, v, e] \not\in \s{mapping}_t$
+\item A ``const'' operation does not modify nonexpired mappings:\\
+  $\p{const}_t ~\Leftrightarrow~\\ \Big([k, v, e] \in \s{mapping}_{t-1} \wedge e>t \Rightarrow [k, v, e] \in \s{mapping}_t\Big)\wedge\\ \Big([k, v, e] \not\in \s{mapping}_{t-1} \Rightarrow [k, v, e] \not\in \s{mapping}_t\Big)\wedge \s{size}_{t-1} \ge \s{size}_t$
+\item An ``isolated'' operation does not modify nonexpired mappings, except for a single one:\\
+  $\p{isolated}_t(k'\in K) ~\Leftrightarrow~\\ \Big(k\neq k' \wedge [k, v, e] \in \s{mapping}_{t-1} \wedge e>t \Rightarrow [k, v, e] \in \s{mapping}_t\Big)\wedge\\ \Big(k\neq k' \wedge [k, v, e] \not\in \s{mapping}_{t-1} \Rightarrow [k, v, e] \not\in \s{mapping}_t\Big)$
+\end{itemize}
+
+\paragraph{Invariants}
+These predicates allways hold:
+\begin{itemize}
+\item The map does not keep expired items: $\forall [k, v, e] \in \s{mapping}_t \Rightarrow e > t$
+\item No operation except for $\o{constructor}_0$ can change the map capacity:
+  \begin{gather*}
+    \forall t\in \nintset: t > 0 \Rightarrow \s{maxSize}_t=\s{maxSize}_0
+  \end{gather*}
+\end{itemize}
+
+\paragraph{Semantics for accessors (may mutate $S$, do not change the nonexpired mappings)}
+\begin{itemize}
+\item[has]
+  \begin{itemize}
+  \item $\o{has}_t(k \in K) ~\Leftrightarrow~ \exists [k,v,e] \in \s{mapping}_t \wedge o_t=\o{has}_t(k)$\\
+  \item It does not change mappings:
+    \begin{gather*}
+      o_t \simeq \o{has}_t(k) ~\Leftrightarrow~ \p{const}_t
+    \end{gather*}
+  \end{itemize}
+\item[get]
+  \begin{itemize}
+  \item One can get a mapping only if it exists in the map:
+      \begin{gather}
+        \o{get}_t(k \in K) \rightarrow fail ~\Leftrightarrow~ [k,v,e] \not\in \s{mapping}_t \wedge o_t=\o{get}_t(k)\label{eq:get1}\\
+        (v\in V,e\in \nintset)\gets \o{get}_t(k \in K) ~\Leftrightarrow~ \exists [k,v,e] \in \s{mapping}_t \wedge o_t=\o{get}_t(k) \label{eq:get2}
+      \end{gather}
+  \item In anyway, it does not change existing unexpired mappings:
+    \begin{gather*}
+      o_t \simeq \o{get}_t(k) ~\Leftrightarrow~ \p{const}_t
+    \end{gather*}
+  \end{itemize}
+\end{itemize}
+
+
+\paragraph{Semantics for operations that mutate state}
+\begin{itemize}
+\item[constructor]
+  \begin{itemize}
+  \item The constructor forms a new empty map
+    \begin{gather*}
+      \o{constructor}_0(s \in \nintset) \Leftrightarrow \p{empty}_0 \wedge \big(\forall t \in \nintset \Rightarrow \s{maxSize}_t=s\big)
+    \end{gather*}
+  \item The constructor must be called once and only once, at the very beginning of $\tau$ (i.e., $\tau$ contains no other constructor call after the first one)
+    \begin{gather*}
+      o_0 \equiv \o{constructor}_0 \wedge \big(\forall t\in \moreset{1} \Rightarrow o_t \neq \o{constructor}_t\big)
+    \end{gather*}
+  \end{itemize}
+\item[erase]
+  \begin{itemize}
+  \item ``Erase'' deletes an entry with a given key. If the entry does not exist in the \s{mapping}, it fails. It does not change other mappings if they are not expired.
+    \begin{gather*}
+      \Big(o_t \simeq \o{erase}_t(k\in K) ~\Leftrightarrow~ \p{isolated}_t(k)\Big) \wedge
+    \end{gather*}
+  \item If there was a such mapping for $k$, ``erase'' will remove it.
+    \begin{gather}
+      \Big(x=\o{erase}_t(k\in K) \wedge \exists [k, v, e] \in \s{mapping}_{t-1} ~\Leftrightarrow~\nonumber\\
+      x=success \wedge \big(\forall v'\in V, e'\in \nintset \Rightarrow [k, v', e'] \not\in \s{mapping}_t\big) \wedge \s{size}_t \le \s{size}_{t-1}-1 \Big) \wedge
+      \label{eq:erase1}
+    \end{gather}
+  \item If there was not --- it will fail.
+    \begin{gather}
+      \Big( x=\o{erase}_t(k\in K) \wedge [k,v,e]\not\in \s{mapping}_{t-1} ~\Leftrightarrow~ \nonumber\\
+      x=fail \wedge \p{const}_t \wedge o_t=\o{erase}_t(k)\Big)
+      \label{eq:erase2}
+    \end{gather}
+  \end{itemize}
+\item[put]
+  \begin{itemize}
+  \item ``Put'' inserts a new mapping, if the number of unexpired elements is less than \s{maxSize} and there is no unexpired entry with the same key.
+    This function does not touch any unexpired entry with key other than $k$.
+    \begin{gather*}
+      \Big(o_t \simeq \o{put}_t(k\in K, v\in V, e\in \moreset{t}) ~\Leftrightarrow~ \p{isolated}_t(k)\Big) \wedge
+    \end{gather*}
+  \item If there was no such mupping before, and there is enough room, it will succeed.
+    \begin{gather}
+      \Big(x=\o{put}_t(k, v, e) \wedge \s{size}_{t-1} < \s{maxSize}_{t-1} \wedge \big(\forall v'\in V, e'\in \nintset \Rightarrow [k, v', e'] \not\in \s{mapping}_{t-1}\big) \Leftrightarrow \nonumber\\
+      x=success \wedge \s{size}_t \le \s{size}_{t-1}+1 \wedge [k, v, e] \in \s{mapping}_t\Big)\wedge
+      \label{eq:put1}
+    \end{gather}
+  \item If a mapping with key $k$ allready exists, and it does not expires on $t$, put will fail.
+    \begin{gather}
+      \Big(x=\o{put}_t(k, v, e) \wedge \big(\exists v'\in V, e'\in \nintset: [k, v', e']\in \s{mapping}_{t-1} \wedge e > t\big) \Leftrightarrow\nonumber\\
+      x=fail \wedge \p{const}_t \wedge o_t = \o{put}_t(k,v,e)\Big)\wedge
+      \label{eq:put2}
+    \end{gather}
+  \item If a mapping with key $k$ expires on $t$, put will replace it:
+    \begin{gather}
+      \Big(x=\o{put}_t(k, v, e) \wedge \big(\exists v'\in V: [k, v', t]\in \s{mapping}_{t-1}\big) \Leftrightarrow\nonumber\\
+      x=success \wedge \s{size}_t \le \s{size}_{t-1} \wedge [k, v, e] \in \s{mapping}_t\Big)\wedge
+      \label{eq:put3}
+    \end{gather}
+  \item If there is no room, but some mappings expire on $t$, put will succeed:
+    \begin{gather}
+      \Big(x=\o{put}_t(k, v, e) \wedge \s{size}_{t-1} = \s{maxSize}_{t-1} \wedge [k, v, e] \not\in \s{mapping}_{t-1} \wedge \nonumber\\
+      \big(\exists k'\in K, v'\in V: [k', v', t] \in \s{mapping}_{t-1}\big) \Leftrightarrow\nonumber\\
+      x=success \wedge \s{state}_t \le \s{state}_{t-1} \wedge [k, v, t] \in \s{mapping}_t\Big)\wedge
+      \label{eq:put4}
+    \end{gather}
+  \item If there is no room, and no mappings expire on $t$, put will fail:
+    \begin{gather}
+      \Big(x=\o{put}_t(k, v, e) \wedge \s{size}_{t-1} = \s{maxSize}_{t-1} \wedge \nonumber\\
+      \big(\forall k'\in K, v'\in V, e' \in \nintset: [k', v', e'] \in \s{mapping}_{t-1} \Rightarrow e' > t \big) \Leftrightarrow\nonumber\\
+      x=fail \wedge \p{const}_t \wedge o_t = \o{put}_t(k,v,e)\Big)
+      \label{eq:put5}
+    \end{gather}
+  \end{itemize}
+
+\end{itemize}
+
+\paragraph{Properties to be proven}
+\begin{itemize}
+\item $\p{empty}_t \Leftrightarrow \s{size}_t=0$
+\item If the map is empty, there no keys in it:
+  \begin{gather*}
+    \p{empty}_t \Leftrightarrow \o{has}_t(k) = false
+  \end{gather*}
+\item Equivalent helper predicate \p{isolated} definition
+  \begin{gather*}
+    \p{isolated}_t(k'\in K) ~\Leftrightarrow~\nonumber\\
+    \Big(k\neq k' \wedge \o{has}_{t-1}(k) \wedge (v,e)=\o{get}_{t-1}(k) \wedge e>t \Rightarrow \o{has}_t(k) \wedge \o{get}_t(k)=(v,e)\Big)\wedge\nonumber\\
+    \Big(k\neq k' \wedge \neg \o{has}_{t-1}(k) \Rightarrow \neg\o{has}_t(k)\Big)
+  \end{gather*}
+\item Equivalent helper predicate \p{const} definition
+  \begin{gather*}
+    \p{const}_t ~\Leftrightarrow~\nonumber\\
+    \Big(\o{has}_{t-1}(k) \wedge (v,e)=\o{get}_{t-1}(k) \wedge e>t \Rightarrow \o{has}_t(k) \wedge \o{get}_t(k)=(v,e)\Big)\wedge\nonumber\\
+    \Big(\forall k\in K: \neg \o{has}_{t-1}(k) \Rightarrow \neg\o{has}_t(k)\Big)
+  \end{gather*}
+
+\item Equivalent of \eqref{eq:get1}:
+  \[
+  \o{has}_t(k) \Leftrightarrow \o{get}_t(k) \not\rightarrow fail
+  \]
+\item If there was a mapping for $k$, ``erase'' removes it. Equivalent of \eqref{eq:erase1}:
+  \begin{gather*}
+    \Big(x=\o{erase}_t(k\in K) \wedge \o{has}_{t-1}(k) ~\Leftrightarrow~ x=success \wedge \neg\o{has}_t(k) \wedge \s{size}_t \le \s{size}_{t-1}-1 \Big)
+  \end{gather*}
+\item If there were not --- ``erase'' will fail. Equivalent of \eqref{eq:erase2}:
+  \begin{gather*}
+    \Big(x=\o{erase}_t(k\in K) \wedge \neg\o{has}_{t-1}(k) ~\Leftrightarrow~ x=fail\wedge \p{const}_t\Big)
+  \end{gather*}
+
+\item Equivalent of \eqref{eq:put1}
+  \begin{gather*}
+    \Big(x=\o{put}_t(k, v, e) \wedge \s{size}_{t-1} < \s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(k) \Leftrightarrow \nonumber\\
+    x=success \wedge \s{size}_t \le \s{size}_{t-1}+1 \wedge \o{has}_t(k)\wedge\o{get}_t(k) = (v, e)\Big)
+  \end{gather*}
+
+\item If there is an unexpired mapping with the same key, put will fail. Equivalent of \eqref{eq:put2}
+  \begin{gather*}
+    \Big(x=\o{put}_t(k, v, e) \wedge \o{has}_{t-1}(k) \wedge \exists e'\in \nintset: (\cdot, e')=\o{get}_{t-1}(k) \wedge e' > t \Leftrightarrow\\
+    x=fail \wedge \p{const}_t\Big)
+  \end{gather*}
+
+\item Equivalent of \eqref{eq:put3}. Expired mapping replaced:
+  \begin{gather*}
+    \Big(x=\o{put}_t(k, v, e) \wedge \o{has}_{t-1}(k) \wedge (\cdot, t)=\o{get}_{t-1}(k) \Leftrightarrow\\
+    x=success \wedge \s{size}_t \le \s{size}_{t-1} \wedge \o{has}_t(k)\wedge\o{get}_t(k) = (v, e)\Big)
+  \end{gather*}
+
+\item Equivalent of \eqref{eq:put4}. If there is no room, but some mappings have expired, one still can put.
+  \begin{gather*}
+    \Big(x=\o{put}_t(k, v, e) \wedge \s{size}_{t-1} = \s{maxSize}_{t-1} \wedge \neg\o{has}_{t-1}(k) \wedge\\
+    \big(\exists k'\in K: \o{has}_{t-1}(k')\wedge (\cdot,t)=\o{get}_{t-1}(k) \big) \Leftrightarrow\\
+    x=success \wedge \o{has}_t(k)\wedge\o{get}_t(k) = (v, e) \wedge \s{size}_t \le \s{size}_{t-1}\Big)
+\end{gather*}
+
+\item Into full map, one can not put any more keys. Equivalent of \eqref{eq:put5}:
+  \begin{gather*}
+    \Big(x=\o{put}_t(k, v, e) \wedge \s{size}_{t-1} = \s{maxSize}_{t-1} \wedge  \\
+    \big(\forall k'\in K,e'\in \nintset :\o{has}_{t-1}(k')\wedge(\cdot,e')=\o{get}_{t-1}(k') \Rightarrow e' > t \big) \Leftrightarrow\\
+    x=fail \wedge size_t = size_{t-1} \wedge \p{const}_t(k)\Big)
+  \end{gather*}
+
+\item The size of the map is always properly bounded
+  \begin{gather*}
+    \forall t\in \nintset: t>0  \wedge \o{constructor}_0(s \in \nintset) \Rightarrow 0 \le \s{size}_t \le \s{maxSize}
+  \end{gather*}
+
+\item For any subsequence of operations other than \o{put}, size of the map may only decrease:
+  \begin{gather*}
+    \forall a\in \nintset,b\in \nintset: a<b \wedge \big(\forall t\in \nintset:a<t<b \Rightarrow o_t \neq \o{put}_t \big) \Rightarrow \s{size}_a \ge \s{size}_b
+  \end{gather*}
+
+\item If a subsequence of operations does not include \o{erase} for key $k\in K$, and there is a mapping, it will be kept until the end of the subsequence, or until expired:
+  \begin{gather*}
+    \forall a\in \nintset,b, k\in K, v\in V, e\in \moreset{b}: a < b \wedge \o{has}_a(k) \wedge (v, e)=\o{get}_a{k} \wedge e > b ~ \wedge\nonumber\\
+    \big(\forall t\in \nintset: a<t<b \Rightarrow o_t\neq \o{erase}_t(k)\big) \Rightarrow\nonumber\\
+    \o{has}_b(k) \wedge \o{get}_b(k) = (v,e)
+  \end{gather*}
+
+\end{itemize}
+
+
+\end{document}

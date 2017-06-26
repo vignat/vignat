@@ -1,0 +1,33 @@
+slide1: dataplane
+
+control plane box above
+data plane below:
+     small version of slide2-net
+arrows from the control plane box to some slide2-net elements
+left-input and right-output arrows
+
+
+slide2: stateful/stateless elements in a net
+
+A directed graph of two types of elements: stateful ones and stateless ones
+stateless elements - gears
+stateful elements - databases
+
+
+slide2a:
+stateful elements are shadowed
+
+
+slide2b:
+stateless elements are shadowed
+
+
+slide3: verification diagramm
+
+left top: datastructures
+right top: DS specs
+left bottom: program
+right bottom: symbex box
+
+Arrows: DS <-> DS specs; DS -> program; program -> symbex box;
+DS specs => symbex box; symbex box -> {correct!}

@@ -1,0 +1,439 @@
+#ifndef SET_GH
+#define SET_GH
+
+#include <listex.gh>
+#include "listexex.gh"
+
+lemma void subset_remove<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys);
+ensures true == subset(remove(el, xs), ys);
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      if (h != el) subset_remove(t, ys, el);
+  }
+}
+
+lemma void remove_subset<t>(list<t> xs, t el, list<t> ys)
+requires true == subset(xs, ys) &*&
+         false == mem(el, xs);
+ensures true == subset(xs, remove(el, ys));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      neq_mem_remove(h, el, ys);
+      remove_subset(t, el, ys);
+  }
+}
+
+lemma void remove_both_subset<t>(t el, list<t> xs, list<t> ys)
+requires true == subset(xs, ys) &*&
+         false == mem(el, remove(el, xs));
+ensures true == subset(remove(el, xs), remove(el, ys));
+{
+  subset_remove(xs, ys, el);
+  remove_subset(remove(el, xs), el, ys);
+}
+
+lemma void subset_remove_unrelevant<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys) &*& false == mem(el, xs);
+ensures true == subset(xs, remove(el, ys));
+{
+  remove_nonmem(el, xs);
+  remove_both_subset(el, xs, ys);
+}
+
+lemma void subset_append<t>(list<t> xs, list<t> ys, list<t> zs)
+requires true == subset(xs, zs) &*& true == subset(ys, zs);
+ensures true == subset(append(xs, ys), zs);
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      subset_append(t, ys, zs);
+  }
+}
+
+lemma void subset_append2<t>(list<t> xs, list<t> ys, list<t> zs)
+requires true == subset(xs, ys);
+ensures true == subset(xs, append(ys, zs));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      subset_append2(t, ys, zs);
+  }
+}
+
+lemma void subset_append3<t>(list<t> xs, list<t> ys, list<t> zs)
+requires true == subset(xs, zs);
+ensures true == subset(xs, append(ys, zs));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      subset_append3(t, ys, zs);
+  }
+}
+
+lemma void remove_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys) &*& true == mem(el, remove(el, ys));
+ensures true == subset(xs, remove(el, ys));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      if (h != el) neq_mem_remove(h, el, ys);
+      remove_extra_preserves_subset(t, ys, el);
+  }
+}
+
+lemma void add_extra_preserves_subset<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys);
+ensures true == subset(xs, cons(el, ys));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      add_extra_preserves_subset(t, ys, el);
+  }
+}
+
+lemma void subset_unremove<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(remove(el, xs), ys);
+ensures true == subset(xs, cons(el, ys));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      if (h != el) subset_unremove(t, ys, el);
+      else add_extra_preserves_subset(t, ys, el);
+  }
+}
+
+lemma void subset_mem_trans<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys) &*& true == mem(el, xs);
+ensures true == mem(el, ys);
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      if (h != el) subset_mem_trans(t, ys, el);
+  }
+}
+
+lemma void subset_disjoint<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == subset(l1, l2) &*&
+         true == disjoint(l2, l3);
+ensures true == disjoint(l1, l3);
+{
+  switch(l3) {
+    case nil:
+    case cons(h,t):
+      if (mem(h, l1)) {
+        subset_mem_trans(l1, l2, h);
+        assert false;
+      }
+      subset_disjoint(l1, l2, t);
+  }
+}//took 3m
+
+lemma void distinct2_subset_sublen<t>(list<t> xs, list<t> ys)
+requires true == distinct(xs) &*&
+         true == subset(xs, ys);
+ensures length(xs) <= length(ys);
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      subset_remove_unrelevant(t, ys, h);
+      distinct2_subset_sublen(t, remove(h, ys));
+  }
+}
+
+lemma list<t> distinct_superset<t>(list<t> xs, list<t> ys)
+requires true == subset(xs, ys) &*&
+         true == distinct(xs);
+ensures true == subset(xs, result) &*& true == subset(result, ys) &*&
+        true == distinct(result) &*& length(result) <= length(ys);
+{
+  switch(ys) {
+    case nil: return nil;
+    case cons(h,t):
+      if (mem(h, t)) {
+        remove_extra_preserves_subset(xs, ys, h);
+        list<t> rez = distinct_superset(xs, t);
+        add_extra_preserves_subset(rez, t, h);
+        return rez;
+      }
+      else {
+        distinct_unique(xs, h);
+        remove_both_subset(h, xs, ys);
+        distinct_remove(h, xs);
+        list<t> t_rez = distinct_superset(remove(h, xs), t);
+        subset_unremove(xs, t_rez, h);
+        add_extra_preserves_subset(t_rez, t, h);
+        if (true == mem(h, t_rez)) {
+          subset_mem_trans(t_rez, t, h);
+        }
+        assert false == mem(h, t_rez);
+        return cons(h, t_rez);
+      }
+  }
+}
+
+lemma void distinct_subset_sublen<t>(list<t> xs, list<t> ys)
+requires true == distinct(xs) &*&
+         true == subset(xs, ys);
+ensures length(xs) <= length(ys);
+{
+  distinct2_subset_sublen(xs, distinct_superset(xs, ys));
+}
+
+lemma void subset_push_to_the_end<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys);
+ensures true == subset(xs, append(remove(el, ys), cons(el, nil)));
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      if (h == el) {
+      } else {
+        neq_mem_remove(h, el, ys);
+      }
+      subset_push_to_the_end(t, ys, el);
+  }
+}
+
+lemma void push_to_the_end_subset<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, ys) &*& true == mem(el, ys);
+ensures true == subset(append(remove(el, xs), cons(el, nil)), ys);
+{
+  subset_remove(xs, ys, el);
+  subset_append(remove(el, xs), cons(el, nil), ys);
+}
+
+lemma void subset_forall<t>(list<t> xs, list<t> ys, fixpoint (t,bool) prop)
+requires true == subset(xs, ys) &*& true == forall(ys, prop);
+ensures true == forall(xs, prop);
+{
+  switch(xs) {
+    case nil: return;
+    case cons(h,t):
+      forall_mem(h, ys, prop);
+      subset_forall(t, ys, prop);
+  }
+}
+
+lemma void subset_append_distinct<t>(list<t> xs, list<t> ys, list<t> zs)
+requires true == subset(xs, ys) &*&
+         true == distinct(xs) &*&
+         true == distinct(append(ys, zs));
+ensures true == distinct(append(xs, zs));
+{
+  switch(xs) {
+    case nil:
+      distinct_unappend(ys, zs);
+    case cons(h,t):
+      mem_append(h, t, zs);
+      if (mem(h, zs)) {
+        assert true == mem(h, ys);
+        double_mem_append_nondistinct(ys, zs, h);
+        assert false == distinct(append(ys, zs));
+      }
+      subset_append_distinct(t, ys, zs);
+  }
+}
+
+lemma void subset_map<t1,t2>(list<t1> l1, list<t1> l2, fixpoint (t1,t2) f)
+requires true == subset(l1, l2);
+ensures true == subset(map(f, l1), map(f, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      mem_map(h, l2, f);
+      subset_map(t, l2, f);
+  }
+}
+
+lemma void filter_subset<t>(fixpoint (t,bool) f, list<t> l)
+requires true;
+ensures true == subset(filter(f, l), l);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      filter_subset(f, t);
+      if (f(h)) {
+        assert remove(h, (filter(f, l))) == filter(f, t);
+        subset_unremove(filter(f,l), t, h);
+      } else {
+        add_extra_preserves_subset(filter(f,l), t, h);
+      }
+  }
+}
+
+lemma void append_both_subset<t>(list<t> xs, list<t> ys, list<t> zs)
+requires true == subset(xs, zs);
+ensures true == subset(append(xs, ys), append(zs, ys)) &*&
+        true == subset(append(xs, ys), append(ys, zs)) &*&
+        true == subset(append(ys, xs), append(zs, ys)) &*&
+        true == subset(append(ys, xs), append(ys, zs));
+{
+  subset_append2(xs, zs, ys);
+  subset_append3(xs, ys, zs);
+  subset_refl(ys);
+  subset_append3(ys, zs, ys);
+  subset_append2(ys, ys, zs);
+  subset_append(xs, ys, append(zs, ys));
+  subset_append(xs, ys, append(ys, zs));
+  subset_append(ys, xs, append(zs, ys));
+  subset_append(ys, xs, append(ys, zs));
+}
+
+fixpoint bool set_eq<t>(list<t> l1, list<t> l2) {
+  return subset(l1, l2) && subset(l2, l1);
+}
+
+lemma void set_eq_remove_uniq_both<t>(list<t> l1, list<t> l2, t x)
+requires true == set_eq(l1, l2) &*&
+         false == mem(x, remove(x, l1)) &*&
+         false == mem(x, remove(x, l2));
+ensures true == set_eq(remove(x, l1), remove(x, l2));
+{
+  remove_both_subset(x, l1, l2);
+  remove_both_subset(x, l2, l1);
+}
+
+lemma void set_eq_remove_both<t>(list<t> l1, list<t> l2, t x)
+requires true == set_eq(l1, l2) &*&
+         true == distinct(l1) &*&
+         true == distinct(l2);
+ensures true == set_eq(remove(x, l1), remove(x, l2));
+{
+  distinct_unique(l1, x);
+  distinct_unique(l2, x);
+  set_eq_remove_uniq_both(l1, l2, x);
+}
+
+lemma void subset_nil_nil<t>(list<t> l)
+requires true == subset(l, nil);
+ensures l == nil;
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+  }
+}
+
+lemma void set_eq_distinct_same_len<t>(list<t> l1,
+                                       list<t> l2)
+requires true == set_eq(l1, l2) &*&
+         true == distinct(l1) &*&
+         true == distinct(l2);
+ensures length(l1) == length(l2);
+{
+  switch(l1) {
+    case nil:
+      subset_nil_nil(l2);
+    case cons(h,t):
+      set_eq_remove_both(l1, l2, h);
+      distinct_remove(h, l2);
+      set_eq_distinct_same_len(t, remove(h,l2));
+  }
+}
+
+lemma void set_eq_forall_both<t>(list<t> l1, list<t> l2,
+                                 fixpoint (t,bool) prop)
+requires true == set_eq(l1, l2);
+ensures forall(l1, prop) == forall(l2, prop);
+{
+  if (forall(l1, prop)) {
+    subset_forall(l2, l1, prop);
+  }
+  if (forall(l2, prop)) {
+    subset_forall(l1, l2, prop);
+  }
+}//took 4m
+
+lemma void content_eq_map<t1,t2>(list<t1> l1, list<t1> l2,
+                                 fixpoint (t1,t2) f)
+requires true == set_eq(l1,l2);
+ensures true == set_eq(map(f, l1), map(f, l2));
+{
+  subset_map(l1, l2, f);
+  subset_map(l2, l1, f);
+}//took 1m
+
+lemma void distinct_shorter_than_nondistinct<t>(list<t> l1, list<t> l2)
+requires true == subset(l1, l2) &*&
+         true == distinct(l1) &*&
+         false == distinct(l2);
+ensures length(l1) < length(l2);
+{
+  switch(l1) {
+    case nil:
+      switch(l2) {
+        case nil:
+          assert false;
+        case cons(h,t):
+          assert 0 < length(l2);
+      }
+    case cons(h,t):
+      remove_subset(t, h, l2);
+      if (mem(h, remove(h, l2))) {
+        distinct_subset_sublen(l1, remove(h, l2));
+      } else {
+        remove_unrelevant_preserves_distinct(l2, h);
+        distinct_shorter_than_nondistinct(t, remove(h, l2));
+      }
+  }
+}
+
+lemma void set_eq_same_len_distinct_both<t>(list<t> l1, list<t> l2)
+requires true == set_eq(l1, l2) &*& length(l1) == length(l2);
+ensures distinct(l1) == distinct(l2);
+{
+  if (distinct(l1) && !distinct(l2)) {
+      distinct_shorter_than_nondistinct(l1, l2);
+  }
+  if (!distinct(l1) && distinct(l2)) {
+      distinct_shorter_than_nondistinct(l2, l1);
+  }
+}
+
+lemma void intersection_subset<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == subset(intersection(l1, l2), l1) &*&
+        true == subset(intersection(l1, l2), l2);
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      intersection_subset(l1, t);
+      if (contains(l1, h)) {
+        subset_unremove(intersection(l1, l2), t, h);
+      } else {
+        add_extra_preserves_subset(intersection(l1, l2), t, h);
+      }
+  }
+}//took 27m
+
+lemma void subset_unremove_outer<t>(list<t> xs, list<t> ys, t el)
+requires true == subset(xs, remove(el, ys));
+ensures true == subset(xs, ys);
+{
+  switch(xs) {
+    case nil:
+    case cons(h,t):
+      if (h!=el)
+      neq_mem_remove(h, el, t);
+      subset_unremove_outer(t, ys, el);
+      mem_remove_mem(h, el, ys);
+  }
+}
+
+#endif SET_GH

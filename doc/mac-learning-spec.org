@@ -1,0 +1,141 @@
+
+This document describes the basic functionality of an Ethernet bridge with MAC learning capability. For the sake of simplicity we ignore the group MAC addresses.
+
+* parameters
+These configuration parameters control operation of the bridge:
+
+- ~CAPACITY~ -- maximum number of dynamic filtering entries.
+- ~T_EXP~ -- expiration time. If a dynamic filtering entry is not refreshed fter ~T_EXP~, it is removed.
+
+* MAC forwarding abstract state
+
+The following defines the abstract representation of the Bridge state and its
+environment.
+
+#+BEGIN_SRC haskell
+-- An ethernet frame featuring source and destination addresses,
+-- and the interface the packet originates from
+Frame := <src :: Mac_addr,
+          dst :: Mac_addr,
+          in_iface :: Integer,
+          content> -- payload. irrelevant for a switch
+#+END_SRC
+
+Static and dynamic rules hold the data necessary to make a forwarding decision
+regarding every incoming frame.
+
+#+BEGIN_SRC haskell
+Static_rule := {dst :: Mac_addr, -- destination address of a frame
+                in_iface :: Integer, -- the interface the frame comes from
+                out_iface :: Integer | "drop"} -- "drop" = filter the frame
+
+Dynamic_rule := {dst :: Mac_addr, -- destination address of a frame
+                 timestamp :: Time, -- last time the rule was refreshed
+                 out_iface :: Integer} -- the interface to forward the frame to
+
+-- Static_table keeps the static configuration of the switch
+Static_table := set<Static_rule>
+-- Dynamic_table keeps the accumulated information during the switch operation
+Dynamic_table := set<Dynamic_rule>
+
+Filtering_table := <static :: Static_table,
+                    dynamic :: Dynamic_table>
+
+table :: Filtering_table -- The bridge state: static and dynamic
+
+#+END_SRC
+
+* rules
+
+We define the bridge operation as a sequence of imperative functions that transform the abstract state /state/.
+
+** Frame processing pipeline
+The bridge works sequentially. In the abcence of frames arriving, it stays idle
+and keeps its abstract state intact. Once a frame /received_frame/ arrives at
+time /arrival_time/, the bridge executes the /upon_receiving/ for it. If a next
+frame arrives before the processing is complete, it is kept in a queue that is
+out of scope of this document. Once the previous frame is processed, bridge
+executes /upon_receiving/ triggers forwarding of the buffered frame.
+
+#+BEGIN_SRC haskell
+upon_receiving(received_frame :: Frame, arrival_time :: Time) :=
+  expire_rules(arrival_time);
+  refresh_rule_for(received_frame, arrival_time);
+  forward(received_frame);
+#+END_SRC
+
+** definitions
+Here we define the functions of the pipeline above. All functions have access to
+the global variable /table/ and transform it accordingly. Special functions
+/send_frame/ and /flood_frame/ are responsible for the output interface.
+/drop_frame/ is just a marker of the processing sequence with no observable effect.
+
+#+BEGIN_SRC haskell
+expire_rules(t :: Time) :=
+  forall Dynamic_rule d in table.dynamic
+    : d.timestamp + T_EXP < t
+    remove d from table.dynamic
+
+-- Here we chose a "never evict" strategy, allowed by the word "may" in the
+-- IEEE standard, so any dynamic entry may not be evicted by an unrelevant 
+-- frame arrival.
+refresh_rule_for(f :: Frame, t :: Time) :=
+  remove Dynamic_rule d from table.dynamic : d.dst == f.src ;
+  if size(table.dynamic) < CAPACITY then
+      insert Dynamic_rule d(f.src, t, f.in_iface) into table.dynamic
+
+forward_dynamic(f :: Frame) :=
+  find Dynamic_rule d in table.dynamic : d.dst == f.dst 
+  if found then send_frame(f, d.out_iface)
+  else flood_frame(f)
+
+forward(f :: Frame) :=
+  find Static_rule s in table.static 
+       : s.dst == f.dst and
+         s.in_iface == f.in_iface
+  if found then
+      if s.out_iface == "drop" then drop_frame()
+      else send_frame(f, s.out_iface)
+  else forward_dynamic(f)
+
+-- output the frame f through the interface out_iface
+send_frame(f :: Frame, out_iface :: Integer)
+-- output the frame f through all the interfaces except f.in_iface
+flood_frame(f :: Frame)
+-- Does nothing, effectively dropping the current frame
+drop_frame()
+#+END_SRC
+
+* Properties
+** Always deliver
+Provided the static configuration is correct, and the destination host did not
+move for the past ~T_EXP~, the bridge will always forward a frame towards the
+correct host.
+** Never fail to drop
+If the static config orders the bridge to drop packets from a certain interface
+for a certain destination, it will always do.
+** No arbitrariness
+If there is a static rule for a specific interface and a specific destination
+address bridge will follow it unconditionally.
+** Learn and improve
+If for the past ~T_EXP~ there were no frames, and then came a frame from A.
+During the next ~T_EXP~ frames to A will not cause flooding.
+
+* Notes
+The standard leaves some details to implementation. Here are some decisions made
+during its formalization.
+
+: If the Filtering Database is already filled to capacity, but a new entry would
+: otherwise be made, then an existing entry may be removed to make room for the
+: new entry
+
+_Interpretation_: if the table is full, no new entry is created until some entry
+expires naturally (sounds easier to formalize)
+
+: A Port Map consisting of a control element that specifies forwarding of
+: frames destined for that MAC Address to a single Port. 
+: NOTE 1—This is equivalent to specifying a single port number; hence, this
+: specification is directly equivalent to the specification of dynamic entries in
+: IEEE Std 802.1D, 1993 Edition
+
+_Interpretation_: dynamic forwarding table keeps only one port for each address.

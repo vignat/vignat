@@ -1,0 +1,405 @@
+#ifndef MULTISUBSET_GH
+#define MULTISUBSET_GH
+
+
+#include "set.gh"
+
+fixpoint bool msubset<t>(list<t> l1, list<t> l2) {
+  switch(l1) {
+    case nil: return true;
+    case cons(h,t):
+      return true == mem(h, l2) && msubset(t, remove(h, l2));
+  }
+}
+
+lemma void msubset_refl<t>(list<t> l)
+requires true;
+ensures true == msubset(l, l);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      msubset_refl(t);
+  }
+}
+
+
+lemma void msubset_of_nil<t>(list<t> l)
+requires true == msubset(l, nil);
+ensures l == nil;
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+  }
+}//took 1m
+
+lemma void msubset_remove_cons_swap<t>(t x, t y, list<t> l)
+requires true == mem(x, l);
+ensures true == msubset(remove(x, cons(y, l)),
+                        cons(y, remove(x, l))) &*&
+        true == msubset(cons(y, remove(x, l)),
+                        remove(x, cons(y, l)));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (h != x) {
+        msubset_remove_cons_swap(x, y, t);
+      } else {
+        msubset_refl(t);
+        assert remove(x, l) == t;
+        if (y == x) {
+        } else {
+        }
+      }
+  }
+}//took 9m
+
+lemma void msubset_remove<t>(list<t> l1, list<t> l2, t x)
+requires true == msubset(l1, l2);
+ensures true == msubset(remove(x, l1), remove(x, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      if (h == x) {}
+      else {
+        msubset_remove(t, remove(h, l2), x);
+        neq_mem_remove(h, x, l2);
+        remove_commutes(l2, h, x);
+      }
+  }
+}
+
+
+lemma void msubset_unremove<t>(list<t> l1, list<t> l2, t x)
+requires true == mem(x, l2) &*&
+         true == msubset(remove(x, l1), remove(x, l2));
+ensures true == msubset(l1, l2);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      if (h == x) {}
+      else {
+        neq_mem_remove(x, h, l2);
+        remove_commutes(l2, h, x);
+        msubset_unremove(t, remove(h, l2), x);
+        mem_remove_mem(h, x, l2);
+      }
+  }
+}//took 5m
+
+
+lemma void msubset_subset<t>(list<t> l1, list<t> l2)
+requires true == msubset(l1, l2);
+ensures true == subset(l1, l2);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_subset(t, remove(h, l2));
+      subset_unremove_outer(t, l2, h);
+  }
+}//took 2m
+
+
+lemma void msubset_trans<t>(list<t> l1, list<t> l2, list<t> l3)
+requires true == msubset(l1, l2) &*& true == msubset(l2, l3);
+ensures true == msubset(l1, l3);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_remove(l2, l3, h);
+      msubset_trans(t, remove(h, l2), remove(h, l3));
+      msubset_subset(l2, l3);
+      subset_mem_trans(l2, l3, h);
+  }
+}//took 10m
+
+lemma void msubset_cons_preserves<t>(list<t> l1, list<t> l2, t x)
+requires true == msubset(l1, l2);
+ensures true == msubset(l1, cons(x, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_cons_preserves(t, remove(h, l2), x);
+      msubset_remove_cons_swap(h, x, l2);
+      msubset_trans(t, cons(x, remove(h, l2)), remove(h, cons(x, l2)));
+      assert true == mem(h, cons(x, l2));
+  }
+}
+
+
+lemma void filter_msubset<t>(fixpoint (t, bool) f, list<t> l)
+requires true;
+ensures true == msubset(filter(f, l), l);
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      filter_msubset(f, t);
+      if (!f(h)) {
+        msubset_cons_preserves(filter(f, t), t, h);
+      }
+  }
+}//took 3m
+
+
+
+
+lemma void msubset_distinct<t>(list<t> l1, list<t> l2)
+requires true == msubset(l1, l2) &*& true == distinct(l2);
+ensures true == distinct(l1);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      distinct_unique(l2, h);
+      remove_still_distinct(l2, h);
+      if (mem(h, t)) {
+        msubset_subset(t, remove(h, l2));
+        subset_mem_trans(t, remove(h, l2), h);
+      }
+      msubset_distinct(t, remove(h, l2));
+  }
+}//took 5m
+
+
+lemma void msubset_unremove_outer<t>(list<t> l1, list<t> l2, t el)
+requires true == msubset(l1, remove(el, l2));
+ensures true == msubset(l1, l2);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      if (h == el) {
+        msubset_cons_preserves(l1, remove(el, l2), el);
+        mem_remove_mem(el, el, l2);
+        msubset_remove_cons_swap(el, el, l2);
+        msubset_trans(l1, cons(el, remove(el, l2)), l2);
+      } else {
+        neq_mem_remove(h, el, t);
+        remove_commutes(l2, el, h);
+        msubset_unremove_outer(t, remove(h, l2), el);
+        mem_remove_mem(h, el, l2);
+      }
+  }
+}//took 11m
+
+
+lemma void msubset_remove_lesser<t>(list<t> l1, list<t> l2, t x)
+requires true == msubset(l1, l2);
+ensures true == msubset(remove(x, l1), l2);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      if (h == x) {
+        msubset_unremove_outer(t, l2, x);
+      } else {
+        msubset_remove_lesser(t, remove(h, l2), x);
+      }
+  }
+}//took 2m
+
+
+lemma void msubset_map_remove_swap<t1,t2>(t1 el, list<t1> l, fixpoint (t1,t2) f)
+requires true == mem(el, l);
+ensures true == msubset(map(f, remove(el, l)),
+                        remove(f(el), map(f, l)));
+{
+  switch(l) {
+    case nil:
+    case cons(h,t):
+      if (h == el) {
+        msubset_refl(map(f, t));
+      } else {
+        if (f(h) == f(el)) {
+          msubset_map_remove_swap(el, t, f);
+          mem_map(el, t, f);
+          msubset_remove_cons_swap(f(el), f(el), map(f, t));
+          msubset_trans(map(f, remove(el, l)),
+                        cons(f(el), remove(f(el), map(f, t))),
+                        map(f, t));
+        } else {
+          msubset_map_remove_swap(el, t, f);
+        }
+      }
+  }
+}//start 33
+
+
+lemma void msubset_map<t1, t2>(fixpoint (t1, t2) f, list<t1> l1, list<t1> l2)
+requires true == msubset(l1, l2);
+ensures true == msubset(map(f, l1), map(f, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_map(f, t, remove(h, l2));
+      msubset_map_remove_swap(h, l2, f);
+      msubset_trans(map(f, t), map(f, remove(h, l2)),
+                    remove(f(h), map(f, l2)));
+      mem_map(h, l2, f);
+  }
+}//took 10m
+
+lemma void msubset_append_left<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == msubset(l1, append(l1, l2));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_append_left(t, l2);
+  }
+}//took 1m
+
+lemma void msubset_append_right<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == msubset(l2, append(l1, l2));
+{
+  switch(l1) {
+    case nil:
+      msubset_refl(l2);
+    case cons(h,t):
+      msubset_append_right(t, l2);
+      msubset_cons_preserves(l2, append(t, l2), h);
+  }
+}//took 3m
+
+lemma void msubset_append<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == msubset(l1, append(l1, l2)) &*&
+        true == msubset(l2, append(l1, l2));
+{
+  msubset_append_left(l1, l2);
+  msubset_append_right(l1, l2);
+}//took 1m
+
+lemma void msubset_append_both<t>(list<t> l1, list<t> l2,
+                                  list<t> l3, list<t> l4)
+requires true == msubset(l1, l3) &*&
+         true == msubset(l2, l4);
+ensures true == msubset(append(l1, l2), append(l3, l4));
+{
+  switch(l1) {
+    case nil:
+      assert true == msubset(l2, l4);
+      msubset_append(l3, l4);
+      msubset_trans(l2, l4, append(l3, l4));
+    case cons(h,t):
+      mem_append(h, l3, l4);
+      append_remove_first(l3, l4, h);
+      msubset_append_both(t, l2, remove(h, l3), l4);
+  }
+}//took 4m
+
+
+lemma void msubset_forall<t>(list<t> l1, list<t> l2, fixpoint (t,bool) f)
+requires true == msubset(l1, l2) &*&
+         true == forall(l2, f);
+ensures true == forall(l1, f);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      forall_remove(l2, h, f);
+      forall_mem(h, l2, f);
+      msubset_forall(t, remove(h, l2), f);
+  }
+}//took 2m
+
+lemma void msubset_lift_cons<t>(list<t> l1, list<t> l2, t el)
+requires true;
+ensures true == msubset(cons(el, append(l1, l2)),
+                        append(l1, cons(el, l2)));
+{
+  switch(l1) {
+    case nil:
+      msubset_refl(cons(el, l2));
+    case cons(h,t):
+      msubset_lift_cons(t, l2, el);
+  }
+}//took 2m
+
+lemma void msubset_move_cons_to_the_middle_keep<t>(list<t> l1,
+                                                   list<t> l2,
+                                                   list<t> l3,
+                                                   t el)
+requires true == msubset(l1, append(cons(el, l2), l3));
+ensures true == msubset(l1, append(l2, cons(el, l3)));
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      mem_append(h, cons(el, l2), l3);
+      remove_append_swap(h, cons(el, l2), l3);
+      remove_append_swap(h, l2, cons(el, l3));
+      if (h != el) {
+        if (mem(h, l2)) {
+          assert remove(h, append(cons(el, l2), l3)) ==
+                 cons(el, append(remove(h, l2), l3));
+          msubset_move_cons_to_the_middle_keep(t, remove(h, l2), l3, el);
+          assert true == msubset(t, remove(h, append(l2, cons(el, l3))));
+          assert true == mem(h, append(l2, cons(el, l3)));
+        } else {
+          assert true == mem(h, l3);
+          msubset_move_cons_to_the_middle_keep(t, l2, remove(h, l3), el);
+          assert true == mem(h, append(l2, cons(el, l3)));
+        }
+      } else {
+        assert true == msubset(t, append(l2, l3));
+        msubset_lift_cons(l2, l3, el);
+        msubset_trans(l1, cons(el, append(l2, l3)),
+                      append(l2, cons(el, l3)));
+        assert true == msubset(l1, append(l2, cons(el, l3)));
+      }
+  }
+}//took 16m
+
+lemma void msubset_remove_append_cons_keep<t>(list<t> l1,
+                                              list<t> l2,
+                                              list<t> l3,
+                                              t el)
+requires true == msubset(l1, append(l2, l3));
+ensures true == msubset(l1, remove(el, append(l2, cons(el, l3))));
+{
+  switch(l2) {
+    case nil:
+    case cons(h,t):
+      if (h == el) {
+        msubset_remove(l1, append(l2, l3), h);
+        remove_append_swap(h, l2, l3);
+        msubset_move_cons_to_the_middle_keep(l1, t, l3, el);
+      } else {
+        msubset_remove(l1, append(l2, l3), h);
+        remove_append_swap(h, l2, l3);
+        msubset_remove_append_cons_keep(remove(h, l1), t, l3, el);
+        remove_commutes(append(l2, cons(el, l3)), el, h);
+        msubset_unremove(l1, remove(el, append(l2, cons(el, l3))), h);
+      }
+  }
+}//took 18m
+
+lemma void msubset_append_swap<t>(list<t> l1, list<t> l2)
+requires true;
+ensures true == msubset(append(l1, l2), append(l2, l1));
+{
+  switch(l1) {
+    case nil:
+      msubset_refl(l2);
+    case cons(h,t):
+      msubset_append_swap(t, l2);
+      assert true == msubset(append(t, l2), append(l2, t));
+      msubset_remove_append_cons_keep(append(t, l2), l2, t, h);
+      assert true == msubset(append(t, l2), remove(h, append(l2, l1)));
+      mem_append(h, l2, l1);
+  }
+}//took 8m
+
+#endif// MULTISUBSET_GH
