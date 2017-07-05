@@ -3,6 +3,7 @@
 
 #include "map-impl.h"
 #include "map-util.h"
+#include <stdint.h>
 
 //@ #include <nat.gh>
 //@ #include "stdex.gh"
@@ -62,7 +63,39 @@ typedef void uq_value_destr/*@ <V>
 /*@ requires full_valp(vp, _); @*/
 /*@ ensures chars(vp, val_size, _); @*/
 
-struct DoubleMap;
+
+struct DoubleMap {
+  int value_size;
+
+  uq_value_copy* cpy;
+  uq_value_destr* dstr;
+
+  uint8_t *values;
+
+  int *bbs_a;
+  void **kps_a;
+  int *khs_a;
+  int *chns_a;
+  int *inds_a;
+  map_keys_equality *eq_a;
+  map_key_hash *hsh_a;
+
+  int *bbs_b;
+  void **kps_b;
+  int *khs_b;
+  int *chns_b;
+  int *inds_b;
+  map_keys_equality *eq_b;
+  map_key_hash *hsh_b;
+
+  dmap_extract_keys *exk;
+  dmap_pack_keys *pk;
+
+  int n_vals;
+  int capacity;
+  int keys_capacity;
+};
+
 /*@
   inductive dmap<t1,t2,vt> = dmap(list<pair<t1,int> >, list<pair<t2,int> >,
                                   list<option<vt> >);

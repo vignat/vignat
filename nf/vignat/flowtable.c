@@ -14,26 +14,20 @@
 #  include "lib/stubs/time_stub_control.h"
 #endif //KLEE_VERIFICATION
 
-struct DoubleMap *flow_map;
-
-void get_flow(int index, struct flow* flow_out) {
-  dmap_get_value(flow_map, index, (char*)flow_out);
+void get_flow(struct DoubleMap* map, int index, struct flow* flow_out) {
+  dmap_get_value(map, index, (char*)flow_out);
 }
 
-struct DoubleMap *get_flow_table(void) {
-  return flow_map;
-}
-
-int get_flow_int(struct int_key* key, int* index) {
+int get_flow_int(struct DoubleMap* map, struct int_key* key, int* index) {
     NF_DEBUG("look up for internal key key = ");
     log_int_key(key);
-    return dmap_get_a(flow_map, key, index);
+    return dmap_get_a(map, key, index);
 }
 
-int get_flow_ext(struct ext_key* key, int* index) {
+int get_flow_ext(struct DoubleMap* map, struct ext_key* key, int* index) {
     NF_DEBUG("look up for external key key = ");
     log_ext_key(key);
-    return dmap_get_b(flow_map, key, index);
+    return dmap_get_b(map, key, index);
 }
 
 static inline void fill_int_key(struct flow *f, struct int_key *k) {
@@ -54,34 +48,26 @@ static inline void fill_ext_key(struct flow *f, struct ext_key *k) {
     k->protocol = f->protocol;
 }
 
-#define SWAP_BYTES(x) (((x&0xff) << 8) | ((x&0xff00) >> 8))
 
 //Warning: this is thread-unsafe, do not youse more than 1 lcore!
-int add_flow(struct flow *f, int index) {
+int add_flow(struct DoubleMap* map, struct flow *f, int index) {
     NF_DEBUG("add_flow (f = ");
     log_flow(f);
     struct int_key* new_int_key = &f->ik;
     struct ext_key* new_ext_key = &f->ek;
     fill_int_key(f, new_int_key);
     fill_ext_key(f, new_ext_key);
-    
-    //int nflows = dmap_size(flow_map);
+
+//#define SWAP_BYTES(x) (((x&0xff) << 8) | ((x&0xff00) >> 8))
+    //int nflows = dmap_size(map);
     //if (nflows % 0xff == 0)
     //  printf("%d flows, prts: %hu - %hu\n", nflows,
     //         SWAP_BYTES(f->int_src_port), SWAP_BYTES(f->dst_port));
 
-    return dmap_put(flow_map, f, index);
+    return dmap_put(map, f, index);
 }
 
-#ifdef KLEE_VERIFICATION
-
-struct DoubleMap **get_dmap_pp(void) {
-  return &flow_map;
-}
-
-#endif //KLEE_VERIFICATION
-
-int allocate_flowtables(uint16_t nb_ports, int max_flows) {
+struct DoubleMap* allocate_flowtables(uint16_t nb_ports, int max_flows) {
     (void)nb_ports;
 #ifdef KLEE_VERIFICATION
     dmap_set_layout(int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),
@@ -89,14 +75,26 @@ int allocate_flowtables(uint16_t nb_ports, int max_flows) {
                     flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr),
                     flow_nests, sizeof(flow_nests)/sizeof(struct nested_field_descr));
 #endif //KLEE_VERIFICATION
-    return dmap_allocate(int_key_eq, int_key_hash,
-                         ext_key_eq, ext_key_hash,
-                         sizeof(struct flow), flow_cpy,
-                         flow_destroy,
-                         flow_extract_keys,
-                         flow_pack_keys,
-                         max_flows,
-                         max_flows,
-                         &flow_map);
+
+    struct DoubleMap* flow_map = (struct DoubleMap*) malloc(sizeof(struct DoubleMap));
+    if (flow_map == NULL) {
+        return NULL;
+    }
+
+    int alloc_result = dmap_allocate(int_key_eq, int_key_hash,
+                                     ext_key_eq, ext_key_hash,
+                                     sizeof(struct flow), flow_cpy,
+                                     flow_destroy,
+                                     flow_extract_keys,
+                                     flow_pack_keys,
+                                     max_flows,
+                                     max_flows,
+                                     &flow_map);
+    if(alloc_result == 0) { // Allocation failure
+        free(flow_map);
+        return NULL;
+    }
+
+    return flow_map;
 }
 
