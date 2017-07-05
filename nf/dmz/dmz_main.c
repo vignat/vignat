@@ -11,6 +11,8 @@
 #include "../lib/nf_forward.h"
 #include "../lib/nf_util.h"
 
+#include "../vignat/flowmanager.h"
+
 #include "dmz_config.h"
 
 struct dmz_config config;
@@ -18,9 +20,9 @@ struct dmz_config config;
 void nf_core_init(void)
 {
         if (!allocate_flowmanager(rte_eth_dev_count(),
-	                          0,
-                                  0,
-                                  0,
+	                          0, // start port
+                                  0, // external addr
+                                  0, // WAN device
                                   config.expiration_time,
                                   config.max_flows)) {
                 rte_exit(EXIT_FAILURE, "Could not allocate flow manager");
