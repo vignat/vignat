@@ -12,7 +12,7 @@
 #include <rte_mbuf.h>
 
 #include "lib/flow.h"
-#include "flowmanager.h"
+#include "lib/flowmanager.h"
 
 #include "lib/nat_config.h"
 #include "lib/nf_forward.h"

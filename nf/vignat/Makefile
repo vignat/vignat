@@ -1,10 +1,11 @@
+<<<<<<< 60a712cbb9c80d304b80b30d1ae2ac22c18c0759
 # Binary name
 APP := nat
 
 # Runtime and verification files
 NF_FILES := nat_forward_vignat.c ../lib/nat_config.c \
             ../lib/flow.c ../lib/flow-log.c \
-            flowmanager.c flowtable.c
+            ../lib/flowmanager.c ../lib/flowtable.c
 
 # Verification files
 NF_VERIF_FILES := loop-stub.c
