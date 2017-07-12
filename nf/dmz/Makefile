@@ -4,11 +4,16 @@ include $(RTE_SDK)/mk/rte.vars.mk
 APP = dmz
 
 # sources
-SRCS-y := dmz_main.c dmz_config.c ../nf_main.c ../lib/nf_time.c ../lib/nf_util.c ../vignat/flowmanager.c
-
+SRCS-y := dmz_main.c dmz_config.c ../nf_main.c ../lib/nf_time.c ../lib/nf_util.c \
+          ../lib/flow.c ../lib/flow-log.c ../lib/flowmanager.c ../lib/flowtable.c \
+          ../lib/expirator.c \
+          ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c \
+          ../lib/containers/map-impl.c ../lib/containers/double-map.c \
+          ../lib/containers/vector.c ../lib/containers/map.c
 # gcc flags
 CFLAGS += -O3
 CFLAGS += -I..
+CFLAGS += -I../..
 CFLAGS += -std=gnu99
 
 # disable warnings triggered by DPDK
