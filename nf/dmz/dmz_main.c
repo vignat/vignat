@@ -1,12 +1,21 @@
 #include <inttypes.h>
+#include <stdbool.h>
 
+#ifdef KLEE_VERIFICATION
+#  include <klee/klee.h>
+#  include "lib/stubs/rte_stubs.h"
+#  include "loop.h"
+#else
 // DPDK uses these but doesn't include them. :|
-#include <linux/limits.h>
-#include <sys/types.h>
-#include <unistd.h>
+#  include <linux/limits.h>
+#  include <sys/types.h>
+#  include <unistd.h>
 
-#include <rte_ethdev.h>
-#include <rte_mbuf.h>
+#  include <rte_ethdev.h>
+#  include <rte_ether.h>
+#  include <rte_ip.h>
+#  include <rte_mbuf.h>
+#endif
 
 #include "../lib/flowmanager.h"
 #include "../lib/nf_forward.h"
@@ -15,9 +24,29 @@
 
 #include "dmz_config.h"
 
+
+enum zone {
+	INTERNET,
+	DMZ,
+	INTRANET
+};
+
+
 struct dmz_config config;
 struct FlowManager* internet_manager;
 struct FlowManager* dmz_manager;
+
+
+static enum zone get_zone(uint32_t ip) {
+	if ((ip & config.dmz_block_mask) == (config.dmz_block_addr & config.dmz_block_mask)) {
+		return DMZ;
+	} else if ((ip & config.intranet_block_mask) == (config.intranet_block_addr & config.intranet_block_mask)) {
+		return INTRANET;
+	} else {
+		return INTERNET;
+	}
+}
+
 
 void nf_core_init(void)
 {
@@ -46,8 +75,8 @@ int nf_core_process(uint8_t device,
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
-	expire_flows(internet_manager, now);
 	expire_flows(dmz_manager, now);
+	expire_flows(internet_manager, now);
 	NF_DEBUG("Flows have been expired.");
 
 	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
@@ -66,10 +95,100 @@ int nf_core_process(uint8_t device,
 
 	NF_DEBUG("Forwarding a packet from device %" PRIu8, device);
 
+	enum zone src_zone = get_zone(ipv4_header->src_addr);
+	if (src_zone == DMZ && device != config.dmz_device) {
+		NF_DEBUG("IP says from DMZ, but device says no, dropping");
+		return device;
+	}
+	if (src_zone == INTRANET && device != config.intranet_device) {
+		NF_DEBUG("IP says from intranet, but device says no, dropping");
+		return device;
+	}
+	if (src_zone == INTERNET && device != config.internet_device) {
+		NF_DEBUG("IP says from internet, but device says no, dropping");
+		return device;
+	}
+
+	enum zone dst_zone = get_zone(ipv4_header->dst_addr);
+	if (src_zone == dst_zone) {
+		NF_DEBUG("Same src/dst zones, dropping");
+		return device;
+	}
+
+	if (src_zone == INTERNET && dst_zone == DMZ) {
+		NF_DEBUG("INTERNET->DMZ, forwarding");
+		return config.dmz_device;
+	} else if (src_zone == DMZ && dst_zone == INTERNET) {
+		NF_DEBUG("DMZ->INTERNET, forwarding");
+		return config.internet_device;
+	}
+
 	uint8_t dst_device;
-	if (device == config.intranet_device) {
-	} else if (device == config.dmz_device) {
+	if (src_zone == INTRANET) {
+		NF_DEBUG("From intranet");
+
+		struct int_key key = {
+			.int_src_port = tcpudp_header->src_port,
+			.dst_port = tcpudp_header->dst_port,
+			.int_src_ip = ipv4_header->src_addr,
+			.dst_ip = ipv4_header->dst_addr,
+			.int_device_id = device,
+			.protocol = ipv4_header->next_proto_id
+		};
+
+		NF_DEBUG("For key:");
+		log_int_key(&key);
+
+		struct FlowManager* manager;
+		if (dst_zone == DMZ) {
+			NF_DEBUG("Towards DMZ");
+			manager = dmz_manager;
+		} else {
+			NF_DEBUG("Towards Internet");
+			manager = internet_manager;
+		}
+
+		struct flow f;
+		int flow_exists = get_flow_by_int_key(manager, &key, now, &f);
+		if (!flow_exists) {
+			NF_DEBUG("New flow");
+
+			if (!allocate_flow(dmz_manager, &key, now, &f)) {
+				NF_DEBUG("No space for the flow, dropping");
+				return device;
+			}
+		}
 	} else {
+		struct ext_key key = {
+			.ext_src_port = tcpudp_header->dst_port, // intentionally swapped
+			.dst_port = tcpudp_header->src_port,
+			.ext_src_ip = ipv4_header->dst_addr, // switched for backwards traffic
+			.dst_ip = ipv4_header->src_addr,
+			.ext_device_id = device,
+			.protocol = ipv4_header->next_proto_id
+		};
+
+		NF_DEBUG("For key:");
+		log_ext_key(&key);
+
+		struct FlowManager* manager;
+		if (src_zone == DMZ) {
+			NF_DEBUG("From DMZ");
+			manager = dmz_manager;
+		} else {
+			NF_DEBUG("From Internet");
+			manager = internet_manager;
+		}
+
+		struct flow f;
+		int flow_exists = get_flow_by_ext_key(manager, &key, now, &f);
+		if (flow_exists) {
+			NF_DEBUG("Found flow:");
+			log_flow(&f);
+		} else {
+			NF_DEBUG("Unknown flow, dropping");
+			return device;
+		}
 	}
 
 	#ifdef KLEE_VERIFICATION
