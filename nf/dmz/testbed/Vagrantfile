@@ -1,0 +1,43 @@
+# 4 machines:
+# - Private server (intranet, IP space 10.0/16)
+# - Public server (DMZ, IP space 10.1/16)
+# - Client (internet, IP space 10.2/16)
+# - DMZ
+
+Vagrant.configure(2) do |config|
+  config.vm.box = "bento/ubuntu-14.04"
+
+  config.vm.define :private_server do |srv|
+    srv.vm.hostname = "private-serv"
+    srv.vm.network "private_network", ip: "10.0.0.0", :mac => "000000000000"
+    srv.vm.provision "shell", path: "pri-server.sh"
+    config.ssh.forward_x11 = true
+  end
+
+  config.vm.define :public_server do |srv|
+    srv.vm.hostname = "public-serv"
+    srv.vm.network "private_network", ip: "10.1.0.0", :mac => "000000000100"
+    srv.vm.provision "shell", path: "pub-server.sh"
+    config.ssh.forward_x11 = true
+  end
+
+  config.vm.define :client do |clt|
+    clt.vm.hostname = "clnt"
+    clt.vm.network "private_network", ip: "10.2.0.0", :mac => "000000000200"
+    clt.vm.provision "shell", path: "client.sh"
+    config.ssh.forward_x11 = true
+  end
+
+  config.vm.define :dmz do |dmz|
+    dmz.vm.hostname = "dmz"
+    dmz.vm.network "private_network", ip: "10.9.0.0", :mac => "000000000900"
+    dmz.vm.network "private_network", ip: "10.9.0.1", :mac => "000000000901"
+    dmz.vm.network "private_network", ip: "10.9.0.2", :mac => "000000000902"
+    dmz.vm.synced_folder "./src", "/dmz"
+    dmz.vm.provision "shell", path: "dmz.sh"
+    config.ssh.forward_x11 = true
+    dmz.vm.provider "virtualbox" do |v|
+      v.memory = 2048
+    end
+  end
+end
