@@ -60,8 +60,6 @@ void dmz_config_init(struct dmz_config* config,
 		{"inter-dev",		required_argument,	NULL, 'a'},
 		{"dmz-dev",		required_argument,	NULL, 'b'},
 		{"intra-dev",		required_argument,	NULL, 'c'},
-		{"inter-addr",		required_argument,	NULL, 'd'},
-		{"inter-mask",		required_argument,	NULL, 'e'},
 		{"dmz-addr",		required_argument,	NULL, 'f'},
 		{"dmz-mask",		required_argument,	NULL, 'g'},
 		{"intra-addr",		required_argument,	NULL, 'h'},
@@ -100,13 +98,6 @@ void dmz_config_init(struct dmz_config* config,
 				if (config->intranet_device >= nb_devices) {
 					PARSE_ERROR("intranet device: %d >= nb_devices (%d)\n", config->intranet_device, nb_devices);
 				}
-				break;
-
-			case 'd':
-				config->internet_block_addr = dmz_config_parse_ipv4(optarg, "internet addr");
-				break;
-			case 'e':
-				config->internet_block_mask = dmz_config_parse_ipv4(optarg, "internet mask");
 				break;
 
 			case 'f':
@@ -162,8 +153,8 @@ void dmz_config_cmdline_print_usage(void)
 		"\t--eth-dest <device>,<mac>: MAC address of the endpoint linked to a device.\n"
 		"\t--expire <time>: flow expiration time.\n"
 		"\t--{inter,dmz,intra}-dev <device>: set device.\n"
-		"\t--{inter,dmz,intra}-addr <addr>: set block address.\n"
-		"\t--{inter,dmz,intra}-mask <mask>: set block mask.\n"
+		"\t--{dmz,intra}-addr <addr>: set block address.\n"
+		"\t--{dmz,intra}-mask <mask>: set block mask.\n"
 		"\t--max-flows <n>: flow table capacity.\n"
 	);
 }
@@ -175,13 +166,6 @@ void dmz_print_config(struct dmz_config* config)
 	NF_INFO("Internet device: %" PRIu8, config->internet_device);
 	NF_INFO("DMZ device: %" PRIu8, config->dmz_device);
 	NF_INFO("Intranet device: %" PRIu8, config->intranet_device);
-
-	char* inter_addr_str = nf_ipv4_to_str(config->internet_block_addr);
-	char* inter_mask_str = nf_ipv4_to_str(config->internet_block_mask);
-	NF_INFO("Internet block address: %s", inter_addr_str);
-	NF_INFO("Internet block mask: %s", inter_mask_str);
-	free(inter_addr_str);
-	free(inter_mask_str);
 
 	char* dmz_addr_str = nf_ipv4_to_str(config->dmz_block_addr);
 	char* dmz_mask_str = nf_ipv4_to_str(config->dmz_block_mask);

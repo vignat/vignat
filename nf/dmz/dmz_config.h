@@ -13,8 +13,6 @@ struct dmz_config {
 	uint8_t intranet_device;
 
 	// IP blocks
-	uint32_t internet_block_addr;
-	uint32_t internet_block_mask;
 	uint32_t dmz_block_addr;
 	uint32_t dmz_block_mask;
 	uint32_t intranet_block_addr;
