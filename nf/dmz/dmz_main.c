@@ -11,6 +11,7 @@
 #include "../lib/flowmanager.h"
 #include "../lib/nf_forward.h"
 #include "../lib/nf_util.h"
+#include "../lib/nf_log.h"
 
 #include "dmz_config.h"
 
@@ -43,7 +44,43 @@ int nf_core_process(uint8_t device,
                     struct rte_mbuf* mbuf,
                     uint32_t now)
 {
-	return 0;
+	NF_DEBUG("It is %" PRIu32, now);
+
+	expire_flows(internet_manager, now);
+	expire_flows(dmz_manager, now);
+	NF_DEBUG("Flows have been expired.");
+
+	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
+
+	struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
+	if (ipv4_header == NULL) {
+		NF_DEBUG("Not IPv4, dropping");
+		return device;
+	}
+
+	struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
+	if (tcpudp_header == NULL) {
+		NF_DEBUG("Not TCP/UDP, dropping");
+		return device;
+	}
+
+	NF_DEBUG("Forwarding a packet from device %" PRIu8, device);
+
+	uint8_t dst_device;
+	if (device == config.intranet_device) {
+	} else if (device == config.dmz_device) {
+	} else {
+	}
+
+	#ifdef KLEE_VERIFICATION
+	klee_assert(dst_device >= 0);
+	klee_assert(dst_device < RTE_MAX_ETHPORTS);
+	#endif
+
+	ether_header->s_addr = config.device_macs[dst_device];
+	ether_header->d_addr = config.endpoint_macs[dst_device];
+
+	return dst_device;
 }
 
 void nf_config_init(int argc, char** argv) {
