@@ -128,8 +128,8 @@ main(int argc, char* argv[])
 		rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 	}
 
-	nf_core_init();
 	nf_config_set(&config);
+	nf_core_init();
 
 
 	printf("Running tests...\n");
