@@ -136,16 +136,15 @@ int nf_core_process(uint8_t device,
 			.protocol = ipv4_header->next_proto_id
 		};
 
-		NF_DEBUG("For key:");
-		log_int_key(&key);
-
 		struct FlowManager* manager;
 		if (dst_zone == DMZ) {
 			NF_DEBUG("Towards DMZ");
 			manager = dmz_manager;
+			dst_device = config.dmz_device;
 		} else {
 			NF_DEBUG("Towards Internet");
 			manager = internet_manager;
+			dst_device = config.internet_device;
 		}
 
 		struct flow f;
@@ -153,7 +152,7 @@ int nf_core_process(uint8_t device,
 		if (!flow_exists) {
 			NF_DEBUG("New flow");
 
-			if (!allocate_flow(dmz_manager, &key, now, &f)) {
+			if (!allocate_flow(manager, &key, now, &f)) {
 				NF_DEBUG("No space for the flow, dropping");
 				return device;
 			}
@@ -167,9 +166,6 @@ int nf_core_process(uint8_t device,
 			.ext_device_id = device,
 			.protocol = ipv4_header->next_proto_id
 		};
-
-		NF_DEBUG("For key:");
-		log_ext_key(&key);
 
 		struct FlowManager* manager;
 		if (src_zone == DMZ) {
@@ -189,6 +185,8 @@ int nf_core_process(uint8_t device,
 			NF_DEBUG("Unknown flow, dropping");
 			return device;
 		}
+
+		dst_device = config.intranet_device;
 	}
 
 	#ifdef KLEE_VERIFICATION
@@ -196,6 +194,7 @@ int nf_core_process(uint8_t device,
 	klee_assert(dst_device < RTE_MAX_ETHPORTS);
 	#endif
 
+	NF_DEBUG("Setting MACs");
 	ether_header->s_addr = config.device_macs[dst_device];
 	ether_header->d_addr = config.endpoint_macs[dst_device];
 
@@ -204,6 +203,10 @@ int nf_core_process(uint8_t device,
 
 void nf_config_init(int argc, char** argv) {
   dmz_config_init(&config, argc, argv);
+}
+
+void nf_config_set(void* value) {
+  config = *((struct dmz_config*) value);
 }
 
 void nf_config_cmdline_print_usage(void) {
