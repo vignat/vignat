@@ -17,7 +17,7 @@ CFLAGS += -I../..
 CFLAGS += -I../../..
 CFLAGS += -std=gnu99
 
-#CFLAGS += -DENABLE_LOG
+CFLAGS += -DENABLE_LOG
 
 # disable warnings triggered by DPDK
 CFLAGS += -Wno-implicit-function-declaration

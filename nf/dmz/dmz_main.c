@@ -125,7 +125,7 @@ int nf_core_process(uint8_t device,
 
 	uint8_t dst_device;
 	if (src_zone == INTRANET) {
-		NF_DEBUG("From intranet");
+		NF_DEBUG("From Intranet");
 
 		struct int_key key = {
 			.int_src_port = tcpudp_header->src_port,
@@ -158,6 +158,8 @@ int nf_core_process(uint8_t device,
 			}
 		}
 	} else {
+		NF_DEBUG("Towards Intranet");
+
 		struct ext_key key = {
 			.ext_src_port = tcpudp_header->dst_port, // intentionally swapped
 			.dst_port = tcpudp_header->src_port,

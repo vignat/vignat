@@ -163,5 +163,48 @@ main(int argc, char* argv[])
 	 /* src: */ INTERNET_1, 0, INTERNET,
 	 /* dst: */ INTERNET_2, 0);
 
+
+	now = 100;
+	forwards("Internet->DMZ",
+	 /* src */ INTERNET_1, 0, INTERNET,
+	 /* dst */ DMZ_1, 0, DMZ);
+
+	now = 200;
+	forwards("DMZ->Internet",
+	 /* src */ DMZ_1, 0, DMZ,
+	 /* dst */ INTERNET_1, 0, INTERNET);
+
+
+	now = 300;
+	drops("UNAUTHORIZED: Internet->Intranet",
+	 /* src */ INTERNET_1, 0, INTERNET,
+	 /* dst */ INTRANET_1, 0);
+
+	now = 400;
+	drops("UNAUTHORIZED: DMZ->Intranet",
+	 /* src */ DMZ_1, 0, DMZ,
+	 /* dst */ INTRANET_1, 0);
+
+
+	now = 500;
+	forwards("NEW FLOW: Intranet->Internet",
+	 /* src */ INTRANET_1, 0, INTRANET,
+	 /* dst */ INTERNET_1, 0, INTERNET);
+	forwards("EXISTING FLOW: Internet->Intranet",
+	 /* src */ INTERNET_1, 0, INTERNET,
+	 /* dst */ INTRANET_1, 0, INTRANET);
+	drops("UNAUTHORIZED: Internet->Intranet other flow",
+	 /* src */ INTERNET_1, 1, INTERNET,
+	 /* dst */ INTRANET_1, 0);
+	drops("UNAUTHORIZED: Internet->Intranet other flow",
+	 /* src */ INTERNET_2, 0, INTERNET,
+	 /* dst */ INTRANET_1, 0);
+	drops("UNAUTHORIZED: Internet->Intranet other flow",
+	 /* src */ INTERNET_1, 0, INTERNET,
+	 /* dst */ INTRANET_1, 1);
+	drops("UNAUTHORIZED: Internet->Intranet other flow",
+	 /* src */ INTERNET_1, 0, INTERNET,
+	 /* dst */ INTRANET_2, 0);
+
 	printf("Done!\n");
 }
