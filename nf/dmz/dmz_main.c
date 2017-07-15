@@ -132,7 +132,7 @@ int nf_core_process(uint8_t device,
 			.dst_port = tcpudp_header->dst_port,
 			.int_src_ip = ipv4_header->src_addr,
 			.dst_ip = ipv4_header->dst_addr,
-			.int_device_id = device,
+			.int_device_id = 0, // see remark in the else block
 			.protocol = ipv4_header->next_proto_id
 		};
 
@@ -160,12 +160,20 @@ int nf_core_process(uint8_t device,
 	} else {
 		NF_DEBUG("Towards Intranet");
 
-		struct ext_key key = {
-			.ext_src_port = tcpudp_header->dst_port, // intentionally swapped
+		// This is, clearly, an *external* flow.
+		// However, the flow manager is designed for a NAT.
+		// In a NAT, external flows have the NAT IP as their destination,
+		// whereas a DMZ performs no translation thus the destination is the target IP.
+		// Therefore, we treat all flows as internal from the flow manager's point of view.
+		// All we have to do is swap the src/dst... so basically we're using it as a single map.
+		// We also ignore the device, since there is only 1 on each side per flow manager.
+		// TODO: Just use the map directly. Perhaps extract flow management ouf of the manager.
+		struct int_key key = {
+			.int_src_port = tcpudp_header->dst_port,
 			.dst_port = tcpudp_header->src_port,
-			.ext_src_ip = ipv4_header->dst_addr, // switched for backwards traffic
+			.int_src_ip = ipv4_header->dst_addr,
 			.dst_ip = ipv4_header->src_addr,
-			.ext_device_id = device,
+			.int_device_id = 0,
 			.protocol = ipv4_header->next_proto_id
 		};
 
@@ -179,7 +187,7 @@ int nf_core_process(uint8_t device,
 		}
 
 		struct flow f;
-		int flow_exists = get_flow_by_ext_key(manager, &key, now, &f);
+		int flow_exists = get_flow_by_int_key(manager, &key, now, &f);
 		if (flow_exists) {
 			NF_DEBUG("Found flow:");
 			log_flow(&f);
