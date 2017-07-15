@@ -134,9 +134,34 @@ main(int argc, char* argv[])
 
 	printf("Running tests...\n");
 
-	drops("Intra->Intra",
+	drops("BAD: Intra IP from DMZ device",
+	 /* src: */ INTRANET_1, 0, DMZ,
+         /* dst: */ INTERNET_1, 0);
+        drops("BAD: Intra IP from Internet device",
+         /* src: */ INTRANET_1, 0, INTERNET,
+         /* dst: */ DMZ_1, 0);
+        drops("BAD: DMZ IP from Intranet device",
+         /* src: */ DMZ_1, 0, INTRANET,
+         /* dst: */ INTERNET_1, 0);
+        drops("BAD: DMZ IP from Internet device",
+         /* src: */ DMZ_1, 0, INTERNET,
+         /* dst: */ INTRANET_1, 0);
+        drops("BAD: Internet IP from Intranet device",
+         /* src: */ INTERNET_1, 0, INTRANET,
+         /* dst: */ DMZ_1, 0);
+        drops("BAD: Internet IP from Intranet device",
+         /* src: */ INTERNET_1, 0, DMZ,
+         /* dst: */ INTRANET_1, 0);
+
+	drops("BAD: Intra->Intra",
 	 /* src: */ INTRANET_1, 0, INTRANET,
+	 /* dst: */ INTRANET_2, 0);
+	drops("BAD: DMZ->DMZ",
+	 /* src: */ DMZ_1, 0, DMZ,
 	 /* dst: */ DMZ_2, 0);
+	drops("BAD: Inter->Inter",
+	 /* src: */ INTERNET_1, 0, INTERNET,
+	 /* dst: */ INTERNET_2, 0);
 
 	printf("Done!\n");
 }
