@@ -1,0 +1,8 @@
+[submodule "verifast"]
+	path = verifast
+	url = gh:vignat/verifast
+	branch = export_path_conditions
+[submodule "klee"]
+	path = klee
+	url = gh:vignat/klee
+	branch = timed-access-dirty
