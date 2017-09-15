@@ -134,42 +134,49 @@ RUN add-apt-repository ppa:avsm/ppa && apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+RUN useradd -m vigor && \
+    echo vigor:vigor | chpasswd && \
+    cp /etc/sudoers /etc/sudoers.bak && \
+    echo `vigor ALL=(root) NOPASSWD: ALL' >> /etc/sudoers
+USER vigor
+
+RUN sudo chown --recursive vigor: ${KLEE_SRC}
+RUN sudo chown --recursive vigor: ${KLEE_BUILD}
+
+# Download and extract DPDK
+WORKDIR /home/vigor
+
 # And install those libraries
 RUN opam init -a -y && \
     eval `opam config env` && \
     opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
 
-# Create the main directory where all the work will take place
-RUN mkdir /work
-
-# Download and extract DPDK
-WORKDIR /work
 RUN wget http://dpdk.org/browse/dpdk/snapshot/dpdk-16.04.tar.gz -O dpdk.tar.gz && \
     tar xf dpdk.tar.gz && \
     mv dpdk-* dpdk && \
     rm dpdk.tar.gz
 
 # Build DPDK
-WORKDIR /work/dpdk
+WORKDIR /home/vigor/dpdk
 RUN sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp && \
     make config install -j4 T=x86_64-native-linuxapp-gcc
 
-ENV RTE_SDK=/work/dpdk \
+ENV RTE_SDK=/home/vigor/dpdk \
     RTE_TARGET=x86_64-native-linuxapp-gcc
 
-WORKDIR /work
+WORKDIR /home/vigor
 
 # Download and build VeriFast
-RUN git clone --depth 1 https://github.com/necto/verifast -b export_path_conditions && \
+RUN git clone --depth 1 https://github.com/vignat/verifast -b export_path_conditions && \
     cd verifast/src && \
     make -j8 verifast
 
-ENV PATH=/root/.opam/system/bin:/work/verifast/bin:/home/klee/klee_build/klee/Release+Asserts/bin:$PATH
+ENV PATH=/root/.opam/system/bin:/home/vigor/verifast/bin:/home/klee/klee_build/klee/Release+Asserts/bin:$PATH
 ENV KLEE_INCLUDE=/home/klee/klee_src/include
 
-COPY nf /work/nf
-COPY validator /work/validator
-WORKDIR /work
+COPY nf /home/vigor/nf
+COPY validator /home/vigor/validator
+WORKDIR /home/vigor
 # export `opam config env`
 #RUN cd nat && make verify
 #RUN cd validator && ./test_all.sh ../nat/klee-last aaa
