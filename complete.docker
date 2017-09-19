@@ -137,18 +137,18 @@ RUN add-apt-repository ppa:avsm/ppa && apt-get update && \
 RUN useradd -m vigor && \
     echo vigor:vigor | chpasswd && \
     cp /etc/sudoers /etc/sudoers.bak && \
-    echo `vigor ALL=(root) NOPASSWD: ALL' >> /etc/sudoers
+    echo 'vigor ALL=(root) NOPASSWD: ALL' >> /etc/sudoers
 USER vigor
 
 RUN sudo chown --recursive vigor: ${KLEE_SRC}
-RUN sudo chown --recursive vigor: ${KLEE_BUILD}
+RUN sudo chown --recursive vigor: ${BUILD_DIR}
 
 # Download and extract DPDK
 WORKDIR /home/vigor
 
 # And install those libraries
 RUN opam init -a -y && \
-    eval `opam config env` && \
+    echo "eval \`opam config env\`" >> /home/vigor/.bashrc && \
     opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
 
 RUN wget http://dpdk.org/browse/dpdk/snapshot/dpdk-16.04.tar.gz -O dpdk.tar.gz && \
@@ -171,13 +171,14 @@ RUN git clone --depth 1 https://github.com/vignat/verifast -b export_path_condit
     cd verifast/src && \
     make -j8 verifast
 
-ENV PATH=/root/.opam/system/bin:/home/vigor/verifast/bin:/home/klee/klee_build/klee/Release+Asserts/bin:$PATH
+ENV PATH=/home/vigor/.opam/system/bin:/home/vigor/verifast/bin:/home/klee/klee_build/klee/Release+Asserts/bin:$PATH
 ENV KLEE_INCLUDE=/home/klee/klee_src/include
 
 COPY nf /home/vigor/nf
 COPY validator /home/vigor/validator
+RUN sudo chown --recursive vigor:vigor /home/vigor/nf
+RUN sudo chown --recursive vigor:vigor /home/vigor/validator
 WORKDIR /home/vigor
-# export `opam config env`
 #RUN cd nat && make verify
 #RUN cd validator && ./test_all.sh ../nat/klee-last aaa
 
