@@ -473,7 +473,7 @@ let fun_types =
                         ekc(new_index_2_0, dp, external_ip, dip,\
                         1, user_buf_23),\n\
                         isp, new_index_2_0, dp, isip,\n\
-                        external_ip, reset_arr20_30, " ^
+                        external_ip, dip, " ^
                            !last_device_id ^
                            ", 1, user_buf_23)," ^
                        (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^ ");\n" ^
