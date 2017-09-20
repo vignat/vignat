@@ -409,30 +409,33 @@ let fun_types =
                   extra_ptr_types = [];
                   lemmas_before = [
                     capture_map_ex "cur_map" "vk1" "vk2" 0;
-                    (fun {args;_} -> "/*@ close int_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ik, ikc(reset_arr20_34, reset_arr20_36, reset_arr20_26,\
-                     reset_arr20_30, " ^
-                           !last_device_id ^
-                           ", user_buf_23));@*/");
-                    (fun {args;_} -> "/*@ close ext_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ek, ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
-                     1, user_buf_23));@*/");
-                    (fun {args;_} -> "/*@ close flw_p(" ^ (List.nth_exn args 1) ^
-                    ", flwc(ikc(reset_arr20_34, reset_arr20_36, reset_arr20_26, reset_arr20_30,\
+                    (fun {args;tmp_gen;_} ->
+                       "/*@ flw the_inserted_flow; @*/\n\
+                        /*@ {\n" ^
+                       "close int_k_p(" ^ (List.nth_exn args 1) ^
+                    ".ik, ikc(?isp, ?dp, ?isip,\
+                     ?dip, " ^ !last_device_id ^
+                     ", user_buf_23));\n" ^
+                     "assert int_k_p(" ^ (List.nth_exn args 1) ^
+                     ".ik, ikc(?isp, ?dp, ?isip,\
+                     ?dip, _, user_buf_23));\n" ^
+                     "close ext_k_p(" ^ (List.nth_exn args 1) ^
+                    ".ek, ekc(new_index_2_0, dp, external_ip, dip,\
+                     1, user_buf_23));\n" ^
+                    " close flw_p(" ^ (List.nth_exn args 1) ^
+                    ", flwc(ikc(isp, dp, isip, dip,\
                      " ^
                            !last_device_id ^
-                           ", user_buf_23), ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
-                     1, user_buf_23), reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\
-                     external_ip, reset_arr20_30, " ^
+                           ", user_buf_23), ekc(new_index_2_0, dp, external_ip, dip,\
+                     1, user_buf_23), isp, new_index_2_0, dp, isip,\
+                     external_ip, dip, " ^
                            !last_device_id ^
-                           ", 1, user_buf_23));@*/");
-                    (fun {args;tmp_gen;_} ->
-                       "/*@{\n\
-                        assert dmap_dchain_coherent(" ^
+                           ", 1, user_buf_23));\n" ^
+                       "assert dmap_dchain_coherent(" ^
                          (tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
-                        ext_k ek = ekc(new_index_2_0, reset_arr20_36,\
-                        external_ip, reset_arr20_30, 1, user_buf_23);\n\
+                        ext_k ek = ekc(new_index_2_0, dp,\
+                        external_ip, dip, 1, user_buf_23);\n\
                         if (dmap_has_k2_fp(" ^ (tmp_gen "cur_map") ^
                        ", ek)) {\n\
                         int index = dmap_get_k2_fp(" ^ (tmp_gen "cur_map") ^
@@ -455,61 +458,50 @@ let fun_types =
                        ", " ^ (List.nth_exn args 2) ^ "));\n\
                         assert(false);\n\
                         }\n\
-                        }@*/");
-                    (fun {args;tmp_gen;_} ->
-                       "/*@{\n\
                         assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
-                       ", ?cur_ch);\n\
+                       ", cur_ch);\n\
                         if (dmap_index_used_fp(" ^ (tmp_gen "cur_map") ^
                        ", " ^ (List.nth_exn args 2) ^ ")) {\n\
                         coherent_dmap_used_dchain_allocated(" ^ (tmp_gen "cur_map") ^
                        ", cur_ch, " ^ (List.nth_exn args 2) ^ ");\n\
                         }\n\
-                        }@*/");
-                    (fun {args;tmp_gen;_} ->
-                       "/*@ dmap_put_preserves_cap(" ^ (tmp_gen "cur_map") ^
-                       ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(reset_arr20_34, reset_arr20_36,\
-                        reset_arr20_26, reset_arr20_30, " ^
+                        dmap_put_preserves_cap(" ^ (tmp_gen "cur_map") ^
+                       ", " ^ (List.nth_exn args 2) ^ ", flwc(ikc(isp, dp,\
+                        isip, dip, " ^
                            !last_device_id ^
                            ", user_buf_23),\n\
-                        ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                        ekc(new_index_2_0, dp, external_ip, dip,\
                         1, user_buf_23),\n\
-                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
+                        isp, new_index_2_0, dp, isip,\n\
                         external_ip, reset_arr20_30, " ^
                            !last_device_id ^
                            ", 1, user_buf_23)," ^
-                       (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^ "); @*/");
-                    (fun _ ->
-                       "/*@ flw the_inserted_flow = " ^
-                       " flwc(ikc(reset_arr20_34, reset_arr20_36,\
-                        reset_arr20_26, reset_arr20_30, " ^
+                       (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^ ");\n" ^
+                       "the_inserted_flow = " ^
+                       " flwc(ikc(isp, dp,\
+                        isip, dip, " ^
                        !last_device_id ^
                        ", user_buf_23),\n\
-                        ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
+                        ekc(new_index_2_0, dp, external_ip, dip,\
                         1, user_buf_23),\n\
-                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
-                        external_ip, reset_arr20_30, " ^
+                        isp, new_index_2_0, dp, isip,\n\
+                        external_ip, dip, " ^
                        !last_device_id ^
-                       ", 1, user_buf_23);@*/");
-                    (fun {args;tmp_gen;_} ->
-                      "/*@ {\n\
+                       ", 1, user_buf_23);\n\
                        assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
                       ", ?ch);\n\
-                       int_k ik = ikc(reset_arr20_34, reset_arr20_36,\
-                        reset_arr20_26, reset_arr20_30, " ^
+                       int_k ik = ikc(isp, dp,\
+                        isip, dip, " ^
                        !last_device_id ^
                        ", user_buf_23);\n\
-                       ext_k ek = ekc(new_index_2_0, reset_arr20_36,\
-                       external_ip, reset_arr20_30,\
-                       1, user_buf_23);\n\
                        coherent_dchain_non_out_of_space_map_nonfull(" ^
                       (tmp_gen "cur_map") ^ ", ch);\n" ^
                       "contains_ext_k_abstract(" ^
                       (tmp_gen "cur_map") ^
                       ", ch, ek);\n" ^
                       "flw the_flow_to_insert = flwc(ik, ek,\n\
-                       reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
-                       external_ip, reset_arr20_30, " ^
+                       isp, new_index_2_0, dp, isip,\n\
+                       external_ip, dip, " ^
                        !last_device_id ^
                       ", 1, user_buf_23);\n" ^
                        "add_flow_abstract(" ^ (tmp_gen "cur_map") ^
@@ -517,45 +509,25 @@ let fun_types =
                        (List.nth_exn args 2) ^ ", " ^
                        !last_time_for_index_alloc ^ ");\n} @*/");];
                   lemmas_after = [
-                    tx_l "open flw_p(_,_);";
-                    tx_l "open int_k_p(_,_);";
-                    tx_l "open ext_k_p(_,_);";
                     (fun params ->
-                       "/*@if (" ^ params.ret_name ^
+                       "/*@ {\n\
+                         open flw_p(_, ?flw);\n\
+                         open int_k_p(_,?ik);\n\
+                         open ext_k_p(_,?ek);\n\
+                        if (" ^ params.ret_name ^
                        "!= 0) {\n\
                         dmap_put_get(" ^
                        (params.tmp_gen "cur_map") ^
                        "," ^ (List.nth_exn params.args 2) ^ ",\
-                        flwc(ikc(reset_arr20_34, reset_arr20_36,\
-                        reset_arr20_26, reset_arr20_30, " ^
-                       !last_device_id ^
-                           ", user_buf_23),\n\
-                        ekc(new_index_2_0, reset_arr20_36, external_ip, reset_arr20_30,\
-                        1, user_buf_23),\n\
-                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
-                        external_ip, reset_arr20_30, " ^
-                           !last_device_id ^
-                           ", 1, user_buf_23),\n" ^
+                        flw,\n" ^
                        (params.tmp_gen "vk1") ^ ", " ^
-                       (params.tmp_gen "vk2") ^ ");\n}@*/");
-                    (fun params ->
-                       "/*@if (" ^ params.ret_name ^
+                       (params.tmp_gen "vk2") ^ ");\n}\n\
+                       if (" ^ params.ret_name ^
                        "!= 0) {\n\
                         assert dmap_dchain_coherent(" ^
                        (params.tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
-                       int_k ik = ikc(reset_arr20_34, reset_arr20_36,\
-                        reset_arr20_26, reset_arr20_30, " ^
-                       !last_device_id ^
-                       ", user_buf_23);\n\
-                        ext_k ek = ekc(new_index_2_0, reset_arr20_36,\
-                        external_ip, reset_arr20_30,\
-                        1, user_buf_23);\n\
-                        flw the_flow_to_insert = flwc(ik, ek,\n\
-                        reset_arr20_34, new_index_2_0, reset_arr20_36, reset_arr20_26,\n\
-                        external_ip, reset_arr20_30, " ^
-                       !last_device_id ^
-                       ", 1, user_buf_23);\n" ^
+                        flw the_flow_to_insert = flw;\n" ^
                       "coherent_put_allocated_preserves_coherent\n(" ^
                       (params.tmp_gen "cur_map") ^
                       ", cur_ch, ik , ek,\
@@ -563,7 +535,8 @@ let fun_types =
                       " ^ (List.nth_exn params.args 2) ^ ", " ^
                       !last_time_for_index_alloc ^
                       ", " ^ (params.tmp_gen "vk1") ^ ", " ^
-                      (params.tmp_gen "vk2") ^ ");\n}@*/");
+                      (params.tmp_gen "vk2") ^ ");\n}\n\
+                                                } @*/");
                   ];};
      "dmap_get_value", {ret_type = Static Void;
                         arg_types = stt [Ptr dmap_struct; Sint32; Ptr flw_struct;];
