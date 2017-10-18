@@ -5,8 +5,8 @@ This repository contains the VigNAT code together with the Vigor verification to
 ### Unconditional dependencies
 * DPDK-16.04
 ### Verification dependencies
-* KLEE
-* VeriFast
+* [patched](https://github.com/vignat/klee) KLEE
+* [patched](https://github.com/vignat/verifast) VeriFast
 
 ## The Docker image
 We gathered all the configuration instructions into a [dockerfile](https://docs.docker.com/engine/reference/builder/) `complete.docker`, that you can conveniently build with
