@@ -249,9 +249,17 @@ let bubble_equalities tterms =
       | (_, Bop(Eq,_,_)) -> 1
       | (_,_) -> 0)
 
+let is_there_device_constraint constraints =
+  List.exists constraints ~f:(fun tterm ->
+      match tterm.v with
+      | Bop (Eq, lhs, {v=Id x; t}) when String.equal x "device_0" ->
+        true
+      | _ -> false)
+
 let guess_support_assignments constraints symbs =
   (* printf "symbols:\n"; *)
   (* Set.iter symbs ~f:(fun name -> printf "%s\n" name;); *)
+  let there_is_a_device_constraint = is_there_device_constraint constraints in
   let (assignments,_) =
     List.fold (bubble_equalities constraints) ~init:([],symbs) ~f:(fun (assignments,symbs) tterm ->
         (* printf "considering %s\n" (render_tterm tterm); *)
@@ -263,10 +271,10 @@ let guess_support_assignments constraints symbs =
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          if (String.equal x "reset_arr23_52") then
-              ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
-          else
+          if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)
+          else
+              ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | _ -> (assignments, symbs))

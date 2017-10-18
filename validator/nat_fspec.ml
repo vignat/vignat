@@ -588,7 +588,7 @@ let fun_types =
                         capture_map_ex "cur_map" "vk1" "vk2" 1;
                         (fun {args;tmp_gen;_} ->
                            if String.equal !last_index_gotten "" then ""
-                           else
+                           else (*FIXME: looks lit it is dead code*)
                            "/*@ { \n\
                             dmap_erase_all_has_trans(" ^
                            (tmp_gen "cur_map") ^
