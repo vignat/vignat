@@ -12,7 +12,7 @@ This repository contains the VigNAT code together with the Vigor verification to
 We gathered all the configuration instructions into a [dockerfile](https://docs.docker.com/engine/reference/builder/) `verification.docker`, that you can conveniently build with
 
 ```bash
-$ build -f verification.docker -t vignat .
+$ docker build -f verification.docker -t vignat .
 ```
 
 This file also serves as a reference if you want to configure your real machine such that it can build and run Vigor. Just look for the `RUN` instructions in `verification.docker` and execute them on your ubuntu 14.04 machine. Once you built the docker image you can run a container with
