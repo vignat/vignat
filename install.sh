@@ -133,3 +133,10 @@ case $(uname -r) in
     done
   ;;
 esac
+
+
+### Validator dependencies
+
+sudo apt-get install -y parallel opam
+opam init -y
+opam install -y core pa_structural_sexp menhir
