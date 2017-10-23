@@ -1,15 +1,16 @@
+#!/bin/sh
 # This was tested on the Linux subsystem for Windows with Ubuntu 16.04, should work on the real Ubuntu.
 
 ### General
 
 BUILDDIR=`pwd`
-sudo apt-get install cmake build-essential curl git subversion 
+sudo apt-get install -y cmake wget build-essential curl git subversion
 
 
 ### KLEE
 
-sudo apt-get install bison flex zlib1g-dev libncurses5-dev libcap-dev \
-                     python-minimal
+sudo apt-get install -y bison flex zlib1g-dev libncurses5-dev libcap-dev \
+                        python-minimal
 
 svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_342/final llvm
 svn co https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_342/final llvm/tools/clang
@@ -83,14 +84,15 @@ cd klee
  --enable-posix-runtime
 make -j `nproc` ENABLE_OPTIMIZED=1
 echo 'PATH=$PATH:'"$BUILDDIR/klee/Release+Asserts/bin" >> ~/.profile
+echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> ~/.profile
 . ~/.profile
 cd ..
 
 
 ### VeriFast
 
-sudo apt-get install --no-install-recommends \
-                     wget ca-certificates m4 \
+sudo apt-get install -y --no-install-recommends \
+                     ca-certificates m4 \
                      ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
                      valac gtksourceview2.0-dev \
                      liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
@@ -100,3 +102,34 @@ cd verifast/src
 make -j `nproc` verifast
 echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
 . ~/.profile
+
+
+### DPDK
+
+# Install the proper headers, even under the Linux subsystem for Windows
+sudo apt-get install -y linux-headers-$(uname -r | sed 's/-Microsoft//')
+
+wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
+tar xf dpdk.tar.xz
+rm dpdk.tar.xz
+mv dpdk-16.07 dpdk
+
+echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> ~/.profile
+echo "export RTE_SDK=$BUILDDIR/dpdk" >> ~/.profile
+. ~/.profile
+
+cd dpdk
+sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp
+# This line will have an error if running under the Linux subsystem for Windows, but that's ok
+make config T=x86_64-native-linuxapp-gcc
+# This line will fail if running under the Linux subsystem for Windows, but that's ok
+# (obviously DPDK itself is not going to work, but the headers will be there, which is enough to work on verification)
+make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
+# We just need to add a few files in case it failed because of Windows
+case $(uname -r) in
+  *Microsoft*)
+    for f in $BUILDDIR/dpdk/lib/librte_cmdline/*.h; do
+      ln -s $f $BUILDDIR/dpdk/x86_64-native-linuxapp-gcc/include/$(basename $f)
+    done
+  ;;
+esac
