@@ -1,4 +1,4 @@
--include $(RTE_SDK)/mk/rte.vars.mk
+include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
 APP = nat
@@ -22,7 +22,7 @@ CFLAGS += -std=gnu99
 CFLAGS += -Wno-implicit-function-declaration
 CFLAGS += -Wno-nested-externs
 
--include $(RTE_SDK)/mk/rte.extapp.mk
+include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
 	clang -DKLEE_VERIFICATION \

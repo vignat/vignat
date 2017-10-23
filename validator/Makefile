@@ -1,7 +1,7 @@
 all: validator.byte nat_fspec.cmo bridge_fspec.cmo
 
 validator.byte: .PHONY
-	corebuild -no-hygiene -use-menhir -lib dynlink validator.byte -use-ocamlfind -package Z3
+	corebuild -no-hygiene -use-menhir -lib dynlink validator.byte -use-ocamlfind
 
 nat_fspec.cmo: _build/nat_fspec.cmo
 	cp _build/nat_fspec.cmo ./

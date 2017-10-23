@@ -13,8 +13,6 @@
 #include "lib/containers/array-u16.h"
 #include "lib/containers/array-lcc.h"
 #include "vignat/loop.h"
-#include "bridge/bridge_loop.h"
-#include "bridge/bridge_data.h"
 
 //@ #include "lib/abstract-state.h"
 
@@ -27,7 +25,18 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 //@ predicate a_packet(struct rte_mbuf *mbuf);
 /*@
+    inductive ether_addri = eaddrc(int, int, int, int, int, int);
     inductive ether_hdri = ether_hdrc(ether_addri, ether_addri, int);
+
+    predicate ether_addrp(struct ether_addr* ptr; ether_addri addr) =
+      struct_ether_addr_padding(ptr) &*&
+      ptr->a |-> ?a &*&
+      ptr->b |-> ?b &*&
+      ptr->c |-> ?c &*&
+      ptr->d |-> ?d &*&
+      ptr->e |-> ?e &*&
+      ptr->f |-> ?f &*&
+      addr == eaddrc(a, b, c, d, e, f);
 
     predicate ether_hdrp(struct ether_hdr *ether; ether_hdri hdr) =
         ether_addrp(&ether->d_addr, ?daddr) &*&
