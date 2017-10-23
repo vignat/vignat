@@ -22,6 +22,8 @@ rm -rf llvm/projects/libcxx/.svn
 cd llvm
 ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
 make -j `nproc`
+echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
+. ~/.profile
 cd ..
 
 git clone --depth 1 https://github.com/stp/minisat.git
