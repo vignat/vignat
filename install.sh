@@ -135,6 +135,9 @@ esac
 make config T=x86_64-native-linuxapp-gcc
 make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
+# Re-build it with atomic intrinsics, otherwise it uses inline ASM which KLEE doesn't support
+sed -i 's/CONFIG_RTE_FORCE_INTRINSICS=n/CONFIG_RTE_FORCE_INTRINSICS=y/' x86_64-native-linuxapp-gcc/.config
+make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
 ### Validator dependencies
 

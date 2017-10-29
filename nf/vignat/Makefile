@@ -26,24 +26,30 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
 	clang -DKLEE_VERIFICATION \
+		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
 		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
-		--include=ssse3_stubs.h --include=builtin_stubs.h --include=rte_config.h \
+		--include=ssse3_stubs.h --include=builtin_stubs.h \
+		--include=rte_config.h `# required by many DPDK files` \
+		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		../nf_main.c \
 		../lib/nf_util.c ../lib/nat_config.c \
 		../lib/stubs/my-time-stub.c \
 		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_errno.c `# for per-lcore errno` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_thread.c `# for per-lcore core id` \
+		$(RTE_SDK)/lib/librte_mempool/rte_mempool_ops.c `# for rte_mempool_ops_table` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal.c `# for lcore_config` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_lcore.c `# lcore/cpu functions` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_lcore.c `# linux-specific lcore/cpu functions` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_log.c `# a bunch of logging functions` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_log.c `# linux-specific logging functions` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_options.c `# configuration stuff` \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow -fsanitize=signed-integer-overflow
-	llvm-link -o veri.bc \
-		nat_forward_vignat.bc \
-		nf_main.bc nf_util.bc nat_config.bc \
-		my-time-stub.bc \
-		flowtable.bc flowmanager.bc flow.bc flow-log.bc \
-		loop-stub.bc double-chain-stub.bc expirator-stub.bc double-map-stub.bc \
-		cmdline_parse*addr.bc
+	llvm-link -o veri.bc *.bc
 	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=12000 --dump-call-trace-prefixes \
 		veri.bc --wan 1 --lan-dev 0 --expire 10 --starting-port 0 --max-flows 65536
 	rm *.bc
