@@ -4,5 +4,4 @@
 // TODO try updating it? not sure how KLEE will enjoy that...
 
 #include <emmintrin.h>
-// TODO is this reasonable?
-#define _mm_alignr_epi8(a, b, n) ((__m128i) {0, 0})
+inline __m128i _mm_alignr_epi8(__m128i a, __m128i b, int n) { return (__m128i) {0, 0}; }

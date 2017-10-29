@@ -1,16 +1,12 @@
 #include <getopt.h>
 #include <inttypes.h>
 
-#if KLEE_VERIFICATION
-	#include "stubs/rte_stubs.h"
-#else
-	// DPDK needs these but doesn't include them. :|
-	#include <linux/limits.h>
-	#include <sys/types.h>
+// DPDK needs these but doesn't include them. :|
+#include <linux/limits.h>
+#include <sys/types.h>
 
-	#include <rte_common.h>
-	#include <rte_ethdev.h>
-#endif
+#include <rte_common.h>
+#include <rte_ethdev.h>
 
 #include <cmdline_parse_etheraddr.h>
 #include <cmdline_parse_ipaddr.h>

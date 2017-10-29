@@ -1,14 +1,5 @@
 #include <inttypes.h>
 
-#if KLEE_VERIFICATION
-// clang doesn't support SSSE3
-#include <ssse3_stubs.h>
-// DPDK uses inline assembly for perf in rte_memory, disable it
-#include <builtin_stubs.h>
-// not included by default, TODO why?
-#include <rte_config.h>
-#endif
-
 #include <netinet/in.h>
 
 #include <rte_byteorder.h>

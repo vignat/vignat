@@ -2,19 +2,17 @@
 
 #ifdef KLEE_VERIFICATION
 #  include <klee/klee.h>
-#  include "lib/stubs/rte_stubs.h"
 #  include "loop.h"
-#else
-// DPDK requires these but doesn't include them. :|
-#  include <linux/limits.h>
-#  include <sys/types.h>
-#  include <unistd.h>
-
-#  include <rte_ethdev.h>
-#  include <rte_ether.h>
-#  include <rte_ip.h>
-#  include <rte_mbuf.h>
 #endif
+// DPDK requires these but doesn't include them. :|
+#include <linux/limits.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <rte_ethdev.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
 
 #include "lib/flow.h"
 #include "flowmanager.h"

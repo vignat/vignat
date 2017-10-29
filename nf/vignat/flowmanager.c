@@ -8,7 +8,6 @@
 #include "lib/expirator.h"
 
 #ifdef KLEE_VERIFICATION
-#  include "lib/stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
 #  include "lib/stubs/containers/double-map-stub-control.h" //<- for set entry cond
 #endif //KLEE_VERIFICATION
 

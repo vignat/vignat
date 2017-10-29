@@ -27,16 +27,18 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 verify:
 	clang -DKLEE_VERIFICATION \
 		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
-		../lib/nf_util.c ../lib/stubs/rte_stubs.c ../lib/nat_config.c \
+		--include=ssse3_stubs.h --include=builtin_stubs.h --include=rte_config.h \
+		../nf_main.c \
+		../lib/nf_util.c ../lib/nat_config.c \
 		../lib/stubs/my-time-stub.c \
 		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
-		../lib/nat_config.c nat_forward_vignat.c  ../nf_main.c\
+		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc \
-		rte_stubs.bc nat_forward_vignat.bc \
+		nat_forward_vignat.bc \
 		nf_main.bc nf_util.bc nat_config.bc \
 		my-time-stub.bc \
 		flowtable.bc flowmanager.bc flow.bc flow-log.bc \

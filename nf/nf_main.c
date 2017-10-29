@@ -1,22 +1,21 @@
 #include <inttypes.h>
 
+#ifdef KLEE_VERIFICATION
+#include <klee/klee.h>
+#include "lib/stubs/my-time-stub-control.h"
+#endif
+
 // DPDK uses these but doesn't include them. :|
 #include <linux/limits.h>
 #include <sys/types.h>
 
-#ifdef KLEE_VERIFICATION
-#  include <klee/klee.h>
-#  include "lib/stubs/rte_stubs.h"
-#  include "lib/stubs/my-time-stub-control.h"
-#else//KLEE_VERIFICATION
-#  include <rte_common.h>
-#  include <rte_eal.h>
-#  include <rte_ethdev.h>
-#  include <rte_launch.h>
-#  include <rte_lcore.h>
-#  include <rte_mbuf.h>
-#  include "rte_errno.h"
-#endif//KLEE_VERIFICATION
+#include <rte_common.h>
+#include <rte_eal.h>
+#include <rte_ethdev.h>
+#include <rte_launch.h>
+#include <rte_lcore.h>
+#include <rte_mbuf.h>
+#include "rte_errno.h"
 
 #include "lib/nf_forward.h"
 #include "lib/nf_log.h"
@@ -115,8 +114,6 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
   return 0;
 }
 
-#ifndef KLEE_VERIFICATION
-
 void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
   for (uint8_t device = 0; device < nb_devices; device++) {
     if (device == skip_device) continue;
@@ -132,8 +129,6 @@ void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
   }
   rte_pktmbuf_free(frame);
 }
-
-#endif//!KLEE_VERIFICATION
 
 // --- Per-core work ---
 
