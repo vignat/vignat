@@ -29,6 +29,7 @@ verify:
 		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
 		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
 		--include=ssse3_stubs.h --include=builtin_stubs.h \
+		--include=klee/klee.h \
 		--include=rte_config.h `# required by many DPDK files` \
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		../nf_main.c \
@@ -46,12 +47,16 @@ verify:
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_log.c `# a bunch of logging functions` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_log.c `# linux-specific logging functions` \
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_options.c `# configuration stuff` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_devargs.c `# args for devices` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_hugepage_info.c `# hugepages` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_debug.c `# rte_panic` \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
 		nat_forward_vignat.c  \
-		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow -fsanitize=signed-integer-overflow
+		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
+	# --log-level 0 otherwise there's an error - for now, verify without logging
 	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=12000 --dump-call-trace-prefixes \
-		veri.bc --wan 1 --lan-dev 0 --expire 10 --starting-port 0 --max-flows 65536
+		veri.bc --log-level 0 -- --lan-dev 0 --expire 10 --starting-port 0 --max-flows 65536
 	rm *.bc
 
 verifast:
