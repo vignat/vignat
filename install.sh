@@ -106,8 +106,10 @@ echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
 
 ### DPDK
 
-# Install the proper headers, even under the Linux subsystem for Windows
-sudo apt-get install -y linux-headers-$(uname -r | sed 's/-Microsoft//')
+# On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
+KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
+
+sudo apt-get install -y "linux-headers-$KERNEL_VER"
 
 wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
 tar xf dpdk.tar.xz
@@ -120,19 +122,17 @@ echo "export RTE_SDK=$BUILDDIR/dpdk" >> ~/.profile
 
 cd dpdk
 sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp
-# This line will have an error if running under the Linux subsystem for Windows, but that's ok
-make config T=x86_64-native-linuxapp-gcc
-# This line will fail if running under the Linux subsystem for Windows, but that's ok
-# (obviously DPDK itself is not going to work, but the headers will be there, which is enough to work on verification)
-make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
-# We just need to add a few files in case it failed because of Windows
+
 case $(uname -r) in
   *Microsoft*)
-    for f in $BUILDDIR/dpdk/lib/librte_cmdline/*.h; do
-      ln -s $f $BUILDDIR/dpdk/x86_64-native-linuxapp-gcc/include/$(basename $f)
-    done
+    # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
+    sudo apt install "linux-headers-$KERNEL_VER-generic"
+    export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
   ;;
 esac
+
+make config T=x86_64-native-linuxapp-gcc
+make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
 
 ### Validator dependencies
