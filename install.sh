@@ -139,4 +139,4 @@ make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
 sudo apt-get install -y parallel opam
 opam init -y
-opam install -y core pa_structural_sexp menhir
+opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
