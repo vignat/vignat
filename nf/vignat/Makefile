@@ -56,7 +56,7 @@ verify:
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# --log-level 0 otherwise there's an error - for now, verify without logging
-	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=12000 --dump-call-trace-prefixes \
+	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=16000 --dump-call-trace-prefixes \
 		veri.bc --log-level 0 -- --lan-dev 0 --expire 10 --starting-port 0 --max-flows 65536
 	rm *.bc
 
