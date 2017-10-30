@@ -50,6 +50,7 @@ verify:
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_devargs.c `# args for devices` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_hugepage_info.c `# hugepages` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_debug.c `# rte_panic` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_string_fns.c `# string functions` \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
