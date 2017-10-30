@@ -39,7 +39,8 @@ verify:
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_errno.c `# for per-lcore errno` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_thread.c `# for per-lcore core id` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_thread.c `# threading stuff` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_thread.c `# linux-specific threading stuff` \
 		$(RTE_SDK)/lib/librte_mempool/rte_mempool_ops.c `# for rte_mempool_ops_table` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal.c `# for lcore_config` \
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_lcore.c `# lcore/cpu functions` \
@@ -51,13 +52,30 @@ verify:
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_hugepage_info.c `# hugepages` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_debug.c `# rte_panic` \
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_string_fns.c `# string functions` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_pci.c `# PCI` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_pci.c `# linux-specific PCI` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_memory.c `# memory` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_memory.c `# linux-specific memory` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_memzone.c `# more memory stuff` \
+		$(RTE_SDK)/lib/librte_eal/common/malloc_heap.c `# even more memory stuff` \
+		$(RTE_SDK)/lib/librte_eal/common/malloc_elem.c `# even more even more memory stuff` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_tailqs.c `# some kind of sys/queues wrapper for tailq` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_alarm.c `# some kind of timer` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_timer.c `# another kind of timer` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_timer.c `# linux-specific timer` \
+		$(RTE_SDK)/lib/librte_eal/common/eal_common_dev.c `# devices` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_interrupts.c `# interrupts` \
+		`# from here on RTE_SDK stuff is required by VigNAT, above it was DPDK EAL` \
+		$(RTE_SDK)/lib/librte_ether/rte_ethdev.c \
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# --log-level 0 otherwise there's an error - for now, verify without logging
 	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=16000 --dump-call-trace-prefixes \
-		veri.bc --log-level 0 -- --lan-dev 0 --expire 10 --starting-port 0 --max-flows 65536
+		veri.bc --log-level 0 --no-pci --no-huge --no-shconf -- \
+		--lan-dev 0 --wan 1 --expire 10 --starting-port 0 --max-flows 65536 \
+		--extip 10.0.0.0 --eth-dest 0,01:23:45:67:89:00 --eth-dest 1,01:23:45:67:89:01
 	rm *.bc
 
 verifast:
