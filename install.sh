@@ -139,6 +139,16 @@ make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 sed -i 's/CONFIG_RTE_FORCE_INTRINSICS=n/CONFIG_RTE_FORCE_INTRINSICS=y/' x86_64-native-linuxapp-gcc/.config
 make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
+# Mount hugepages
+sudo mkdir -p /mnt/huge
+grep -s '/mnt/huge' /proc/mounts > /dev/null
+if [ $? -ne 0 ] ; then
+  sudo mount -t hugetlbfs nodev /mnt/huge
+fi
+
+cd ..
+
+
 ### Validator dependencies
 
 sudo apt-get install -y parallel opam
