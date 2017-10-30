@@ -102,6 +102,7 @@ cd verifast/src
 make -j `nproc` verifast
 echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
 . ~/.profile
+cd ../..
 
 
 ### DPDK
