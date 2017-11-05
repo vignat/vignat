@@ -1,3 +1,6 @@
+# allow the use of extglob in paths
+SHELL=/bin/bash -O extglob -c
+
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
@@ -39,38 +42,12 @@ verify:
 		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_errno.c `# for per-lcore errno` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_thread.c `# threading stuff` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_thread.c `# linux-specific threading stuff` \
-		$(RTE_SDK)/lib/librte_mempool/rte_mempool_ops.c `# for rte_mempool_ops_table` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal.c `# for lcore_config` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_lcore.c `# lcore/cpu functions` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_lcore.c `# linux-specific lcore/cpu functions` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_log.c `# a bunch of logging functions` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_log.c `# linux-specific logging functions` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_options.c `# configuration stuff` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_devargs.c `# args for devices` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_hugepage_info.c `# hugepages` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_debug.c `# rte_panic` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_string_fns.c `# string functions` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_pci.c `# PCI` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_pci.c `# linux-specific PCI` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_memory.c `# memory` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_memory.c `# linux-specific memory` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_memzone.c `# more memory stuff` \
-		$(RTE_SDK)/lib/librte_eal/common/malloc_heap.c `# even more memory stuff` \
-		$(RTE_SDK)/lib/librte_eal/common/malloc_elem.c `# even more even more memory stuff` \
-		$(RTE_SDK)/lib/librte_eal/common/rte_malloc.c `# even more even more even more memory stuff` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_tailqs.c `# some kind of sys/queues wrapper for tailq` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_alarm.c `# some kind of timer` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_timer.c `# another kind of timer` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_timer.c `# linux-specific timer` \
-		$(RTE_SDK)/lib/librte_eal/common/eal_common_dev.c `# devices` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_interrupts.c `# interrupts` \
-		`# from here on RTE_SDK stuff is required by VigNAT, above it was DPDK EAL` \
-		$(RTE_SDK)/lib/librte_ether/rte_ethdev.c \
-		$(RTE_SDK)/lib/librte_mbuf/rte_mbuf.c \
-		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*.c \
+		`# Platform-independent EAL. cpuflags has CPU intrinsics, xen_memory is only for Xen` \
+		$(RTE_SDK)/lib/librte_eal/common/!(eal_common_cpuflags|eal_xen_memory).c \
+		`# Linux-specific EAL. xen_memory is only for Xen` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/!(eal_xen_memory).c \
+		`# Other libs. acl has CPU intrinsics, hash uses SSSE2, power and ivshmem don't easily compile` \
+		$(RTE_SDK)/lib/!(librte_acl|librte_hash|librte_power|librte_ivshmem)/*.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
