@@ -28,10 +28,11 @@ verify:
 	clang -DKLEE_VERIFICATION \
 		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
 		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
-		--include=ssse3_stubs.h --include=builtin_stubs.h \
+		--include=sse_stubs.h --include=builtin_stubs.h \
 		--include=klee/klee.h \
 		--include=rte_config.h `# required by many DPDK files` \
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
+		../lib/stubs/device_stub.c \
 		../nf_main.c \
 		../lib/nf_util.c ../lib/nat_config.c \
 		../lib/stubs/my-time-stub.c \
@@ -59,6 +60,7 @@ verify:
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_memzone.c `# more memory stuff` \
 		$(RTE_SDK)/lib/librte_eal/common/malloc_heap.c `# even more memory stuff` \
 		$(RTE_SDK)/lib/librte_eal/common/malloc_elem.c `# even more even more memory stuff` \
+		$(RTE_SDK)/lib/librte_eal/common/rte_malloc.c `# even more even more even more memory stuff` \
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_tailqs.c `# some kind of sys/queues wrapper for tailq` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_alarm.c `# some kind of timer` \
 		$(RTE_SDK)/lib/librte_eal/common/eal_common_timer.c `# another kind of timer` \
@@ -67,7 +69,8 @@ verify:
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/eal_interrupts.c `# interrupts` \
 		`# from here on RTE_SDK stuff is required by VigNAT, above it was DPDK EAL` \
 		$(RTE_SDK)/lib/librte_ether/rte_ethdev.c \
-		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
+		$(RTE_SDK)/lib/librte_mbuf/rte_mbuf.c \
+		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc

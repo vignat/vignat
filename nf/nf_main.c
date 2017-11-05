@@ -3,6 +3,7 @@
 #ifdef KLEE_VERIFICATION
 #include <klee/klee.h>
 #include "lib/stubs/my-time-stub-control.h"
+#include "lib/stubs/device_stub.h"
 #endif
 
 // DPDK uses these but doesn't include them. :|
@@ -206,6 +207,10 @@ void lcore_main(void)
 int
 main(int argc, char* argv[])
 {
+#ifdef KLEE_VERIFICATION
+        rte_eal_driver_register(&stub_driver);
+#endif
+
   // Initialize the Environment Abstraction Layer (EAL)
   int ret = rte_eal_init(argc, argv);
   if (ret < 0) {
