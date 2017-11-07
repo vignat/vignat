@@ -68,7 +68,7 @@ make -j `nproc`
 sudo make install
 cd ../..
 
-git clone --depth 1 --branch timed-access-dirty https://github.com/vignat/klee.git
+git clone --depth 1 --branch timed-access-dirty https://github.com/SolalPirelli/klee.git
 rm -rf klee/.git
 cd klee
 # TODO we should use a KLEE with CMake...

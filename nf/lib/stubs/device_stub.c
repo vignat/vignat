@@ -95,8 +95,6 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 		return -ENODEV;
 	}
 
-	klee_assert(dev->data->rx_queues[rx_queue_id] == NULL);
-
 	struct stub_device* device = dev->data->dev_private;
 	device->rx_queues[rx_queue_id].device = device;
 	dev->data->rx_queues[rx_queue_id] = &device->rx_queues[rx_queue_id];
@@ -112,8 +110,6 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 	if (tx_queue_id >= dev->data->nb_tx_queues) {
 		return -ENODEV;
 	}
-
-	klee_assert(dev->data->tx_queues[tx_queue_id] == NULL);
 
 	struct stub_device* device = dev->data->dev_private;
 	device->tx_queues[tx_queue_id].device = device;
@@ -158,7 +154,7 @@ stub_stats_reset(struct rte_eth_dev *dev)
 static int
 stub_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 {
-	klee_abort();
+	return 0; // DPDK doesn't even check the return value anyway...
 }
 
 static int
@@ -227,13 +223,16 @@ stub_dev_create(const char *name,
 
 	data->dev_private = device;
 	data->port_id = eth_dev->data->port_id;
-	data->nb_rx_queues = 1;
-	data->nb_tx_queues = 1;
+	data->rx_queues = NULL;
+	data->nb_rx_queues = 0;
+	data->tx_queues = NULL;
+	data->nb_tx_queues = 0;
+        data->dev_started = 0;
 	data->dev_link = stub_link;
 	data->mac_addrs = &stub_addr;
 	strncpy(data->name, eth_dev->data->name, strlen(eth_dev->data->name));
-	data->dev_flags = RTE_ETH_DEV_DETACHABLE;
-	data->kdrv = RTE_KDRV_NONE;
+	//data->dev_flags = RTE_ETH_DEV_DETACHABLE;
+	//data->kdrv = RTE_KDRV_NONE;
 	data->drv_name = stub_name;
 	data->numa_node = numa_node;
 

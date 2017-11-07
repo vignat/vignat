@@ -28,6 +28,7 @@ CFLAGS += -Wno-nested-externs
 include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
+	rm -f *.bc # in case previous build failed after generating bc files
 	clang -DKLEE_VERIFICATION \
 		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
 		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
@@ -52,11 +53,11 @@ verify:
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# --log-level 0 otherwise there's an error - for now, verify without logging
-	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=16000 --dump-call-trace-prefixes \
-		veri.bc --log-level 0 --no-pci --no-huge --no-shconf -- \
+	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=24000 --dump-call-trace-prefixes \
+		veri.bc --log-level 0 --no-pci --no-huge -m 80 --no-shconf -- \
 		--lan-dev 0 --wan 1 --expire 10 --starting-port 0 --max-flows 65536 \
 		--extip 10.0.0.0 --eth-dest 0,01:23:45:67:89:00 --eth-dest 1,01:23:45:67:89:01
-	rm *.bc
+	rm -f *.bc
 
 verifast:
 	verifast -I . -I .. -allow_assume -shared \

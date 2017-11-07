@@ -60,7 +60,7 @@ int nf_core_process(uint8_t device,
 	}
 
 	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
-
+fprintf(stderr,"ipv4 packet\n");fflush(stderr);
 	uint8_t dst_device;
   int allocated = 0;
 	if (device == config.wan_device) {
@@ -140,7 +140,7 @@ int nf_core_process(uint8_t device,
 
 	ether_header->s_addr = config.device_macs[dst_device];
 	ether_header->d_addr = config.endpoint_macs[dst_device];
-
+fprintf(stderr,"checksum\n");fflush(stderr);
 	nf_set_ipv4_checksum(ipv4_header);
 
   //klee_assert(allocated);
