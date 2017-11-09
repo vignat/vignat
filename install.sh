@@ -16,10 +16,6 @@ svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_342/final llvm
 svn co https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_342/final llvm/tools/clang
 svn co https://llvm.org/svn/llvm-project/compiler-rt/tags/RELEASE_342/final llvm/projects/compiler-rt
 svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final llvm/projects/libcxx
-rm -rf llvm/.svn
-rm -rf llvm/tools/clang/.svn
-rm -rf llvm/projects/compiler-rt/.svn
-rm -rf llvm/projects/libcxx/.svn
 cd llvm
 ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
 make -j `nproc`
@@ -28,13 +24,11 @@ echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
 cd ..
 
 git clone --depth 1 https://github.com/stp/minisat.git
-rm -rf minisat/.git
 cd minisat
 make
 cd ..
 
 git clone --depth 1 --branch stp-2.2.0 https://github.com/stp/stp.git
-rm -rf stp/.git
 cd stp
 mkdir build
 cd build
@@ -50,7 +44,6 @@ make -j `nproc`
 cd ../..
 
 git clone --depth 1 --branch klee_uclibc_v1.0.0 https://github.com/klee/klee-uclibc.git
-rm -rf klee-uclibc/.git
 cd klee-uclibc
 ./configure \
  --make-llvm-lib \
@@ -60,7 +53,6 @@ make -j `nproc`
 cd ..
 
 git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3.git
-rm -rf z3/.git
 cd z3
 python scripts/mk_make.py
 cd build
@@ -68,25 +60,28 @@ make -j `nproc`
 sudo make install
 cd ../..
 
-git clone --depth 1 --branch timed-access-dirty https://github.com/SolalPirelli/klee.git
-rm -rf klee/.git
+git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git
 cd klee
-# TODO we should use a KLEE with CMake...
-./configure \
- LDFLAGS="-L$BUILDDIR/minisat/build/release/lib/" \
- --with-llvm=$BUILDDIR/llvm/ \
- --with-llvmcc=$BUILDDIR/llvm/Release/bin/clang \
- --with-llvmcxx=$BUILDDIR/llvm/Release/bin/clang++ \
- --with-stp=$BUILDDIR/stp/build/ \
- --with-uclibc=$BUILDDIR/klee-uclibc \
- --with-z3=$BUILDDIR/z3/build/ \
- --enable-cxx11 \
- --enable-posix-runtime
-make -j `nproc` ENABLE_OPTIMIZED=1
-echo 'PATH=$PATH:'"$BUILDDIR/klee/Release+Asserts/bin" >> ~/.profile
+mkdir build
+cd build
+cmake \
+ -DENABLE_UNIT_TESTS=OFF \
+ -DBUILD_SHARED_LIBS=OFF \
+ -DENABLE_KLEE_ASSERTS=OFF \
+ -DLLVM_CONFIG_BINARY=$BUILDDIR/llvm/Release/bin/llvm-config \
+ -DLLVMCC=$BUILDDIR/llvm/Release/bin/clang \
+ -DLLVMCXX=$BUILDDIR/llvm/Release/bin/clang++ \
+ -DENABLE_SOLVER_STP=ON \
+ -DSTP_DIR=$BUILDDIR/stp/build/ \
+ -DENABLE_KLEE_UCLIBC=ON \
+ -DKLEE_UCLIBC_PATH=$BUILDDIR/klee-uclibc \
+ -DENABLE_POSIX_RUNTIME=ON \
+ ..
+make
+echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> ~/.profile
 echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> ~/.profile
 . ~/.profile
-cd ..
+cd ../..
 
 
 ### VeriFast
