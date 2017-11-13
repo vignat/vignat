@@ -75,17 +75,16 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
   device_conf.rx_adv_conf.rss_conf.rss_key = NULL;
   device_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 
-fprintf(stderr,"config device\n");fflush(stderr);
   retval = rte_eth_dev_configure(
     device, // The device
     1, // # of RX queues
     1, // # of TX queues
     &device_conf // device config
   );
-  if (retval != 0) {fprintf(stderr,"CONF ERROR %d\n",retval);fflush(stderr);
+  if (retval != 0) {
     rte_exit(EXIT_FAILURE, "Cannot configure device %" PRIu8 ", err=%d", device, retval);
   }
-fprintf(stderr,"rx setup\n");fflush(stderr);
+
   // Allocate and set up 1 RX queue per device
   retval = rte_eth_rx_queue_setup(
     device, // device ID
@@ -98,7 +97,7 @@ fprintf(stderr,"rx setup\n");fflush(stderr);
   if (retval < 0) {
     rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu8 ", err=%d", device, retval);
   }
-fprintf(stderr,"tx setup\n");fflush(stderr);
+
   // Allocate and set up 1 TX queue per device
   retval = rte_eth_tx_queue_setup(
     device, // device ID
@@ -110,13 +109,13 @@ fprintf(stderr,"tx setup\n");fflush(stderr);
   if (retval < 0) {
     rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu8 " err=%d", device, retval);
   }
-fprintf(stderr,"dev start\n");fflush(stderr);
+
   // Start the device
   retval = rte_eth_dev_start(device);
   if (retval < 0) {
     rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu8 ", err=%d", device, retval);
   }
-fprintf(stderr,"promisc\n");fflush(stderr);
+
   // Enable RX in promiscuous mode for the Ethernet device
   rte_eth_promiscuous_enable(device);
 
@@ -145,15 +144,14 @@ void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
 void lcore_main(void)
 {
   uint8_t nb_devices = rte_eth_dev_count();
-fprintf(stderr,"oh hai\n");fflush(stderr);
   for (uint8_t device = 0; device < nb_devices; device++) {
     if (rte_eth_dev_socket_id(device) > 0 && rte_eth_dev_socket_id(device) != (int) rte_socket_id()) {
       NF_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
     }
   }
-fprintf(stderr,"oh hai again\n");fflush(stderr);
+
   nf_core_init();
-fprintf(stderr,"inited\n");fflush(stderr);
+
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
   // Run until the application is killed
@@ -164,14 +162,11 @@ fprintf(stderr,"inited\n");fflush(stderr);
   int x = klee_int("loop_termination");
   nf_loop_iteration_begin(lcore_id, starting_time);
   while (klee_induce_invariants() & x) {
-    uint8_t device = klee_range(0, nb_devices, "device");
-    {
       nf_add_loop_iteration_assumptions(lcore_id, starting_time);
 #else //KLEE_VERIFICATION
   while (1) {
-    for (uint8_t device = 0; device < nb_devices; device++) {
 #endif //KLEE_VERIFICATION
-fprintf(stderr,"starting\n");fflush(stderr);
+    for (uint8_t device = 0; device < nb_devices; device++) {
       uint32_t now = current_time();
 
       struct rte_mbuf* buf[1];
@@ -195,7 +190,6 @@ fprintf(stderr,"starting\n");fflush(stderr);
           }
         }
       }
-fprintf(stderr,"ending\n");fflush(stderr);
 // TODO benchmark, consider batching
 //      struct rte_mbuf* bufs[BATCH_SIZE];
 //      uint16_t bufs_len = rte_eth_rx_burst(device, 0, bufs, BATCH_SIZE);
@@ -254,7 +248,6 @@ main(int argc, char* argv[])
   }*/
 
   // Initialize all devices
-fprintf(stderr,"init device\n");fflush(stderr);
   for (uint8_t device = 0; device < nb_devices; device++) {
     if (nf_init_device(device, mbuf_pool) == 0) {
       NF_INFO("Initialized device %" PRIu8 ".", device);
@@ -262,7 +255,6 @@ fprintf(stderr,"init device\n");fflush(stderr);
       rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
     }
   }
-fprintf(stderr,"run\n");fflush(stderr);
   // Run!
   // ...in single-threaded mode, that is.
   lcore_main();

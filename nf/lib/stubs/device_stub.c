@@ -4,13 +4,143 @@
 
 #include <klee/klee.h>
 
-#include <rte_mbuf.h>
-#include <rte_ethdev.h>
-#include <rte_memcpy.h>
+#include "containers/str-descr.h"
+
 #include <rte_dev.h>
+#include <rte_ethdev.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
+#include <rte_memcpy.h>
+#include <rte_tcp.h>
 
 #define STUB_DEVICES_COUNT 2
 #define STUB_PACKET_SIZE 64
+
+// Arseniy's black magic, TODO understand it
+struct user_buf {
+  struct ether_hdr ether;
+  struct ipv4_hdr ipv4;
+  struct tcp_hdr tcp;
+};
+struct str_field_descr mbuf_descrs[] = {
+  //Do not forget about "buf_addr" -- it is a pointer that is why it is not listed here.
+  {offsetof(struct rte_mbuf, buf_physaddr), sizeof(uint64_t), "buf_physaddr"},
+  {offsetof(struct rte_mbuf, buf_len), sizeof(uint16_t), "buf_len"},
+  {offsetof(struct rte_mbuf, data_off), sizeof(uint16_t), "data_off"},
+  {offsetof(struct rte_mbuf, refcnt), sizeof(uint16_t), "refcnt"},
+  {offsetof(struct rte_mbuf, nb_segs), sizeof(uint8_t), "nb_segs"},
+  {offsetof(struct rte_mbuf, port), sizeof(uint8_t), "port"},
+  {offsetof(struct rte_mbuf, ol_flags), sizeof(uint64_t), "ol_flags"},
+  {offsetof(struct rte_mbuf, packet_type), sizeof(uint32_t), "packet_type"},
+  {offsetof(struct rte_mbuf, pkt_len), sizeof(uint32_t), "pkt_len"},
+  {offsetof(struct rte_mbuf, data_len), sizeof(uint16_t), "data_len"},
+  {offsetof(struct rte_mbuf, vlan_tci), sizeof(uint16_t), "vlan_tci"},
+  {offsetof(struct rte_mbuf, hash), sizeof(uint32_t), "hash"},
+  {offsetof(struct rte_mbuf, seqn), sizeof(uint32_t), "seqn"},
+  {offsetof(struct rte_mbuf, vlan_tci_outer), sizeof(uint16_t), "vlan_tci_outer"},
+  {offsetof(struct rte_mbuf, udata64), sizeof(uint64_t), "udata64"},
+  {offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"},
+  {offsetof(struct rte_mbuf, next), sizeof(struct rte_mbuf*), "next"},
+  {offsetof(struct rte_mbuf, tx_offload), sizeof(uint64_t), "tx_offload"},
+  {offsetof(struct rte_mbuf, priv_size), sizeof(uint16_t), "priv_size"},
+  {offsetof(struct rte_mbuf, timesync), sizeof(uint16_t), "timesync"},
+};
+struct nested_field_descr user_buf_nested[] = {
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, ether_type), sizeof(uint16_t), "ether_type"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), sizeof(struct ether_addr), "d_addr"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), sizeof(struct ether_addr), "s_addr"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, version_ihl), sizeof(uint8_t), "version_ihl"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, type_of_service), sizeof(uint8_t), "type_of_service"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, total_length), sizeof(uint16_t), "total_length"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, packet_id), sizeof(uint16_t), "packet_id"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, fragment_offset), sizeof(uint16_t), "fragment_offset"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, time_to_live), sizeof(uint8_t), "time_to_live"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, next_proto_id), sizeof(uint8_t), "next_proto_id"},
+  /*
+    skip the checksum, as it is very hard to verify symbolically.
+    {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, hdr_checksum),
+    sizeof(uint16_t), "hdr_checksum"},
+  */
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, src_addr), sizeof(uint32_t), "src_addr"},
+  {offsetof(struct user_buf, ipv4), offsetof(struct ipv4_hdr, dst_addr), sizeof(uint32_t), "dst_addr"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, src_port), sizeof(uint16_t), "src_port"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, dst_port), sizeof(uint16_t), "dst_port"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, sent_seq), sizeof(uint32_t), "sent_seq"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, recv_ack), sizeof(uint32_t), "recv_ack"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, data_off), sizeof(uint8_t), "data_off"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, tcp_flags), sizeof(uint8_t), "tcp_flags"},
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, rx_win), sizeof(uint16_t), "rx_win"},
+  /*
+    skip the checksum, as it is very hard to verify symbolically.
+    {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, cksum),
+    sizeof(uint16_t), "cksum"},
+  */
+  {offsetof(struct user_buf, tcp), offsetof(struct tcp_hdr, tcp_urp), sizeof(uint16_t), "tcp_urp"},
+};
+struct nested_nested_field_descr user_buf_n2[] = {
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 0, sizeof(uint8_t), "a"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 1, sizeof(uint8_t), "b"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 2, sizeof(uint8_t), "c"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 3, sizeof(uint8_t), "d"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 4, sizeof(uint8_t), "e"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, d_addr), 5, sizeof(uint8_t), "f"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 0, sizeof(uint8_t), "a"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 1, sizeof(uint8_t), "b"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 2, sizeof(uint8_t), "c"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 3, sizeof(uint8_t), "d"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 4, sizeof(uint8_t), "e"},
+  {offsetof(struct user_buf, ether), offsetof(struct ether_hdr, s_addr), 5, sizeof(uint8_t), "f"},
+};
+#define KLEE_TRACE_USER_BUF(u_ptr)                            \
+  klee_trace_extra_ptr(u_ptr, sizeof(struct user_buf),                  \
+                       "user_buf_addr", "");                            \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct user_buf, ether),   \
+                             sizeof(struct ether_hdr), "ether");        \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct user_buf, ipv4),    \
+                             sizeof(struct ipv4_hdr), "ipv4");          \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct user_buf, tcp),     \
+                             sizeof(struct tcp_hdr), "tcp");            \
+  for (int i = 0; i < sizeof(user_buf_nested)/sizeof(user_buf_nested[0]); ++i) {\
+    klee_trace_extra_ptr_nested_field(u_ptr,                  \
+                                      user_buf_nested[i].base_offset,   \
+                                      user_buf_nested[i].offset,        \
+                                      user_buf_nested[i].width,         \
+                                      user_buf_nested[i].name);         \
+  }                                                                     \
+  for (int i = 0; i < sizeof(user_buf_n2)/sizeof(user_buf_n2[0]); ++i) { \
+    klee_trace_extra_ptr_nested_nested_field                            \
+      (u_ptr,                                                 \
+       user_buf_n2[i].base_base_offset,                                 \
+       user_buf_n2[i].base_offset,                                      \
+       user_buf_n2[i].offset,                                           \
+       user_buf_n2[i].width,                                            \
+       user_buf_n2[i].name);                                            \
+  }
+
+#define KLEE_TRACE_MBUF(m_ptr, dir)                                     \
+  klee_trace_param_ptr_directed(m_ptr, sizeof(*m_ptr), #m_ptr, dir);        \
+  klee_trace_param_ptr_field_directed(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
+                                      sizeof(struct user_buf*), "buf_addr", \
+                                      dir);                             \
+  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) { \
+    klee_trace_param_ptr_field_directed(m_ptr,                          \
+                                        mbuf_descrs[i].offset,          \
+                                        mbuf_descrs[i].width,           \
+                                        mbuf_descrs[i].name,            \
+                                        dir);                           \
+  }
+
+#define KLEE_TRACE_MBUF_EPTR(m_ptr, pname)                               \
+  klee_trace_extra_ptr(m_ptr, sizeof(*(m_ptr)), pname, "");                \
+  klee_trace_extra_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), \
+                             sizeof(struct user_buf*), "buf_addr");     \
+  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) { \
+    klee_trace_extra_ptr_field(m_ptr,                                   \
+                               mbuf_descrs[i].offset,                   \
+                               mbuf_descrs[i].width,                    \
+                               mbuf_descrs[i].name);                    \
+  }
+
 
 static const char* stub_name = "stub";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
@@ -30,39 +160,71 @@ struct stub_queue {
 
 struct stub_device {
 	uint16_t port_id;
+	struct user_buf user_buf;
+	struct rte_mbuf incoming_package;
+	int incoming_package_allocated;
 	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
 	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
 };
 
+// TODO what are those for? (I moved them to stub_device, anyway)
+//struct user_buf user_buf;
+//struct rte_mbuf incoming_package;
+//int incoming_package_allocated;
+
 static uint16_t
 stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
-	int i;
 	struct stub_queue *stub_q = q;
-	for (i = 0; i < nb_bufs; i++) {
-		bufs[i] = rte_pktmbuf_alloc(stub_q->mb_pool);
-		if (!bufs[i]) {
-			break;
-		}
-
-		bufs[i]->data_len = STUB_PACKET_SIZE;
-		bufs[i]->pkt_len = STUB_PACKET_SIZE;
-		bufs[i]->nb_segs = 1;
-		bufs[i]->next = NULL;
-		bufs[i]->port = stub_q->device->port_id;
+// TODO do we need that? and if not, can we kill the mb_pool member?
+//	bufs[i] = rte_pktmbuf_alloc(stub_q->mb_pool);
+//	if (!bufs[i]) {
+//		break;
+//	}
+//	bufs[i]->data_len = STUB_PACKET_SIZE;
+//	bufs[i]->pkt_len = STUB_PACKET_SIZE;
+//	bufs[i]->nb_segs = 1;
+//	bufs[i]->next = NULL;
+//	bufs[i]->port = stub_q->device->port_id;
+	int received;
+	klee_make_symbolic(&received, sizeof(int), "received");
+	if (received) {
+		klee_trace_ret();
+		klee_trace_param_i32(stub_q->device->port_id, "received_packet_device");
+		klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
+		KLEE_TRACE_MBUF_EPTR(&(stub_q->device->incoming_package), "incoming_package");
+		KLEE_TRACE_USER_BUF(&(stub_q->device->user_buf));
+		klee_allow_access(&(stub_q->device->user_buf), sizeof(struct user_buf));
+		klee_allow_access(&(stub_q->device->incoming_package), sizeof(struct rte_mbuf));
+		klee_assert(!stub_q->device->incoming_package_allocated);
+		*bufs = &(stub_q->device->incoming_package);
+		stub_q->device->incoming_package_allocated = 1;
+		return 1;
 	}
 
-	return i;
+	return 0;
 }
 
 static uint16_t
 stub_tx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
-	for (int i = 0; i < nb_bufs; i++) {
-		rte_pktmbuf_free(bufs[i]);
+	struct stub_queue *stub_q = q;
+// TODO is this needed?
+//	rte_pktmbuf_free(bufs[i]);
+
+	klee_trace_ret();
+	KLEE_TRACE_MBUF(bufs[0], TD_IN);
+	KLEE_TRACE_USER_BUF(bufs[0]->buf_addr);
+	klee_trace_param_i32(stub_q->device->port_id, "portid");
+	int packet_sent;
+	klee_make_symbolic(&packet_sent, sizeof(int), "packet_sent");
+	if (packet_sent) {
+		klee_forbid_access(bufs[0]->buf_addr, sizeof(struct user_buf), "pkt sent");
+		klee_forbid_access(bufs[0], sizeof(struct rte_mbuf), "pkt sent");
+		return 1;
 	}
 
-	return nb_bufs;
+	return 0;
 }
 
 static int
