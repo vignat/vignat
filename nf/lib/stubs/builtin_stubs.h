@@ -11,6 +11,9 @@
 // DPDK only uses it as an atomic add, no fetch necessary
 #define __sync_fetch_and_add(ptr, value) (*(ptr) += (value))
 
+// As the name implies, add then fetch
+#define __sync_add_and_fetch(ptr, value) (*(ptr) += (value))
+
 
 // Despite it being called test_and_set, GCC docs describe it as "not a traditional test-and-set operation, but rather an atomic exchange operation"
 static inline int stub_test_and_set(volatile int* ptr, int value)

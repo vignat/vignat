@@ -1,9 +1,5 @@
 #include <inttypes.h>
 
-#ifdef KLEE_VERIFICATION
-#  include <klee/klee.h>
-#  include "loop.h"
-#endif
 // DPDK requires these but doesn't include them. :|
 #include <linux/limits.h>
 #include <sys/types.h>
@@ -60,9 +56,9 @@ int nf_core_process(uint8_t device,
 	}
 
 	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
-fprintf(stderr,"ipv4 packet\n");fflush(stderr);
+
 	uint8_t dst_device;
-  int allocated = 0;
+	int allocated = 0;
 	if (device == config.wan_device) {
 		NF_DEBUG("Device %" PRIu8 " is external", device);
 
@@ -127,24 +123,13 @@ fprintf(stderr,"ipv4 packet\n");fflush(stderr);
 		ipv4_header->src_addr = f.ext_src_ip;
 		tcpudp_header->src_port = f.ext_src_port;
 		dst_device = f.ext_device_id;
-    //klee_assert(f.ik.int_device_id == f.int_device_id);
-    //klee_assert(f.ek.ext_device_id == f.ext_device_id);
-    //klee_assert(f.int_device_id != f.ext_device_id);
-    allocated = 1;
+    		allocated = 1;
 	}
-
-	#ifdef KLEE_VERIFICATION
-		klee_assert(dst_device >= 0);
-		klee_assert(dst_device < RTE_MAX_ETHPORTS);
-	#endif
 
 	ether_header->s_addr = config.device_macs[dst_device];
 	ether_header->d_addr = config.endpoint_macs[dst_device];
-fprintf(stderr,"checksum\n");fflush(stderr);
 	nf_set_ipv4_checksum(ipv4_header);
 
-  //klee_assert(allocated);
-  //klee_assert(device != dst_device);
 	return dst_device;
 }
 
@@ -162,6 +147,7 @@ void nf_print_config() {
 }
 
 #ifdef KLEE_VERIFICATION
+#include "loop.h"
 
 void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
@@ -186,6 +172,5 @@ void nf_loop_iteration_end(unsigned lcore_id,
                      config.max_flows,
                      config.start_port);
 }
-
-#endif //KLEE_VERIFICATION
+#endif
 

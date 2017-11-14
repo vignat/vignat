@@ -160,8 +160,8 @@ struct stub_queue {
 
 struct stub_device {
 	uint16_t port_id;
-	struct user_buf user_buf;
-	struct rte_mbuf incoming_package;
+	//struct user_buf user_buf;
+	struct rte_mbuf* incoming_package;
 	int incoming_package_allocated;
 	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
 	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
@@ -172,9 +172,14 @@ struct stub_device {
 //struct rte_mbuf incoming_package;
 //int incoming_package_allocated;
 
+// TODO maybe try to find a way to receive up to nb_bufs packets instead of always 0/1?
 static uint16_t
 stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
+	if (nb_bufs == 0) {
+		return 0;
+	}
+
 	struct stub_queue *stub_q = q;
 // TODO do we need that? and if not, can we kill the mb_pool member?
 //	bufs[i] = rte_pktmbuf_alloc(stub_q->mb_pool);
@@ -189,15 +194,15 @@ stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 	int received;
 	klee_make_symbolic(&received, sizeof(int), "received");
 	if (received) {
-		klee_trace_ret();
+/*		klee_trace_ret();
 		klee_trace_param_i32(stub_q->device->port_id, "received_packet_device");
 		klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
 		KLEE_TRACE_MBUF_EPTR(&(stub_q->device->incoming_package), "incoming_package");
 		KLEE_TRACE_USER_BUF(&(stub_q->device->user_buf));
 		klee_allow_access(&(stub_q->device->user_buf), sizeof(struct user_buf));
 		klee_allow_access(&(stub_q->device->incoming_package), sizeof(struct rte_mbuf));
-		klee_assert(!stub_q->device->incoming_package_allocated);
-		*bufs = &(stub_q->device->incoming_package);
+		klee_assert(!stub_q->device->incoming_package_allocated);*/
+		bufs[0] = stub_q->device->incoming_package;
 		stub_q->device->incoming_package_allocated = 1;
 		return 1;
 	}
@@ -208,19 +213,23 @@ stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 static uint16_t
 stub_tx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
+	if (nb_bufs == 0) {
+		return 0;
+	}
+
 	struct stub_queue *stub_q = q;
 // TODO is this needed?
 //	rte_pktmbuf_free(bufs[i]);
 
-	klee_trace_ret();
+/*	klee_trace_ret();
 	KLEE_TRACE_MBUF(bufs[0], TD_IN);
 	KLEE_TRACE_USER_BUF(bufs[0]->buf_addr);
-	klee_trace_param_i32(stub_q->device->port_id, "portid");
+	klee_trace_param_i32(stub_q->device->port_id, "portid");*/
 	int packet_sent;
 	klee_make_symbolic(&packet_sent, sizeof(int), "packet_sent");
 	if (packet_sent) {
-		klee_forbid_access(bufs[0]->buf_addr, sizeof(struct user_buf), "pkt sent");
-		klee_forbid_access(bufs[0], sizeof(struct rte_mbuf), "pkt sent");
+/*		klee_forbid_access(bufs[0]->buf_addr, sizeof(struct user_buf), "pkt sent");
+		klee_forbid_access(bufs[0], sizeof(struct rte_mbuf), "pkt sent");*/
 		return 1;
 	}
 
@@ -258,6 +267,7 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 	}
 
 	struct stub_device* device = dev->data->dev_private;
+	device->incoming_package = rte_pktmbuf_alloc(mb_pool);
 	device->rx_queues[rx_queue_id].device = device;
 	dev->data->rx_queues[rx_queue_id] = &device->rx_queues[rx_queue_id];
 	return 0;
