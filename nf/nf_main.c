@@ -40,9 +40,8 @@ static const uint16_t TX_QUEUE_SIZE = 512;
 // Memory pool #buffers and per-core cache size (set to their values from l3fwd sample)
 // NOTE: eth_dev_count*BUFFER_COUNT >= 1.5*CACHE_SIZE
 #ifdef KLEE_VERIFICATION
-static const unsigned MEMPOOL_BUFFER_COUNT = 2;
-static const unsigned MEMPOOL_CACHE_SIZE = 2;
-static const unsigned MEMPOOL_CLONE_COUNT = 2;
+static const unsigned MEMPOOL_BUFFER_COUNT = 1;
+static const unsigned MEMPOOL_CACHE_SIZE = 0;
 #else
 static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
 static const unsigned MEMPOOL_CACHE_SIZE = 256;

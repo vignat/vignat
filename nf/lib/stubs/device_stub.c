@@ -267,7 +267,17 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 	}
 
 	struct stub_device* device = dev->data->dev_private;
+
 	device->incoming_package = rte_pktmbuf_alloc(mb_pool);
+	if (!(device->incoming_package)) {
+		return -ENOMEM;
+	}
+	device->incoming_package->data_len = STUB_PACKET_SIZE;
+	device->incoming_package->pkt_len = STUB_PACKET_SIZE;
+	device->incoming_package->nb_segs = 1;
+	device->incoming_package->next = NULL;
+	device->incoming_package->port = device->port_id;
+
 	device->rx_queues[rx_queue_id].device = device;
 	dev->data->rx_queues[rx_queue_id] = &device->rx_queues[rx_queue_id];
 	return 0;
