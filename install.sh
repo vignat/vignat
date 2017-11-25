@@ -130,8 +130,13 @@ esac
 make config T=x86_64-native-linuxapp-gcc
 make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
-# Re-build it with atomic intrinsics, otherwise it uses inline ASM which KLEE doesn't support
+# Enable atomic intrinsics, otherwise it uses inline ASM which KLEE doesn't support
 sed -i 's/CONFIG_RTE_FORCE_INTRINSICS=n/CONFIG_RTE_FORCE_INTRINSICS=y/' x86_64-native-linuxapp-gcc/.config
+# Disable callbacks, unnecessary (TODO is this really required?)
+sed -i 's/CONFIG_RTE_ETHDEV_RXTX_CALLBACKS=y/CONFIG_RTE_ETHDEV_RXTX_CALLBACKS=n/' x86_64-native-linuxapp-gcc/.config
+# Use stacks instead of rings for mbuf pools, so that an [allocate+free] operation is idempotent
+sed -i 's/CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="ring_mp_mc"/CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="stack"/' x86_64-native-linuxapp-gcc/.config
+# Rebuild
 make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
 
 cd ..

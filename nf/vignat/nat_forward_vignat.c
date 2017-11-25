@@ -58,7 +58,7 @@ int nf_core_process(uint8_t device,
 	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
 
 	uint8_t dst_device;
-	int allocated = 0;
+
 	if (device == config.wan_device) {
 		NF_DEBUG("Device %" PRIu8 " is external", device);
 
@@ -83,10 +83,6 @@ int nf_core_process(uint8_t device,
 			ipv4_header->dst_addr = f.int_src_ip;
 			tcpudp_header->dst_port = f.int_src_port;
 			dst_device = f.int_device_id;
-      //klee_assert(f.ik.int_device_id == f.int_device_id);
-      //klee_assert(f.ek.ext_device_id == f.ext_device_id);
-      //klee_assert(f.int_device_id != f.ext_device_id);
-      allocated = 1;
 		} else {
 			NF_DEBUG("Unknown flow, dropping");
 			return device;
@@ -123,7 +119,6 @@ int nf_core_process(uint8_t device,
 		ipv4_header->src_addr = f.ext_src_ip;
 		tcpudp_header->src_port = f.ext_src_port;
 		dst_device = f.ext_device_id;
-    		allocated = 1;
 	}
 
 	ether_header->s_addr = config.device_macs[dst_device];
