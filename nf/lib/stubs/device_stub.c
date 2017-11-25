@@ -170,8 +170,7 @@ stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 
 	struct stub_queue *stub_q = q;
 
-	int received;
-	klee_make_symbolic(&received, sizeof(int), "received");
+	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
 	if (received) {
 /*		klee_trace_ret();
 		klee_trace_param_i32(stub_q->device->port_id, "received_packet_device");
@@ -195,6 +194,24 @@ stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 			bufs[i]->nb_segs = 1;
 			bufs[i]->next = NULL;
 			bufs[i]->port = stub_q->port_id;
+
+			// TODO realistic packets...
+			int is_ipv4 = klee_int("is_ipv4");
+			if (is_ipv4) {
+				bufs[i]->packet_type = RTE_PTYPE_L3_IPV4;
+				struct ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(bufs[i], struct ipv4_hdr*, sizeof(struct ether_hdr));
+
+				int tcpudp_type = klee_range(0, 3, "tcpudp_type");
+				if (tcpudp_type == 0) {
+					ipv4_header->next_proto_id = IPPROTO_IP;
+				} else if (tcpudp_type == 1) {
+					ipv4_header->next_proto_id = IPPROTO_TCP;
+				} else {
+					ipv4_header->next_proto_id = IPPROTO_UDP;
+				}
+			} else {
+				bufs[i]->packet_type = RTE_PTYPE_UNKNOWN;
+			}
 		}
 		return i;
 	}
