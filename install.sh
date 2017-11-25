@@ -142,3 +142,6 @@ cd ..
 sudo apt-get install -y parallel opam
 opam init -y
 opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
+echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> ~/.profile
+echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
+. ~/.profile
