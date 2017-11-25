@@ -6,6 +6,27 @@
 #include "lib/stubs/device_stub.h"
 #endif
 
+
+#ifdef KLEE_VERIFICATION
+#define VIGOR_LOOP_BEGIN \
+  unsigned _vigor_lcore_id = rte_lcore_id(); \
+  uint32_t _vigor_start_time = start_time(); \
+  int _vigor_loop_termination = klee_int("loop_termination"); \
+  nf_loop_iteration_begin(_vigor_lcore_id, _vigor_start_time); \
+  while(klee_induce_invariants() & _vigor_loop_termination) { \
+    nf_add_loop_iteration_assumptions(_vigor_lcore_id, _vigor_start_time); \
+    uint32_t VIGOR_NOW = current_time();
+#define VIGOR_LOOP_END \
+    nf_loop_iteration_end(_vigor_lcore_id, VIGOR_NOW); \
+  }
+#else
+#define VIGOR_LOOP_BEGIN \
+  while (1) { \
+    uint32_t VIGOR_NOW = current_time();
+#define VIGOR_LOOP_END }
+#endif
+
+
 // DPDK uses these but doesn't include them. :|
 #include <linux/limits.h>
 #include <sys/types.h>
@@ -24,15 +45,6 @@
 #include "lib/nf_util.h"
 #include <string.h>
 
-
-// --- Static config ---
-// TODO see remark in lcore_main
-// Size of batches to receive; trade-off between latency and throughput
-// Can be overriden at compile time
-//#ifndef BATCH_SIZE
-//static const uint16_t BATCH_SIZE = 32;
-//#endif
-
 // Queue sizes for receiving/transmitting packets (set to their values from l3fwd sample)
 static const uint16_t RX_QUEUE_SIZE = 128;
 static const uint16_t TX_QUEUE_SIZE = 512;
@@ -47,8 +59,6 @@ static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
 static const unsigned MEMPOOL_CACHE_SIZE = 256;
 static const unsigned MEMPOOL_CLONE_COUNT = 256;
 #endif
-
-static struct rte_mempool* clone_pool;
 
 // --- Initialization ---
 static int
@@ -121,25 +131,9 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
   return 0;
 }
 
-void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
-  for (uint8_t device = 0; device < nb_devices; device++) {
-    if (device == skip_device) continue;
-    struct rte_mbuf* copy = rte_pktmbuf_clone(frame, clone_pool);
-    if (copy == NULL) {
-      rte_exit(EXIT_FAILURE, "Cannot clone a frame for flooding");
-    }
-    uint16_t actual_tx_len = rte_eth_tx_burst(device, 0, &copy, 1);
-
-    if (actual_tx_len == 0) {
-      rte_pktmbuf_free(copy);
-    }
-  }
-  rte_pktmbuf_free(frame);
-}
-
 // --- Per-core work ---
 
-//static __attribute__((noreturn))
+//static __attribute__((noreturn)) // TODO make this work
 void lcore_main(void)
 {
   uint8_t nb_devices = rte_eth_dev_count();
@@ -153,54 +147,26 @@ void lcore_main(void)
 
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
-  // Run until the application is killed
-#ifdef KLEE_VERIFICATION
-  uint32_t starting_time = start_time();
-  unsigned lcore_id = rte_lcore_id(); // TODO do we need that?
-
-  int x = klee_int("loop_termination");
-  nf_loop_iteration_begin(lcore_id, starting_time);
-  while (klee_induce_invariants() & x) {
-      nf_add_loop_iteration_assumptions(lcore_id, starting_time);
-#else //KLEE_VERIFICATION
-  while (1) {
-#endif //KLEE_VERIFICATION
+  VIGOR_LOOP_BEGIN
     for (uint8_t device = 0; device < nb_devices; device++) {
-      uint32_t now = current_time();
-
       struct rte_mbuf* buf[1];
       uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
 
       if (actual_rx_len != 0) {
-        int fwd_result = nf_core_process(device, buf[0], now);
+        int fwd_result = nf_core_process(device, buf[0], VIGOR_NOW);
 
-        if (fwd_result == FLOOD_FRAME) {
-          flood(buf[0], device, nb_devices);
+        uint8_t dst_device = fwd_result;
+        if (dst_device == device) {
+          rte_pktmbuf_free(buf[0]);
         } else {
-          uint8_t dst_device = fwd_result;
-          if (dst_device == device) {
+          uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
+          if (actual_tx_len == 0) {
             rte_pktmbuf_free(buf[0]);
-          } else {
-            uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
-
-            if (actual_tx_len == 0) {
-              rte_pktmbuf_free(buf[0]);
-            }
           }
         }
       }
-// TODO benchmark, consider batching
-//      struct rte_mbuf* bufs[BATCH_SIZE];
-//      uint16_t bufs_len = rte_eth_rx_burst(device, 0, bufs, BATCH_SIZE);
-
-//      if (likely(bufs_len != 0)) {
-//        nf_core_process(config, core_id, device, bufs, bufs_len);
-//      }
-#ifdef KLEE_VERIFICATION
-      nf_loop_iteration_end(lcore_id, now);
-#endif//KLEE_VERIFICATION
     }
-  }
+  VIGOR_LOOP_END
 }
 
 
@@ -210,7 +176,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef KLEE_VERIFICATION
-        rte_eal_driver_register(&stub_driver);
+  rte_eal_driver_register(&stub_driver);
 #endif
 
   // Initialize the Environment Abstraction Layer (EAL)
@@ -237,14 +203,6 @@ main(int argc, char* argv[])
   if (mbuf_pool == NULL) {
     rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
   }
-
-  /*clone_pool = rte_pktmbuf_pool_create("clone_pool", MEMPOOL_CLONE_COUNT,
-                                       MEMPOOL_CACHE_SIZE,
-                                       0, 0, rte_socket_id());
-  if (clone_pool == NULL) {
-    rte_exit(EXIT_FAILURE, "Cannot create mbuf clone pool: %s\n",
-             rte_strerror(rte_errno));
-  }*/
 
   // Initialize all devices
   for (uint8_t device = 0; device < nb_devices; device++) {
