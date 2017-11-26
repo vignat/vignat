@@ -51,8 +51,6 @@ stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 
 	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
 	if (received) {
-		received = 1; // TODO support more than one
-
 		int i = 0;
 		for (i = 0; i < received; i++) {
 			// Use raw_alloc for now, we reset it later after making it symbolic
@@ -121,9 +119,6 @@ stub_tx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
 	if (nb_bufs == 0) {
 		return 0;
-	}
-	if (nb_bufs > 1) {
-		klee_abort(); // TODO support more than one
 	}
 
 	struct stub_queue *stub_q = q;
