@@ -15,15 +15,21 @@
   nf_loop_iteration_begin(_vigor_lcore_id, _vigor_start_time); \
   while(klee_induce_invariants() & _vigor_loop_termination) { \
     nf_add_loop_iteration_assumptions(_vigor_lcore_id, _vigor_start_time); \
-    uint32_t VIGOR_NOW = current_time();
+    uint32_t VIGOR_NOW = current_time(); \
+    /* FIXME TODO TEMP HACK */ \
+    unsigned _vigor_devices_count = rte_eth_dev_count(); \
+    unsigned VIGOR_DEVICE = klee_range(0, _vigor_devices_count, "VIGOR_DEVICE"); \
+    for(unsigned _ = 0; _ < _vigor_devices_count; _++) if (VIGOR_DEVICE == _) { VIGOR_DEVICE = _; break; }
 #define VIGOR_LOOP_END \
     nf_loop_iteration_end(_vigor_lcore_id, VIGOR_NOW); \
   }
 #else
 #define VIGOR_LOOP_BEGIN \
   while (1) { \
-    uint32_t VIGOR_NOW = current_time();
-#define VIGOR_LOOP_END }
+    uint32_t VIGOR_NOW = current_time(); \
+    unsigned _vigor_devices_count = rte_eth_dev_count(); \
+    for (uint8_t VIGOR_DEVICE = 0; VIGOR_DEVICE < _vigor_devices_count; device++) {
+#define VIGOR_LOOP_END } }
 #endif
 
 
@@ -49,15 +55,12 @@
 static const uint16_t RX_QUEUE_SIZE = 128;
 static const uint16_t TX_QUEUE_SIZE = 512;
 
-// Memory pool #buffers and per-core cache size (set to their values from l3fwd sample)
-// NOTE: eth_dev_count*BUFFER_COUNT >= 1.5*CACHE_SIZE
+// Memory pool #buffers (set to its value from l3fwd sample)
 #ifdef KLEE_VERIFICATION
+// TODO this shouldn't be needed
 static const unsigned MEMPOOL_BUFFER_COUNT = 1;
-static const unsigned MEMPOOL_CACHE_SIZE = 0;
 #else
 static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
-static const unsigned MEMPOOL_CACHE_SIZE = 256;
-static const unsigned MEMPOOL_CLONE_COUNT = 256;
 #endif
 
 // --- Initialization ---
@@ -136,8 +139,8 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
 //static __attribute__((noreturn)) // TODO make this work
 void lcore_main(void)
 {
-  uint8_t nb_devices = rte_eth_dev_count();
-  for (uint8_t device = 0; device < nb_devices; device++) {
+  // TODO is this check useful?
+  for (uint8_t device = 0; device < rte_eth_dev_count(); device++) {
     if (rte_eth_dev_socket_id(device) > 0 && rte_eth_dev_socket_id(device) != (int) rte_socket_id()) {
       NF_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
     }
@@ -148,21 +151,17 @@ void lcore_main(void)
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
   VIGOR_LOOP_BEGIN
-    for (uint8_t device = 0; device < nb_devices; device++) {
-      struct rte_mbuf* buf[1];
-      uint16_t actual_rx_len = rte_eth_rx_burst(device, 0, buf, 1);
+    struct rte_mbuf* buf[1];
+    uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, buf, 1);
 
-      if (actual_rx_len != 0) {
-        int fwd_result = nf_core_process(device, buf[0], VIGOR_NOW);
-
-        uint8_t dst_device = fwd_result;
-        if (dst_device == device) {
+    if (actual_rx_len != 0) {
+      uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf[0], VIGOR_NOW);
+      if (dst_device == VIGOR_DEVICE) {
+        rte_pktmbuf_free(buf[0]);
+      } else {
+        uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
+        if (actual_tx_len == 0) {
           rte_pktmbuf_free(buf[0]);
-        } else {
-          uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
-          if (actual_tx_len == 0) {
-            rte_pktmbuf_free(buf[0]);
-          }
         }
       }
     }
@@ -195,7 +194,7 @@ main(int argc, char* argv[])
   struct rte_mempool* mbuf_pool = rte_pktmbuf_pool_create(
     "MEMPOOL", // name
     MEMPOOL_BUFFER_COUNT * nb_devices, // #elements
-    MEMPOOL_CACHE_SIZE, // cache size
+    0, // cache size (per-lcore, not useful in a single-threaded app)
     0, // application private area size
     RTE_MBUF_DEFAULT_BUF_SIZE, // data buffer size
     rte_socket_id() // socket ID

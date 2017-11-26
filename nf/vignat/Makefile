@@ -53,7 +53,7 @@ verify:
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
-	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=32000 --dump-call-trace-prefixes -solver-backend=z3 --max-solver-time=10 `#--debug-report-symbdex` \
+	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=32000 --dump-call-trace-prefixes -solver-backend=z3 --max-solver-time=3 --debug-report-symbdex \
 		veri.bc --log-level 10 --no-pci --no-huge -m 18000 --no-shconf -- \
 		--lan-dev 0 --wan 1 --expire 10 --starting-port 0 --max-flows 65536 \
 		--extip 10.0.0.0 --eth-dest 0,01:23:45:67:89:00 --eth-dest 1,01:23:45:67:89:01

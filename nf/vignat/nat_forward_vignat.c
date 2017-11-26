@@ -121,6 +121,9 @@ int nf_core_process(uint8_t device,
 		dst_device = f.ext_device_id;
 	}
 
+	// FIXME XXX TODO TEMP HACK
+	for(unsigned _ = 0; _ < RTE_MAX_ETHPORTS; _++) if (dst_device == _) { dst_device = _; break; }
+
 	ether_header->s_addr = config.device_macs[dst_device];
 	ether_header->d_addr = config.endpoint_macs[dst_device];
 	nf_set_ipv4_checksum(ipv4_header);
