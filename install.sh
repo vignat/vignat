@@ -23,26 +23,6 @@ echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
 . ~/.profile
 cd ..
 
-git clone --depth 1 https://github.com/stp/minisat.git
-cd minisat
-make
-cd ..
-
-git clone --depth 1 --branch stp-2.2.0 https://github.com/stp/stp.git
-cd stp
-mkdir build
-cd build
-cmake \
- -DBUILD_STATIC_BIN=ON \
- -DBUILD_SHARED_LIBS:BOOL=OFF \
- -DENABLE_PYTHON_INTERFACE:BOOL=OFF \
- -DMINISAT_INCLUDE_DIR="../../minisat/" \
- -DMINISAT_LIBRARY="../../minisat/build/release/lib/libminisat.a" \
- -DCMAKE_BUILD_TYPE="Release" \
- -DTUNE_NATIVE:BOOL=ON ..
-make -j `nproc`
-cd ../..
-
 git clone --depth 1 --branch klee_uclibc_v1.0.0 https://github.com/klee/klee-uclibc.git
 cd klee-uclibc
 ./configure \
@@ -52,13 +32,7 @@ cd klee-uclibc
 make -j `nproc`
 cd ..
 
-git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3.git
-cd z3
-python scripts/mk_make.py
-cd build
-make -j `nproc`
-sudo make install
-cd ../..
+sudo apt-get install z3
 
 git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git
 cd klee
