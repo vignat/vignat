@@ -43,10 +43,6 @@ struct stub_device {
 static uint16_t
 stub_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
-	if (nb_bufs == 0) {
-		return 0;
-	}
-
 	struct stub_queue *stub_q = q;
 
 	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
