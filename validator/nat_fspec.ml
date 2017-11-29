@@ -97,11 +97,12 @@ let tcp_hdr_struct = Ir.Str ("tcp_hdr", ["src_port", Uint16;
                                             "cksum", Uint16; *)
                                          "tcp_urp", Uint16;])
 
-let user_buf_struct = Ir.Str ("user_buf", ["ether", ether_hdr_struct;
-                                           "ipv4", ipv4_hdr_struct;
-                                           "tcp", tcp_hdr_struct;])
+let stub_mbuf_content_struct = Ir.Str ( "stub_mbuf_content",
+                                        ["ether", ether_hdr_struct;
+                                         "ipv4", ipv4_hdr_struct;
+                                         "tcp", tcp_hdr_struct;])
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
-                               ["buf_addr", Ptr user_buf_struct;
+                               ["buf_addr", Ptr stub_mbuf_content_struct;
                                 "buf_physaddr", Uint64;
                                 "buf_len", Uint16;
                                 "data_off", Uint16;
@@ -123,14 +124,14 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "priv_size", Uint16;
                                 "timesync", Uint16] )
 
-let copy_user_buf var_name ptr =
-  ("struct user_buf* tmp_ub_ptr" ^ var_name ^
+let copy_stub_mbuf_content var_name ptr =
+  ("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
    " = (" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
-     Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
-                        t=Ptr user_buf_struct};
-               t=user_buf_struct}}
+     Ir.value={v=Deref {v=Ir.Id ("tmp_smc_ptr" ^ var_name);
+                        t=Ptr stub_mbuf_content_struct};
+               t=stub_mbuf_content_struct}}
 
 let fun_types =
   String.Map.of_alist_exn
@@ -710,48 +711,48 @@ let fun_types =
                                       "int the_index_rejuvenated = " ^
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
-     "received_packet", {ret_type = Static Void;
-                         arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];
-                         extra_ptr_types = estt ["user_buf_addr",
-                                                 user_buf_struct;
-                                                 "incoming_package",
-                                                 rte_mbuf_struct];
-                         lemmas_before = [];
-                         lemmas_after = [(fun _ -> "a_packet_received = true;\n");
-                                         (fun params ->
-                                            let recv_pkt =
-                                              "*" ^ (List.nth_exn params.args 1)
-                                            in
-                                            "received_on_port = " ^
-                                            (List.nth_exn params.args 0) ^ ";\n" ^
-                                            "received_packet_type = (" ^
-                                            recv_pkt ^ ")->packet_type;\n" ^
-                                            (copy_user_buf "the_received_packet"
-                                               recv_pkt));
-                                           ];};
-     "send_single_packet", {ret_type = Static Ir.Sint32;
-                            arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
-                            extra_ptr_types = estt ["user_buf_addr",
-                                                    user_buf_struct];
-                            lemmas_before = [
-                              (fun params ->
-                                 let sent_pkt =
-                                   (List.nth_exn params.args 0)
-                                 in
-                                 (copy_user_buf "sent_packet"
-                                    sent_pkt) ^ "\n" ^
-                                 "sent_on_port = " ^
-                                 (List.nth_exn params.args 1) ^
-                                 ";\n" ^
-                                 "sent_packet_type = (" ^
-                                 sent_pkt ^ ")->packet_type;")
-                            ];
-                            lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                                            ];};
+     "stub_rx", {ret_type = Static Ir.Uint16;
+                 arg_types = stt [Ptr Void; Ptr (Ptr rte_mbuf_struct); Ir.Uint16];
+                 extra_ptr_types = estt ["user_buf_addr",
+                                         stub_mbuf_content_struct;
+                                         "incoming_package",
+                                         rte_mbuf_struct];
+                 lemmas_before = [];
+                 lemmas_after = [(fun _ -> "a_packet_received = true;\n");
+                                 (fun params ->
+                                     let recv_pkt =
+                                       "*" ^ (List.nth_exn params.args 1)
+                                     in
+                                       "received_on_port = " ^
+                                       (List.nth_exn params.args 0) ^ ";\n" ^
+                                       "received_packet_type = (" ^
+                                       recv_pkt ^ ")->packet_type;\n" ^
+                                       (copy_stub_mbuf_content "the_received_packet"
+                                        recv_pkt));
+                                 ];};
+     "stub_tx", {ret_type = Static Ir.Uint26;
+                 arg_types = stt [Ptr Void; Ptr (Ptr rte_mbuf_struct); Ir.Uint16];
+                 extra_ptr_types = estt ["user_buf_addr",
+                                         stub_mbuf_content_struct];
+                 lemmas_before = [
+                      (fun params ->
+                          let sent_pkt =
+                            (List.nth_exn params.args 0)
+                          in
+                            (copy_stub_mbuf_content "sent_packet"
+                             sent_pkt) ^ "\n" ^
+                            "sent_on_port = " ^
+                            (List.nth_exn params.args 1) ^
+                            ";\n" ^
+                            "sent_packet_type = (" ^
+                            sent_pkt ^ ")->packet_type;")
+                 ];
+                 lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
+                 ];};
      "rte_pktmbuf_free", {ret_type = Static Void;
                           arg_types = stt [Ptr rte_mbuf_struct;];
                           extra_ptr_types = estt ["user_buf_addr",
-                                                  user_buf_struct];
+                                                  stub_mbuf_content_struct];
                           lemmas_before = [];
                           lemmas_after = [];}
     ]
@@ -828,9 +829,9 @@ struct
                   struct lcore_rx_queue *last_rq;\n\
                   uint8_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
-                  struct user_buf the_received_packet;\n\
+                  struct stub_mbuf_content the_received_packet;\n\
                   bool a_packet_received = false;\n\
-                  struct user_buf sent_packet;\n\
+                  struct stub_mbuf_content sent_packet;\n\
                   uint8_t sent_on_port;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
