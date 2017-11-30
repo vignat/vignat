@@ -115,22 +115,21 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       //TODO: ^^^ is it really always so?
 @*/
 
-int send_single_packet(struct rte_mbuf *m, uint8_t port);
-//@ requires a_packet(m) &*& mbufp(m, _);
-//@ ensures result != 0 ? true : (a_packet(m) &*& mbufp(m, _));
+uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
+//@ requires *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
+//@ ensures result != 0 ? true : (*bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _));
+
+uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
+//@ requires *bufs |-> _;
+//@ ensures *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
+
+void stub_free(struct rte_mbuf* mbuf);
+//@ requires a_packet(mbuf) &*& mbufp(mbuf, _);
+//@ ensures true;
 
 void flood(struct rte_mbuf *m, uint8_t skip_device,
            uint8_t nb_devices);
 //@ requires a_packet(m) &*& mbufp(m, _);
-//@ ensures true;
-
-void received_packet(uint8_t portid,
-                     struct rte_mbuf **mbuf);
-//@ requires *mbuf |-> _;
-//@ ensures *mbuf |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
-
-void rte_pktmbuf_free(struct rte_mbuf *mbuf);
-//@ requires a_packet(mbuf) &*& mbufp(mbuf, _);
 //@ ensures true;
 
 /*@

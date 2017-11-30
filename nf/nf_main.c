@@ -175,7 +175,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef KLEE_VERIFICATION
-  rte_eal_driver_register(&stub_driver);
+  stub_init();
 #endif
 
   // Initialize the Environment Abstraction Layer (EAL)

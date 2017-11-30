@@ -62,7 +62,6 @@ void log_flow(const struct flow *f);
 
 #include <klee/klee.h>
 #include "lib/stubs/containers/double-map-stub-control.h"
-#include "lib/static-component-params.h"
 
 //TODO: this is dirty.
 extern uint16_t starting_port;

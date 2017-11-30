@@ -1,9 +1,6 @@
 #include <stdio.h>
 
-#include "lib/static-component-params.h"
-
 #include "flow.h"
-
 #include "lib/nf_log.h"
 
 inline void log_ip(uint32_t addr) {
