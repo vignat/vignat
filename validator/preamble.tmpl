@@ -5,13 +5,6 @@
 #include "lib/containers/double-map.h"
 #include "lib/containers/double-chain.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
-
-#include "lib/containers/batcher.h"
-
-#include "lib/containers/array-bat.h"
-#include "lib/containers/array-rq.h"
-#include "lib/containers/array-u16.h"
-#include "lib/containers/array-lcc.h"
 #include "vignat/loop.h"
 
 //@ #include "lib/abstract-state.h"
@@ -117,7 +110,7 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 //@ requires *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
-//@ ensures result != 0 ? true : (*bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _));
+//@ ensures result != 0 ? true : (*bufs |-> mb &*& a_packet(mb) &*& mbufp(mb, _));
 
 uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 //@ requires *bufs |-> _;

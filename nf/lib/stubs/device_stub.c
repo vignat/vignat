@@ -169,7 +169,7 @@ stub_free(struct rte_mbuf* mbuf) {
 static uint16_t
 stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
-	struct stub_queue *stub_q = q;
+	struct stub_queue* stub_q = q;
 
 	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
 	if (received) {
@@ -233,6 +233,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		if (i > 0) {
 			// Packet is actually received, trace now
 			klee_trace_ret();
+			klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
 			klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
 			klee_trace_param_u16(nb_bufs, "nb_bufs");
 			KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package");
@@ -246,18 +247,20 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 }
 
 static uint16_t
-stub_tx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
+stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
 	int packets_sent = klee_range(0, nb_bufs + 1 /* end is exclusive */, "packets_sent");
 	// Only trace if packet is actually sent
 	if (packets_sent) {
 		klee_trace_ret();
+		klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
 		klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
 		klee_trace_param_u16(nb_bufs, "nb_bufs");
 	}
 
 	for (int i = 0; i < packets_sent; i++) {
 		rte_pktmbuf_free(bufs[i]);
+		stub_free(bufs[i]);
 	}
 	return packets_sent;
 }

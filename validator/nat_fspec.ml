@@ -101,6 +101,9 @@ let stub_mbuf_content_struct = Ir.Str ( "stub_mbuf_content",
                                         ["ether", ether_hdr_struct;
                                          "ipv4", ipv4_hdr_struct;
                                          "tcp", tcp_hdr_struct;])
+
+let stub_queue_struct = Ir.Str ( "stub_queue", [] )
+
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                ["buf_addr", Ptr stub_mbuf_content_struct;
                                 "buf_physaddr", Uint64;
@@ -712,7 +715,7 @@ let fun_types =
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
      "stub_rx", {ret_type = Static Ir.Uint16;
-                 arg_types = stt [Ptr Void; Ptr (Ptr rte_mbuf_struct); Ir.Uint16];
+                 arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
                  extra_ptr_types = estt ["user_buf_addr",
                                          stub_mbuf_content_struct;
                                          "incoming_package",
@@ -730,8 +733,8 @@ let fun_types =
                                        (copy_stub_mbuf_content "the_received_packet"
                                         recv_pkt));
                                  ];};
-     "stub_tx", {ret_type = Static Ir.Uint26;
-                 arg_types = stt [Ptr Void; Ptr (Ptr rte_mbuf_struct); Ir.Uint16];
+     "stub_tx", {ret_type = Static Ir.Uint16;
+                 arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
                  extra_ptr_types = estt ["user_buf_addr",
                                          stub_mbuf_content_struct];
                  lemmas_before = [
@@ -826,7 +829,6 @@ struct
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
                   uint32_t external_ip = 0;\n\
-                  struct lcore_rx_queue *last_rq;\n\
                   uint8_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
                   struct stub_mbuf_content the_received_packet;\n\
