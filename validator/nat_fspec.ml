@@ -751,7 +751,7 @@ let fun_types =
                  ];
                  lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
                  ];};
-     "stub_free", {ret_type = Static Void;
+     "stub_free", {ret_type = Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
                    extra_ptr_types = estt ["user_buf_addr",
                                            stub_mbuf_content_struct];
