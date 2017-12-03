@@ -2,8 +2,6 @@
 
 #include <device_stub.h>
 
-#include <inttypes.h>
-
 #include <klee/klee.h>
 
 #include <containers/str-descr.h>
@@ -15,14 +13,6 @@
 #include <rte_mbuf.h>
 #include <rte_tcp.h>
 
-// TODO more complete stub content?
-// do change the total_len in rx if this is changed!
-struct stub_mbuf_content {
-  struct ether_hdr ether;
-  struct ipv4_hdr ipv4;
-  struct tcp_hdr tcp;
-};
-
 static const char* stub_name = "stub";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
@@ -30,16 +20,6 @@ static struct rte_eth_link stub_link = {
 	.link_duplex = ETH_LINK_FULL_DUPLEX,
 	.link_status = ETH_LINK_DOWN,
 	.link_autoneg = ETH_LINK_SPEED_AUTONEG,
-};
-
-struct stub_queue {
-	struct rte_mempool* mb_pool;
-	uint16_t port_id;
-};
-
-struct stub_device {
-	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
-	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
 };
 
 // BEGIN TRACING

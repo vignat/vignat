@@ -727,7 +727,7 @@ let fun_types =
                                        "*" ^ (List.nth_exn params.args 1)
                                      in
                                        "received_on_port = " ^
-                                       (List.nth_exn params.args 0) ^ ";\n" ^
+                                       (String.sub (List.nth_exn params.args 0) 1 ((String.length (List.nth_exn params.args 0) - 1))) ^ ".port_id;\n" ^ (* HACK: idk why but params.args[0] has &() *)
                                        "received_packet_type = (" ^
                                        recv_pkt ^ ")->packet_type;\n" ^
                                        (copy_stub_mbuf_content "the_received_packet"
@@ -747,11 +747,10 @@ let fun_types =
                             (List.nth_exn params.args 1) ^
                             ";\n" ^
                             "sent_packet_type = (" ^
-                            sent_pkt ^ ")->packet_type;")
-                 ];
-                 lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                 ];};
-     "stub_free", {ret_type = Void;
+                            sent_pkt ^ ")->packet_type;");];
+                 lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
+                 };
+     "stub_free", {ret_type = Static Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
                    extra_ptr_types = estt ["user_buf_addr",
                                            stub_mbuf_content_struct];
@@ -828,7 +827,7 @@ struct
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
                   uint32_t external_ip = 0;\n\
-                  uint8_t received_on_port;\n\
+                  uint16_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
                   struct stub_mbuf_content the_received_packet;\n\
                   bool a_packet_received = false;\n\

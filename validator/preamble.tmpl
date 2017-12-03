@@ -6,8 +6,71 @@
 #include "lib/containers/double-chain.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
 #include "vignat/loop.h"
+#include "lib/stubs/device_stub.h"
 
 //@ #include "lib/abstract-state.h"
+
+// DPDK stuff - but since this is used by VeriFast, we can't include rte_ things (VeriFast's preprocessor is lacking)
+struct rte_mbuf {
+	void *buf_addr;
+	uint64_t buf_physaddr;
+	uint16_t buf_len;
+	uint16_t data_off;
+	uint16_t refcnt;
+	uint8_t nb_segs;
+	uint8_t port;
+	uint64_t ol_flags;
+	uint32_t packet_type;
+	uint32_t pkt_len;
+	uint16_t data_len;
+	uint16_t vlan_tci;
+	uint32_t hash;
+	uint32_t seqn;
+	uint16_t vlan_tci_outer;
+	uint64_t udata64;
+	void* pool;
+	struct rte_mbuf *next;
+	uint64_t tx_offload;
+	uint16_t priv_size;
+	uint16_t timesync;
+	void* offload_ops;
+};
+struct ether_addr {
+        uint8_t a;
+        uint8_t b;
+        uint8_t c;
+        uint8_t d;
+        uint8_t e;
+        uint8_t f;
+};
+struct ether_hdr {
+	struct ether_addr d_addr;
+	struct ether_addr s_addr;
+	uint16_t ether_type;
+};
+struct ipv4_hdr {
+	uint8_t  version_ihl;
+	uint8_t  type_of_service;
+	uint16_t total_length;
+	uint16_t packet_id;
+	uint16_t fragment_offset;
+	uint8_t  time_to_live;
+	uint8_t  next_proto_id;
+	uint16_t hdr_checksum;
+	uint32_t src_addr;
+	uint32_t dst_addr;
+};
+struct tcp_hdr {
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint32_t sent_seq;
+	uint32_t recv_ack;
+	uint8_t  data_off;
+	uint8_t  tcp_flags;
+	uint16_t rx_win;
+	uint16_t cksum;
+	uint16_t tcp_urp;
+};
 
 int flow_consistency(void* key_a, void* key_b, int index, void* value)
 /*@ requires true; @*/
@@ -72,7 +135,7 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
     inductive user_bufi = user_bufc(ether_hdri, ipv4_hdri, tcp_hdri);
 
-    predicate user_bufferp(struct user_buf *buf; user_bufi ub) =
+    predicate user_bufferp(struct stub_mbuf_content *buf; user_bufi ub) =
       ether_hdrp(&buf->ether, ?hdr) &*&
       ipv4_hdrp(&buf->ipv4, ?ipv4) &*&
       tcp_hdrp(&buf->tcp, ?tcp) &*&

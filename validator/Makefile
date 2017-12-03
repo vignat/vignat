@@ -18,6 +18,8 @@ _build/bridge_fspec.cmo: .PHONY
 .PHONY:
 
 clean:
-	rm _build -r
-	rm nat_fspec.cmo
-	rm validator.byte
+	rm -rf aaa
+	rm -rf _build
+	find -iname '*.cmo' -delete
+	find -iname '*.log' -delete
+	rm -f validator.byte
