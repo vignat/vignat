@@ -43,14 +43,13 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
   | None -> "\n"
 
-let rec render_assignment {lhs;rhs;} =
+let render_assignment {lhs;rhs;} =
   match rhs.v with
   | Undef -> "";
   | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
 
 let rec gen_plain_equalities {lhs;rhs} =
-  if term_eq lhs.v rhs.v then []
-  else match rhs.t, rhs.v with
+  match rhs.t, rhs.v with
   | Ptr ptee_t, Addr pointee ->
     gen_plain_equalities {lhs={v=Deref lhs;t=ptee_t};
                           rhs=pointee}
@@ -102,14 +101,16 @@ let rec gen_plain_equalities {lhs;rhs} =
                t=Boolean}}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | Ptr _, Zeroptr -> []
-  | _ -> failwith ("unsupported output type:rhs.t=" ^
-                   (ttype_to_str rhs.t) ^
-                   " : rhs=" ^
-                   (render_tterm rhs) ^
-                   " : lhs.t=" ^
-                   (ttype_to_str lhs.t) ^
-                   " : lhs=" ^
-                   (render_tterm lhs))
+  | _ -> match lhs.v, rhs.v with
+         | Deref lref, Deref rref -> gen_plain_equalities {lhs=lref; rhs=rref}
+         | _ -> failwith ("unsupported output type:rhs.t=" ^
+                          (ttype_to_str rhs.t) ^
+                          " : rhs=" ^
+                          (render_tterm rhs) ^
+                          " : lhs.t=" ^
+                          (ttype_to_str lhs.t) ^
+                          " : lhs=" ^
+                          (render_tterm lhs))
 
 let render_extra_pre_conditions context =
   String.concat ~sep:"\n"
