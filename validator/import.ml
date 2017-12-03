@@ -449,7 +449,7 @@ let find_first_known_address_comply addr tt at property =
                          but left here for the sake of void** output pointers,
                          that are not concretized yet. *)
           failwith ("Searching for a void instantiation of addr" ^
-                  (Int64.to_string addr))
+                  (Int64.to_string addr) ^ " x.tt:" ^ (ttype_to_str x.tt) ^ " tt:" ^ (ttype_to_str tt))
          | t1, t2 ->
            if (t1 <> t2) then
              lprintf "discarding: %s != %s\n"

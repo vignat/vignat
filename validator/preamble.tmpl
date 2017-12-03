@@ -10,9 +10,60 @@
 
 //@ #include "lib/abstract-state.h"
 
+// DPDK driver stub - copy/pasted here because VeriFast's C parser is awful so #ifdefs are painful
+//                    (it seems it even parses stuff inside an #ifdef that it won't use...)
+struct stub_mbuf_content {
+	struct ether_hdr ether;
+	struct ipv4_hdr ipv4;
+	struct tcp_hdr tcp;
+};
+struct stub_queue {
+	struct rte_mempool* mb_pool;
+	uint16_t port_id;
+};
+struct stub_device {
+	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
+	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
+};
 // DPDK stuff - but since this is used by VeriFast, we can't include rte_ things (VeriFast's preprocessor is lacking)
+// TODO check if can just struct rte_mempool;
+struct rte_ring {
+	char name[32];
+	int flags;
+	uint32_t watermark;
+	uint32_t sp_enqueue;
+	uint32_t size1;
+	uint32_t mask1;
+	volatile uint32_t head1;
+	volatile uint32_t tail1;
+	uint32_t sc_dequeue;
+	uint32_t size2;
+	uint32_t mask2;
+	volatile uint32_t head2;
+	volatile uint32_t tail2;
+	void** ring;
+};
+struct rte_mempool {
+	char name[32];
+	struct rte_ring* ring;
+	uint64_t phys_addr;
+	int flags;
+	uint32_t size;
+	uint32_t cache_size;
+	uint32_t cache_flushthresh;
+	uint32_t elt_size;
+	uint32_t header_size;
+	uint32_t trailer_size;
+	unsigned private_data_size;
+	uint32_t    pg_num;
+	uint32_t    pg_shift;
+	uintptr_t   pg_mask;
+	uintptr_t   elt_va_start;
+	uintptr_t   elt_va_end;
+	uint64_t elt_pa[1];
+};
 struct rte_mbuf {
-	void *buf_addr;
+	struct stub_mbuf_content* buf_addr; // <- WARNING this has changed from void* to struct stub_mbuf_content* !!!
 	uint64_t buf_physaddr;
 	uint16_t buf_len;
 	uint16_t data_off;
@@ -28,7 +79,7 @@ struct rte_mbuf {
 	uint32_t seqn;
 	uint16_t vlan_tci_outer;
 	uint64_t udata64;
-	void* pool;
+	struct rte_mempool* pool;
 	struct rte_mbuf *next;
 	uint64_t tx_offload;
 	uint16_t priv_size;
@@ -71,23 +122,6 @@ struct tcp_hdr {
 	uint16_t cksum;
 	uint16_t tcp_urp;
 };
-// DPDK driver stub - copy/pasted here because VeriFast's C parser is awful so #ifdefs are painful
-//                    (it seems it even parses stuff inside an #ifdef that it won't use...)
-struct rte_mempool;
-struct stub_mbuf_content {
-	struct ether_hdr ether;
-	struct ipv4_hdr ipv4;
-	struct tcp_hdr tcp;
-};
-struct stub_queue {
-	struct rte_mempool* mb_pool;
-	uint16_t port_id;
-};
-struct stub_device {
-	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
-	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
-};
-
 
 int flow_consistency(void* key_a, void* key_b, int index, void* value)
 /*@ requires true; @*/

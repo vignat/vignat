@@ -49,7 +49,8 @@ let rec render_assignment {lhs;rhs;} =
   | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
 
 let rec gen_plain_equalities {lhs;rhs} =
-  match rhs.t, rhs.v with
+  if term_eq lhs.v rhs.v then []
+  else match rhs.t, rhs.v with
   | Ptr ptee_t, Addr pointee ->
     gen_plain_equalities {lhs={v=Deref lhs;t=ptee_t};
                           rhs=pointee}
@@ -101,10 +102,14 @@ let rec gen_plain_equalities {lhs;rhs} =
                t=Boolean}}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | Ptr _, Zeroptr -> []
-  | _ -> failwith ("unsupported output type: " ^
+  | _ -> failwith ("unsupported output type:rhs.t=" ^
                    (ttype_to_str rhs.t) ^
-                   " : " ^
-                   (render_tterm rhs))
+                   " : rhs=" ^
+                   (render_tterm rhs) ^
+                   " : lhs.t=" ^
+                   (ttype_to_str lhs.t) ^
+                   " : lhs=" ^
+                   (render_tterm lhs))
 
 let render_extra_pre_conditions context =
   String.concat ~sep:"\n"
