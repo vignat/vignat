@@ -444,12 +444,12 @@ let find_first_known_address_comply addr tt at property =
         &&
         (match x.tt, tt with
          | _, Unknown
-         | _, Void -> true
+         | _, Void ->
          (* TODO: should not really occur.
                          but left here for the sake of void** output pointers,
                          that are not concretized yet. *)
-         (* failwith ("Searching for a void instantiation of addr" ^ *)
-         (*         (Int64.to_string addr)) *)
+          failwith ("Searching for a void instantiation of addr" ^
+                  (Int64.to_string addr))
          | t1, t2 ->
            if (t1 <> t2) then
              lprintf "discarding: %s != %s\n"

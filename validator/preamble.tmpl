@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "rte_config.h"
 #include "lib/expirator.h"
 #include "lib/nf_time.h"
 #include "lib/stubs/my-time-stub-control.h"
@@ -6,7 +7,6 @@
 #include "lib/containers/double-chain.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
 #include "vignat/loop.h"
-#include "lib/stubs/device_stub.h"
 
 //@ #include "lib/abstract-state.h"
 
@@ -71,6 +71,23 @@ struct tcp_hdr {
 	uint16_t cksum;
 	uint16_t tcp_urp;
 };
+// DPDK driver stub - copy/pasted here because VeriFast's C parser is awful so #ifdefs are painful
+//                    (it seems it even parses stuff inside an #ifdef that it won't use...)
+struct rte_mempool;
+struct stub_mbuf_content {
+	struct ether_hdr ether;
+	struct ipv4_hdr ipv4;
+	struct tcp_hdr tcp;
+};
+struct stub_queue {
+	struct rte_mempool* mb_pool;
+	uint16_t port_id;
+};
+struct stub_device {
+	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
+	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
+};
+
 
 int flow_consistency(void* key_a, void* key_b, int index, void* value)
 /*@ requires true; @*/

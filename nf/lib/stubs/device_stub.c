@@ -9,9 +9,7 @@
 #include <rte_byteorder.h>
 #include <rte_dev.h>
 #include <rte_ethdev.h>
-#include <rte_ip.h>
 #include <rte_mbuf.h>
-#include <rte_tcp.h>
 
 static const char* stub_name = "stub";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
