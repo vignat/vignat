@@ -164,6 +164,16 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 				break;
 			}
 
+			if (i == 0) {
+				// Packet is actually received, trace now
+				klee_trace_ret();
+				klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
+				klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
+				klee_trace_param_u16(nb_bufs, "nb_bufs");
+				KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package");
+				KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr);
+			}
+
 			// Make the packet symbolic...
 			klee_make_symbolic(buf_value, stub_q->mb_pool->elt_size, "buf_value");
 			memcpy(bufs[i], buf_value, stub_q->mb_pool->elt_size);
@@ -206,16 +216,6 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 				(bufs[i]->packet_type == 0 && buf_content->ether.ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
 				buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
 			}
-		}
-
-		if (i > 0) {
-			// Packet is actually received, trace now
-			klee_trace_ret();
-			klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
-			klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
-			klee_trace_param_u16(nb_bufs, "nb_bufs");
-			KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package");
-			KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr);
 		}
 
 		return i;
