@@ -1,5 +1,5 @@
-
 open Core.Std
+open Str
 open Fspec_api
 open Ir
 
@@ -127,6 +127,13 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "tx_offload", Uint64;
                                 "priv_size", Uint16;
                                 "timesync", Uint16] )
+
+(* VeriFast's C parser is quite limited, so simplify stuff... *)
+let simplify_c_string str =
+  let str0 = Str.global_replace (Str.regexp "\\*&") "" str in (* don't deref an address *)
+  let str1 = Str.global_replace (Str.regexp "&(\\([^)]+\\))->\\([^)]+\\)") "\\1.\\2" str0 in (* don't take an addres to deref it *)
+  let str2 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str1 in (* don't deref to use the dot *)
+  str2
 
 let copy_stub_mbuf_content var_name ptr =
   ("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
@@ -727,12 +734,13 @@ let fun_types =
                                      let recv_pkt =
                                        "*" ^ (List.nth_exn params.args 1)
                                      in
-                                       "received_on_port = " ^
-                                       (String.sub (List.nth_exn params.args 0) 1 ((String.length (List.nth_exn params.args 0) - 1))) ^ ".port_id;\n" ^ (* HACK: idk why but params.args[0] has &() *)
-                                       "received_packet_type = (" ^
-                                       recv_pkt ^ ")->packet_type;\n" ^
-                                       (copy_stub_mbuf_content "the_received_packet"
-                                        recv_pkt));
+                                       simplify_c_string (
+                                         "received_on_port = " ^
+                                         (List.nth_exn params.args 0) ^ "->port_id;\n" ^
+                                         "received_packet_type = (" ^
+                                         recv_pkt ^ ")->packet_type;\n" ^
+                                         (copy_stub_mbuf_content "the_received_packet"
+                                          recv_pkt)));
                                  ];};
      "stub_tx", {ret_type = Static Ir.Uint16;
                  arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
@@ -740,15 +748,16 @@ let fun_types =
                  lemmas_before = [
                       (fun params ->
                           let sent_pkt =
-                            (List.nth_exn params.args 0)
+                            (List.nth_exn params.args 1)
                           in
-                            (copy_stub_mbuf_content "sent_packet"
-                             sent_pkt) ^ "\n" ^
-                            "sent_on_port = " ^
-                            (List.nth_exn params.args 1) ^
-                            ";\n" ^
-                            "sent_packet_type = (" ^
-                            sent_pkt ^ ")->packet_type;");];
+                            simplify_c_string (
+                              (copy_stub_mbuf_content "sent_packet"
+                               ("*" ^ sent_pkt)) ^ "\n" ^
+                              "sent_on_port = " ^
+                              (List.nth_exn params.args 1) ^
+                              ";\n" ^
+                              "sent_packet_type = (" ^
+                              sent_pkt ^ ")->packet_type;"));];
                  lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
                  };
      "stub_free", {ret_type = Static Void;

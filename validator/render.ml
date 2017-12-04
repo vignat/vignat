@@ -13,6 +13,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
     assert(out_val.t = out_arg.t);
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
+  | Undef -> "// render_eq_sttmt undef..."
   | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 

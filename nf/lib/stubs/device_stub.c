@@ -101,35 +101,38 @@ struct nested_nested_field_descr stub_mbuf_content_n2[] = {
                                         mbuf_descrs[i].name,                                                                           \
                                         dir);                                                                                          \
   }
-#define KLEE_TRACE_MBUF_EPTR(m_ptr, pname)                                                                               \
-  klee_trace_extra_ptr(m_ptr, sizeof(*m_ptr), pname, "");                                                                \
-  klee_trace_extra_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), sizeof(struct stub_mbuf_content*), "buf_addr"); \
-  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) {                                                 \
-    klee_trace_extra_ptr_field(m_ptr,                                                                                    \
-                               mbuf_descrs[i].offset,                                                                    \
-                               mbuf_descrs[i].width,                                                                     \
-                               mbuf_descrs[i].name);                                                                     \
+#define KLEE_TRACE_MBUF_EPTR(m_ptr, pname, dir)                                                                               \
+  klee_trace_extra_ptr(m_ptr, sizeof(*m_ptr), pname, "", dir);                                                                \
+  klee_trace_extra_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), sizeof(struct stub_mbuf_content*), "buf_addr", dir); \
+  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) {                                                      \
+    klee_trace_extra_ptr_field(m_ptr,                                                                                         \
+                               mbuf_descrs[i].offset,                                                                         \
+                               mbuf_descrs[i].width,                                                                          \
+                               mbuf_descrs[i].name,                                                                           \
+                               dir);                                                                                          \
   }
-#define KLEE_TRACE_MBUF_CONTENT(u_ptr)                                                                             \
-  klee_trace_extra_ptr(u_ptr, sizeof(struct stub_mbuf_content), "user_buf_addr", "");                              \
-  klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, ether), sizeof(struct ether_hdr), "ether"); \
-  klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, ipv4), sizeof(struct ipv4_hdr), "ipv4");    \
-  klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, tcp), sizeof(struct tcp_hdr), "tcp");       \
-  for (int i = 0; i < sizeof(stub_mbuf_content_nested)/sizeof(stub_mbuf_content_nested[0]); ++i) {                 \
-    klee_trace_extra_ptr_nested_field(u_ptr,                                                                       \
-                                      stub_mbuf_content_nested[i].base_offset,                                     \
-                                      stub_mbuf_content_nested[i].offset,                                          \
-                                      stub_mbuf_content_nested[i].width,                                           \
-                                      stub_mbuf_content_nested[i].name);                                           \
-  }                                                                                                                \
-  for (int i = 0; i < sizeof(stub_mbuf_content_n2)/sizeof(stub_mbuf_content_n2[0]); ++i) {                         \
-    klee_trace_extra_ptr_nested_nested_field                                                                       \
-      (u_ptr,                                                                                                      \
-       stub_mbuf_content_n2[i].base_base_offset,                                                                   \
-       stub_mbuf_content_n2[i].base_offset,                                                                        \
-       stub_mbuf_content_n2[i].offset,                                                                             \
-       stub_mbuf_content_n2[i].width,                                                                              \
-       stub_mbuf_content_n2[i].name);                                                                              \
+#define KLEE_TRACE_MBUF_CONTENT(u_ptr, dir)                                                                             \
+  klee_trace_extra_ptr(u_ptr, sizeof(struct stub_mbuf_content), "user_buf_addr", "", dir);                              \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, ether), sizeof(struct ether_hdr), "ether", dir); \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, ipv4), sizeof(struct ipv4_hdr), "ipv4", dir);    \
+  klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, tcp), sizeof(struct tcp_hdr), "tcp", dir);       \
+  for (int i = 0; i < sizeof(stub_mbuf_content_nested)/sizeof(stub_mbuf_content_nested[0]); ++i) {                      \
+    klee_trace_extra_ptr_nested_field(u_ptr,                                                                            \
+                                      stub_mbuf_content_nested[i].base_offset,                                          \
+                                      stub_mbuf_content_nested[i].offset,                                               \
+                                      stub_mbuf_content_nested[i].width,                                                \
+                                      stub_mbuf_content_nested[i].name,                                                 \
+                                      dir);                                                                             \
+  }                                                                                                                     \
+  for (int i = 0; i < sizeof(stub_mbuf_content_n2)/sizeof(stub_mbuf_content_n2[0]); ++i) {                              \
+    klee_trace_extra_ptr_nested_nested_field                                                                            \
+      (u_ptr,                                                                                                           \
+       stub_mbuf_content_n2[i].base_base_offset,                                                                        \
+       stub_mbuf_content_n2[i].base_offset,                                                                             \
+       stub_mbuf_content_n2[i].offset,                                                                                  \
+       stub_mbuf_content_n2[i].width,                                                                                   \
+       stub_mbuf_content_n2[i].name,                                                                                    \
+       dir);                                                                                                            \
   }
 // END TRACING
 
@@ -137,7 +140,7 @@ void
 stub_free(struct rte_mbuf* mbuf) {
 	klee_trace_ret();
 	KLEE_TRACE_MBUF(mbuf, TD_IN);
-	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr);
+	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
 
 	klee_alias_function("rte_pktmbuf_free", "rte_pktmbuf_free");
 	rte_pktmbuf_free(mbuf);
@@ -162,16 +165,6 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 			if (buf_value == NULL) {
 				rte_pktmbuf_free(bufs[i]);
 				break;
-			}
-
-			if (i == 0) {
-				// Packet is actually received, trace now
-				klee_trace_ret();
-				klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
-				klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
-				klee_trace_param_u16(nb_bufs, "nb_bufs");
-				KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package");
-				KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr);
 			}
 
 			// Make the packet symbolic...
@@ -216,6 +209,18 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 				(bufs[i]->packet_type == 0 && buf_content->ether.ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
 				buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
 			}
+
+			if (i == 0) { // TODO should trace every packet... but for now there's only 1 anyway
+				// Packet is actually received, trace now
+				klee_trace_ret();
+				klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
+				klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_OUT);
+				klee_trace_param_u16(nb_bufs, "nb_bufs");
+				// FIXME replacing 0 by i here causes KLEE to fail...
+				KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package", TD_OUT);
+				KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_OUT);
+			}
+
 		}
 
 		return i;
@@ -232,13 +237,12 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	if (packets_sent) {
 		klee_trace_ret();
 		klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
-		klee_trace_param_ptr(bufs, sizeof(struct rte_mbuf*), "mbuf");
+		klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_IN);
 		klee_trace_param_u16(nb_bufs, "nb_bufs");
 	}
 
 	for (int i = 0; i < packets_sent; i++) {
 		rte_pktmbuf_free(bufs[i]);
-		stub_free(bufs[i]);
 	}
 	return packets_sent;
 }
