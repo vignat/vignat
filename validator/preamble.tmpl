@@ -223,8 +223,8 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 @*/
 
 uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires *bufs |-> ?mb &*& mb->buf_addr |-> ?bc &*& a_packet(mb) &*& mbufp(mb, _) &*& rte_mbuf_buf_addr(mb, bc);
-//@ ensures result != 0 ? true : (*bufs |-> mb &*& mb->buf_addr |-> bc &*& a_packet(mb) &*& mbufp(mb, _) &*& rte_mbuf_buf_addr(mb, bc));
+//@ requires *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
+//@ ensures result != 0 ? true : (*bufs |-> mb &*& a_packet(mb) &*& mbufp(mb, _));
 
 uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 //@ requires *bufs |-> _;
