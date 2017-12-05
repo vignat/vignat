@@ -464,8 +464,8 @@ let find_first_known_address_comply addr tt at property =
         | Beginning, _ -> prev
         | _, Beginning -> cand
         | After x1, After x2 ->
-          if x1 < x2 then cand
-          else if x2 < x1 then prev
+          if x1 < x2 then prev
+          else if x2 < x1 then cand
           else if prev.str_depth < cand.str_depth then prev
           else cand)
       candidates
