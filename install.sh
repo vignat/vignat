@@ -45,8 +45,7 @@ cmake \
  -DLLVM_CONFIG_BINARY=$BUILDDIR/llvm/Release/bin/llvm-config \
  -DLLVMCC=$BUILDDIR/llvm/Release/bin/clang \
  -DLLVMCXX=$BUILDDIR/llvm/Release/bin/clang++ \
- -DENABLE_SOLVER_STP=ON \
- -DSTP_DIR=$BUILDDIR/stp/build/ \
+ -DENABLE_SOLVER_Z3=ON \
  -DENABLE_KLEE_UCLIBC=ON \
  -DKLEE_UCLIBC_PATH=$BUILDDIR/klee-uclibc \
  -DENABLE_POSIX_RUNTIME=ON \
