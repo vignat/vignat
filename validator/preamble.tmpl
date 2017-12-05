@@ -224,14 +224,14 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 //@ requires *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
-//@ ensures result != 0 ? true : (*bufs |-> mb &*& a_packet(mb) &*& mbufp(mb, _));
+//@ ensures *bufs |-> mb &*& a_packet(mb) &*& mbufp(mb, _);
 
 uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 //@ requires *bufs |-> _;
-//@ ensures *bufs |-> ?mb &*& mb->buf_addr |-> ?bc &*& a_packet(mb) &*& mbufp(mb, _) &*& rte_mbuf_buf_addr(mb, bc);
+//@ ensures *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
 
 void stub_free(struct rte_mbuf* mbuf);
-//@ requires a_packet(mbuf) &*& mbufp(mbuf, _) &*& mbuf->buf_addr |-> ?bc &*& rte_mbuf_buf_addr(mbuf, bc);
+//@ requires a_packet(mbuf) &*& mbufp(mbuf, _);
 //@ ensures true;
 
 void flood(struct rte_mbuf *m, uint8_t skip_device,

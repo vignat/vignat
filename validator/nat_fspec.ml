@@ -128,12 +128,14 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "priv_size", Uint16;
                                 "timesync", Uint16] )
 
-(* VeriFast's C parser is quite limited, so simplify stuff... *)
-let simplify_c_string str =
-  let str0 = Str.global_replace (Str.regexp "\\*&") "" str in (* don't deref an address *)
-  let str1 = Str.global_replace (Str.regexp "&(\\([^)]+\\))->\\([^)]+\\)") "\\1.\\2" str0 in (* don't take an addres to deref it *)
-  let str2 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str1 in (* don't deref to use the dot *)
-  str2
+(* VeriFast's C parser is quite limited, so simplify stuff... this is very brittle since it does no lookbehind to avoid accidents *)
+let rec simplify_c_string str =
+  let str0 = Str.global_replace (Str.regexp "\\*&") "" str in (* *&a  ==>  a *)
+  let str0 = Str.global_replace (Str.regexp "\\*(&\\([^)]+\\))") "\\1" str0 in (* * (&a)  ==>  a *)
+  let str0 = Str.global_replace (Str.regexp "&(\\([^)]+\\))->\\([^)]+\\)") "\\1.\\2" str0 in (* &a->b  ==>  a.b *)
+  let str0 = Str.global_replace (Str.regexp "(&(\\([^)]+\\)))->\\([^)]+\\)") "\\1.\\2" str0 in (* (&a)->b  ==>  a.b *)
+  let str0 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str0 in (* ( *a ).b  ==>  a->b *)
+  if str = str0 then str else simplify_c_string str0 (* find a fixpoint *)
 
 let copy_stub_mbuf_content var_name ptr =
   ("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
@@ -754,9 +756,8 @@ let fun_types =
                               (copy_stub_mbuf_content "sent_packet"
                                ("*" ^ sent_pkt)) ^ "\n" ^
                               "sent_on_port = " ^
-                              (List.nth_exn params.args 1) ^
-                              ";\n" ^
-                              "sent_packet_type = (" ^
+                              (List.nth_exn params.args 0) ^ "->port_id;\n" ^
+                              "sent_packet_type = *(" ^
                               sent_pkt ^ ")->packet_type;"));];
                  lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
                  };
@@ -842,7 +843,7 @@ struct
                   struct stub_mbuf_content the_received_packet;\n\
                   bool a_packet_received = false;\n\
                   struct stub_mbuf_content sent_packet;\n\
-                  uint8_t sent_on_port;\n\
+                  uint16_t sent_on_port;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
   let fun_types = fun_types
