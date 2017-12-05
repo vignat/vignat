@@ -152,6 +152,10 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
 	struct stub_queue* stub_q = q;
 
+	uint16_t priv_size = rte_pktmbuf_priv_size(stub_q->mb_pool);
+	uint16_t mbuf_size = sizeof(struct rte_mbuf) + priv_size;
+	uint16_t buf_len = rte_pktmbuf_data_room_size(stub_q->mb_pool);
+
 	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
 	if (received) {
 		int i = 0;
@@ -161,22 +165,29 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 				break;
 			}
 
-			struct rte_mbuf* buf_value = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
-			if (buf_value == NULL) {
+			struct rte_mbuf* buf_symbol = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
+			if (buf_symbol == NULL) {
 				rte_pktmbuf_free(bufs[i]);
 				break;
 			}
 
-			// Make the packet symbolic...
-			klee_make_symbolic(buf_value, stub_q->mb_pool->elt_size, "buf_value");
-			memcpy(bufs[i], buf_value, stub_q->mb_pool->elt_size);
-			free(buf_value);
+			// Make the packet symbolic
+			klee_make_symbolic(buf_symbol, stub_q->mb_pool->elt_size, "buf_value");
+			memcpy(bufs[i], buf_symbol, stub_q->mb_pool->elt_size);
+			free(buf_symbol);
 
-			// ...except for what a driver guarantees
+			// Explicitly make the content symbolic
+			struct stub_mbuf_content* buf_content_symbol = (struct stub_mbuf_content*) malloc(sizeof(struct stub_mbuf_content));
+			if (buf_content_symbol == NULL) {
+				rte_pktmbuf_free(bufs[i]);
+				break;
+			}
+			klee_make_symbolic(buf_content_symbol, sizeof(struct stub_mbuf_content), "user_buf");
+			memcpy((char*) bufs[i] + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
+			free(buf_content_symbol);
+
+			// Keep contrete values for what a driver guarantees
 			// (assignments are in the same order as the rte_mbuf declaration)
-			uint16_t priv_size = rte_pktmbuf_priv_size(stub_q->mb_pool);
-			uint16_t mbuf_size = sizeof(struct rte_mbuf) + priv_size;
-			uint16_t buf_len = rte_pktmbuf_data_room_size(stub_q->mb_pool);
 			bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
 			bufs[i]->buf_physaddr = rte_mempool_virt2phy(stub_q->mb_pool, bufs[i]) + mbuf_size;
 			bufs[i]->buf_len = (uint16_t) buf_len;
