@@ -731,18 +731,14 @@ let fun_types =
                                          "incoming_package",
                                          rte_mbuf_struct];
                  lemmas_before = [];
-                 lemmas_after = [(fun _ -> "a_packet_received = true;\n");
-                                 (fun params ->
-                                     let recv_pkt =
-                                       "*" ^ (List.nth_exn params.args 1)
-                                     in
+                 lemmas_after = [(fun params -> "if (" ^ params.ret_name ^ " == 1) { a_packet_received = true;\n" ^
                                        simplify_c_string (
                                          "received_on_port = " ^
                                          (List.nth_exn params.args 0) ^ "->port_id;\n" ^
                                          "received_packet_type = (" ^
-                                         recv_pkt ^ ")->packet_type;\n" ^
+                                         "*" ^ (List.nth_exn params.args 1) ^ ")->packet_type;\n" ^
                                          (copy_stub_mbuf_content "the_received_packet"
-                                          recv_pkt)));
+                                          ("*" ^ (List.nth_exn params.args 1)))) ^ "}");
                                  ];};
      "stub_tx", {ret_type = Static Ir.Uint16;
                  arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];

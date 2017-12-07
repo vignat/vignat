@@ -123,16 +123,16 @@ let render_extra_pre_conditions context =
 let render_hist_fun_call {context;result} =
   (render_extra_pre_conditions context) ^
   (render_fcall_with_lemmas context) ^
-  (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
-  match result.ret_val.t with
-  | Ptr _ -> (if result.ret_val.v = Zeroptr then
-                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
-                " == " ^ "0);\n"
-              else
-                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
-                " != " ^ "0);\n") ^
-             "/* Do not render the return ptee assumption for hist calls */\n"
-  | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
+  (match result.ret_val.t with
+   | Ptr _ -> (if result.ret_val.v = Zeroptr then
+                 "//@ assume(" ^ (Option.value_exn context.ret_name) ^
+                 " == " ^ "0);\n"
+               else
+                 "//@ assume(" ^ (Option.value_exn context.ret_name) ^
+                 " != " ^ "0);\n") ^
+              "/* Do not render the return ptee assumption for hist calls */\n"
+   | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val) ^
+  (render_args_post_conditions ~is_assert:false result.args_post_conditions)
 
 let find_known_complementaries (sttmts:tterm list) =
   List.filter_map sttmts ~f:(fun sttmt ->
