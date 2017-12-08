@@ -220,27 +220,31 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       val == rte_mbufc(ub, port, ptype, doff) &*&
       doff == 0;
       //TODO: ^^^ is it really always so?
+
+   predicate packets(struct rte_mbuf** bufs, uint16_t start, uint16_t end) =
+     start == end ? true : (pointer(bufs + start, ?buf) &*& a_packet(buf) &*& mbufp(buf,_) &*& packets(bufs, start + 1, end));
 @*/
 
 // TODO a lot of assumptions about only sending 1 packet here :(
 
 uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires *bufs |-> _;
-//@ ensures result <= nb_bufs &*& (result == 0 ? true : (*bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _)));
+//@ requires bufs[0..nb_bufs] |-> ?mbs;
+//@ ensures result <= nb_bufs &*& packets(bufs, 0, result) &*& bufs[result..nb_bufs] |-> _;
 
+// HACK we pretend that free is called after tx when in fact tx calls free, this is not great
 // we pretend that TX always succeeds since the validated property would be weird otherwise
 // TODO maybe trace some "tx was successful" variable, so we can put that in the property
 uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires *bufs |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
-//@ ensures result <= nb_bufs &*& *bufs |-> mb &*& a_packet(mb) &*& mbufp(mb, _);
+//@ requires packets(bufs, 0, nb_bufs);
+//@ ensures result <= nb_bufs &*& packets(bufs, result, nb_bufs);
 
 void stub_free(struct rte_mbuf* mbuf);
-//@ requires a_packet(mbuf) &*& mbufp(mbuf, _);
+//@ requires a_packet(mbuf) &*& mbufp(mbuf,_);
 //@ ensures true;
 
 void flood(struct rte_mbuf *m, uint8_t skip_device,
            uint8_t nb_devices);
-//@ requires a_packet(m) &*& mbufp(m, _);
+//@ requires a_packet(m) &*& mbufp(m,_);
 //@ ensures true;
 
 /*@

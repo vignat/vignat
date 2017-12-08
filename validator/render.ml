@@ -17,13 +17,15 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
          (render_tterm out_val) ^ ");\n"
 
-let render_fcall_with_lemmas context =
+let render_fcall_with_prelemmas context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
   (match context.ret_name with
    | Some name -> (ttype_to_str context.ret_type) ^
                   " " ^ name ^ " = "
    | None -> "") ^
-  (render_term context.application) ^ ";\n" ^
+  (render_term context.application) ^ ";\n"
+
+let render_postlemmas context =
   (String.concat ~sep:"\n" context.post_lemmas) ^ "\n"
 
 let render_args_post_conditions ~is_assert apk =
@@ -122,7 +124,7 @@ let render_extra_pre_conditions context =
 
 let render_hist_fun_call {context;result} =
   (render_extra_pre_conditions context) ^
-  (render_fcall_with_lemmas context) ^
+  (render_fcall_with_prelemmas context) ^
   (match result.ret_val.t with
    | Ptr _ -> (if result.ret_val.v = Zeroptr then
                  "//@ assume(" ^ (Option.value_exn context.ret_name) ^
@@ -132,7 +134,8 @@ let render_hist_fun_call {context;result} =
                  " != " ^ "0);\n") ^
               "/* Do not render the return ptee assumption for hist calls */\n"
    | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val) ^
-  (render_args_post_conditions ~is_assert:false result.args_post_conditions)
+  (render_postlemmas context) (* postlemmas can depend on the return value *) ^
+  (render_args_post_conditions ~is_assert:false result.args_post_conditions) (* ret can influence whether args are accessible *)
 
 let find_known_complementaries (sttmts:tterm list) =
   List.filter_map sttmts ~f:(fun sttmt ->
@@ -500,7 +503,8 @@ let render_tip_fun_call
     export_point free_vars hist_symbols
     ~render_assertions
     cmplxs =
-  (render_fcall_with_lemmas context) ^
+  (render_fcall_with_prelemmas context) ^
+  (render_postlemmas context) ^
   (* "// The legibility of these assignments is ensured by analysis.ml\n" ^ *)
   (* (render_equality_assumptions free_vars) ^ "\n" ^ *)
   (render_export_point export_point) ^
