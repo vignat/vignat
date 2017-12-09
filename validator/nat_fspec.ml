@@ -731,8 +731,7 @@ let fun_types =
                                          "incoming_package",
                                          rte_mbuf_struct];
                  lemmas_before = [];
-                 lemmas_after = [(fun params -> "//@ open packets(" ^ (List.nth_exn params.args 1) ^ ", 0, " ^ params.ret_name ^ ");");
-                                 (fun params -> "if (" ^ params.ret_name ^ " == 1) { a_packet_received = true;\n" ^
+                 lemmas_after = [(fun params -> "if (" ^ params.ret_name ^ " == 1) { a_packet_received = true;\n" ^
                                        simplify_c_string (
                                          "received_on_port = " ^
                                          (List.nth_exn params.args 0) ^ "->port_id;\n" ^
@@ -755,9 +754,7 @@ let fun_types =
                               "sent_on_port = " ^
                               (List.nth_exn params.args 0) ^ "->port_id;\n" ^
                               "sent_packet_type = *(" ^
-                              sent_pkt ^ ")->packet_type;"));
-                     (fun params -> "//@ close packets(" ^ (List.nth_exn params.args 1) ^ ", 0, " ^ (List.nth_exn params.args 2) ^ ");");
-                   ];
+                              sent_pkt ^ ")->packet_type;"));];
                  lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
                  };
      "stub_free", {ret_type = Static Void;
