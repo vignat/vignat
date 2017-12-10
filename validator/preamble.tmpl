@@ -220,6 +220,8 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       doff == 0;
       //TODO: ^^^ is it really always so?
 
+   // This is pretty and useful, but annoying since mbufp doesn't auto-open in that case
+   // TODO use this!
    predicate packets(struct rte_mbuf** bufs, uint16_t start, uint16_t end; list<rte_mbufi> vals) =
      start == end ? vals == nil : (pointer(bufs + start, ?buf) &*& mbufp(buf, ?head) &*& packets(bufs, start + 1, end, ?tail) &*& vals == cons(head, tail));
 @*/
@@ -227,15 +229,15 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 // TODO a lot of assumptions about only sending 1 packet here :(
 
 uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires bufs[0..nb_bufs] |-> ?mbs;
-//@ ensures result <= nb_bufs &*& packets(bufs, 0, result, _) &*& bufs[result..nb_bufs] |-> _;
+//@ requires nb_bufs == 1 &*& *bufs |-> _;
+//@ ensures result <= nb_bufs &*& *bufs |-> ?mb &*& (result == 0 ? true : mbufp(mb, _));
 
 // HACK we pretend that free is called after tx when in fact tx calls free, this is not great
-// we pretend that TX always succeeds since the validated property would be weird otherwise
+// also we pretend that TX always succeeds since the validated property would be weird otherwise
 // TODO maybe trace some "tx was successful" variable, so we can put that in the property
 uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires packets(bufs, 0, nb_bufs, _);
-//@ ensures result <= nb_bufs &*& packets(bufs, result, nb_bufs, _);
+//@ requires nb_bufs == 1 &*& *bufs |-> ?mb &*& mbufp(mb, _);
+//@ ensures result <= nb_bufs &*& *bufs |-> mb &*& mbufp(mb, _);
 
 void stub_free(struct rte_mbuf* mbuf);
 //@ requires mbufp(mbuf,_);
