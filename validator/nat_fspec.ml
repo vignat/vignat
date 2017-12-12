@@ -102,7 +102,7 @@ let stub_mbuf_content_struct = Ir.Str ( "stub_mbuf_content",
                                          "ipv4", ipv4_hdr_struct;
                                          "tcp", tcp_hdr_struct;])
 
-let stub_queue_struct = Ir.Str ( "stub_queue", [] )
+let stub_queue_struct = Ir.Str ( "stub_queue", ["port_id", Uint16] )
 
 let rte_mempool_struct = Ir.Str ( "rte_mempool", [] )
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",

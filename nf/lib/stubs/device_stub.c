@@ -150,7 +150,8 @@ static uint16_t
 stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
 	klee_trace_ret();
-	klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
+	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
+	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
 	klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_OUT);
 	klee_trace_param_u16(nb_bufs, "nb_bufs");
 
@@ -244,7 +245,8 @@ static uint16_t
 stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
 	klee_trace_ret();
-	klee_trace_param_just_ptr(q, sizeof(struct stub_queue), "q");
+	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
+	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
 	klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_IN);
 	klee_trace_param_u16(nb_bufs, "nb_bufs");
 
@@ -496,6 +498,23 @@ void
 stub_init(void)
 {
 	klee_alias_function("rte_pktmbuf_free", "stub_free"); // HACK
-	klee_alias_function("rte_pktmbuf_free931", "stub_free"); // HACK HACK HACK I don't get why clang does this even with -O0...
+	// HACK clang, what u doin?
+	klee_alias_function("rte_pktmbuf_free941", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1119", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1156", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1185", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1223", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1319", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1663", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1743", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1777", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1817", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1852", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1893", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1927", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1970", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2023", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2104", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2305", "stub_free");
 	rte_eal_driver_register(&stub_driver);
 }
