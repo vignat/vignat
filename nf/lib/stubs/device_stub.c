@@ -249,10 +249,11 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	klee_trace_param_u16(nb_bufs, "nb_bufs");
 
 	int packets_sent = klee_range(0, nb_bufs + 1 /* end is exclusive */, "packets_sent");
-	for (int i = 0; i < packets_sent; i++) {
+	int i;
+	for (i = 0; i < packets_sent; i++) {
 		rte_pktmbuf_free(bufs[i]);
 	}
-	return packets_sent;
+	return i;
 }
 
 static int
@@ -495,5 +496,6 @@ void
 stub_init(void)
 {
 	klee_alias_function("rte_pktmbuf_free", "stub_free"); // HACK
+	klee_alias_function("rte_pktmbuf_free931", "stub_free"); // HACK HACK HACK I don't get why clang does this even with -O0...
 	rte_eal_driver_register(&stub_driver);
 }
