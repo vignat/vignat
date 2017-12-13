@@ -4,7 +4,24 @@
 ### General
 
 BUILDDIR=`pwd`
-sudo apt-get install -y cmake wget build-essential curl git subversion
+sudo apt-get install -y cmake wget build-essential curl git subversion python parallel opam
+opam init -y
+echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> ~/.profile
+echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
+. ~/.profile
+
+
+### Z3 v4.5
+
+opam install ocamlfind -y
+
+git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3
+cd z3
+python scripts/mk_make.py --ml
+cd build
+make
+sudo "PATH=$PATH" make install # need the path for ocamlfind
+cd ../..
 
 
 ### KLEE
@@ -31,8 +48,6 @@ cd klee-uclibc
  --with-cc="../llvm/Release/bin/clang"
 make -j `nproc`
 cd ..
-
-sudo apt-get install z3
 
 git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git
 cd klee
@@ -65,9 +80,9 @@ sudo apt-get install -y --no-install-recommends \
                      valac gtksourceview2.0-dev \
                      liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
 
-git clone --depth 1 --branch export_path_conditions https://github.com/vignat/verifast
+git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast
 cd verifast/src
-make -j `nproc` verifast
+make Z3V4DOT5=yes
 echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
 . ~/.profile
 cd ../..
@@ -119,9 +134,4 @@ cd ..
 
 ### Validator dependencies
 
-sudo apt-get install -y parallel opam
-opam init -y
 opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
-echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> ~/.profile
-echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
-. ~/.profile
