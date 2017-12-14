@@ -585,24 +585,6 @@ let fun_types =
                         capture_chain "cur_ch" 0;
                         capture_map_ex "cur_map" "vk1" "vk2" 1;
                         (fun {args;tmp_gen;_} ->
-                           if String.equal !last_index_gotten "" then ""
-                           else (*FIXME: looks lit it is dead code*)
-                           "/*@ { \n\
-                            dmap_erase_all_has_trans(" ^
-                           (tmp_gen "cur_map") ^
-                           ", ikc(reset_arr20_34,\
-                            reset_arr20_36, reset_arr20_26, reset_arr20_30, " ^
-                           !last_device_id ^
-                           ", user_buf_23),\n\
-                            dchain_get_expired_indexes_fp(" ^
-                           (tmp_gen "cur_ch") ^ ", " ^
-                           (List.nth_exn args 2) ^
-                           "), " ^ (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^
-                           ");\n\
-                            coherent_same_cap(" ^
-                           (tmp_gen "cur_map") ^ ", " ^ (tmp_gen "cur_ch") ^
-                           ");\n } @*/");
-                        (fun {args;tmp_gen;_} ->
                            "//@ expire_flows_abstract(" ^ (tmp_gen "cur_map") ^
                            ", " ^ (tmp_gen "cur_ch") ^
                            ", " ^ (List.nth_exn args 2) ^ ");");
