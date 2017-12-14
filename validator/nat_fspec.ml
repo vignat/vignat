@@ -122,7 +122,7 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "seqn", Uint32;
                                 "vlan_tci_outer", Uint16;
                                 "udata64", Uint64;
-                                "pool", Ptr rte_mempool_struct;
+                                (*"pool", Ptr rte_mempool_struct;*)
                                 "next", Ptr Void;
                                 "tx_offload", Uint64;
                                 "priv_size", Uint16;

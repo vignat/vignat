@@ -38,7 +38,7 @@ struct str_field_descr mbuf_descrs[] = {
   {offsetof(struct rte_mbuf, seqn), sizeof(uint32_t), "seqn"},
   {offsetof(struct rte_mbuf, vlan_tci_outer), sizeof(uint16_t), "vlan_tci_outer"},
   {offsetof(struct rte_mbuf, udata64), sizeof(uint64_t), "udata64"},
-  {offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"},
+  /*{offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"}, */
   {offsetof(struct rte_mbuf, next), sizeof(struct rte_mbuf*), "next"},
   {offsetof(struct rte_mbuf, tx_offload), sizeof(uint64_t), "tx_offload"},
   {offsetof(struct rte_mbuf, priv_size), sizeof(uint16_t), "priv_size"},
