@@ -149,12 +149,6 @@ stub_free(struct rte_mbuf* mbuf) {
 static uint16_t
 stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
-	klee_trace_ret();
-	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
-	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
-	klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_OUT);
-	klee_trace_param_u16(nb_bufs, "nb_bufs");
-
 	struct stub_queue* stub_q = q;
 
 	uint16_t priv_size = rte_pktmbuf_priv_size(stub_q->mb_pool);
@@ -162,96 +156,99 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	uint16_t buf_len = rte_pktmbuf_data_room_size(stub_q->mb_pool);
 
 	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
-	if (received) {
-		int i = 0;
-		for (i = 0; i < received; i++) {
-			bufs[i] = rte_mbuf_raw_alloc(stub_q->mb_pool);
-			if (!bufs[i]) {
-				break;
-			}
-
-			struct rte_mbuf* buf_symbol = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
-			if (buf_symbol == NULL) {
-				rte_pktmbuf_free(bufs[i]);
-				break;
-			}
-
-			// Make the packet symbolic
-			klee_make_symbolic(buf_symbol, stub_q->mb_pool->elt_size, "buf_value");
-			memcpy(bufs[i], buf_symbol, stub_q->mb_pool->elt_size);
-			free(buf_symbol);
-
-			// Explicitly make the content symbolic
-			struct stub_mbuf_content* buf_content_symbol = (struct stub_mbuf_content*) malloc(sizeof(struct stub_mbuf_content));
-			if (buf_content_symbol == NULL) {
-				rte_pktmbuf_free(bufs[i]);
-				break;
-			}
-			klee_make_symbolic(buf_content_symbol, sizeof(struct stub_mbuf_content), "user_buf");
-			memcpy((char*) bufs[i] + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
-			free(buf_content_symbol);
-
-			// Keep contrete values for what a driver guarantees
-			// (assignments are in the same order as the rte_mbuf declaration)
-			bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
-			bufs[i]->buf_physaddr = rte_mempool_virt2phy(stub_q->mb_pool, bufs[i]) + mbuf_size;
-			bufs[i]->buf_len = (uint16_t) buf_len;
-			// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
-			// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
-			bufs[i]->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
-			bufs[i]->refcnt = 1;
-			bufs[i]->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
-			bufs[i]->port = stub_q->port_id;
-			bufs[i]->ol_flags = 0;
-			// packet_type is symbolic
-			bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
-			bufs[i]->data_len = sizeof(struct stub_mbuf_content);
-			// vlan_tci is symbolic
-			// hash is symbolic
-			// seqn is symbolic
-			// vlan_tci_outer is symbolic
-			bufs[i]->userdata = NULL;
-			bufs[i]->pool = stub_q->mb_pool;
-			bufs[i]->next = NULL;
-			// tx_offload is symbolic
-			bufs[i]->priv_size = priv_size;
-			// timesync is symbolic
-
-			rte_mbuf_sanity_check(bufs[i], 1 /* is head mbuf */);
-
-			struct stub_mbuf_content* buf_content = rte_pktmbuf_mtod(bufs[i], struct stub_mbuf_content*);
-			// TODO this matches nf_util, fix at the same time
-			if(RTE_ETH_IS_IPV4_HDR(bufs[i]->packet_type) ||
-				(bufs[i]->packet_type == 0 && buf_content->ether.ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
-				buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
-			}
-
-			if (i == 0) { // TODO should trace every packet... but for now there's only 1 anyway
-				// Packet is actually received, trace it now
-				// FIXME replacing 0 by i here causes KLEE to fail...
-				KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package", TD_OUT);
-				KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_OUT);
-			}
-
+	int i; // force concrete return value
+	for (i = 0; i < received; i++) {
+		bufs[i] = rte_mbuf_raw_alloc(stub_q->mb_pool);
+		if (!bufs[i]) {
+			break;
 		}
 
-		return i;
+		struct rte_mbuf* buf_symbol = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
+		if (buf_symbol == NULL) {
+			rte_pktmbuf_free(bufs[i]);
+			break;
+		}
+
+		// Make the packet symbolic
+		klee_make_symbolic(buf_symbol, stub_q->mb_pool->elt_size, "buf_value");
+		memcpy(bufs[i], buf_symbol, stub_q->mb_pool->elt_size);
+		free(buf_symbol);
+
+		// Explicitly make the content symbolic
+		struct stub_mbuf_content* buf_content_symbol = (struct stub_mbuf_content*) malloc(sizeof(struct stub_mbuf_content));
+		if (buf_content_symbol == NULL) {
+			rte_pktmbuf_free(bufs[i]);
+			break;
+		}
+		klee_make_symbolic(buf_content_symbol, sizeof(struct stub_mbuf_content), "user_buf");
+		memcpy((char*) bufs[i] + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
+		free(buf_content_symbol);
+
+		// Keep contrete values for what a driver guarantees
+		// (assignments are in the same order as the rte_mbuf declaration)
+		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
+		bufs[i]->buf_physaddr = rte_mempool_virt2phy(stub_q->mb_pool, bufs[i]) + mbuf_size;
+		bufs[i]->buf_len = (uint16_t) buf_len;
+		// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
+		// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
+		bufs[i]->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
+		bufs[i]->refcnt = 1;
+		bufs[i]->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
+		bufs[i]->port = stub_q->port_id;
+		bufs[i]->ol_flags = 0;
+		// packet_type is symbolic
+		bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
+		bufs[i]->data_len = sizeof(struct stub_mbuf_content);
+		// vlan_tci is symbolic
+		// hash is symbolic
+		// seqn is symbolic
+		// vlan_tci_outer is symbolic
+		bufs[i]->userdata = NULL;
+		bufs[i]->pool = stub_q->mb_pool;
+		bufs[i]->next = NULL;
+		// tx_offload is symbolic
+		bufs[i]->priv_size = priv_size;
+		// timesync is symbolic
+
+		rte_mbuf_sanity_check(bufs[i], 1 /* is head mbuf */);
+
+		struct stub_mbuf_content* buf_content = rte_pktmbuf_mtod(bufs[i], struct stub_mbuf_content*);
+		// TODO this matches nf_util, fix at the same time
+		if(RTE_ETH_IS_IPV4_HDR(bufs[i]->packet_type) ||
+			(bufs[i]->packet_type == 0 && buf_content->ether.ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+			buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+		}
 	}
 
-	return 0;
+	klee_trace_ret();
+	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_BOTH);
+	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_BOTH);
+	klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_OUT);
+	klee_trace_param_u16(nb_bufs, "nb_bufs");
+	if (i > 0) {
+		// TODO should trace every packet... but for now there's only 1 anyway
+		// Packet is actually received, trace it now
+		KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package", TD_OUT);
+		KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_OUT);
+	}
+
+	return i;
 }
 
 static uint16_t
 stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
 	klee_trace_ret();
-	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
-	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
+	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_BOTH);
+	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_BOTH);
 	klee_trace_param_ptr_directed(bufs, sizeof(struct rte_mbuf*), "mbuf", TD_IN);
 	klee_trace_param_u16(nb_bufs, "nb_bufs");
+	// TODO should trace every packet... but for now there's only 1 anyway
+	KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package", TD_IN);
+	KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_IN);
 
 	int packets_sent = klee_range(0, nb_bufs + 1 /* end is exclusive */, "packets_sent");
-	int i;
+	int i; // force concrete return value
 	for (i = 0; i < packets_sent; i++) {
 		rte_pktmbuf_free(bufs[i]);
 	}

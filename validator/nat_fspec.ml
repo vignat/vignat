@@ -724,7 +724,10 @@ let fun_types =
                                  ];};
      "stub_tx", {ret_type = Static Ir.Uint16;
                  arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
-                 extra_ptr_types = estt [];
+                 extra_ptr_types = estt ["user_buf_addr",
+                                         stub_mbuf_content_struct;
+                                         "incoming_package",
+                                         rte_mbuf_struct];
                  lemmas_before = [
                      (fun params ->
                           let sent_pkt =
