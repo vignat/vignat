@@ -104,16 +104,17 @@ let rec gen_plain_equalities {lhs;rhs} =
                t=Boolean}}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | Ptr _, Zeroptr -> []
+  | _, Undef -> []
   | _ -> match lhs.v, rhs.v with
          | Deref lref, Deref rref -> gen_plain_equalities {lhs=lref; rhs=rref}
-         | _ -> [] (*failwith ("unsupported output type:rhs.t=" ^
+         | _ -> failwith ("unsupported output type:rhs.t=" ^
                           (ttype_to_str rhs.t) ^
                           " : rhs=" ^
                           (render_tterm rhs) ^
                           " : lhs.t=" ^
                           (ttype_to_str lhs.t) ^
                           " : lhs=" ^
-                          (render_tterm lhs))*)
+                          (render_tterm lhs))
 
 let render_extra_pre_conditions context =
   String.concat ~sep:"\n"
