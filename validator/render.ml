@@ -267,6 +267,8 @@ let is_there_device_constraint constraints =
       | _ -> false)
 
 let guess_support_assignments constraints symbs =
+  (* printf "guess constraints\n"; *)
+  (* List.iter constraints ~f:(fun xxx -> printf "%s\n" (render_tterm xxx)); *)
   (* printf "symbols:\n"; *)
   (* Set.iter symbs ~f:(fun name -> printf "%s\n" name;); *)
   let there_is_a_device_constraint = is_there_device_constraint constraints in
@@ -280,11 +282,14 @@ let guess_support_assignments constraints symbs =
         | Bop (Eq, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
-        | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
-              ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)
+        | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
+          (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+1 *)
+          if List.exists constraints (fun cstr -> match cstr with {v=Bop (Eq,{v=Bool false;_},{v=Bop (Eq,{v=Id _;_},{v=Id r;_});_});_} when r = x -> true | _ -> false) then
+              ({lhs={v=Id x;t};rhs={v=Int (i+1);t=lt}}::assignments, String.Set.remove symbs x)
+          else if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
+              ({lhs={v=Id x;t};rhs={v=Int 1;t=lt}}::assignments, String.Set.remove symbs x)
           else
-              ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
+              ({lhs={v=Id x;t};rhs={v=Int i;t=lt}}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | _ -> (assignments, symbs))
