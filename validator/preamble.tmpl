@@ -235,9 +235,9 @@ uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 // HACK we pretend that free is called after tx when in fact tx calls free, this is not great
 // also we pretend that TX always succeeds since the validated property would be weird otherwise
 // TODO maybe trace some "tx was successful" variable, so we can put that in the property
-uint16_t stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires nb_bufs == 1 &*& *bufs |-> ?mb &*& mbufp(mb, _);
-//@ ensures result <= nb_bufs &*& *bufs |-> mb &*& mbufp(mb, _);
+uint16_t stub_tx(void* q, struct rte_mbuf* bufs, uint16_t nb_bufs);
+//@ requires nb_bufs == 1 &*&  mbufp(bufs, _);
+//@ ensures result <= nb_bufs &*& mbufp(bufs, _);
 
 void stub_free(struct rte_mbuf* mbuf);
 //@ requires mbufp(mbuf,_);

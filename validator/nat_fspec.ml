@@ -723,11 +723,9 @@ let fun_types =
                                           ("*" ^ (List.nth_exn params.args 1)))) ^ "}");
                                  ];};
      "stub_tx", {ret_type = Static Ir.Uint16;
-                 arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
+                 arg_types = stt [Ptr stub_queue_struct; Ptr rte_mbuf_struct; Ir.Uint16;];
                  extra_ptr_types = estt ["user_buf_addr",
-                                         stub_mbuf_content_struct;
-                                         "incoming_package",
-                                         rte_mbuf_struct];
+                                         stub_mbuf_content_struct];
                  lemmas_before = [
                      (fun params ->
                           let sent_pkt =
@@ -735,10 +733,10 @@ let fun_types =
                           in
                             simplify_c_string (
                               (copy_stub_mbuf_content "sent_packet"
-                               ("*" ^ sent_pkt)) ^ "\n" ^
+                               (sent_pkt)) ^ "\n" ^
                               "sent_on_port = " ^
                               (List.nth_exn params.args 0) ^ "->port_id;\n" ^
-                              "sent_packet_type = *(" ^
+                              "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
                  lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
                  };
