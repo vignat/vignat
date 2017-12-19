@@ -139,7 +139,8 @@ struct nested_nested_field_descr stub_mbuf_content_n2[] = {
 void
 stub_free(struct rte_mbuf* mbuf) {
 	klee_trace_ret();
-	klee_trace_param_just_ptr(mbuf, sizeof(struct rte_mbuf), "mbuf");
+	KLEE_TRACE_MBUF(mbuf, TD_IN);
+	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
 
 	klee_alias_function("rte_pktmbuf_free", "rte_pktmbuf_free");
 	rte_pktmbuf_free(mbuf);

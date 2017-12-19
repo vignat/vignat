@@ -742,7 +742,8 @@ let fun_types =
                  };
      "stub_free", {ret_type = Static Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
-                   extra_ptr_types = estt [];
+                   extra_ptr_types = estt ["user_buf_addr",
+                                           stub_mbuf_content_struct];
                    lemmas_before = [];
                    lemmas_after = [];}
     ]
