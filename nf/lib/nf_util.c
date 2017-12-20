@@ -39,9 +39,8 @@ nf_get_ipv4_tcpudp_header(struct ipv4_hdr* header)
 		return NULL;
 	}
 
-	uint8_t offset = header->version_ihl & IPV4_HDR_IHL_MASK;
-	// TODO use offset
-	return (struct tcpudp_hdr*)(header + 1);
+	uint8_t offset = (header->version_ihl & IPV4_HDR_IHL_MASK) * IPV4_IHL_MULTIPLIER;
+	return (struct tcpudp_hdr*)((unsigned char*) header + offset);
 }
 
 void

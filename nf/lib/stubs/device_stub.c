@@ -217,6 +217,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		// TODO this matches nf_util, fix at the same time
 		if(RTE_ETH_IS_IPV4_HDR(bufs[i]->packet_type) ||
 			(bufs[i]->packet_type == 0 && buf_content->ether.ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+			buf_content->ipv4.version_ihl = (4 << 4) | 5; // IPv4, 5x4 bytes - concrete to avoid symbolic indexing
 			buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
 		}
 	}
