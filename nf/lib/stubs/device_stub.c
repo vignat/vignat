@@ -175,7 +175,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		memcpy(bufs[i], buf_symbol, stub_q->mb_pool->elt_size);
 		free(buf_symbol);
 
-		// Explicitly make the content symbolic
+		// Explicitly make the content symbolic - validator depends on an user_buf symbol for the proof
 		struct stub_mbuf_content* buf_content_symbol = (struct stub_mbuf_content*) malloc(sizeof(struct stub_mbuf_content));
 		if (buf_content_symbol == NULL) {
 			rte_pktmbuf_free(bufs[i]);
