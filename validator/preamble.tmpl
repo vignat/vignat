@@ -80,11 +80,10 @@ struct rte_mbuf {
 	uint16_t vlan_tci_outer;
 	uint64_t udata64;
 	struct rte_mempool* pool;
-	struct rte_mbuf *next;
+	struct rte_mbuf* next;
 	uint64_t tx_offload;
 	uint16_t priv_size;
 	uint16_t timesync;
-	void* offload_ops;
 };
 struct ether_addr {
         uint8_t a;
