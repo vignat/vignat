@@ -139,7 +139,7 @@ enum DCHAIN_ENUM {
 
   lemma void initial_empty_cell(int ind)
   requires true;
-  ensures empty_cells_seg(nat_of_int(1), ind) == cons(dcell(ind+1,ind+1),nil);
+  ensures empty_cells_seg(succ(zero), ind) == cons(dcell(ind+1,ind+1),nil);
   {
     assert(nat_of_int(1) == succ(zero));
     assert(empty_cells_seg(zero, ind+1) == nil);
@@ -236,14 +236,18 @@ enum DCHAIN_ENUM {
   ensures true == some_engaged(full_free_list_fp(len, i), from, to);
   {
     switch(len) {
-      case zero: return;
+      case zero:
+          assert true == some_engaged(full_free_list_fp(zero, i), from, to);
+          return;
       case succ(n):
-        if (succ(from) == to) break;
-        else {
-          if (int_of_nat(succ(from)) == int_of_nat(to)) {
-            assert(nat_of_int(int_of_nat(succ(from))) ==
-                   nat_of_int(int_of_nat(to)));
-          }
+        if (int_of_nat(succ(from)) == int_of_nat(to)) {
+          assume(succ(from) == to); // FIXME really, VeriFast? you can't figure that one out?
+          assert true == some_engaged(full_free_list_fp(len, i), from, to);
+        } else {
+          //if (int_of_nat(succ(from)) == int_of_nat(to)) {
+          //  assert(nat_of_int(int_of_nat(succ(from))) ==
+          //         nat_of_int(int_of_nat(to)));
+          //}
           assert int_of_nat(succ(from)) != int_of_nat(to);
           full_free_list_some_engaged(n, succ(from), to, i+1);
           some_engaged_over_bigger_list(n, succ(from), to, i);

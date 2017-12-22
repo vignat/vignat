@@ -69,7 +69,7 @@ verify:
 	rm -f *.bc
 
 verifast:
-	verifast -I . -I .. -allow_assume -shared \
+	verifast -I . -I .. -allow_assume -shared -prover z3v4.5 \
 		../lib/assumptions_stubs.c \
 		../lib/flow.c \
 		../lib/containers/double-chain-impl.c \

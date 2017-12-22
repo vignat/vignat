@@ -999,7 +999,8 @@ int dchain_expire_one_index(struct DoubleChain* chain,
                     take(n, get_expired_indexes_fp(time, at)));
   {
     switch(at) {
-      case nil: return;
+      case nil:
+        return;
       case cons(h,t):
         if (0 < n)
           if (snd(h) < time)

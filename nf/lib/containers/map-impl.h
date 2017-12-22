@@ -1,11 +1,13 @@
 #ifndef _MAP_IMPL_H_INCLUDED_
 #define _MAP_IMPL_H_INCLUDED_
 
+#include <stdbool.h>
+
 //@ #include "stdex.gh"
 
-typedef int map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, void* k2);
+typedef bool map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, void* k2);
 //@ requires [?fr1]keyp(k1, ?kk1) &*& [?fr2]keyp(k2, ?kk2);
-//@ ensures [fr1]keyp(k1, kk1) &*& [fr2]keyp(k2, kk2) &*& (0 == result ? (kk1 != kk2) : (kk1 == kk2));
+//@ ensures [fr1]keyp(k1, kk1) &*& [fr2]keyp(k2, kk2) &*& (false == result ? (kk1 != kk2) : (kk1 == kk2));
 
 
 /*@ predicate pred_arg4<t1,t2,t3,t4>(predicate (t1,t2,t3,t4) p) = true;
