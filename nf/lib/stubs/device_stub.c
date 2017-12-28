@@ -244,7 +244,7 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	klee_trace_ret();
 	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
 	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
-	struct rte_mbuf* mbuf = bufs[0]; KLEE_TRACE_MBUF(mbuf, TD_IN);//klee_trace_param_ptr_directed(bufs[0], sizeof(struct rte_mbuf), "mbuf", TD_BOTH);
+	struct rte_mbuf* mbuf = bufs[0]; KLEE_TRACE_MBUF(mbuf, TD_IN); // TODO fix this silly macro to take a name, and document the horrible single-pointer hack or fix the damn thing
 	klee_trace_param_u16(nb_bufs, "nb_bufs");
 	// TODO should trace every packet... but for now there's only 1 anyway
 	KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_IN);

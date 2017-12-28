@@ -151,9 +151,22 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    void *key_a = 0;
-    void *key_b = 0;
+    void* key_a = NULL;
+    void* key_b = NULL;
     dexk_g(value, &key_a, &key_b);
+
+// HACK HACK HACK
+// This is a workaround for a KLEE bug - the eq_b_a below will fail with "provably false assume"
+// because it uses &&, and for some reason KLEE doesn't like assumes of the (a && b) form
+  struct int_key* k1 = key_a;
+  struct int_key* k2 = key;
+  klee_assume(k1->int_src_port == k2->int_src_port);
+  klee_assume(k1->dst_port == k2->dst_port);
+  klee_assume(k1->int_src_ip == k2->int_src_ip);
+  klee_assume(k1->dst_ip == k2->dst_ip);
+  klee_assume(k1->int_device_id == k2->int_device_id);
+  klee_assume(k1->protocol == k2->protocol);
+
     klee_assume(eq_a_g(key_a, key));
     if (ent_cond)
       klee_assume(ent_cond(key_a, key_b,
@@ -185,9 +198,20 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    void *key_a = 0;
-    void *key_b = 0;
+    void* key_a = NULL;
+    void* key_b = NULL;
     dexk_g(value, &key_a, &key_b);
+
+// HACK, see remark in dmap_get_a
+  struct ext_key* k1 = key_b;
+  struct ext_key* k2 = key;
+  klee_assume( k1->ext_src_port  == k2->ext_src_port);
+  klee_assume( k1->dst_port      == k2->dst_port);
+  klee_assume( k1->ext_src_ip    == k2->ext_src_ip);
+  klee_assume( k1->dst_ip        == k2->dst_ip);
+  klee_assume( k1->ext_device_id == k2->ext_device_id);
+  klee_assume( k1->protocol      == k2->protocol);
+
     klee_assume(eq_b_g(key_b, key));
     if (ent_cond) klee_assume(ent_cond(key_a, key_b,
                                        allocated_index, value));
@@ -265,22 +289,24 @@ void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_i32(index, "index");
-  klee_trace_param_ptr(value_out, value_size_g, "value_out");
+  klee_trace_param_ptr_directed(value_out, value_size_g, "value_out", TD_OUT);
   {
     for (int i = 0; i < value_field_count; ++i) {
-      klee_trace_param_ptr_field(value_out,
-                                 value_fields[i].offset,
-                                 value_fields[i].width,
-                                 value_fields[i].name);
+      klee_trace_param_ptr_field_directed(value_out,
+                                          value_fields[i].offset,
+                                          value_fields[i].width,
+                                          value_fields[i].name,
+                                          TD_OUT);
     }
   }
   {
     for (int i = 0; i < value_nests_count; ++i) {
-      klee_trace_param_ptr_nested_field(value_out,
-                                        value_nests[i].base_offset,
-                                        value_nests[i].offset,
-                                        value_nests[i].width,
-                                        value_nests[i].name);
+      klee_trace_param_ptr_nested_field_directed(value_out,
+                                                 value_nests[i].base_offset,
+                                                 value_nests[i].offset,
+                                                 value_nests[i].width,
+                                                 value_nests[i].name,
+                                                 TD_OUT);
     }
   }
   klee_assert(allocation_succeeded);
