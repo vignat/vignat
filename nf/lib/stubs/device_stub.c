@@ -222,6 +222,11 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		}
 	}
 
+	// Zero out the space we haven't used
+	for (int j = i; j < nb_bufs; j++) {
+		bufs[j] = NULL;
+	}
+
 	klee_trace_ret();
 	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
 	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
@@ -498,7 +503,7 @@ void
 stub_init(void)
 {
 	klee_alias_function("rte_pktmbuf_free", "stub_free"); // HACK
-	// HACK clang, what u doin?
+	// HACK rte_pktmbuf_free is static so it's cloned a bunch of times... :(
 	klee_alias_function("rte_pktmbuf_free941", "stub_free");
 	klee_alias_function("rte_pktmbuf_free1119", "stub_free");
 	klee_alias_function("rte_pktmbuf_free1156", "stub_free");

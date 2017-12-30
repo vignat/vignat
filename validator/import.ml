@@ -1106,7 +1106,10 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
       | Apathptr -> None
       | Curioptr ptee ->
         if is_empty_struct_val ptee.after then None
-          else
+        else match ptee.after.full with
+        | Some x when (Sexp.to_string x = "0" && arg.aname = "mbuf") -> (* HACK special-casing this, don't know how to get the argument name *)
+            Some {lhs={v=Id "arg6";t=Ptr Void};rhs={v=Int 0;t=Uint32}} 
+        | _ ->
             let key = Int64.of_string (Sexp.to_string arg.value) in
             let arg_type = (get_fun_arg_type ftype_of call i) in
             match find_first_known_address key (get_pointee arg_type) (After call.id) with
@@ -1323,13 +1326,13 @@ let extract_tip_calls ftype_of calls rets free_vars =
         ret_val=get_ret_val tip2;
         post_statements=convert_ctxt_list tip2.ret_context;}]
     | _ ->
-      List.map calls ~f:(fun tip ->
+      (*List.map calls ~f:(fun tip ->
           {args_post_conditions = compose_args_post_conditions tip ftype_of;
            ret_val = get_ret_val tip;
-           post_statements = convert_ctxt_list tip.ret_context})
-      (* failwith ("More than two tip calls (" ^ *)
-      (*           (string_of_int (List.length calls)) ^ *)
-      (*           ") is not supported.") *)
+           post_statements = convert_ctxt_list tip.ret_context}) *)
+       failwith ("More than two tip calls (" ^ 
+                 (string_of_int (List.length calls)) ^ 
+                 ") is not supported.") 
   in
   lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}

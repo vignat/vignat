@@ -457,7 +457,8 @@ let rec build_decision_tree results =
 let rec render_post_assertions dtree ret_name ret_type hist_symbs cmplxs =
   match dtree with
   | Single_result res ->
-    (render_output_check
+   (render_args_post_conditions ~is_assert:false res.args_post_conditions) ^ "\n" ^
+   (render_output_check
        res.ret_val ret_name ret_type
        res.post_statements hist_symbs
        res.args_post_conditions cmplxs) ^ "\n"

@@ -150,21 +150,24 @@ void lcore_main(void)
 
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
+
   VIGOR_LOOP_BEGIN
-    struct rte_mbuf* buf[1];
-    uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, buf, 1);
+    struct rte_mbuf* buf = NULL;
+    uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
 
     if (actual_rx_len != 0) {
-      uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf[0], VIGOR_NOW);
+      uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
       if (dst_device == VIGOR_DEVICE) {
-        rte_pktmbuf_free(buf[0]);
+        rte_pktmbuf_free(buf);
       } else {
-        uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, buf, 1);
+        uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, &buf, 1);
         if (actual_tx_len == 0) {
-          rte_pktmbuf_free(buf[0]);
+          rte_pktmbuf_free(buf);
         }
       }
     }
+
+//    buf = NULL;
   VIGOR_LOOP_END
 }
 
