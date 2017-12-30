@@ -1311,28 +1311,11 @@ let extract_tip_calls ftype_of calls rets free_vars =
   let results =
     match calls with
     | [] -> failwith "There must be at least one tip call."
-    | tip :: [] ->
-      let args_post_conditions = compose_args_post_conditions tip ftype_of in
-      [{args_post_conditions;
-        ret_val=get_ret_val tip;
-        post_statements=convert_ctxt_list tip.ret_context;}]
-    | tip1 :: tip2 :: [] ->
-      let args_post_conditions1 = compose_args_post_conditions tip1 ftype_of in
-      let args_post_conditions2 = compose_args_post_conditions tip2 ftype_of in
-      [{args_post_conditions=args_post_conditions1;
-        ret_val=get_ret_val tip1;
-        post_statements=convert_ctxt_list tip1.ret_context;};
-       {args_post_conditions=args_post_conditions2;
-        ret_val=get_ret_val tip2;
-        post_statements=convert_ctxt_list tip2.ret_context;}]
     | _ ->
-      (*List.map calls ~f:(fun tip ->
+      List.map calls ~f:(fun tip ->
           {args_post_conditions = compose_args_post_conditions tip ftype_of;
            ret_val = get_ret_val tip;
-           post_statements = convert_ctxt_list tip.ret_context}) *)
-       failwith ("More than two tip calls (" ^ 
-                 (string_of_int (List.length calls)) ^ 
-                 ") is not supported.") 
+           post_statements = convert_ctxt_list tip.ret_context})
   in
   lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
