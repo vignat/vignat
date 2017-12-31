@@ -26,42 +26,7 @@ struct stub_device {
 	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
 };
 // DPDK stuff - but since this is used by VeriFast, we can't include rte_ things (VeriFast's preprocessor is lacking)
-// TODO check if can just struct rte_mempool;
-struct rte_ring {
-	char name[32];
-	int flags;
-	uint32_t watermark;
-	uint32_t sp_enqueue;
-	uint32_t size1;
-	uint32_t mask1;
-	volatile uint32_t head1;
-	volatile uint32_t tail1;
-	uint32_t sc_dequeue;
-	uint32_t size2;
-	uint32_t mask2;
-	volatile uint32_t head2;
-	volatile uint32_t tail2;
-	void** ring;
-};
-struct rte_mempool {
-	char name[32];
-	struct rte_ring* ring;
-	uint64_t phys_addr;
-	int flags;
-	uint32_t size;
-	uint32_t cache_size;
-	uint32_t cache_flushthresh;
-	uint32_t elt_size;
-	uint32_t header_size;
-	uint32_t trailer_size;
-	unsigned private_data_size;
-	uint32_t    pg_num;
-	uint32_t    pg_shift;
-	uintptr_t   pg_mask;
-	uintptr_t   elt_va_start;
-	uintptr_t   elt_va_end;
-	uint64_t elt_pa[1];
-};
+struct rte_mempool;
 struct rte_mbuf {
 	struct stub_mbuf_content* buf_addr; // <- WARNING this has changed from void* to struct stub_mbuf_content* !!!
 	uint64_t buf_physaddr;
