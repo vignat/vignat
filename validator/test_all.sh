@@ -104,7 +104,8 @@ fi
 command -v $VERIFAST >/dev/null 2>&1 ||
     { echo >&2 "I require custom VeriFast in the PATH.  Aborting."; exit 1; }
 
-(cd $BASE_DIR && make all )
+(cd $BASE_DIR && make all)
+if [ $? != 0 ]; then exit 1; fi
 mkdir -p $WORK_DIR
 rm -f $REPORT_FNAME
 

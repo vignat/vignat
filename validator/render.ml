@@ -11,11 +11,13 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
       ptee
   | Struct (_, fields) ->
     assert(out_val.t = out_arg.t);
+    (match out_arg with
+     | {v=Deref {v=Id arg_name;t=_};t=_} -> "//@ " ^ head ^ "(" ^ arg_name ^ "!= 0 );\n" (* can be important to know the arg can be read *)
+     | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | Undef -> "// render_eq_sttmt undef..."
-  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
-         (render_tterm out_val) ^ ");\n"
+  | Undef -> "// render_eq_sttmt undef...\n"
+  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_prelemmas context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
@@ -313,6 +315,7 @@ let fix_mistyped_tip_ret tterm =
     -> {v=Not {v=Bop (Eq,{v=Int 0;t=Sint32},tterm);
                t=Boolean};
         t=Boolean}
+  | Bop (Bit_and, _, _) -> {v=Not {v=Bop (Eq,{v=Int 0;t=Sint32},tterm);t=Boolean};t=Boolean}
   | _ -> tterm
 
 
@@ -392,9 +395,8 @@ let statements_aligned_with_constraint constr sttmts =
 
 let rec build_decision_tree results =
   let handle_two_constraints hd1 hd2 =
-    match find_complementary_sttmts
-            hd1.post_statements
-            hd2.post_statements with
+    let results = hd1::hd2::[] in
+    match find_complementary_sttmts hd1.post_statements hd2.post_statements with
     | None ->
       failwith ("No complementary statements found.")
     | Some (sttmt1,sttmt2) ->
@@ -404,21 +406,21 @@ let rec build_decision_tree results =
       let results_pro2 = List.filter results ~f:(fun res ->
           statements_aligned_with_constraint sttmt2 res.post_statements)
       in
-    assert (0 < List.length results_pro1);
-    assert (0 < List.length results_pro2);
-    if (List.length results_pro1) + (List.length results_pro2) <>
-       (List.length results) then
-      failwith ("Statements " ^ (render_tterm sttmt1) ^ " and " ^
-                (render_tterm sttmt2) ^
-                " do not cleanly divide results set. Leftover " ^
-                "post statements: \n" ^
-                (String.concat ~sep:" \n AND \n "
-                   (List.map (List.filter results ~f:(fun res ->
-                        not (statements_aligned_with_constraint
-                               sttmt1 res.post_statements) &&
-                        not (statements_aligned_with_constraint
-                               sttmt2 res.post_statements)))
-                       ~f:(fun res -> tterm_list_to_string res.post_statements))));
+      assert (0 < List.length results_pro1);
+      assert (0 < List.length results_pro2);
+      if (List.length results_pro1) + (List.length results_pro2) <>
+         (List.length results) then
+        failwith ("Statements " ^ (render_tterm sttmt1) ^ " and " ^
+                  (render_tterm sttmt2) ^
+                  " do not cleanly divide results set. Leftover " ^
+                  "post statements: \n" ^
+                  (String.concat ~sep:" \n AND \n "
+                     (List.map (List.filter results ~f:(fun res ->
+                          not (statements_aligned_with_constraint
+                                 sttmt1 res.post_statements) &&
+                          not (statements_aligned_with_constraint
+                                 sttmt2 res.post_statements)))
+                         ~f:(fun res -> tterm_list_to_string res.post_statements))));
       Alternative_by_constraint ((sttmt1, build_decision_tree results_pro1),(sttmt2, build_decision_tree results_pro2))
   in
   match results with
@@ -444,42 +446,53 @@ let rec build_decision_tree results =
     (* All results have 2 statements except one *)
     let single_statement_result = List.find_exn results ~f:(fun rs -> List.length rs.post_statements = 1) in
     (* Add a statement to make the rest easier - it is implied by the existing statement, anyway *)
-    let statements = List.map results ~f:(fun rs -> 
+    let results = List.map results ~f:(fun rs -> 
       if rs = single_statement_result then
         match rs.post_statements with
           (* 0 != (x & N) for any N implies 0 != x *)
-        | {v=Not {v=Bop (Eq, {v=Int 0;t=zero_t}, {v=Bop (Bit_and, {v=Id var_v;t=var_t}, {v=_;t=_});t=_});t=_};t=_} :: [] ->
-            let new_post = {v=Not {v=Bop (Eq, {v=Int 0;t=zero_t}, {v=Id var_v;t=var_t});t=Boolean};t=Boolean} in
+        | {v=Bop (Bit_and, {v=Id var_v;t=var_t}, {v=_;t=_});t=_} :: [] ->
+            let new_post = {v=Id var_v;t=var_t} in
             {args_post_conditions=rs.args_post_conditions;
              ret_val=rs.ret_val;
              post_statements=new_post::rs.post_statements}
-        | x :: [] -> printf "%s\n" (render_tterm x); failwith "Sorry, you're on your own, welcome to special-case world!"
-        | _ -> failwith "uuuuh...."
-      else rs) in
+        | _ -> failwith "Sorry, you're on your own, welcome to special-case world!"
+      else rs)
+    in
+    assert (List.for_all results ~f:(fun res -> List.length res.post_statements = 2));
     (* From the given 'results', find the element that has a matching post-statement with 'result' *)
     (* Return (the matching element, the matching statement, the other elements) *)
     let rec find_matching_result res results =
       match results with
       | hd :: tl ->
-          begin match List.find res.post_statements ~f:(fun st -> 
-                  List.exists tl ~f:(fun other_res ->
-                    List.mem other_res.post_statements st)) with
+          begin
+          match List.find res.post_statements ~f:(fun st ->
+                  List.exists hd.post_statements ~f:(fun st2 -> term_eq st2.v st.v)) with
           | Some st -> (hd, st, tl)
           | None ->
               let (mate, mats, rest) = find_matching_result res tl in
               (mate, mats, hd :: rest)
           end
-      | _ -> failwith "Can't find a matching result!"
+      | [] -> failwith "Can't find a matching result!"
+    in
+    let remove_statement res stmt =
+      {args_post_conditions=res.args_post_conditions;
+       ret_val=res.ret_val;
+       post_statements=List.filter res.post_statements ~f:(fun st -> not(term_eq st.v stmt.v))}
     in
     match results with
     | hd1 :: tl1 ->
-        begin let (mat1, st1, rest) = find_matching_result hd1 tl1 in
+        begin
+        let (mat1, st1, rest) = find_matching_result hd1 tl1 in
+        assert (2 = List.length rest);
         match rest with
         | hd2 :: tl2 ->
             let (mat2, st2, rest) = find_matching_result hd2 tl2 in
-            assert (0 = List.length tl2);
+            assert (0 = List.length rest);
             (* Now that we have cleanly grouped our 4 statements into 2, we make a proper 2-level decision tree *)
-            Alternative_by_constraint ((st1,(handle_two_constraints hd1 mat1)),(st2,(handle_two_constraints hd2 mat2)))
+            Alternative_by_constraint ((st1,
+                                        (handle_two_constraints (remove_statement hd1 st1) (remove_statement mat1 st1))),
+                                       (st2,
+                                        (handle_two_constraints (remove_statement hd2 st2) (remove_statement mat2 st2))))
         | _ -> failwith "should not happen"
         end
     | _ -> failwith "should not happen, bis"

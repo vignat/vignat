@@ -1114,18 +1114,14 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
             let arg_type = (get_fun_arg_type ftype_of call i) in
             match find_first_known_address key (get_pointee arg_type) (After call.id) with
             | Some out_arg ->
-              lprintf "processing %s argptr: %s| strval: %s\n"
-                arg.aname (ttype_to_str out_arg.t)
-                (render_tterm (get_struct_val_value
-                                 ptee.after (get_pointee out_arg.t)));
-              begin match get_struct_val_value
-                            ptee.after (get_pointee out_arg.t) with
+              lprintf "processing %s argptr: %s| strval: %s\n" arg.aname (ttype_to_str out_arg.t)
+                                                               (render_tterm (get_struct_val_value ptee.after (get_pointee out_arg.t)));
+              begin match get_struct_val_value ptee.after (get_pointee out_arg.t) with
               | {v=Utility (Ptr_placeholder addr);t=Ptr ptee} ->
                 begin
                   match find_first_known_address addr ptee (After call.id) with
                   | Some value ->
-                    lprintf "found an interesting pointer value: %s\n"
-                      (render_tterm value);
+                    lprintf "found an interesting pointer value: %s\n" (render_tterm value);
                     Some {lhs=deref_tterm out_arg;
                           rhs=value}
                   | None -> None

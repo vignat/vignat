@@ -227,9 +227,10 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 // TODO a lot of assumptions about only sending 1 packet here :(
 
+// Most of the ensures is a convoluted way to say "*bufs is null iff result == 0, otherwise it points to a valid mbuf"
 uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
 //@ requires nb_bufs == 1 &*& *bufs |-> _;
-//@ ensures result <= nb_bufs &*& *bufs |-> ?mb &*& (result == 0 ? true : mbufp(mb, _)) &*& (result == nb_bufs ? mb != 0 : true);
+//@ ensures result <= nb_bufs &*& *bufs |-> ?mb &*& (result == 0 ? true : mbufp(mb, _)) &*& (result == nb_bufs ? mb != 0 : mb == 0);
 
 // HACK we pretend that free is called after tx when in fact tx calls free, this is not great
 // also we pretend that TX always succeeds since the validated property would be weird otherwise
