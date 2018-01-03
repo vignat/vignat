@@ -16,7 +16,7 @@
   while(klee_induce_invariants() & _vigor_loop_termination) { \
     nf_add_loop_iteration_assumptions(_vigor_lcore_id, _vigor_start_time); \
     uint32_t VIGOR_NOW = current_time(); \
-    /* FIXME TODO TEMP HACK */ \
+    /* concretize the device to avoid leaking symbols into DPDK */ \
     unsigned _vigor_devices_count = rte_eth_dev_count(); \
     unsigned VIGOR_DEVICE = klee_range(0, _vigor_devices_count, "VIGOR_DEVICE"); \
     for(unsigned _ = 0; _ < _vigor_devices_count; _++) if (VIGOR_DEVICE == _) { VIGOR_DEVICE = _; break; }
@@ -28,7 +28,7 @@
   while (1) { \
     uint32_t VIGOR_NOW = current_time(); \
     unsigned _vigor_devices_count = rte_eth_dev_count(); \
-    for (uint8_t VIGOR_DEVICE = 0; VIGOR_DEVICE < _vigor_devices_count; device++) {
+    for (uint8_t VIGOR_DEVICE = 0; VIGOR_DEVICE < _vigor_devices_count; VIGOR_DEVICE++) {
 #define VIGOR_LOOP_END } }
 #endif
 

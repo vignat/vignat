@@ -126,9 +126,6 @@ void nat_print_config(struct nat_config* config)
 {
 	NF_INFO("\n--- NAT Config ---\n");
 
-// TODO see remark in lcore_main
-//	NF_INFO("Batch size: %" PRIu16, BATCH_SIZE);
-
 	NF_INFO("Main LAN device: %" PRIu8, config->lan_main_device);
 	NF_INFO("WAN device: %" PRIu8, config->wan_device);
 

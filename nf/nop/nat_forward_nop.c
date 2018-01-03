@@ -1,5 +1,3 @@
-#include <inttypes.h>
-
 // DPDK uses these but doesn't include them. :|
 #include <linux/limits.h>
 #include <sys/types.h>
@@ -18,9 +16,7 @@ void nf_core_init(void)
 {
 }
 
-int nf_core_process(uint8_t device,
-                    struct rte_mbuf* mbuf,
-                    uint32_t now)
+int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 {
 	// Mark now as unused, we don't care about time
 	(void) now;
