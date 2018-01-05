@@ -6,10 +6,8 @@
 #include "lib/containers/double-chain.h"
 #include "lib/containers/double-map.h"
 #include "lib/flow.h"
-
-//@ #include "lib/predicates.gh"
-
 #include "lib/coherence.h"
+#include "lib/nf_time.h"
 
 /*@
 fixpoint bool nat_int_fp(int_k ik, int index) {

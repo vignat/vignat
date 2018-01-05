@@ -155,18 +155,6 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
     void* key_b = NULL;
     dexk_g(value, &key_a, &key_b);
 
-// HACK HACK HACK
-// This is a workaround for a KLEE bug - the eq_b_a below will fail with "provably false assume"
-// because it uses &&, and for some reason KLEE doesn't like assumes of the (a && b) form
-  struct int_key* k1 = key_a;
-  struct int_key* k2 = key;
-  klee_assume(k1->int_src_port == k2->int_src_port);
-  klee_assume(k1->dst_port == k2->dst_port);
-  klee_assume(k1->int_src_ip == k2->int_src_ip);
-  klee_assume(k1->dst_ip == k2->dst_ip);
-  klee_assume(k1->int_device_id == k2->int_device_id);
-  klee_assume(k1->protocol == k2->protocol);
-
     klee_assume(eq_a_g(key_a, key));
     if (ent_cond)
       klee_assume(ent_cond(key_a, key_b,
@@ -201,17 +189,6 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
     void* key_a = NULL;
     void* key_b = NULL;
     dexk_g(value, &key_a, &key_b);
-
-// HACK, see remark in dmap_get_a
-  struct ext_key* k1 = key_b;
-  struct ext_key* k2 = key;
-  klee_assume( k1->ext_src_port  == k2->ext_src_port);
-  klee_assume( k1->dst_port      == k2->dst_port);
-  klee_assume( k1->ext_src_ip    == k2->ext_src_ip);
-  klee_assume( k1->dst_ip        == k2->dst_ip);
-  klee_assume( k1->ext_device_id == k2->ext_device_id);
-  klee_assume( k1->protocol      == k2->protocol);
-
     klee_assume(eq_b_g(key_b, key));
     if (ent_cond) klee_assume(ent_cond(key_a, key_b,
                                        allocated_index, value));

@@ -142,6 +142,11 @@ stub_free(struct rte_mbuf* mbuf) {
 	KLEE_TRACE_MBUF(mbuf, TD_IN);
 	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
 
+	// Undo our pseudo-chain trickery (see stub_rx)
+	klee_allow_access(mbuf->next, mbuf->pool->elt_size);
+	free(mbuf->next);
+	mbuf->next = NULL;
+
 	klee_alias_function("rte_pktmbuf_free", "rte_pktmbuf_free");
 	rte_pktmbuf_free(mbuf);
 	klee_alias_function("rte_pktmbuf_free", "stub_free");
@@ -150,6 +155,9 @@ stub_free(struct rte_mbuf* mbuf) {
 static uint16_t
 stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
+	klee_assert(q != NULL);
+	klee_assert(nb_bufs == 1); // :(
+
 	struct stub_queue* stub_q = q;
 
 	uint16_t priv_size = rte_pktmbuf_priv_size(stub_q->mb_pool);
@@ -157,7 +165,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	uint16_t buf_len = rte_pktmbuf_data_room_size(stub_q->mb_pool);
 
 	int received = klee_range(0, nb_bufs + 1 /* end is exclusive */, "received");
-	int i; // force concrete return value
+	int i; // Concrete return value, validator doesn't like return symbols
 	for (i = 0; i < received; i++) {
 		bufs[i] = rte_mbuf_raw_alloc(stub_q->mb_pool);
 		if (!bufs[i]) {
@@ -185,6 +193,15 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		memcpy((char*) bufs[i] + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
 		free(buf_content_symbol);
 
+		// We do not support chained mbufs for now, make sure the NF doesn't touch them
+		struct rte_mbuf* buf_next = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
+                if (buf_next == NULL) {
+                        rte_pktmbuf_free(bufs[i]);
+                        break;
+                }
+		bufs[i]->next = buf_next;
+		klee_forbid_access(bufs[i]->next, stub_q->mb_pool->elt_size, "buf_next");
+
 		// Keep contrete values for what a driver guarantees
 		// (assignments are in the same order as the rte_mbuf declaration)
 		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
@@ -206,7 +223,6 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		// vlan_tci_outer is symbolic
 		bufs[i]->userdata = NULL;
 		bufs[i]->pool = stub_q->mb_pool;
-		bufs[i]->next = NULL;
 		// tx_offload is symbolic
 		bufs[i]->priv_size = priv_size;
 		// timesync is symbolic
@@ -217,6 +233,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		// TODO this matches nf_util, fix at the same time
 		if(RTE_ETH_IS_IPV4_HDR(bufs[i]->packet_type) ||
 			(bufs[i]->packet_type == 0 && buf_content->ether.ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+			// TODO can we make version_ihl symbolic?
 			buf_content->ipv4.version_ihl = (4 << 4) | 5; // IPv4, 5x4 bytes - concrete to avoid symbolic indexing
 			buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
 		}
@@ -246,6 +263,9 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 static uint16_t
 stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 {
+	klee_assert(q != NULL);
+	klee_assert(nb_bufs == 1); // :(
+
 	klee_trace_ret();
 	klee_trace_param_ptr_directed(q, sizeof(struct stub_queue), "q", TD_IN);
 	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
@@ -255,7 +275,7 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_IN);
 
 	int packets_sent = klee_range(0, nb_bufs + 1 /* end is exclusive */, "packets_sent");
-	int i; // force concrete return value
+	int i; // Concrete return value, validator doesn't like symbols
 	for (i = 0; i < packets_sent; i++) {
 		rte_pktmbuf_free(bufs[i]);
 	}
@@ -266,14 +286,18 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 static int
 stub_dev_configure(struct rte_eth_dev *dev)
 {
-	return 0;
+	return klee_int("dev_configure_return");
 }
 
 static int
 stub_dev_start(struct rte_eth_dev *dev)
 {
-	dev->data->dev_link.link_status = ETH_LINK_UP;
-	return 0;
+//NOPE
+	int ret =0;// klee_int("dev_start_return");
+	if (ret == 0) {
+		dev->data->dev_link.link_status = ETH_LINK_UP;
+	}
+	return ret;
 }
 
 static void
@@ -293,13 +317,17 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 		return -ENODEV;
 	}
 
-	struct stub_device* device = dev->data->dev_private;
-	device->rx_queues[rx_queue_id].port_id = dev->data->port_id;
-	device->rx_queues[rx_queue_id].mb_pool = mb_pool;
+	int ret = klee_int("dev_rx_queue_setup_return");
 
-	dev->data->rx_queues[rx_queue_id] = &device->rx_queues[rx_queue_id];
+	if (ret == 0) {
+		struct stub_device* device = dev->data->dev_private;
+		device->rx_queues[rx_queue_id].port_id = dev->data->port_id;
+		device->rx_queues[rx_queue_id].mb_pool = mb_pool;
 
-	return 0;
+		dev->data->rx_queues[rx_queue_id] = &device->rx_queues[rx_queue_id];
+	}
+
+	return ret;
 }
 
 static int
@@ -312,20 +340,26 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 		return -ENODEV;
 	}
 
-	struct stub_device* device = dev->data->dev_private;
-	device->tx_queues[tx_queue_id].port_id = dev->data->port_id;
-	device->tx_queues[tx_queue_id].mb_pool = NULL;
+	int ret = klee_int("dev_tx_queue_setup_return");
 
-	dev->data->tx_queues[tx_queue_id] = &device->tx_queues[tx_queue_id];
+	if (ret == 0) {
+	 	struct stub_device* device = dev->data->dev_private;
+		device->tx_queues[tx_queue_id].port_id = dev->data->port_id;
+		device->tx_queues[tx_queue_id].mb_pool = NULL;
 
-	return 0;
+		dev->data->tx_queues[tx_queue_id] = &device->tx_queues[tx_queue_id];
+	}
+
+	return ret;
 }
 
 
 static void
 stub_queue_release(void *q)
 {
-	klee_abort();
+	if (q != NULL) {
+		klee_forbid_access(q, sizeof(struct stub_queue), "released_queue");
+	}
 }
 
 static void
@@ -358,7 +392,7 @@ stub_stats_reset(struct rte_eth_dev *dev)
 static int
 stub_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 {
-	return 0; // DPDK doesn't even check the return value anyway...
+	return klee_int("dev_link_update_return");
 }
 
 static int
@@ -408,6 +442,11 @@ int
 stub_dev_create(const char *name,
 		const unsigned numa_node)
 {
+	int ret = klee_int("dev_create_return");
+	if (ret != 0) {
+		return ret;
+	}
+
 	struct rte_eth_dev_data* data = (struct rte_eth_dev_data*) malloc(sizeof(struct rte_eth_dev_data));
 	if (data == NULL) {
 		return -1;
@@ -449,18 +488,17 @@ stub_dev_create(const char *name,
 	eth_dev->tx_pkt_burst = stub_tx;
 
 	return 0;
-
-error:
-	free(data);
-	free(device);
-
-	return -1;
 }
 
 static int
 stub_devinit(const char *name, const char *params)
 {
 	// name is always NULL
+
+        int ret = klee_int("devinit_return");
+        if (ret != 0) {
+                return ret;
+        }
 
 	unsigned numa_node = rte_socket_id();
 
@@ -478,6 +516,11 @@ static int
 stub_devuninit(const char *name)
 {
 	// name is always NULL
+
+	int ret =0;// klee_int("devuninit_return");
+	if (ret != 0) {
+		return ret;
+	}
 
 	struct rte_eth_dev* eth_dev = rte_eth_dev_allocated(stub_name);
 	if (eth_dev == NULL) {
@@ -502,24 +545,26 @@ struct rte_driver stub_driver = {
 void
 stub_init(void)
 {
-	klee_alias_function("rte_pktmbuf_free", "stub_free"); // HACK
-	// HACK rte_pktmbuf_free is static so it's cloned a bunch of times... :(
-	klee_alias_function("rte_pktmbuf_free941", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1119", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1156", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1185", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1223", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1319", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1663", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1743", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1777", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1817", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1852", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1893", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1927", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1970", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2023", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2104", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2305", "stub_free");
+	// HACK
+	klee_alias_function("rte_pktmbuf_free", "stub_free");
+	// rte_pktmbuf_free is 'static inline', so it gets duplicated...
+	klee_alias_function("rte_pktmbuf_free942", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1120", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1157", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1186", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1224", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1320", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1667", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1747", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1781", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1821", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1856", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1897", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1931", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1974", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2027", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2108", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2307", "stub_free");
+
 	rte_eal_driver_register(&stub_driver);
 }

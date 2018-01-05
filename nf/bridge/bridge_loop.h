@@ -5,7 +5,7 @@
 #include "lib/containers/vector.h"
 #include "bridge_data.h"
 #include "lib/coherence.h"
-//@ #include "lib/predicates.gh"
+#include "lib/nf_time.h"
 
 /*@
   fixpoint bool st_entry_bound<t>(int bound, pair<t,int> p) {

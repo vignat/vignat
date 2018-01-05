@@ -1,7 +1,7 @@
 #pragma once
 
 #include <inttypes.h>
-#include <time.h>
+#include "lib/nf_time.h"
 
 struct rte_mbuf;
 

@@ -1,6 +1,6 @@
 #include "nf_time.h"
 
-#include <time.h>
+#include <stddef.h>
 
 time_t current_time(void)
 //@ requires last_time(?x);

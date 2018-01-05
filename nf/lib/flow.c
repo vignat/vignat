@@ -7,6 +7,14 @@
 #include "flow.h"
 #include "ignore.h"
 
+// KLEE doesn't tolerate && in a klee_assume (see klee/klee#809),
+// so we replace them with & during symbex but interpret them as && in the validator
+#ifdef KLEE_VERIFICATION
+#  define AND &
+#else // KLEE_VERIFICATION
+#  define AND &&
+#endif // KLEE_VERIFICATION
+
 bool int_key_eq(void* a, void* b)
 //@ requires [?f1]int_k_p(a, ?ak) &*& [?f2]int_k_p(b, ?bk);
 //@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (false == result ? (ak != bk) : (ak == bk));
@@ -14,11 +22,11 @@ bool int_key_eq(void* a, void* b)
   struct int_key* k1 = a;
   struct int_key* k2 = b;
   return k1->int_src_port  == k2->int_src_port
-      && k1->dst_port      == k2->dst_port
-      && k1->int_src_ip    == k2->int_src_ip
-      && k1->dst_ip        == k2->dst_ip
-      && k1->int_device_id == k2->int_device_id
-      && k1->protocol      == k2->protocol;
+     AND k1->dst_port      == k2->dst_port
+     AND k1->int_src_ip    == k2->int_src_ip
+     AND k1->dst_ip        == k2->dst_ip
+     AND k1->int_device_id == k2->int_device_id
+     AND k1->protocol      == k2->protocol;
 }
 
 bool ext_key_eq(void* a, void* b)
@@ -28,11 +36,11 @@ bool ext_key_eq(void* a, void* b)
   struct ext_key* k1 = a;
   struct ext_key* k2 = b;
   return k1->ext_src_port  == k2->ext_src_port
-      && k1->dst_port      == k2->dst_port
-      && k1->ext_src_ip    == k2->ext_src_ip
-      && k1->dst_ip        == k2->dst_ip
-      && k1->ext_device_id == k2->ext_device_id
-      && k1->protocol      == k2->protocol;
+     AND k1->dst_port      == k2->dst_port
+     AND k1->ext_src_ip    == k2->ext_src_ip
+     AND k1->dst_ip        == k2->dst_ip
+     AND k1->ext_device_id == k2->ext_device_id
+     AND k1->protocol      == k2->protocol;
 }
 
 static long long wrap(long long x)

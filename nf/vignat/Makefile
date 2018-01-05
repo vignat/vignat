@@ -52,7 +52,7 @@ verify:
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
-	klee -libc=uclibc -posix-runtime -dump-call-traces -max-memory=32000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
+	klee -libc=uclibc -posix-runtime -dump-call-traces -max-memory=12000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
 		--no-pci `# disable PCI enumeration since PCI is not available, we don't it use anyway` \
 		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \

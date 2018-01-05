@@ -4,7 +4,6 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include <queue>
 #include <vector>
@@ -16,6 +15,7 @@
 #include "../lib/nat_config.h"
 #include "../lib/nf_forward.h"
 #include "../lib/nf_log.h"
+#include "../lib/nf_time.h"
 #include "../lib/nf_util.h"
 
 #include "nat_flow.h"
@@ -45,7 +45,7 @@ static std::priority_queue<struct nat_flow*,
 				std::vector<struct nat_flow*>,
 				decltype(&nat_flow_greater_timestamp)> flows_by_time(nat_flow_greater_timestamp);
 
-static uint32_t current_timestamp;
+static time_t current_timestamp;
 
 
 static struct nat_flow_id
@@ -77,9 +77,11 @@ nat_flows_by_time_refresh(void)
 
 void nf_core_init(void)
 {
-  int power = 1;
-  while(power < config.max_flows)
-    power*=2;
+	int power = 1;
+	while(power < config.max_flows) {
+		power *= 2;
+	}
+
 	nat_map_set_fns(&nat_flow_id_hash, &nat_flow_id_eq);
 	flows_from_inside = nat_map_create(power);
 	flows_from_outside = nat_map_create(power);

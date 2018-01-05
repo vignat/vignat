@@ -106,7 +106,7 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
     NULL, // config (NULL = default)
     mbuf_pool // memory pool
   );
-  if (retval < 0) {
+  if (retval != 0) {
     rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu8 ", err=%d", device, retval);
   }
 
@@ -118,13 +118,13 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
     rte_eth_dev_socket_id(device), // socket
     NULL // config (NULL = default)
   );
-  if (retval < 0) {
+  if (retval != 0) {
     rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu8 " err=%d", device, retval);
   }
 
   // Start the device
   retval = rte_eth_dev_start(device);
-  if (retval < 0) {
+  if (retval != 0) {
     rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu8 ", err=%d", device, retval);
   }
 

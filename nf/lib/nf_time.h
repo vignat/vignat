@@ -1,9 +1,12 @@
 #ifndef NF_TIME_H_INCLUDED
 #define NF_TIME_H_INCLUDED
 #include <stdint.h>
-#include <time.h>
 
-//@ #include "lib/predicates.gh"
+// TODO use time_t from time.h - but this is used by VeriFast
+// so even #ifdef-ing the time.h inclusion out doesn't work
+#define time_t uint32_t
+
+//@ predicate last_time(time_t t) = true;
 
 /**
    A wrapper around the system time function. Returns the number of

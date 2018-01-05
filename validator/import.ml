@@ -434,7 +434,7 @@ let rec guess_type_l exps t =
     end
   | [] -> Unknown
 
-let find_first_known_address_comply addr tt at property earliest =
+let find_first_known_address_comply addr tt at property ~earliest =
   let legit_candidates lst =
     List.filter lst ~f:(fun x ->
         (match x.callid, at with
@@ -489,11 +489,11 @@ let find_first_known_address_comply addr tt at property earliest =
 
 let find_first_known_address addr tt at =
   lprintf "looking for first *%Ld\n" addr;
-  find_first_known_address_comply addr tt at (fun _ -> true) true
+  find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:true
 
 let find_last_known_address addr tt at =
   lprintf "looking for last *%Ld\n" addr;
-  find_first_known_address_comply addr tt at (fun _ -> true) false
+  find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:false
 
 let find_first_symbol_by_address addr tt at =
   lprintf "looking for a first symbol at *%Ld\n" addr;
@@ -506,7 +506,7 @@ let find_first_symbol_by_address addr tt at =
       lprintf "rejecting: %s\n" (render_tterm cand);
       false
   in
-  find_first_known_address_comply addr tt at (fun candidate -> is_addressable candidate.value) true
+  find_first_known_address_comply addr tt at (fun candidate -> is_addressable candidate.value) ~earliest:true
 
 let find_first_known_address_or_dummy addr t at =
   match find_first_known_address addr t at with
@@ -1107,8 +1107,8 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
       | Curioptr ptee ->
         if is_empty_struct_val ptee.after then None
         else match ptee.after.full with
-        | Some x when (Sexp.to_string x = "0" && arg.aname = "mbuf") -> (* HACK special-casing this, don't know how to get the argument name *)
-            Some {lhs={v=Id "arg6";t=Ptr Void};rhs={v=Int 0;t=Uint32}} 
+        | Some x when (Sexp.to_string x = "0" && arg.aname = "mbuf") ->
+            Some {lhs={v=Id "arg6";t=Ptr Void};rhs={v=Int 0;t=Uint32}} (* HACK special-casing this, don't know how to get the argument name *)
         | _ ->
             let key = Int64.of_string (Sexp.to_string arg.value) in
             let arg_type = (get_fun_arg_type ftype_of call i) in

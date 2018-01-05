@@ -1,9 +1,0 @@
-#ifndef PREDICATES_GH_INCLUDED
-#define PREDICATES_GH_INCLUDED
-
-/* TODO: how do you include stdint.h here? */
-
-predicate last_time(unsigned int t) = true;
-
-
-#endif
