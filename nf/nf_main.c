@@ -166,10 +166,44 @@ void lcore_main(void)
         }
       }
     }
-
-//    buf = NULL;
   VIGOR_LOOP_END
 }
+
+// Flood method for the bridge
+#ifndef KLEE_VERIFICATION
+static struct rte_mempool* clone_pool;
+
+static void init_clone_pool() {
+  clone_pool = rte_pktmbuf_pool_create(
+    "clone_pool", // name
+     MEMPOOL_BUFFER_COUNT, // #elements
+     0, // cache size (same remark as above)
+     0, // application private data size
+     RTE_MBUF_DEFAULT_BUF_SIZE, // data buffer size
+     rte_socket_id() // socket ID
+  );
+  if (clone_pool == NULL) {
+    rte_exit(EXIT_FAILURE, "Cannot create mbuf clone pool: %s\n",
+             rte_strerror(rte_errno));
+  }
+}
+
+void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
+  for (uint8_t device = 0; device < nb_devices; device++) {
+    if (device == skip_device) continue;
+    struct rte_mbuf* copy = rte_pktmbuf_clone(frame, clone_pool);
+    if (copy == NULL) {
+      rte_exit(EXIT_FAILURE, "Cannot clone a frame for flooding");
+    }
+    uint16_t actual_tx_len = rte_eth_tx_burst(device, 0, &copy, 1);
+
+    if (actual_tx_len == 0) {
+      rte_pktmbuf_free(copy);
+    }
+  }
+  rte_pktmbuf_free(frame);
+}
+#endif//!KLEE_VERIFICATION
 
 
 // --- Main ---
@@ -205,6 +239,11 @@ main(int argc, char* argv[])
   if (mbuf_pool == NULL) {
     rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
   }
+
+#ifndef KLEE_VERIFICATION
+  // Create another pool for the flood() cloning
+  init_clone_pool();
+#endif
 
   // Initialize all devices
   for (uint8_t device = 0; device < nb_devices; device++) {
