@@ -38,8 +38,8 @@ struct str_field_descr mbuf_descrs[] = {
   {offsetof(struct rte_mbuf, seqn), sizeof(uint32_t), "seqn"},
   {offsetof(struct rte_mbuf, vlan_tci_outer), sizeof(uint16_t), "vlan_tci_outer"},
   {offsetof(struct rte_mbuf, udata64), sizeof(uint64_t), "udata64"},
-  /*{offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"}, */
-  {offsetof(struct rte_mbuf, next), sizeof(struct rte_mbuf*), "next"},
+  /*{offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"}, TODO no real reason this is commented out? */
+  /*{offsetof(struct rte_mbuf, next), sizeof(struct rte_mbuf*), "next"}, - we ban access to it, so let's not trace it */
   {offsetof(struct rte_mbuf, tx_offload), sizeof(uint64_t), "tx_offload"},
   {offsetof(struct rte_mbuf, priv_size), sizeof(uint16_t), "priv_size"},
   {offsetof(struct rte_mbuf, timesync), sizeof(uint16_t), "timesync"},
@@ -292,8 +292,7 @@ stub_dev_configure(struct rte_eth_dev *dev)
 static int
 stub_dev_start(struct rte_eth_dev *dev)
 {
-//NOPE
-	int ret =0;// klee_int("dev_start_return");
+	int ret = klee_int("dev_start_return");
 	if (ret == 0) {
 		dev->data->dev_link.link_status = ETH_LINK_UP;
 	}
