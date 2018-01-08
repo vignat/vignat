@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Ir
 
 type lemma_params = {ret_name: string; ret_val: string;
@@ -57,8 +57,8 @@ type fun_spec = {ret_type: type_set; arg_types: type_set list;
 module type Spec =
 sig
   val preamble  : string
-  val fun_types : fun_spec Core.Std.String.Map.t
-  val fixpoints : Ir.tterm Core.Std.String.Map.t
+  val fun_types : fun_spec Core.String.Map.t
+  val fixpoints : Ir.tterm Core.String.Map.t
   val boundary_fun : string
   val finishing_fun : string
   val eventproc_iteration_begin : string

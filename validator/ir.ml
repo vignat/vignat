@@ -1,11 +1,11 @@
 open Sexplib.Conv
-open Core.Std
+open Core
 
-module Sexp = Core.Std.Sexp
+module Sexp = Core.Sexp
 
 type bop = Eq | Le | Lt | Ge | Gt
          | Add | Sub | Mul
-         | And | Bit_and with sexp
+         | And | Bit_and [@@deriving sexp]
 
 
 type ttype = | Ptr of ttype
@@ -22,11 +22,9 @@ type ttype = | Ptr of ttype
              | Boolean
              | Sunknown
              | Uunknown
-             | Unknown
-with sexp
+             | Unknown [@@deriving sexp]
 
-type term_util = Ptr_placeholder of int64
-with sexp
+type term_util = Ptr_placeholder of int64 [@@deriving sexp]
 
 type term = Bop of bop*tterm*tterm
           | Apply of string*tterm list
@@ -42,12 +40,11 @@ type term = Bop of bop*tterm*tterm
           | Cast of ttype*tterm
           | Zeroptr
           | Undef
-          | Utility of term_util
-and tterm = {v:term; t:ttype}
-and var_spec = {name: string; value:tterm}
-with sexp
+          | Utility of term_util [@@deriving sexp]
+and tterm = {v:term; t:ttype} [@@deriving sexp]
+and var_spec = {name: string; value:tterm} [@@deriving sexp]
 
-type eq_condition = {lhs: tterm; rhs: tterm} with sexp
+type eq_condition = {lhs: tterm; rhs: tterm} [@@deriving sexp]
 
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
@@ -73,26 +70,26 @@ type fun_call_context = {
   ret_name:string option;
   ret_type:ttype;
   call_id:int;
-} with sexp
+} [@@deriving sexp]
 
 type hist_call_result = {
   args_post_conditions:eq_condition list;
   ret_val:tterm;
-} with sexp
+} [@@deriving sexp]
 
 type tip_result = {
   args_post_conditions:eq_condition list;
   ret_val:tterm;
   post_statements:tterm list;
-} with sexp
+} [@@deriving sexp]
 
 type hist_call = {
   context:fun_call_context;
   result:hist_call_result;
-} with sexp
+} [@@deriving sexp]
 
 type tip_call = {context:fun_call_context;
-                 results:tip_result list} with sexp
+                 results:tip_result list} [@@deriving sexp]
 
 type ir = {
   preamble:string;
@@ -107,7 +104,7 @@ type ir = {
   finishing:bool;
   complete_event_loop_iteration:bool;
   semantic_checks:string;
-} with sexp
+} [@@deriving sexp]
 
 let strip_outside_parens str =
   if (String.is_prefix str ~prefix:"(") &&

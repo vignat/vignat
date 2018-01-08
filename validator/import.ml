@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Trace_prefix
 open Ir
 open Fspec_api
@@ -126,12 +126,6 @@ let expand_shorted_sexp sexp =
   let defs = cross_expand_defs_fixp defs in
   if (map_expandable defs defs) then begin
     lprintf "failed expansion on sexp: \n%s\n" (Sexp.to_string sexp);
-    lprintf "defs: ";
-    Map.iter (get_defs sexp) ~f:(fun ~key ~data ->
-        lprintf "%s ::: %s\n" key (Sexp.to_string data));
-    lprintf "expanded defs: ";
-    Map.iter defs ~f:(fun ~key ~data ->
-        lprintf "%s ::: %s\n" key (Sexp.to_string data));
     failwith ("incomplete map expansion for " ^ (Sexp.to_string sexp));
   end;
   (fst (expand_exp (remove_defs sexp) defs))
@@ -1098,7 +1092,7 @@ let rec is_empty_struct_val {sname;full;break_down} =
   (List.for_all break_down ~f:(fun {fname;value;addr} ->
      is_empty_struct_val value))
 
-let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
+let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args =
   List.filter_mapi call.args ~f:(fun i arg ->
       match arg.ptr with
       | Nonptr -> None
@@ -1108,7 +1102,10 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
         if is_empty_struct_val ptee.after then None
         else match ptee.after.full with
         | Some x when (Sexp.to_string x = "0" && arg.aname = "mbuf") ->
-            Some {lhs={v=Id "arg6";t=Ptr Void};rhs={v=Int 0;t=Uint32}} (* HACK special-casing this, don't know how to get the argument name *)
+            begin match List.nth_exn fun_args i with
+            | {v=Addr fun_arg_val;t=_} ->
+                Some {lhs=fun_arg_val;rhs={v=Int 0;t=Uint32}} (* HACK special-casing this, don't know how to get the argument name *)
+            | _ -> failwith "Write your own special case. Sorry." end
         | _ ->
             let key = Int64.of_string (Sexp.to_string arg.value) in
             let arg_type = (get_fun_arg_type ftype_of call i) in
@@ -1263,7 +1260,7 @@ let extract_common_call_context
 
 let extract_hist_call ftype_of call rets free_vars =
   let args = extract_fun_args ftype_of call in
-  let args_post_conditions = compose_args_post_conditions call ftype_of in
+  let args_post_conditions = compose_args_post_conditions call ftype_of args in
   (* XXX: what does it mean extra_ptrs post conditions?
      when is it applicable? *)
   (* let args_post_conditions = *)
@@ -1309,7 +1306,7 @@ let extract_tip_calls ftype_of calls rets free_vars =
     | [] -> failwith "There must be at least one tip call."
     | _ ->
       List.map calls ~f:(fun tip ->
-          {args_post_conditions = compose_args_post_conditions tip ftype_of;
+          {args_post_conditions = compose_args_post_conditions tip ftype_of args;
            ret_val = get_ret_val tip;
            post_statements = convert_ctxt_list tip.ret_context})
   in

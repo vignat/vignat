@@ -58,6 +58,7 @@ verify:
 		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \
 		--no-shconf `# don't mmap the config` \
 		-- \
+		`# TODO make those parameters symbolic` \
 		--lan-dev 0 \
 		--wan 1 \
 		--expire 10 \

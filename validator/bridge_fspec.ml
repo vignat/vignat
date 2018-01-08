@@ -1,5 +1,5 @@
 
-open Core.Std
+open Core
 open Fspec_api
 open Ir
 

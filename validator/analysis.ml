@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Ir
 
 let do_log = true
@@ -18,7 +18,7 @@ let lprint_list lst =
   List.iter lst ~f:(fun vn -> lprintf "%s\n" vn)
 
 let expand_fixpoints_in_tterm
-    (fixpoints : Ir.tterm Core.Std.String.Map.t) tterm =
+    (fixpoints : Ir.tterm Core.String.Map.t) tterm =
   let impl tterm =
     match tterm with
     | Apply (fname,args) ->

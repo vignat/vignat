@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Ir
 
 let validate_prefix fin fout intermediate_pref verifast_bin proj_root =

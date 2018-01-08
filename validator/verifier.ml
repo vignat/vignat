@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Parser_util
 
 type verification_outcome =

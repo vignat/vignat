@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Str
 open Fspec_api
 open Ir

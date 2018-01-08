@@ -6,7 +6,9 @@
 
 BUILDDIR=`pwd`
 sudo apt-get install -y cmake wget build-essential curl git subversion python parallel opam
+
 opam init -y
+opam switch 4.06.0
 echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> ~/.profile
 echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
 . ~/.profile
@@ -14,6 +16,7 @@ echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
 
 ### Z3 v4.5
 
+# VeriFast requires Z3 in ocamlfind; install it now so that it puts itself in ocamlfind
 opam install ocamlfind -y
 
 git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3
@@ -81,9 +84,12 @@ sudo apt-get install -y --no-install-recommends \
                      valac gtksourceview2.0-dev \
                      liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
 
-git clone --depth 1 --branch export_path_conditions https://github.com/necto/verifast
+# Not mentioned by VeriFast's readme, required anyway
+opam install ocamlfind camlp4 -y
+
+git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast
 cd verifast/src
-make Z3V4DOT5=yes verifast
+make verifast # should be just "make" but vfide fails (even with lablgtk)
 echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
 . ~/.profile
 cd ../..
@@ -133,4 +139,4 @@ cd ..
 
 ### Validator dependencies
 
-opam install ocamlfind core.112.35.00 sexplib.112.35.00 menhir -y
+opam install ocamlfind core sexplib menhir -y

@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
@@ -16,7 +16,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
      | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | Undef -> "// render_eq_sttmt undef...\n"
+  | Undef -> failwith "// render_eq_sttmt undef...\n"
   | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_prelemmas context =

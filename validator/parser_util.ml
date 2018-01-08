@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lexing
 
 let print_position outx lexbuf =
