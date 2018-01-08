@@ -1,5 +1,6 @@
 #!/bin/sh
-# This was tested on the Linux subsystem for Windows with Ubuntu 16.04, should work on the real Ubuntu.
+# Run from home: `. vnds/install.sh`
+# Tested on Ubuntu 16.04 and the Linux Subsystem for Windows
 
 ### General
 
