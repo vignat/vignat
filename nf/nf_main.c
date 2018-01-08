@@ -19,7 +19,7 @@
     /* concretize the device to avoid leaking symbols into DPDK */ \
     unsigned _vigor_devices_count = rte_eth_dev_count(); \
     unsigned VIGOR_DEVICE = klee_range(0, _vigor_devices_count, "VIGOR_DEVICE"); \
-    for(unsigned _ = 0; _ < _vigor_devices_count; _++) if (VIGOR_DEVICE == _) { VIGOR_DEVICE = _; break; }
+    for(unsigned _d = 0; _d < _vigor_devices_count; _d++) if (VIGOR_DEVICE == _d) { VIGOR_DEVICE = _d; break; }
 #define VIGOR_LOOP_END \
     nf_loop_iteration_end(_vigor_lcore_id, VIGOR_NOW); \
   }
