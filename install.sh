@@ -81,9 +81,9 @@ sudo apt-get install -y --no-install-recommends \
                      valac gtksourceview2.0-dev \
                      liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
 
-git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast
+git clone --depth 1 --branch export_path_conditions https://github.com/necto/verifast
 cd verifast/src
-make Z3V4DOT5=yes
+make Z3V4DOT5=yes verifast
 echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
 . ~/.profile
 cd ../..

@@ -167,9 +167,9 @@ ENV RTE_SDK=/home/vigor/dpdk \
 WORKDIR /home/vigor
 
 # Download and build VeriFast
-RUN git clone --depth 1 https://github.com/vignat/verifast -b export_path_conditions && \
+RUN git clone --depth 1 https://github.com/necto/verifast -b export_path_conditions && \
     cd verifast/src && \
-    make -j8 verifast
+    make -j8 Z3V4DOT5=yes verifast
 
 ENV PATH=/home/vigor/.opam/system/bin:/home/vigor/verifast/bin:/home/klee/klee_build/klee/Release+Asserts/bin:$PATH
 ENV KLEE_INCLUDE=/home/klee/klee_src/include
