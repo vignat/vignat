@@ -55,11 +55,12 @@
 static const uint16_t RX_QUEUE_SIZE = 128;
 static const uint16_t TX_QUEUE_SIZE = 512;
 
-// Memory pool #buffers (set to its value from l3fwd sample)
+// Memory pool #buffers
 #ifdef KLEE_VERIFICATION
-// TODO this shouldn't be needed
+// During verification, we need to minimize the amount of memory used
 static const unsigned MEMPOOL_BUFFER_COUNT = 1;
 #else
+// Normal execution (set to its value from l3fwd sample)
 static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
 #endif
 
