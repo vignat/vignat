@@ -1000,11 +1000,31 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   {
     switch(at) {
       case nil:
+        note(fold_left(nil, remove_by_index_fp,
+                       take(n, get_expired_indexes_fp(time, nil))) == nil);
+
+        note(take(n+1, get_expired_indexes_fp(time, cons(ah,nil))) == cons(fst(ah), nil));
+
+        note(fold_left(cons(ah,nil), remove_by_index_fp,
+             take(n+1, get_expired_indexes_fp(time, cons(ah,nil)))) == remove_by_index_fp(cons(ah,nil), fst(ah)));
+        note(remove_by_index_fp(cons(ah,nil), fst(ah)) == nil);
+
+        note(fold_left(cons(ah,nil), remove_by_index_fp,
+             take(n+1, get_expired_indexes_fp(time, cons(ah,nil)))) == nil);
+
+        note(fold_left(cons(ah,nil), remove_by_index_fp,
+                       take(n+1, get_expired_indexes_fp(time, cons(ah,nil)))) ==
+             fold_left(nil, remove_by_index_fp,
+                       take(n, get_expired_indexes_fp(time, nil))));
         return;
       case cons(h,t):
-        if (0 < n)
-          if (snd(h) < time)
+        if (0 < n) {
+          if (snd(h) < time) {
             expire_indexes_tail(h, t, time, n-1);
+          } else {
+          }
+        } else {
+       }
     }
   }
   @*/
