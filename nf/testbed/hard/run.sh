@@ -27,23 +27,24 @@
 #           Tester sends packets to server, which are modified by the middlebox;
 #           there are two subnets, tester-middlebox and middlebox-server.
 #           a.k.a. request/response
+# $3: Results file
 
 MIDDLEBOX=$1
 SCENARIO=$2
 RESULTS_FILE=$3
 
 if [ -z $MIDDLEBOX ]; then
-    echo "[bench] No app specified" 1>&2
+    echo "[run] No middlebox specified" 1>&2
     exit 1
 fi
 
 if [ -z $SCENARIO ]; then
-    echo "[bench] No scenario specified" 1>&2
+    echo "[run] No scenario specified" 1>&2
     exit 2
 fi
 
 if [ -z $RESULTS_FILE ]; then
-    echo "[bench] No result file specified" 1>&2
+    echo "[bench] No results file specified" 1>&2
     exit 3
 fi
 
