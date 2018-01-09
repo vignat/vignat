@@ -1104,15 +1104,16 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
         | Some x when (Sexp.to_string x = "0" && arg.aname = "mbuf") ->
             begin match List.nth_exn fun_args i with
             | {v=Addr fun_arg_val;t=_} ->
-                Some {lhs=fun_arg_val;rhs={v=Int 0;t=Uint32}} (* HACK special-casing this, don't know how to get the argument name *)
+                Some {lhs=fun_arg_val;rhs={v=Int 0;t=Uint32}}
             | _ -> failwith "Write your own special case. Sorry." end
         | _ ->
             let key = Int64.of_string (Sexp.to_string arg.value) in
             let arg_type = (get_fun_arg_type ftype_of call i) in
             match find_first_known_address key (get_pointee arg_type) (After call.id) with
             | Some out_arg ->
-              lprintf "processing %s argptr: %s| strval: %s\n" arg.aname (ttype_to_str out_arg.t)
-                                                               (render_tterm (get_struct_val_value ptee.after (get_pointee out_arg.t)));
+              lprintf "processing %s argptr: %s| strval: %s\n" 
+                      arg.aname (ttype_to_str out_arg.t)
+                      (render_tterm (get_struct_val_value ptee.after (get_pointee out_arg.t)));
               begin match get_struct_val_value ptee.after (get_pointee out_arg.t) with
               | {v=Utility (Ptr_placeholder addr);t=Ptr ptee} ->
                 begin
