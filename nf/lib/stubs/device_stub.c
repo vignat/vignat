@@ -453,20 +453,20 @@ stub_dev_create(const char *name,
 
 	struct rte_eth_dev_data* data = (struct rte_eth_dev_data*) malloc(sizeof(struct rte_eth_dev_data));
 	if (data == NULL) {
-		return -1;
+		return -ENOMEM;
 	}
 
 	struct stub_device* device = (struct stub_device*) malloc(sizeof(struct stub_device));
 	if (device == NULL) {
 		free(data);
-		return -1;
+		return -ENOMEM;
 	}
 
 	struct rte_eth_dev* eth_dev = rte_eth_dev_allocate(name, RTE_ETH_DEV_VIRTUAL);
 	if (eth_dev == NULL) {
 		free(data);
 		free(device);
-		return -1;
+		return -ENOMEM;
 	}
 
 	data->dev_private = device;
@@ -528,7 +528,7 @@ stub_devuninit(const char *name)
 
 	struct rte_eth_dev* eth_dev = rte_eth_dev_allocated(stub_name);
 	if (eth_dev == NULL) {
-		return -1;
+		return -ENOMEM;
 	}
 
 	free(eth_dev->data->dev_private);
@@ -552,23 +552,23 @@ stub_init(void)
 	// HACK
 	klee_alias_function("rte_pktmbuf_free", "stub_free");
 	// rte_pktmbuf_free is 'static inline', so it gets duplicated...
-	klee_alias_function("rte_pktmbuf_free942", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1120", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1157", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1186", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1224", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1320", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1667", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1747", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1781", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1821", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1856", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1897", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1931", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1974", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2027", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2108", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2307", "stub_free");
+	klee_alias_function("rte_pktmbuf_free930", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1108", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1144", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1173", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1211", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1307", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1651", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1731", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1766", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1806", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1841", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1882", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1916", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1959", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2012", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2093", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2293", "stub_free");
 
 	rte_eal_driver_register(&stub_driver);
 }
