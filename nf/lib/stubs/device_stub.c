@@ -222,7 +222,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		bufs[i]->ol_flags = 0;
 		// packet_type is symbolic
 		bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
-		bufs[i]->data_len = sizeof(struct stub_mbuf_content);
+		bufs[i]->data_len = sizeof(struct stub_mbuf_content); // TODO ideally those should be symbolic...
 		// vlan_tci is symbolic
 		// hash is symbolic
 		// seqn is symbolic
