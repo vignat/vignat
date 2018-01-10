@@ -738,7 +738,9 @@ let fun_types =
                               (List.nth_exn params.args 0) ^ "->port_id;\n" ^
                               "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
-                 lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
+                 (* TODO use a_packet_sent somehow *)
+                 lemmas_after = [(fun params -> "a_packet_send_attempted = true;\n" ^ 
+                                                "if (" ^ params.ret_name ^ " == 1 ) { a_packet_sent = true; }\n");];
                  };
      "stub_free", {ret_type = Static Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
@@ -824,6 +826,7 @@ struct
                   struct stub_mbuf_content sent_packet;\n\
                   uint16_t sent_on_port;\n\
                   uint32_t sent_packet_type;\n\
+                  bool a_packet_send_attempted = false;\n\
                   bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints

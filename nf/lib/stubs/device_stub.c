@@ -136,12 +136,9 @@ struct nested_nested_field_descr stub_mbuf_content_n2[] = {
   }
 // END TRACING
 
+// "Real" free function, not traced; stub tx and free both call it
 void
-stub_free(struct rte_mbuf* mbuf) {
-	klee_trace_ret();
-	KLEE_TRACE_MBUF(mbuf, TD_IN);
-	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
-
+real_free(struct rte_mbuf* mbuf) {
 	// Undo our pseudo-chain trickery (see stub_rx)
 	klee_allow_access(mbuf->next, mbuf->pool->elt_size);
 	free(mbuf->next);
@@ -150,6 +147,15 @@ stub_free(struct rte_mbuf* mbuf) {
 	klee_alias_function("rte_pktmbuf_free", "rte_pktmbuf_free");
 	rte_pktmbuf_free(mbuf);
 	klee_alias_function("rte_pktmbuf_free", "stub_free");
+}
+
+void
+stub_free(struct rte_mbuf* mbuf) {
+	klee_trace_ret();
+	KLEE_TRACE_MBUF(mbuf, TD_IN);
+	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
+
+	real_free(mbuf);
 }
 
 static uint16_t
@@ -271,13 +277,12 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	klee_trace_param_ptr_field_directed(q, offsetof(struct stub_queue, port_id), sizeof(uint16_t), "port_id", TD_IN);
 	struct rte_mbuf* mbuf = bufs[0]; KLEE_TRACE_MBUF(mbuf, TD_IN); // TODO fix this silly macro to take a name, and document the horrible single-pointer hack or fix the damn thing
 	klee_trace_param_u16(nb_bufs, "nb_bufs");
-	// TODO should trace every packet... but for now there's only 1 anyway
 	KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_IN);
 
 	int packets_sent = klee_range(0, nb_bufs + 1 /* end is exclusive */, "packets_sent");
 	int i; // Concrete return value, validator doesn't like symbols
 	for (i = 0; i < packets_sent; i++) {
-		rte_pktmbuf_free(bufs[i]);
+		real_free(bufs[i]);
 	}
 
 	return i;
