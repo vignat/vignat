@@ -52,6 +52,7 @@ verify:
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
+        # note: as of 2018-01-10, can't use --optimize because it creates a ShuffleVector instr in KLEE's own memmove, which KLEE doesn't support...
 	klee -libc=uclibc -posix-runtime -dump-call-traces -max-memory=12000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
 		--no-pci `# disable PCI enumeration since PCI is not available, we don't it use anyway` \
