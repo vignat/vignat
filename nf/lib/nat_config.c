@@ -110,7 +110,7 @@ void nat_config_init(struct nat_config* config,
 
 void nat_config_cmdline_print_usage(void)
 {
-	printf("Usage:\n"
+	NF_INFO("Usage:\n"
 		"[DPDK EAL options] --\n"
 		"\t--eth-dest <device>,<mac>: MAC address of the endpoint linked to a device.\n"
 		"\t--expire <time>: flow expiration time.\n"
