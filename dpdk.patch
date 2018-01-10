@@ -1,0 +1,182 @@
+diff --git a/include/dpdk/rte_cycles.h b/include/dpdk/rte_cycles.h
+index 6e3c7d8..17d6617 100644
+--- a/include/dpdk/rte_cycles.h
++++ b/include/dpdk/rte_cycles.h
+@@ -98,10 +98,14 @@ rte_rdtsc(void)
+ 	}
+ #endif
+ 
++#ifdef KLEE_VERIFICATION
++	return 0;
++#else
+ 	asm volatile("rdtsc" :
+ 		     "=a" (tsc.lo_32),
+ 		     "=d" (tsc.hi_32));
+ 	return tsc.tsc_64;
++#endif
+ }
+ 
+ static inline uint64_t
+diff --git a/lib/librte_eal/common/eal_common_log.c b/lib/librte_eal/common/eal_common_log.c
+index 7916c78..cdb601b 100644
+--- a/lib/librte_eal/common/eal_common_log.c
++++ b/lib/librte_eal/common/eal_common_log.c
+@@ -145,7 +145,12 @@ int
+ rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
+ {
+ 	int ret;
++#ifdef KLEE_VERIFICATION
++	// KLEE doesn't seem to like files
++	FILE *f = stderr;
++#else
+ 	FILE *f = rte_logs.file;
++#endif
+ 
+ 	if ((level > rte_logs.level) || !(logtype & rte_logs.type))
+ 		return 0;
+diff --git a/lib/librte_eal/common/eal_common_options.c b/lib/librte_eal/common/eal_common_options.c
+index 1a1bab3..4d7dbac 100644
+--- a/lib/librte_eal/common/eal_common_options.c
++++ b/lib/librte_eal/common/eal_common_options.c
+@@ -810,6 +810,7 @@ eal_parse_common_option(int opt, const char *optarg,
+ 		conf->memory = atoi(optarg);
+ 		conf->memory *= 1024ULL;
+ 		conf->memory *= 1024ULL;
++
+ 		mem_parsed = 1;
+ 		break;
+ 	/* force number of channels */
+diff --git a/lib/librte_eal/common/include/arch/x86/rte_cycles.h b/lib/librte_eal/common/include/arch/x86/rte_cycles.h
+index 6e3c7d8..17d6617 100644
+--- a/lib/librte_eal/common/include/arch/x86/rte_cycles.h
++++ b/lib/librte_eal/common/include/arch/x86/rte_cycles.h
+@@ -98,10 +98,14 @@ rte_rdtsc(void)
+ 	}
+ #endif
+ 
++#ifdef KLEE_VERIFICATION
++	return 0;
++#else
+ 	asm volatile("rdtsc" :
+ 		     "=a" (tsc.lo_32),
+ 		     "=d" (tsc.hi_32));
+ 	return tsc.tsc_64;
++#endif
+ }
+ 
+ static inline uint64_t
+diff --git a/lib/librte_eal/linuxapp/eal/eal.c b/lib/librte_eal/linuxapp/eal/eal.c
+index 3fb2188..952aa25 100644
+--- a/lib/librte_eal/linuxapp/eal/eal.c
++++ b/lib/librte_eal/linuxapp/eal/eal.c
+@@ -170,11 +170,11 @@ rte_eal_config_create(void)
+ 	void *rte_mem_cfg_addr;
+ 	int retval;
+ 
+-	const char *pathname = eal_runtime_config_path();
+-
+ 	if (internal_config.no_shconf)
+ 		return;
+ 
++	const char *pathname = eal_runtime_config_path();
++
+ 	/* map the config before hugepage address so that we don't waste a page */
+ 	if (internal_config.base_virtaddr != 0)
+ 		rte_mem_cfg_addr = (void *)
+@@ -223,11 +223,11 @@ rte_eal_config_attach(void)
+ {
+ 	struct rte_mem_config *mem_config;
+ 
+-	const char *pathname = eal_runtime_config_path();
+-
+ 	if (internal_config.no_shconf)
+ 		return;
+ 
++	const char *pathname = eal_runtime_config_path();
++
+ 	if (mem_cfg_fd < 0){
+ 		mem_cfg_fd = open(pathname, O_RDWR);
+ 		if (mem_cfg_fd < 0)
+@@ -847,8 +847,10 @@ rte_eal_init(int argc, char **argv)
+ 	if (rte_eal_intr_init() < 0)
+ 		rte_panic("Cannot init interrupt-handling thread\n");
+ 
++#ifdef KLEE_VERIFICATION
++		// KLEE doesn't support pthreads or pipes
++#else
+ 	RTE_LCORE_FOREACH_SLAVE(i) {
+-
+ 		/*
+ 		 * create communication pipes between master thread
+ 		 * and children
+@@ -882,6 +884,7 @@ rte_eal_init(int argc, char **argv)
+ 	 */
+ 	rte_eal_mp_remote_launch(sync_func, NULL, SKIP_MASTER);
+ 	rte_eal_mp_wait_lcore();
++#endif
+ 
+ 	/* Probe & Initialize PCI devices */
+ 	if (rte_eal_pci_probe())
+diff --git a/lib/librte_eal/linuxapp/eal/eal_interrupts.c b/lib/librte_eal/linuxapp/eal/eal_interrupts.c
+index 47a3b20..94679e1 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_interrupts.c
++++ b/lib/librte_eal/linuxapp/eal/eal_interrupts.c
+@@ -862,6 +862,10 @@ eal_intr_thread_main(__rte_unused void *arg)
+ int
+ rte_eal_intr_init(void)
+ {
++#ifdef KLEE_VERIFICATION
++	// KLEE doesn't seem to support pipes
++	return 0;
++#endif
+ 	int ret = 0, ret_1 = 0;
+ 	char thread_name[RTE_MAX_THREAD_NAME_LEN];
+ 
+diff --git a/lib/librte_eal/linuxapp/eal/eal_log.c b/lib/librte_eal/linuxapp/eal/eal_log.c
+index d391100..c779475 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_log.c
++++ b/lib/librte_eal/linuxapp/eal/eal_log.c
+@@ -89,6 +89,11 @@ static cookie_io_functions_t console_log_func = {
+ int
+ rte_eal_log_init(const char *id, int facility)
+ {
++#ifdef KLEE_VERIFICATION
++	// syslog uses sockets, which KLEE doesn't support
++	return 0;
++#endif
++
+ 	FILE *log_stream;
+ 
+ 	log_stream = fopencookie(NULL, "w+", console_log_func);
+diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
+index 41e0a92..23b3737 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_memory.c
++++ b/lib/librte_eal/linuxapp/eal/eal_memory.c
+@@ -1,3 +1,4 @@
++
+ /*-
+  *   BSD LICENSE
+  *
+@@ -1190,6 +1191,14 @@ rte_eal_hugepage_init(void)
+ 
+ 	/* hugetlbfs can be disabled */
+ 	if (internal_config.no_hugetlbfs) {
++#ifdef KLEE_VERIFICATION
++		addr = malloc(internal_config.memory);
++		if (addr == NULL) {
++			RTE_LOG(ERR, EAL, "malloc failed\n");
++			return -1;
++		}
++		memset(addr, 0, internal_config.memory);
++#else
+ 		addr = mmap(NULL, internal_config.memory, PROT_READ | PROT_WRITE,
+ 				MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+ 		if (addr == MAP_FAILED) {
+@@ -1197,6 +1206,7 @@ rte_eal_hugepage_init(void)
+ 					strerror(errno));
+ 			return -1;
+ 		}
++#endif
+ 		mcfg->memseg[0].phys_addr = (phys_addr_t)(uintptr_t)addr;
+ 		mcfg->memseg[0].addr = addr;
+ 		mcfg->memseg[0].hugepage_sz = RTE_PGSIZE_4K;

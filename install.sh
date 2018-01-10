@@ -1,10 +1,18 @@
-#!/bin/sh
-# Run from home: `. vnds/install.sh`
+#!/bin/bash
 # Tested on Ubuntu 16.04 and the Linux Subsystem for Windows
+
+# Bash "strict mode"
+set -euxo pipefail
+
+# Setup
+
+VNDSDIR=$(cd $(dirname "$0") && pwd)
+BUILDDIR="$HOME"
+cd "$BUILDDIR"
+
 
 ### General
 
-BUILDDIR=`pwd`
 sudo apt-get install -y cmake wget build-essential curl git subversion python parallel opam
 
 opam init -y
@@ -39,7 +47,7 @@ svn co https://llvm.org/svn/llvm-project/compiler-rt/tags/RELEASE_342/final llvm
 svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final llvm/projects/libcxx
 cd llvm
 ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
-make -j `nproc`
+make -j $(nproc)
 echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
 . ~/.profile
 cd ..
@@ -50,7 +58,7 @@ cd klee-uclibc
  --make-llvm-lib \
  --with-llvm-config="../llvm/Release/bin/llvm-config" \
  --with-cc="../llvm/Release/bin/clang"
-make -j `nproc`
+make -j $(nproc)
 cd ..
 
 git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git
@@ -124,6 +132,9 @@ esac
 
 make config T=x86_64-native-linuxapp-gcc
 make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
+
+# Apply the Vigor patches ( :( )
+patch -p1 < "$VNDSDIR/dpdk.patch"
 
 # Enable atomic intrinsics, otherwise it uses inline ASM which KLEE doesn't support
 sed -i 's/CONFIG_RTE_FORCE_INTRINSICS=n/CONFIG_RTE_FORCE_INTRINSICS=y/' x86_64-native-linuxapp-gcc/.config
