@@ -8,7 +8,7 @@
 #include "lib/expirator.h"
 
 #ifdef KLEE_VERIFICATION
-#  include "rte_config.h"
+#  include "rte_ethdev.h"
 #  include "lib/stubs/containers/double-map-stub-control.h" //<- for set entry cond
 #endif //KLEE_VERIFICATION
 
@@ -25,8 +25,8 @@ struct DoubleChain** get_dchain_pp(void) {
 }
 
 void concretize_devices(struct flow* f) {
-    for(unsigned _ = 0; _ < RTE_MAX_ETHPORTS; _++) if (f->int_device_id == _) { f->int_device_id = _; break; }
-    for(unsigned _ = 0; _ < RTE_MAX_ETHPORTS; _++) if (f->ext_device_id == _) { f->ext_device_id = _; break; }
+    for(unsigned _ = 0; _ < rte_eth_dev_count(); _++) if (f->int_device_id == _) { f->int_device_id = _; break; }
+    for(unsigned _ = 0; _ < rte_eth_dev_count(); _++) if (f->ext_device_id == _) { f->ext_device_id = _; break; }
 }
 #endif//KLEE_VERIFICATION
 

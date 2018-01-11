@@ -13,6 +13,8 @@
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 
+
+static const int stub_devices_count = 4; // more devices = lots more paths because of possible failures
 static const char* stub_driver_name = "stub";
 static const char* stub_device_name_format = "stub_%d";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
@@ -523,7 +525,7 @@ stub_devinit(const char *name, const char *params)
 
 	unsigned numa_node = rte_socket_id();
 
-	for (int n = 0; n < RTE_MAX_ETHPORTS; n++) {
+	for (int n = 0; n < stub_devices_count; n++) {
 		char* name = stub_device_name(n);
 		if (name == NULL) {
 			return -ENOMEM;
@@ -549,7 +551,7 @@ stub_devuninit(const char *name)
 	}
 
 	bool end = false;
-	for (int n = 0; n < RTE_MAX_ETHPORTS; n++) {
+	for (int n = 0; n < stub_devices_count; n++) {
 		char* name = stub_device_name(n);
 		if (name == NULL) {
 			return -ENOMEM;
