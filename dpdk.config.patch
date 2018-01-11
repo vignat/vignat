@@ -1,0 +1,33 @@
+diff --git a/config/common_base b/config/common_base
+index 7830535..f908cbb 100644
+--- a/config/common_base
++++ b/config/common_base
+@@ -57,7 +57,8 @@ CONFIG_RTE_TOOLCHAIN=
+ #
+ # Use intrinsics or assembly code for key routines
+ #
+-CONFIG_RTE_FORCE_INTRINSICS=n
++# Enable atomic intrinsics, otherwise it uses inline ASM which KLEE doesn't support
++CONFIG_RTE_FORCE_INTRINSICS=y
+ 
+ #
+ # Machine forces strict alignment constraints.
+@@ -306,7 +307,7 @@ CONFIG_RTE_PMD_RING_MAX_TX_RINGS=16
+ #
+ # Compile software PMD backed by PCAP files
+ #
+-CONFIG_RTE_LIBRTE_PMD_PCAP=n
++CONFIG_RTE_LIBRTE_PMD_PCAP=y
+ 
+ #
+ # Compile link bonding PMD library
+@@ -418,7 +419,8 @@ CONFIG_RTE_LIBRTE_MEMPOOL_DEBUG=n
+ #
+ CONFIG_RTE_LIBRTE_MBUF=y
+ CONFIG_RTE_LIBRTE_MBUF_DEBUG=n
+-CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="ring_mp_mc"
++# Use stacks instead of rings for mbuf pools, so that an [allocate+free] operation is idempotent
++CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="stack"
+ CONFIG_RTE_MBUF_REFCNT_ATOMIC=y
+ CONFIG_RTE_PKTMBUF_HEADROOM=128
+ 

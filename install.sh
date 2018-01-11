@@ -1,15 +1,23 @@
 #!/bin/bash
 # Tested on Ubuntu 16.04 and the Linux Subsystem for Windows
 
-# Bash "strict mode"
-set -euxo pipefail
-
 # Setup
 
-VNDSDIR=$(cd $(dirname "$0") && pwd)
-BUILDDIR="$HOME"
-cd "$BUILDDIR"
+VNDSDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+BUILDDIR=`pwd`
+if [ $BUILDDIR -ef $VNDSDIR ]; then
+  echo "It is not recommented to install the dependencies into the project root directory."
+  echo "We recommend you to run the script from the parent directory like this: . $VNDSDIR/install.sh"
+  read -p "Continue installing into $BUILDDIR? [y/n]" -n 1 -r
+  echo    # (optional) move to a new line
+  if [[ ! $REPLY =~ ^[Yy]$ ]]
+  then
+      [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
+  fi
+fi
 
+# Bash "strict mode"
+set -euxo pipefail
 
 ### General
 
@@ -28,13 +36,14 @@ echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
 # Num is required for Big_int
 opam install ocamlfind num -y
 
-git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3
-cd z3
-python scripts/mk_make.py --ml
-cd build
-make
-sudo "PATH=$PATH" make install # need the path for ocamlfind
-cd ../..
+git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3 $BUILDDIR/z3
+pushd $BUILDDIR/z3
+  python scripts/mk_make.py --ml
+  pushd build
+    make
+    sudo "PATH=$PATH" make install # need the path for ocamlfind
+  popd
+popd
 
 
 ### KLEE
@@ -42,47 +51,48 @@ cd ../..
 sudo apt-get install -y bison flex zlib1g-dev libncurses5-dev libcap-dev \
                         python-minimal
 
-svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_342/final llvm
-svn co https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_342/final llvm/tools/clang
-svn co https://llvm.org/svn/llvm-project/compiler-rt/tags/RELEASE_342/final llvm/projects/compiler-rt
-svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final llvm/projects/libcxx
-cd llvm
-./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
-make -j $(nproc)
-echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
-. ~/.profile
-cd ..
+svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_342/final $BUILDDIR/llvm
+svn co https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_342/final $BUILDDIR/llvm/tools/clang
+svn co https://llvm.org/svn/llvm-project/compiler-rt/tags/RELEASE_342/final $BUILDDIR/llvm/projects/compiler-rt
+svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final $BUILDDIR/llvm/projects/libcxx
+pushd $BUILDDIR/llvm
+  ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
+  make -j $(nproc)
+  echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
+  . ~/.profile
+popd
 
-git clone --depth 1 --branch klee_uclibc_v1.0.0 https://github.com/klee/klee-uclibc.git
-cd klee-uclibc
-./configure \
- --make-llvm-lib \
- --with-llvm-config="../llvm/Release/bin/llvm-config" \
- --with-cc="../llvm/Release/bin/clang"
-make -j $(nproc)
-cd ..
+git clone --depth 1 --branch klee_uclibc_v1.0.0 https://github.com/klee/klee-uclibc.git $BUILDDIR/klee-uclibc
+pushd $BUILDDIR/klee-uclibc
+  ./configure \
+   --make-llvm-lib \
+   --with-llvm-config="../llvm/Release/bin/llvm-config" \
+   --with-cc="../llvm/Release/bin/clang"
+  make -j $(nproc)
+popd
 
-git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git
-cd klee
-mkdir build
-cd build
-cmake \
- -DENABLE_UNIT_TESTS=OFF \
- -DBUILD_SHARED_LIBS=OFF \
- -DENABLE_KLEE_ASSERTS=OFF \
- -DLLVM_CONFIG_BINARY=$BUILDDIR/llvm/Release/bin/llvm-config \
- -DLLVMCC=$BUILDDIR/llvm/Release/bin/clang \
- -DLLVMCXX=$BUILDDIR/llvm/Release/bin/clang++ \
- -DENABLE_SOLVER_Z3=ON \
- -DENABLE_KLEE_UCLIBC=ON \
- -DKLEE_UCLIBC_PATH=$BUILDDIR/klee-uclibc \
- -DENABLE_POSIX_RUNTIME=ON \
- ..
-make
-echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> ~/.profile
-echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> ~/.profile
-. ~/.profile
-cd ../..
+git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git $BUILDDIR/klee
+pushd $BUILDDIR/klee
+  mkdir build
+  pushd build
+    cmake \
+     -DENABLE_UNIT_TESTS=OFF \
+     -DBUILD_SHARED_LIBS=OFF \
+     -DENABLE_KLEE_ASSERTS=OFF \
+     -DLLVM_CONFIG_BINARY=$BUILDDIR/llvm/Release/bin/llvm-config \
+     -DLLVMCC=$BUILDDIR/llvm/Release/bin/clang \
+     -DLLVMCXX=$BUILDDIR/llvm/Release/bin/clang++ \
+     -DENABLE_SOLVER_Z3=ON \
+     -DENABLE_KLEE_UCLIBC=ON \
+     -DKLEE_UCLIBC_PATH=$BUILDDIR/klee-uclibc \
+     -DENABLE_POSIX_RUNTIME=ON \
+     ..
+    make
+    echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> ~/.profile
+    echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> ~/.profile
+    . ~/.profile
+  popd
+popd
 
 
 ### VeriFast
@@ -96,12 +106,12 @@ sudo apt-get install -y --no-install-recommends \
 # Not mentioned by VeriFast's readme, required anyway
 opam install ocamlfind camlp4 -y
 
-git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast
-cd verifast/src
-make verifast # should be just "make" but vfide fails (even with lablgtk)
-echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
-. ~/.profile
-cd ../..
+git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast $BUILDDIR/verifast
+pushd $BUILDDIR/verifast/src
+  make verifast # should be just "make" but vfide fails (even with lablgtk)
+  echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
+  . ~/.profile
+popd
 
 
 ### DPDK
@@ -111,40 +121,34 @@ KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
 
 sudo apt-get install -y "linux-headers-$KERNEL_VER"
 
-wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
-tar xf dpdk.tar.xz
-rm dpdk.tar.xz
-mv dpdk-16.07 dpdk
+pushd $BUILDDIR
+  wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
+  tar xf dpdk.tar.xz
+  rm dpdk.tar.xz
+  mv dpdk-16.07 dpdk
 
-echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> ~/.profile
-echo "export RTE_SDK=$BUILDDIR/dpdk" >> ~/.profile
-. ~/.profile
+  echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> ~/.profile
+  echo "export RTE_SDK=$BUILDDIR/dpdk" >> ~/.profile
+  . ~/.profile
 
-cd dpdk
-sed -ri 's,(PMD_PCAP=).*,\1y,' config/common_linuxapp
+  pushd dpdk
 
-case $(uname -r) in
-  *Microsoft*)
-    # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
-    sudo apt install "linux-headers-$KERNEL_VER-generic"
-    export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
-  ;;
-esac
+    # Apply the Vigor patches ( :( )
+    patch -p1 < "$VNDSDIR/dpdk.patch"
+    patch -p1 < "$VNDSDIR/dpdk.config.patch"
 
-make config T=x86_64-native-linuxapp-gcc
-make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
+    case $(uname -r) in
+      *Microsoft*)
+        # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
+        sudo apt install "linux-headers-$KERNEL_VER-generic"
+        export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
+      ;;
+    esac
 
-# Apply the Vigor patches ( :( )
-patch -p1 < "$VNDSDIR/dpdk.patch"
-
-# Enable atomic intrinsics, otherwise it uses inline ASM which KLEE doesn't support
-sed -i 's/CONFIG_RTE_FORCE_INTRINSICS=n/CONFIG_RTE_FORCE_INTRINSICS=y/' x86_64-native-linuxapp-gcc/.config
-# Use stacks instead of rings for mbuf pools, so that an [allocate+free] operation is idempotent
-sed -i 's/CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="ring_mp_mc"/CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="stack"/' x86_64-native-linuxapp-gcc/.config
-# Rebuild
-make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
-
-cd ..
+    make config T=x86_64-native-linuxapp-gcc
+    make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
+  popd
+popd
 
 
 ### Validator dependencies
