@@ -2,6 +2,8 @@
 
 #include <device_stub.h>
 
+#include <stdbool.h>
+
 #include <klee/klee.h>
 
 #include <containers/str-descr.h>
@@ -11,16 +13,16 @@
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 
-static const char* stub_name = "stub";
+static const char* stub_driver_name = "stub";
+static const char* stub_device_name_format = "stub_%d";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
 	.link_duplex = ETH_LINK_FULL_DUPLEX,
 	.link_status = ETH_LINK_DOWN,
-	.link_autoneg = ETH_LINK_SPEED_AUTONEG,
+	.link_autoneg = ETH_LINK_SPEED_AUTONEG
 };
 
-// BEGIN TRACING
 struct str_field_descr mbuf_descrs[] = {
   //Do not forget about "buf_addr" -- it is a pointer that is why it is not listed here.
   {offsetof(struct rte_mbuf, buf_physaddr), sizeof(uint64_t), "buf_physaddr"},
@@ -134,7 +136,7 @@ struct nested_nested_field_descr stub_mbuf_content_n2[] = {
        stub_mbuf_content_n2[i].name,                                                                                    \
        dir);                                                                                                            \
   }
-// END TRACING
+
 
 // "Real" free function, not traced; stub tx and free both call it
 void
@@ -370,11 +372,13 @@ static void
 stub_dev_info(struct rte_eth_dev *dev,
 		struct rte_eth_dev_info *dev_info)
 {
-	dev_info->driver_name = stub_name;
+	struct stub_device* device = dev->data->dev_private;
+
+	dev_info->driver_name = stub_driver_name;
 	dev_info->max_mac_addrs = 1;
 	dev_info->max_rx_pktlen = (uint32_t) -1;
-	dev_info->max_rx_queues = 1;
-	dev_info->max_tx_queues = 1;
+	dev_info->max_rx_queues = RTE_DIM(device->rx_queues);
+	dev_info->max_tx_queues = RTE_DIM(device->tx_queues);
 	dev_info->min_rx_bufsize = 0;
 	dev_info->pci_dev = NULL;
 	dev_info->reta_size = 0;
@@ -443,7 +447,7 @@ static const struct eth_dev_ops stub_ops = {
 };
 
 int
-stub_dev_create(const char *name,
+stub_dev_create(const char* name,
 		const unsigned numa_node)
 {
 	int ret = klee_int("dev_create_return");
@@ -451,40 +455,30 @@ stub_dev_create(const char *name,
 		return ret;
 	}
 
-	struct rte_eth_dev_data* data = (struct rte_eth_dev_data*) malloc(sizeof(struct rte_eth_dev_data));
-	if (data == NULL) {
-		return -ENOMEM;
-	}
-
 	struct stub_device* device = (struct stub_device*) malloc(sizeof(struct stub_device));
 	if (device == NULL) {
-		free(data);
 		return -ENOMEM;
 	}
 
-	struct rte_eth_dev* eth_dev = rte_eth_dev_allocate(name, RTE_ETH_DEV_VIRTUAL);
+	struct rte_eth_dev* eth_dev = rte_eth_dev_allocate(name, RTE_ETH_DEV_PCI);
 	if (eth_dev == NULL) {
-		free(data);
 		free(device);
 		return -ENOMEM;
 	}
 
-	data->dev_private = device;
-	data->port_id = eth_dev->data->port_id;
-	data->rx_queues = NULL;
-	data->nb_rx_queues = 0;
-	data->tx_queues = NULL;
-	data->nb_tx_queues = 0;
-        data->dev_started = 0;
-	data->dev_link = stub_link;
-	data->mac_addrs = &stub_addr;
-	strncpy(data->name, eth_dev->data->name, strlen(eth_dev->data->name));
-	data->dev_flags = 0;
-	data->kdrv = RTE_KDRV_NONE;
-	data->drv_name = stub_name;
-	data->numa_node = numa_node;
+	memset(device, 0, sizeof(struct stub_device));
 
-	eth_dev->data = data;
+	eth_dev->data->dev_private = device;
+	eth_dev->data->nb_rx_queues = 1;
+	eth_dev->data->nb_tx_queues = 1;
+	eth_dev->data->dev_started = 0;
+	eth_dev->data->dev_link = stub_link;
+	eth_dev->data->mac_addrs = &stub_addr;
+	eth_dev->data->dev_flags = 0;
+	eth_dev->data->kdrv = RTE_KDRV_NONE;
+	eth_dev->data->drv_name = stub_driver_name;
+	eth_dev->data->numa_node = numa_node;
+
 	eth_dev->dev_ops = &stub_ops;
 	TAILQ_INIT(&eth_dev->link_intr_cbs);
 	eth_dev->driver = NULL;
@@ -492,6 +486,29 @@ stub_dev_create(const char *name,
 	eth_dev->tx_pkt_burst = stub_tx;
 
 	return 0;
+}
+
+int
+stub_dev_delete(struct rte_eth_dev* eth_dev)
+{
+	free(eth_dev->data->dev_private);
+	free(eth_dev->data);
+
+	return rte_eth_dev_release_port(eth_dev);
+}
+
+static char*
+stub_device_name(int n)
+{
+	int length = snprintf(NULL, 0, stub_device_name_format, n) + 1;
+
+	char* buffer = (char*) malloc(length);
+	if (buffer == NULL) {
+		return NULL;
+	}
+
+	snprintf(buffer, length, stub_device_name_format, n);
+	return buffer;
 }
 
 static int
@@ -507,7 +524,12 @@ stub_devinit(const char *name, const char *params)
 	unsigned numa_node = rte_socket_id();
 
 	for (int n = 0; n < RTE_MAX_ETHPORTS; n++) {
-		int ret = stub_dev_create(stub_name, numa_node);
+		char* name = stub_device_name(n);
+		if (name == NULL) {
+			return -ENOMEM;
+		}
+
+		int ret = stub_dev_create(name, numa_node);
 		if (ret != 0) {
 			return ret;
 		}
@@ -521,22 +543,33 @@ stub_devuninit(const char *name)
 {
 	// name is always NULL
 
-	int ret =0;// klee_int("devuninit_return");
+	int ret = klee_int("devuninit_return");
 	if (ret != 0) {
 		return ret;
 	}
 
-	struct rte_eth_dev* eth_dev = rte_eth_dev_allocated(stub_name);
-	if (eth_dev == NULL) {
-		return -ENOMEM;
+	bool end = false;
+	for (int n = 0; n < RTE_MAX_ETHPORTS; n++) {
+		char* name = stub_device_name(n);
+		if (name == NULL) {
+			return -ENOMEM;
+		}
+
+		struct rte_eth_dev* eth_dev = rte_eth_dev_allocated(name);
+		if (eth_dev == NULL) {
+			end = true;
+			continue;
+		}
+		if (end) {
+			// There was an unallocated device before
+			// but the current one is allocated - nonsensical!
+			klee_abort();
+		}
+
+		stub_dev_delete(eth_dev);
 	}
 
-	free(eth_dev->data->dev_private);
-	free(eth_dev->data);
-
-	rte_eth_dev_release_port(eth_dev);
-
-	return 0;
+	return ret;
 }
 
 struct rte_driver stub_driver = {
@@ -547,8 +580,17 @@ struct rte_driver stub_driver = {
 };
 
 void
+stub_panic(void)
+{
+	klee_silent_exit(1);
+}
+
+void
 stub_init(void)
 {
+	// If DPDK tries to commit suicide, translate that in KLEE terms...
+	klee_alias_function("__rte_panic", "stub_panic");
+
 	// HACK
 	klee_alias_function("rte_pktmbuf_free", "stub_free");
 	// rte_pktmbuf_free is 'static inline', so it gets duplicated...

@@ -17,6 +17,21 @@ index 6e3c7d8..17d6617 100644
  }
  
  static inline uint64_t
+diff --git a/lib/librte_eal/common/eal_common_dev.c b/lib/librte_eal/common/eal_common_dev.c
+index a8a4146..3ea83d9 100644
+--- a/lib/librte_eal/common/eal_common_dev.c
++++ b/lib/librte_eal/common/eal_common_dev.c
+@@ -120,7 +120,9 @@ rte_eal_dev_init(void)
+ 		if (driver->type != PMD_PDEV)
+ 			continue;
+ 		/* PDEV drivers don't get passed any parameters */
+-		driver->init(NULL, NULL);
++		if (driver->init(NULL, NULL)) {
++			return -1; // SOLAL: THIS IS A BUG, ORIGINALLY THERE WAS NO CHECK!!!!!!!
++		}
+ 	}
+ 	return 0;
+ }
 diff --git a/lib/librte_eal/common/eal_common_log.c b/lib/librte_eal/common/eal_common_log.c
 index 7916c78..cdb601b 100644
 --- a/lib/librte_eal/common/eal_common_log.c
