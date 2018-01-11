@@ -25,7 +25,8 @@ echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
 ### Z3 v4.5
 
 # VeriFast requires Z3 in ocamlfind; install it now so that it puts itself in ocamlfind
-opam install ocamlfind -y
+# Num is required for Big_int
+opam install ocamlfind num -y
 
 git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3
 cd z3
