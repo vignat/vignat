@@ -26,8 +26,8 @@ struct stub_queue {
 
 struct stub_device {
 	uint16_t port_id;
-	struct stub_queue rx_queues[1 /*RTE_MAX_QUEUES_PER_PORT*/];
-	struct stub_queue tx_queues[1 /*RTE_MAX_QUEUES_PER_PORT*/];
+	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
+	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
 };
 
 void stub_init(void);
