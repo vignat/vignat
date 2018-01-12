@@ -20,13 +20,14 @@ struct stub_mbuf_content {
 };
 
 struct stub_queue {
-	struct rte_mempool* mb_pool;
 	uint16_t port_id;
+	struct rte_mempool* mb_pool;
 };
 
 struct stub_device {
-	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
-	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
+	uint16_t port_id;
+	struct stub_queue rx_queues[1 /*RTE_MAX_QUEUES_PER_PORT*/];
+	struct stub_queue tx_queues[1 /*RTE_MAX_QUEUES_PER_PORT*/];
 };
 
 void stub_init(void);
