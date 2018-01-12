@@ -19,6 +19,9 @@ fi
 # Bash "strict mode"
 set -euxo pipefail
 
+PATHSFILE=$BUILDDIR/paths.sh
+echo "# The configuration paths for VNDS dependencies" > $PATHSFILE
+
 ### General
 
 sudo apt-get update
@@ -39,9 +42,9 @@ fi
 
 opam init -y
 opam switch 4.06.0
-echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> ~/.profile
-echo ". $HOME/.opam/opam-init/init.sh" >> ~/.profile
-. ~/.profile
+echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> $PATHSFILE
+echo ". $HOME/.opam/opam-init/init.sh" >> $PATHSFILE
+. $PATHSFILE
 
 
 ### Z3 v4.5
@@ -52,10 +55,11 @@ opam install ocamlfind num -y
 
 git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3 $BUILDDIR/z3
 pushd $BUILDDIR/z3
-  python scripts/mk_make.py --ml
+  python scripts/mk_make.py --ml -p $BUILDDIR/z3/build
   pushd build
+    # -jN here may break the make (hidden deps or something)
     make
-    sudo "PATH=$PATH" make install # need the path for ocamlfind
+    make install # need the path for ocamlfind
   popd
 popd
 
@@ -72,8 +76,8 @@ svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final $BUILDDIR
 pushd $BUILDDIR/llvm
   ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
   make -j $(nproc)
-  echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> ~/.profile
-  . ~/.profile
+  echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> $PATHSFILE
+  . $PATHSFILE
 popd
 
 git clone --depth 1 --branch klee_uclibc_v1.0.0 https://github.com/klee/klee-uclibc.git $BUILDDIR/klee-uclibc
@@ -102,9 +106,9 @@ pushd $BUILDDIR/klee
      -DENABLE_POSIX_RUNTIME=ON \
      ..
     make
-    echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> ~/.profile
-    echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> ~/.profile
-    . ~/.profile
+    echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> $PATHSFILE
+    echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> $PATHSFILE
+    . $PATHSFILE
   popd
 popd
 
@@ -122,9 +126,9 @@ opam install ocamlfind camlp4 -y
 
 git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast $BUILDDIR/verifast
 pushd $BUILDDIR/verifast/src
-  make verifast # should be just "make" but vfide fails (even with lablgtk)
-  echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> ~/.profile
-  . ~/.profile
+  make verifast # should be just "make" but the verifast checks fail due to a non auto lemma
+  echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> $PATHSFILE
+  . $PATHSFILE
 popd
 
 
@@ -141,9 +145,9 @@ pushd $BUILDDIR
   rm dpdk.tar.xz
   mv dpdk-16.07 dpdk
 
-  echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> ~/.profile
-  echo "export RTE_SDK=$BUILDDIR/dpdk" >> ~/.profile
-  . ~/.profile
+  echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> $PATHSFILE
+  echo "export RTE_SDK=$BUILDDIR/dpdk" >> $PATHSFILE
+  . $PATHSFILE
 
   pushd dpdk
 
@@ -168,3 +172,6 @@ popd
 ### Validator dependencies
 
 opam install ocamlfind core sexplib menhir -y
+
+echo "source $PATHSFILE" >> .profile
+
