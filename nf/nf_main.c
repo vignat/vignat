@@ -238,7 +238,8 @@ main(int argc, char* argv[])
     rte_socket_id() // socket ID
   );
   if (mbuf_pool == NULL) {
-    rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
+    rte_exit(EXIT_FAILURE, "Cannot create mbuf pool: %s\n",
+             rte_strerror(rte_errno));
   }
 
 #ifndef KLEE_VERIFICATION
