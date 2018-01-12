@@ -1,22 +1,3 @@
-diff --git a/include/dpdk/rte_cycles.h b/include/dpdk/rte_cycles.h
-index 6e3c7d8..17d6617 100644
---- a/include/dpdk/rte_cycles.h
-+++ b/include/dpdk/rte_cycles.h
-@@ -98,10 +98,14 @@ rte_rdtsc(void)
- 	}
- #endif
- 
-+#ifdef KLEE_VERIFICATION
-+	return 0;
-+#else
- 	asm volatile("rdtsc" :
- 		     "=a" (tsc.lo_32),
- 		     "=d" (tsc.hi_32));
- 	return tsc.tsc_64;
-+#endif
- }
- 
- static inline uint64_t
 diff --git a/lib/librte_eal/common/eal_common_dev.c b/lib/librte_eal/common/eal_common_dev.c
 index a8a4146..3ea83d9 100644
 --- a/lib/librte_eal/common/eal_common_dev.c

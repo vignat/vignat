@@ -12,7 +12,7 @@ if [ $BUILDDIR -ef $VNDSDIR ]; then
   echo    # (optional) move to a new line
   if [[ ! $REPLY =~ ^[Yy]$ ]]
   then
-      [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
+    [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
   fi
 fi
 
@@ -71,10 +71,10 @@ sudo apt-get install -y bison flex zlib1g-dev libncurses5-dev libcap-dev \
 
 svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_342/final $BUILDDIR/llvm
 svn co https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_342/final $BUILDDIR/llvm/tools/clang
-svn co https://llvm.org/svn/llvm-project/compiler-rt/tags/RELEASE_342/final $BUILDDIR/llvm/projects/compiler-rt
+#svn co https://llvm.org/svn/llvm-project/compiler-rt/tags/RELEASE_342/final $BUILDDIR/llvm/projects/compiler-rt
 svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final $BUILDDIR/llvm/projects/libcxx
 pushd $BUILDDIR/llvm
-  ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
+  CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
   make -j $(nproc)
   echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> $PATHSFILE
   . $PATHSFILE
@@ -93,7 +93,9 @@ git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/Solal
 pushd $BUILDDIR/klee
   mkdir build
   pushd build
-    cmake \
+    CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" \
+    CMAKE_INCLUDE_PATH=$BUILDDIR/z3/build/include/ \
+     cmake \
      -DENABLE_UNIT_TESTS=OFF \
      -DBUILD_SHARED_LIBS=OFF \
      -DENABLE_KLEE_ASSERTS=OFF \
@@ -105,7 +107,7 @@ pushd $BUILDDIR/klee
      -DKLEE_UCLIBC_PATH=$BUILDDIR/klee-uclibc \
      -DENABLE_POSIX_RUNTIME=ON \
      ..
-    make
+    make -j $(nproc)
     echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> $PATHSFILE
     echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> $PATHSFILE
     . $PATHSFILE
