@@ -152,7 +152,6 @@ pushd $BUILDDIR
   . $PATHSFILE
 
   pushd dpdk
-
     # Apply the Vigor patches ( :( )
     patch -p1 < "$VNDSDIR/dpdk.patch"
     patch -p1 < "$VNDSDIR/dpdk.config.patch"

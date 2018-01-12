@@ -15,7 +15,7 @@
 
 
 // Constant stuff
-static const int stub_devices_count = 4; // more devices = lots more paths because of possible failures
+static const int stub_devices_count = 2;
 static const char* stub_driver_name = "stub";
 static const char* stub_device_name_format = "stub_%d";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
@@ -695,23 +695,23 @@ stub_init(void)
 	// HACK
 	klee_alias_function("rte_pktmbuf_free", "stub_free");
 	// rte_pktmbuf_free is 'static inline', so it gets duplicated...
-	klee_alias_function("rte_pktmbuf_free930", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1108", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1144", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1173", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1211", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1307", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1651", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1731", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1766", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1806", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1841", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1882", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1916", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1959", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2012", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2093", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2293", "stub_free");
+	klee_alias_function("rte_pktmbuf_free932", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1110", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1146", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1175", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1213", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1309", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1654", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1734", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1768", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1808", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1843", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1884", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1918", "stub_free");
+	klee_alias_function("rte_pktmbuf_free1961", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2015", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2096", "stub_free");
+	klee_alias_function("rte_pktmbuf_free2298", "stub_free");
 
 	rte_eal_driver_register(&stub_driver);
 }

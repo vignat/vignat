@@ -25,8 +25,15 @@ struct DoubleChain** get_dchain_pp(void) {
 }
 
 void concretize_devices(struct flow* f) {
-    for(unsigned _ = 0; _ < rte_eth_dev_count(); _++) if (f->int_device_id == _) { f->int_device_id = _; break; }
-    for(unsigned _ = 0; _ < rte_eth_dev_count(); _++) if (f->ext_device_id == _) { f->ext_device_id = _; break; }
+    int count = rte_eth_dev_count();
+
+    klee_assume(f->int_device_id >= 0);
+    klee_assume(f->ext_device_id >= 0);
+    klee_assume(f->int_device_id < count);
+    klee_assume(f->ext_device_id < count);
+
+    for(unsigned d = 0; d < count; d++) if (f->int_device_id == d) { f->int_device_id = d; break; }
+    for(unsigned d = 0; d < count; d++) if (f->ext_device_id == d) { f->ext_device_id = d; break; }
 }
 #endif//KLEE_VERIFICATION
 
