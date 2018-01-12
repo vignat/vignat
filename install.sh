@@ -21,7 +21,21 @@ set -euxo pipefail
 
 ### General
 
-sudo apt-get install -y cmake wget build-essential curl git subversion python parallel opam
+sudo apt-get update
+
+# cmake for KLEE
+# subversion for LLVM
+# parallel for the Vigor Validator
+# m4 for OCaml (not a dependency of opam but in practice it is)
+sudo apt-get install -y cmake wget build-essential curl git subversion python parallel opam m4
+
+ # OCaml uses variables in its scripts without defining it first - we're in strict mode!
+if [ -z ${PERL5LIB+x} ]; then
+  export PERL5LIB=''
+fi
+if [ -z ${MANPATH+x} ]; then
+  export MANPATH=''
+fi
 
 opam init -y
 opam switch 4.06.0
