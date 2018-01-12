@@ -582,7 +582,7 @@ struct rte_driver stub_driver = {
 };
 
 void
-stub_panic(void)
+stub_panic(const char *funcname, const char *format, ...)
 {
 	klee_silent_exit(1);
 }
