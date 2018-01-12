@@ -339,6 +339,8 @@ stub_dev_start(struct rte_eth_dev *dev)
 
 	klee_assert(device_created[stub_dev->port_id]);
 	klee_assert(device_configured[stub_dev->port_id]);
+	klee_assert(device_rx_setup[stub_dev->port_id]);
+	klee_assert(device_tx_setup[stub_dev->port_id]);
 	klee_assert(!device_started[stub_dev->port_id]);
 
 	int ret = klee_int("dev_start_return");
@@ -375,7 +377,6 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 
 	klee_assert(device_created[stub_dev->port_id]);
 	klee_assert(device_configured[stub_dev->port_id]);
-	klee_assert(device_started[stub_dev->port_id]);
 	klee_assert(!device_rx_setup[stub_dev->port_id]);
 
 	// Only 1 RX queue allowed
@@ -388,7 +389,6 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 	if (ret == 0) {
 		stub_dev->rx_queues[rx_queue_id].port_id = stub_dev->port_id;
 		stub_dev->rx_queues[rx_queue_id].mb_pool = mb_pool;
-		dev->data->nb_rx_queues++;
 		dev->data->rx_queues[rx_queue_id] = &stub_dev->rx_queues[rx_queue_id];
 		device_rx_setup[stub_dev->port_id] = true;
 	}
@@ -406,7 +406,6 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 
 	klee_assert(device_created[stub_dev->port_id]);
 	klee_assert(device_configured[stub_dev->port_id]);
-	klee_assert(device_started[stub_dev->port_id]);
 	klee_assert(!device_tx_setup[stub_dev->port_id]);
 
 	if (tx_queue_id != 0) {
@@ -418,7 +417,6 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 	if (ret == 0) {
 		stub_dev->tx_queues[tx_queue_id].port_id = stub_dev->port_id;
 		stub_dev->tx_queues[tx_queue_id].mb_pool = NULL;
-		dev->data->nb_tx_queues++;
 		dev->data->tx_queues[tx_queue_id] = &stub_dev->tx_queues[tx_queue_id];
 		device_tx_setup[stub_dev->port_id] = true;
 	}
@@ -426,12 +424,24 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 	return ret;
 }
 
-
 static void
 stub_queue_release(void *q)
 {
-	klee_assert(q != NULL);
-	klee_forbid_access(q, sizeof(struct stub_queue), "released_queue");
+	// Queues' creation and deletion is somewhat counter-intuitive.
+	//
+	// Drivers can say how many RX/TX queues they support per device;
+	// then, they have to initialize their devices' queues arrays to NULL,
+	// and the arrays are malloc'ed by DPDK when the app initializes the device,
+	// at which point DPDK also sets the "nb_rx/tx_queues" fields.
+	//
+	// However, queues aren't created until the app creates them;
+	// and if some part of the initialization fails, DPDK will request
+	// the deletion of all queues, even those who haven't been initialized yet.
+	//
+	// Thus, the queue "release" method can be given a null pointer.
+	if (q != NULL) {
+		klee_forbid_access(q, sizeof(struct stub_queue), "released_queue");
+	}
 }
 
 static void
@@ -536,9 +546,7 @@ stub_dev_create(const char* name, unsigned numa_node)
 	memset(stub_dev, 0, sizeof(struct stub_device));
 	stub_dev->port_id = dev->data->port_id;
 
-	if (device_created[stub_dev->port_id]) {
-		klee_abort();
-	}
+	klee_assert(!device_created[stub_dev->port_id]);
 
 	dev->data->dev_private = stub_dev;
 	dev->data->rx_queues = NULL;
@@ -569,9 +577,7 @@ stub_dev_delete(struct rte_eth_dev* dev)
 {
 	struct stub_device* stub_dev = dev->data->dev_private;
 
-	if (!device_created[stub_dev->port_id]) {
-		klee_abort();
-	}
+	klee_assert(device_created[stub_dev->port_id]);
 
 	device_created[stub_dev->port_id] = false;
 
@@ -665,6 +671,12 @@ struct rte_driver stub_driver = {
 };
 
 void
+stub_exit(int exit_code, const char *format, ...)
+{
+	klee_silent_exit(exit_code);
+}
+
+void
 stub_panic(const char *funcname, const char *format, ...)
 {
 	klee_silent_exit(1);
@@ -675,6 +687,10 @@ stub_init(void)
 {
 	// If DPDK tries to commit suicide, translate that in KLEE terms...
 	klee_alias_function("__rte_panic", "stub_panic");
+
+	// rte_exit does formatting on its arguments; if one of them is a symbol,
+	// we get tons of useless paths...
+	klee_alias_function("rte_exit", "stub_exit");
 
 	// HACK
 	klee_alias_function("rte_pktmbuf_free", "stub_free");

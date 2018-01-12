@@ -151,7 +151,6 @@ void lcore_main(void)
 
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
-
   VIGOR_LOOP_BEGIN
     struct rte_mbuf* buf = NULL;
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
@@ -255,6 +254,7 @@ main(int argc, char* argv[])
       rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
     }
   }
+
   // Run!
   // ...in single-threaded mode, that is.
   lcore_main();
