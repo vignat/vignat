@@ -159,9 +159,10 @@ real_free(struct rte_mbuf* mbuf) {
 	free(mbuf->next);
 	mbuf->next = NULL;
 
-	klee_alias_function("rte_pktmbuf_free", "rte_pktmbuf_free");
+	// Forward to the real function
+	klee_alias_undo("rte_pktmbuf_free.*");
 	rte_pktmbuf_free(mbuf);
-	klee_alias_function("rte_pktmbuf_free", "stub_free");
+	klee_alias_functions("rte_pktmbuf_free.*", "stub_free");
 }
 
 void
@@ -685,33 +686,16 @@ stub_panic(const char *funcname, const char *format, ...)
 void
 stub_init(void)
 {
-	// If DPDK tries to commit suicide, translate that in KLEE terms...
+	// If DPDK tries to commit suicide, translate that in KLEE terms
 	klee_alias_function("__rte_panic", "stub_panic");
 
 	// rte_exit does formatting on its arguments; if one of them is a symbol,
 	// we get tons of useless paths...
 	klee_alias_function("rte_exit", "stub_exit");
 
-	// HACK
-	klee_alias_function("rte_pktmbuf_free", "stub_free");
-	// rte_pktmbuf_free is 'static inline', so it gets duplicated...
-	klee_alias_function("rte_pktmbuf_free930", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1108", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1144", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1173", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1211", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1307", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1651", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1731", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1766", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1806", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1841", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1882", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1916", "stub_free");
-	klee_alias_function("rte_pktmbuf_free1959", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2012", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2093", "stub_free");
-	klee_alias_function("rte_pktmbuf_free2293", "stub_free");
+	// Trace the packet free; need a regex to alias the duplicated functions
+	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
+	klee_alias_functions("rte_pktmbuf_free.*", "stub_free");
 
 	rte_eal_driver_register(&stub_driver);
 }
