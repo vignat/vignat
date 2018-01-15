@@ -36,6 +36,7 @@ verify:
 		--include=rte_config.h `# required by many DPDK files` \
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		../lib/stubs/device_stub.c \
+		../lib/stubs/external_stubs.c \
 		../nf_main.c \
 		../lib/nf_util.c ../lib/nat_config.c \
 		../lib/stubs/my-time-stub.c \
@@ -53,7 +54,7 @@ verify:
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # note: as of 2018-01-10, can't use --optimize because it creates a ShuffleVector instr in KLEE's own memmove, which KLEE doesn't support...
-	klee -libc=uclibc -posix-runtime -all-external-warnings -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
+	klee -libc=uclibc `#-posix-runtime` -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
 		--no-pci `# disable PCI enumeration since PCI is not available, we don't it use anyway` \
 		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \

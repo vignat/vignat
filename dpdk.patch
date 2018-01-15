@@ -176,3 +176,16 @@ index 41e0a92..23b3737 100644
  		mcfg->memseg[0].phys_addr = (phys_addr_t)(uintptr_t)addr;
  		mcfg->memseg[0].addr = addr;
  		mcfg->memseg[0].hugepage_sz = RTE_PGSIZE_4K;
+diff --git a/lib/librte_eal/common/eal_common_options.c b/lib/librte_eal/common/eal_common_options.c
+index 4d7dbac..bcca599 100644
+--- a/lib/librte_eal/common/eal_common_options.c
++++ b/lib/librte_eal/common/eal_common_options.c
+@@ -959,7 +959,7 @@ eal_check_common_options(struct internal_config *internal_cfg)
+ 		RTE_LOG(ERR, EAL, "Invalid process type specified\n");
+ 		return -1;
+ 	}
+-	if (index(internal_cfg->hugefile_prefix, '%') != NULL) {
++	if (strchr(internal_cfg->hugefile_prefix, '%') != NULL) {
+ 		RTE_LOG(ERR, EAL, "Invalid char, '%%', in --"OPT_FILE_PREFIX" "
+ 			"option\n");
+ 		return -1;
