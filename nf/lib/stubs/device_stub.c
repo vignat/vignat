@@ -162,7 +162,7 @@ real_free(struct rte_mbuf* mbuf) {
 	// Forward to the real function
 	klee_alias_undo("rte_pktmbuf_free.*");
 	rte_pktmbuf_free(mbuf);
-	klee_alias_functions("rte_pktmbuf_free.*", "stub_free");
+	klee_alias_function_regex("rte_pktmbuf_free.*", "stub_free");
 }
 
 void
@@ -695,7 +695,7 @@ stub_init(void)
 
 	// Trace the packet free; need a regex to alias the duplicated functions
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
-	klee_alias_functions("rte_pktmbuf_free.*", "stub_free");
+	klee_alias_function_regex("rte_pktmbuf_free.*", "stub_free");
 
 	rte_eal_driver_register(&stub_driver);
 }
