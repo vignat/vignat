@@ -60,7 +60,7 @@ pushd "$BUILDDIR/z3"
   pushd build
     # -jN here may break the make (hidden deps or something)
     make
-    make install # need the path for ocamlfind
+    make install
   popd
 popd
 
