@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -29,29 +30,6 @@ static const char* PAGEMAP_PATH = "/proc/self/pagemap";
 
 static const char* CPUINFO_PATH = "/proc/cpuinfo";
 
-// Useful macros
-#define LENGTH(str) (sizeof(str)/sizeof(str[0]))
-
-
-// Helper methods that do not use libc methods
-bool
-fake_strcmp(const char* left, const char* right)
-{
-	int l, r;
-        for (l = 0, r = 0; left[l] && right[r]; l++, r++) { }
-        return !left[l] && !right[r];
-}
-
-void
-fake_strcpy(char* dst, const char* src)
-{
-	int n;
-	for (n = 0; src[n]; n++) {
-		dst[n] = src[n];
-	}
-	dst[n] = '\0';
-}
-
 
 int
 snprintf(char* str, size_t size, const char* format, ...)
@@ -62,11 +40,11 @@ snprintf(char* str, size_t size, const char* format, ...)
 	va_start(args, format);
 
 	// CPU ID for CPU 0
-	if (fake_strcmp(format, CPU_ID_PATH_FORMAT)) {
+	if (!strcmp(format, CPU_ID_PATH_FORMAT)) {
 		unsigned core = va_arg(args, unsigned);
-		if (core == 0 && size >= LENGTH(CPU_ID_VALUE_ZERO)) {
-			fake_strcpy(str, CPU_ID_VALUE_ZERO);
-			return LENGTH(CPU_ID_VALUE_ZERO) - 1;
+		if (core == 0 && size >= strlen(CPU_ID_VALUE_ZERO)) {
+			strcpy(str, CPU_ID_VALUE_ZERO);
+			return strlen(CPU_ID_VALUE_ZERO) - 1;
 		}
 
 		return -1; // TODO support it
@@ -74,23 +52,23 @@ snprintf(char* str, size_t size, const char* format, ...)
 
 	// Same, but for some reason the second part is a %s as well
 	// TODO: If we end up upstreaming DPDK patches, might as well do this...
-	if (fake_strcmp(format, CPU_PATH_FORMAT)) {
-		if (va_arg(args, unsigned) == 0 && size >= LENGTH(CPU_ID_VALUE_ZERO)) {
-			if (fake_strcmp(va_arg(args, char*), CPU_ID_PATH)) {
-				fake_strcpy(str, CPU_ID_VALUE_ZERO);
-				return LENGTH(CPU_ID_VALUE_ZERO) - 1;
+	if (!strcmp(format, CPU_PATH_FORMAT)) {
+		if (va_arg(args, unsigned) == 0 && size >= strlen(CPU_ID_VALUE_ZERO)) {
+			if (!strcmp(va_arg(args, char*), CPU_ID_PATH)) {
+				strcpy(str, CPU_ID_VALUE_ZERO);
+				return strlen(CPU_ID_VALUE_ZERO) - 1;
 			}
 		}
 	}
 
 	// NUMA node 0, CPU 0
-	if (fake_strcmp(format, NUMA_PATH_FORMAT)) {
-		if (fake_strcmp(va_arg(args, char*), NUMA_PATH_PREFIX)) {
+	if (!strcmp(format, NUMA_PATH_FORMAT)) {
+		if (!strcmp(va_arg(args, char*), NUMA_PATH_PREFIX)) {
 			unsigned socket = va_arg(args, unsigned);
 			unsigned core = va_arg(args, unsigned);
-			if (socket == 0 && core == 0 && size >= LENGTH(NUMA_VALUE_ZERO)) {
-				fake_strcpy(str, NUMA_VALUE_ZERO);
-				return LENGTH(NUMA_VALUE_ZERO) - 1;
+			if (socket == 0 && core == 0 && size >= strlen(NUMA_VALUE_ZERO)) {
+				strcpy(str, NUMA_VALUE_ZERO);
+				return strlen(NUMA_VALUE_ZERO) - 1;
 			}
 
 			return -1; // TODO not supported yet
@@ -98,60 +76,60 @@ snprintf(char* str, size_t size, const char* format, ...)
 	}
 
 	// CPU 0 with a comma, when dumping affinity
-	if (fake_strcmp(format, "%u,")) {
+	if (!strcmp(format, "%u,")) {
 		unsigned arg = va_arg(args, unsigned);
 		if (arg == 0) {
 			const char* result = "0,";
-			if (size >= LENGTH(result)) {
-				fake_strcpy(str, result);
-				return LENGTH(result) - 1;
+			if (size >= strlen(result)) {
+				strcpy(str, result);
+				return strlen(result) - 1;
 			}
 		}
 	}
 
 	// Memory pool name
-	if (fake_strcmp(format, "MP_%s")) {
+	if (!strcmp(format, "MP_%s")) {
 		char* name = va_arg(args, char*);
-		if (name != NULL && LENGTH(name) + 3 <= size) {
-			fake_strcpy(str, "MP_");
+		if (name != NULL && strlen(name) + 3 <= size) {
+			strcpy(str, "MP_");
 			str += 3;
-			fake_strcpy(str, name);
-			return LENGTH(name) + 3 - 1;
+			strcpy(str, name);
+			return strlen(name) + 3 - 1;
 		}
 	}
 
 	// Memory pool sub-name
-	if (fake_strcmp(format, "MP_%s_%d")) {
+	if (!strcmp(format, "MP_%s_%d")) {
 		char* name = va_arg(args, char*);
 		if (name != NULL) {
 			// NOTE: this is a DPDK bug, format should be %u...
 			unsigned id = va_arg(args, unsigned);
-			if (LENGTH(name) + 5 <= size) {
-				fake_strcpy(str, "MP_");
+			if (strlen(name) + 5 <= size) {
+				strcpy(str, "MP_");
 				str += 3;
 
-				fake_strcpy(str, name);
+				strcpy(str, name);
 
 				if (id == 0) {
-					fake_strcpy(str, "_0");
+					strcpy(str, "_0");
 				} else if (id == 2) {
-					fake_strcpy(str, "_2");
+					strcpy(str, "_2");
 				} else {
 					klee_abort();
 				}
 
-				return LENGTH(name) + 5 - 1;
+				return strlen(name) + 5 - 1;
 			}
 		}
 	}
 
 	// Trivial case: string copy
-	if (fake_strcmp(format, "%s")) {
+	if (!strcmp(format, "%s")) {
 		char* arg = va_arg(args, char*);
 		if (arg != NULL) {
-			if (LENGTH(arg) <= size) {
-				fake_strcpy(str, arg);
-				return LENGTH(arg) - 1;
+			if (strlen(arg) <= size) {
+				strcpy(str, arg);
+				return strlen(arg) - 1;
 			}
 		}
 	}
@@ -199,12 +177,12 @@ int
 access(const char* pathname, int mode)
 {
 	// Yup, CPU 0 exists!
-	if (fake_strcmp(pathname, CPU_ID_VALUE_ZERO) && mode == F_OK) {
+	if (!strcmp(pathname, CPU_ID_VALUE_ZERO) && mode == F_OK) {
 		return 0;
 	}
 
 	// CPU 0 on NUMA node 0 exists too!
-	if (fake_strcmp(pathname, NUMA_VALUE_ZERO) && mode == F_OK) {
+	if (!strcmp(pathname, NUMA_VALUE_ZERO) && mode == F_OK) {
 		return 0;
 	}
 
@@ -215,7 +193,7 @@ int
 open(const char* file, int oflag, ...)
 {
 	// CPU 0
-	if (fake_strcmp(file, CPU_ID_VALUE_ZERO) && oflag == O_RDONLY) {
+	if (!strcmp(file, CPU_ID_VALUE_ZERO) && oflag == O_RDONLY) {
 		if (!klee_is_symbolic(CPU_ID_ZERO_FD)) {
 			CPU_ID_ZERO_FD = klee_int("cpu_id_zero_fd");
 		}
@@ -223,11 +201,11 @@ open(const char* file, int oflag, ...)
 	}
 
 	// page map
-	if (fake_strcmp(file, PAGEMAP_PATH) && oflag == O_RDONLY) {
+	if (!strcmp(file, PAGEMAP_PATH) && oflag == O_RDONLY) {
 		return -1; // TODO
 	}
 
-	if (fake_strcmp(file, CPUINFO_PATH) && oflag == O_RDONLY) {
+	if (!strcmp(file, CPUINFO_PATH) && oflag == O_RDONLY) {
 		return -1; // TODO
 	}
 
