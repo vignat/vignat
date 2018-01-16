@@ -189,3 +189,16 @@ index 4d7dbac..bcca599 100644
  		RTE_LOG(ERR, EAL, "Invalid char, '%%', in --"OPT_FILE_PREFIX" "
  			"option\n");
  		return -1;
+diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
+index 23b3737..6fcbeb4 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_memory.c
++++ b/lib/librte_eal/linuxapp/eal/eal_memory.c
+@@ -169,7 +169,7 @@ rte_mem_virt2phy(const void *virtaddr)
+ 
+ 	/* when using dom0, /proc/self/pagemap always returns 0, check in
+ 	 * dpdk memory by browsing the memsegs */
+-	if (rte_xen_dom0_supported()) {
++	if (rte_xen_dom0_supported() || !proc_pagemap_readable) { // SOLAL: should not be needed I guess?
+ 		struct rte_mem_config *mcfg;
+ 		struct rte_memseg *memseg;
+ 		unsigned i;

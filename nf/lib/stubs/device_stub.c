@@ -16,8 +16,8 @@
 
 // Constant stuff
 static const int stub_devices_count = 2; // more devices = lots more paths in the NF
+static char* stub_devices_names[] = { "stub_0", "stub_1" }; // don't depend on snprintf
 static const char* stub_driver_name = "stub";
-static const char* stub_device_name_format = "stub_%d";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
@@ -592,15 +592,7 @@ stub_dev_delete(struct rte_eth_dev* dev)
 static char*
 stub_device_name(int n)
 {
-	int length = snprintf(NULL, 0, stub_device_name_format, n) + 1;
-
-	char* buffer = (char*) malloc(length);
-	if (buffer == NULL) {
-		return NULL;
-	}
-
-	snprintf(buffer, length, stub_device_name_format, n);
-	return buffer;
+	return stub_devices_names[n];
 }
 
 static int
