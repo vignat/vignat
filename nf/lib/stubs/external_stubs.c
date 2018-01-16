@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -70,6 +71,14 @@ pthread_self(void)
 	// We are on CPU 0 - always
 	return 0;
 }
+
+int
+pthread_setaffinity_np(pthread_t thread, size_t cpusetsize, const cpu_set_t* cpuset)
+{
+	// Not supported
+	return -1;
+}
+
 
 FILE*
 fopencookie(void* cookie, const char* mode, cookie_io_functions_t io_funcs)
