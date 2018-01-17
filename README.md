@@ -20,21 +20,21 @@ This will compile and link VigNAT in the `build` directory. (Run it to be shown 
 
 # Verification
 
-First step, verify the data structures:
+First step, verify the data structures (can be done any time):
 
 ```bash
 $ cd nf/vignat
 $ make verifast
 ```
 
-Second step, symbolically execute the NAT:
+Second step, symbolically execute the NAT to generate traces (can be done any time):
 
 ```bash
 $ cd nf/vignat
 $ make verifast
 ```
 
-Third step, validate the generated traces:
+Third step, validate the generated traces (depends on the traces from the second step):
 
 ```bash
 $ cd validator
