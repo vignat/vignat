@@ -80,7 +80,7 @@ pushd "$BUILDDIR/llvm"
   . "$PATHSFILE"
 popd
 
-git clone --depth 1 --branch klee_uclibc_v1.0.0 https://github.com/klee/klee-uclibc.git "$BUILDDIR/klee-uclibc"
+git clone --depth 1 --branch fix_no_buffers https://github.com/SolalPirelli/klee-uclibc.git "$BUILDDIR/klee-uclibc"
 pushd "$BUILDDIR/klee-uclibc"
   ./configure \
    --make-llvm-lib \
