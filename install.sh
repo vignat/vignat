@@ -6,13 +6,12 @@
 VNDSDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 BUILDDIR=`pwd`
 
-if [ "$BUILDDIR" -ef "$VNDSDIR" ]; then
-  echo "It is not recommented to install the dependencies into the project root directory."
+if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$1" != "--force" ]; then
+  echo 'It is not recommented to install the dependencies into the project root directory.'
   echo "We recommend you to run the script from the parent directory like this: . $VNDSDIR/install.sh"
   read -p "Continue installing into $BUILDDIR? [y/n]" -n 1 -r
-  echo    # (optional) move to a new line
-  if [[ ! $REPLY =~ ^[Yy]$ ]]
-  then
+  echo # move to a new line
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
   fi
 fi
@@ -88,7 +87,7 @@ pushd "$BUILDDIR/klee-uclibc"
    --with-cc="../llvm/Release/bin/clang"
 
   # Use our minimalistic config
-  cp "$VNDSDIR/klee-uclibc.config" '.config'
+  cp "$VNDSDIR/install/klee-uclibc.config" '.config'
 
   make -j $(nproc)
 popd
@@ -157,8 +156,8 @@ pushd "$BUILDDIR"
 
   pushd dpdk
     # Apply the Vigor patches ( :( )
-    patch -p1 < "$VNDSDIR/dpdk.patch"
-    patch -p1 < "$VNDSDIR/dpdk.config.patch"
+    patch -p1 < "$VNDSDIR/install/dpdk.patch"
+    patch -p1 < "$VNDSDIR/install/dpdk.config.patch"
 
     case $(uname -r) in
       *Microsoft*)

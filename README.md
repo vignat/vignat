@@ -2,9 +2,11 @@
 This repository contains the VigNAT code together with the Vigor verification toolchain.
 
 ## Dependencies
-### Unconditional dependencies
-* DPDK-16.04
-### Verification dependencies
+
+### Run-time
+* DPDK 16.07
+
+### Verification-time
 * [patched](https://github.com/vignat/klee) KLEE
 * [patched](https://github.com/vignat/verifast) VeriFast
 
@@ -14,12 +16,7 @@ We gathered all the configuration instructions into a [dockerfile](https://docs.
 ```bash
 $ docker build -f verification.docker -t vignat .
 ```
-
-This file also serves as a reference if you want to configure your real machine such that it can build and run Vigor. Just look for the `RUN` instructions in `verification.docker` and execute them on your ubuntu 14.04 machine. Once you built the docker image you can run a container with
-
-```bash
-$ docker run -it vignat
-```
+``
 
 ### Build the NAT
 To build VigNAT, run
@@ -28,6 +25,7 @@ $ cd nf/vignat
 $ make
 ```
 This will compile and link VigNAT in the `build` directory. See `nf/vignat/testbed` for hints how to run it.
+
 ### Verify the NAT
 Vigor approach consists of three steps:
 1. Verification of the VigLib datastructures with theorem proving by running VeriFast on the annotated code.
@@ -57,9 +55,8 @@ $ ./test_all.sh ../nf/vignat/klee-last aaa ../nf nat_fspec.cmo
 
 Here is a brief description of the contents of the project, which is essentially a collection of weakly connected artifacts. Please, look also for README.md files in the subdirectories.
 
-* verification.docker - A Docker config file that contains full instructions to setup proper build and verificaiton environment for VigNAT
-* doc - contains all the documents/specs/justifications for Vigor approach
-* example - contains a small example that demonstrates the Vigor approach. It is a more complete version of the example used for our paper.
-* map-verification-attempts
 * nf - contains the library of the verifiec Vigor data structures and all the NF involved in the projects, some of them are verified some are not
 * validator - the validator, one of the steps in the Vigor approach.
+* doc - contains all the documents/specs/justifications for Vigor approach
+* doc/example - contains a small example that demonstrates the Vigor approach. It is a more complete version of the example used for our paper.
+* doc/map-verification-attempts - old attempts to verify maps
