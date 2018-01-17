@@ -97,6 +97,7 @@ pushd "$BUILDDIR/klee"
   mkdir build
   pushd build
     CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" \
+    CMAKE_PREFIX_PATH="$BUILDDIR/z3/build" \
     CMAKE_INCLUDE_PATH="$BUILDDIR/z3/build/include/" \
      cmake \
      -DENABLE_UNIT_TESTS=OFF \

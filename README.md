@@ -1,61 +1,52 @@
-# VigNAT
-This repository contains the VigNAT code together with the Vigor verification toolchain.
+This repository contains the Vigor verification toolchain, along with the verified NAT ("VigNAT") and some experiments.
 
-## Dependencies
 
-### Run-time
-* DPDK 16.07
+# Installation
 
-### Verification-time
-* [patched](https://github.com/vignat/klee) KLEE
-* [patched](https://github.com/vignat/verifast) VeriFast
+Use the `install.sh` script to install all dependencies (in your working directory), or use the Dockerfile (`docker build . -t vignat`).
 
-## The Docker image
-We gathered all the configuration instructions into a [dockerfile](https://docs.docker.com/engine/reference/builder/) `verification.docker`, that you can conveniently build with
 
-```bash
-$ docker build -f verification.docker -t vignat .
-```
-``
+# Compilation
 
-### Build the NAT
 To build VigNAT, run
+
 ```bash
 $ cd nf/vignat
 $ make
 ```
-This will compile and link VigNAT in the `build` directory. See `nf/vignat/testbed` for hints how to run it.
 
-### Verify the NAT
-Vigor approach consists of three steps:
-1. Verification of the VigLib datastructures with theorem proving by running VeriFast on the annotated code.
-2. Verification of the VigNAT safety with symbolic execution using KLEE.
-3. Validation of the symbolic models used in the previous step against the formal contracts, and verificaiton against a semantic property formulated in `validator/forwarding_property.tmpl`.
-First step relies only on the formal contracts for the datastructures and can be performed at any time independently.
-The other two steps are dependent.
-The last step works with symbolic call traces produced in the second step, so they should be run in order.
-#### Theorem proving
+This will compile and link VigNAT in the `build` directory. (Run it to be shown a help page)
+
+
+# Verification
+
+First step, verify the data structures:
+
 ```bash
 $ cd nf/vignat
 $ make verifast
 ```
-#### Symbolic execution
+
+Second step, symbolically execute the NAT:
+
 ```bash
 $ cd nf/vignat
-$ make verify
+$ make verifast
 ```
-#### Validation
+
+Third step, validate the generated traces:
+
 ```bash
 $ cd validator
-$ ./test_all.sh ../nf/vignat/klee-last aaa ../nf nat_fspec.cmo
+$ make clean && ./test_all.sh ../nf/vignat/klee-last aaa ../nf nat_fspec.cmo
 ```
 
 
-## Files
+# Other information
 
-Here is a brief description of the contents of the project, which is essentially a collection of weakly connected artifacts. Please, look also for README.md files in the subdirectories.
+The project is a collection of weakly connected artifacts. Subdirectories have their own README files.
 
-* nf - contains the library of the verifiec Vigor data structures and all the NF involved in the projects, some of them are verified some are not
+* nf - contains the library of the verified Vigor data structures and all the NFs involved in the project, some of them are verified some are not
 * validator - the validator, one of the steps in the Vigor approach.
 * doc - contains all the documents/specs/justifications for Vigor approach
 * doc/example - contains a small example that demonstrates the Vigor approach. It is a more complete version of the example used for our paper.
