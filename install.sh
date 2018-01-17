@@ -30,7 +30,12 @@ sudo apt-get update
 # subversion for LLVM
 # parallel for the Vigor Validator
 # m4 for OCaml (not a dependency of opam but in practice it is)
-sudo apt-get install -y cmake wget build-essential curl git subversion python parallel opam m4
+sudo apt-get install -y \
+                     cmake `# for KLEE` \
+                     subversion `# for LLVM` \
+                     parallel `# for the Vigor Validator` \
+                     opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
+                     wget build-essential curl git python locate `# for more or less everything`
 
  # OCaml uses variables in its scripts without defining it first - we're in strict mode!
 if [ -z ${PERL5LIB+x} ]; then
