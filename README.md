@@ -3,41 +3,34 @@ This repository contains the Vigor verification toolchain, along with the verifi
 
 # Installation
 
-Use the `install.sh` script to install all dependencies (in your working directory), or use the Dockerfile (`docker build . -t vignat`).
+### With Docker
+
+Run `install-docker.sh`, which will create a Docker image and a container with the Vigor toolchain pre-installed.
+
+### Manually
+
+Run `install.sh`, which will install the Vigor toolchain and create a file named `paths.sh` containing all necessary environment variables
+(which can be added to your `~/.profile`).
 
 
-# Compilation
-
-To build VigNAT, run
+# Compilation, Execution, Verification
 
 ```bash
+# Compile VigNAT
 $ cd nf/vignat
 $ make
-```
 
-This will compile and link VigNAT in the `build` directory. (Run it to be shown a help page)
+# Run it (this will print a help message
+$ ./build/nat
 
-
-# Verification
-
-First step, verify the data structures (can be done any time):
-
-```bash
-$ cd nf/vignat
+# Verify the data structures (can be done at any time)
 $ make verifast
-```
 
-Second step, symbolically execute the NAT to generate traces (can be done any time):
+# Symbolically execute VigNAT to generate traces
+$ make verify
 
-```bash
-$ cd nf/vignat
-$ make verifast
-```
-
-Third step, validate the generated traces (depends on the traces from the second step):
-
-```bash
-$ cd validator
+# Verify the traces
+$ cd ../../validator
 $ make clean && ./test_all.sh ../nf/vignat/klee-last aaa ../nf nat_fspec.cmo
 ```
 
@@ -48,6 +41,7 @@ The project is a collection of weakly connected artifacts. Subdirectories have t
 
 * nf - contains the library of the verified Vigor data structures and all the NFs involved in the project, some of them are verified some are not
 * validator - the validator, one of the steps in the Vigor approach.
+* install - patches and config files for the Vigor toolchain dependencies
 * doc - contains all the documents/specs/justifications for Vigor approach
 * doc/example - contains a small example that demonstrates the Vigor approach. It is a more complete version of the example used for our paper.
 * doc/map-verification-attempts - old attempts to verify maps
