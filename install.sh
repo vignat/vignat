@@ -1,12 +1,24 @@
 #!/bin/bash
-# Tested on Ubuntu 16.04 and the Linux Subsystem for Windows
+# Tested on Ubuntu 16.04, Debian Stretch, and the Linux Subsystem for Windows
 
 # Setup
 
 VNDSDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 BUILDDIR=`pwd`
 
-if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$1" != "--force" ]; then
+# Detect Docker or the Windows Subsystem for Linux
+OS='linux'
+if grep docker /proc/1/cgroup -qa; then
+  OS='docker'
+fi
+case $(uname -r) in
+  *Microsoft*)
+    OS='windows'
+    ;;
+esac
+
+
+if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$OS" != "docker" ]; then
   echo 'It is not recommented to install the dependencies into the project root directory.'
   echo "We recommend you to run the script from the parent directory like this: . $VNDSDIR/install.sh"
   read -p "Continue installing into $BUILDDIR? [y/n]" -n 1 -r
@@ -31,11 +43,10 @@ sudo apt-get update
 # parallel for the Vigor Validator
 # m4 for OCaml (not a dependency of opam but in practice it is)
 sudo apt-get install -y \
-                     cmake `# for KLEE` \
-                     subversion `# for LLVM` \
+                     bison flex zlib1g-dev libncurses5-dev libcap-dev cmake subversion `# for KLEE/LLVM` \
                      parallel `# for the Vigor Validator` \
                      opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
-                     wget build-essential curl git python locate `# for more or less everything`
+                     wget build-essential git python `# for more or less everything`
 
  # OCaml uses variables in its scripts without defining it first - we're in strict mode!
 if [ -z ${PERL5LIB+x} ]; then
@@ -65,14 +76,35 @@ pushd "$BUILDDIR/z3"
     # -jN here may break the make (hidden deps or something)
     make
     make install
+
+    # Weird, but required sometimes
+    sudo ln -s "$BUILDDIR/z3/build/libz3.so" "/usr/lib/libz3.so"
+    sudo ldconfig
   popd
 popd
 
 
-### KLEE
+### VeriFast
 
-sudo apt-get install -y bison flex zlib1g-dev libncurses5-dev libcap-dev \
-                        python-minimal
+# directly from VeriFast's readme
+sudo apt-get install -y --no-install-recommends \
+                     ca-certificates m4 \
+                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
+                     valac gtksourceview2.0-dev \
+                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
+
+# Not mentioned by VeriFast's readme, required anyway
+opam install ocamlfind camlp4 -y
+
+git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast "$BUILDDIR/verifast"
+pushd "$BUILDDIR/verifast/src"
+  make verifast # should be just "make" but the verifast checks fail due to a non auto lemma
+  echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> "$PATHSFILE"
+  . "$PATHSFILE"
+popd
+
+
+### KLEE
 
 svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_342/final "$BUILDDIR/llvm"
 svn co https://llvm.org/svn/llvm-project/cfe/tags/RELEASE_342/final "$BUILDDIR/llvm/tools/clang"
@@ -124,31 +156,20 @@ pushd "$BUILDDIR/klee"
 popd
 
 
-### VeriFast
-
-sudo apt-get install -y --no-install-recommends \
-                     ca-certificates m4 \
-                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
-                     valac gtksourceview2.0-dev \
-                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
-
-# Not mentioned by VeriFast's readme, required anyway
-opam install ocamlfind camlp4 -y
-
-git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast "$BUILDDIR/verifast"
-pushd "$BUILDDIR/verifast/src"
-  make verifast # should be just "make" but the verifast checks fail due to a non auto lemma
-  echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> "$PATHSFILE"
-  . "$PATHSFILE"
-popd
-
-
 ### DPDK
+
 
 # On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
 KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
 
-sudo apt-get install -y "linux-headers-$KERNEL_VER"
+# Install the right headers; we do *not* install headers on Docker since it uses the underlying kernel
+if [ "$OS" = 'microsoft' ]; then
+  # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
+  sudo apt install "linux-headers-$KERNEL_VER-generic"
+  export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
+elif [ "$OS" = 'linux' ]; then
+  sudo apt-get install -y "linux-headers-$KERNEL_VER"
+fi
 
 pushd "$BUILDDIR"
   wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
@@ -164,14 +185,6 @@ pushd "$BUILDDIR"
     # Apply the Vigor patches ( :( )
     patch -p1 < "$VNDSDIR/install/dpdk.patch"
     patch -p1 < "$VNDSDIR/install/dpdk.config.patch"
-
-    case $(uname -r) in
-      *Microsoft*)
-        # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
-        sudo apt install "linux-headers-$KERNEL_VER-generic"
-        export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
-      ;;
-    esac
 
     make config T=x86_64-native-linuxapp-gcc
     make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.

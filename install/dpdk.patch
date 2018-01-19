@@ -30,18 +30,6 @@ index 7916c78..cdb601b 100644
  
  	if ((level > rte_logs.level) || !(logtype & rte_logs.type))
  		return 0;
-diff --git a/lib/librte_eal/common/eal_common_options.c b/lib/librte_eal/common/eal_common_options.c
-index 1a1bab3..4d7dbac 100644
---- a/lib/librte_eal/common/eal_common_options.c
-+++ b/lib/librte_eal/common/eal_common_options.c
-@@ -810,6 +810,7 @@ eal_parse_common_option(int opt, const char *optarg,
- 		conf->memory = atoi(optarg);
- 		conf->memory *= 1024ULL;
- 		conf->memory *= 1024ULL;
-+
- 		mem_parsed = 1;
- 		break;
- 	/* force number of channels */
 diff --git a/lib/librte_eal/common/include/arch/x86/rte_cycles.h b/lib/librte_eal/common/include/arch/x86/rte_cycles.h
 index 6e3c7d8..17d6617 100644
 --- a/lib/librte_eal/common/include/arch/x86/rte_cycles.h
