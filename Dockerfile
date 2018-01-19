@@ -32,9 +32,9 @@ COPY validator /home/vigor/validator
 RUN sudo chown -R vigor:vigor nf \
  && sudo chown -R vigor:vigor validator
 
-# Set the path
-RUN echo '. /home/vigor/paths.sh' >> /home/vigor/.profile
-
 # Clean up
 RUN sudo rm -rf install \
  && sudo rm -f install.sh
+
+# Pass -l to bash so it reads ~/.profile
+ENTRYPOINT ["/bin/bash", "-l"]

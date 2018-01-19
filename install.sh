@@ -197,5 +197,6 @@ popd
 
 opam install ocamlfind core sexplib menhir -y
 
-echo "source $PATHSFILE" >> .profile
 
+# Source the paths file at login
+echo ". $PATHSFILE" >> "$HOME/.profile"
