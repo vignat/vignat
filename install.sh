@@ -46,6 +46,7 @@ sudo apt-get install -y \
                      bison flex zlib1g-dev libncurses5-dev libcap-dev cmake subversion `# for KLEE/LLVM` \
                      parallel `# for the Vigor Validator` \
                      opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
+                     libpcap-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
  # OCaml uses variables in its scripts without defining it first - we're in strict mode!

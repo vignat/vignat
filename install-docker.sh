@@ -6,16 +6,33 @@ set -euxo pipefail
 
 
 VNDSDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
-KERNEL_VER="$(uname -r)"
-HEADERS_PATH="/usr/src/linux-headers-$KERNEL_VER"
+KERNEL_VER=$(uname -r | sed 's/-generic//')
 IMAGE_NAME='vigor'
+
 
 # Make sure we have the Linux headers
 sudo apt-get install -y "linux-headers-$KERNEL_VER"
 
+
 # Create the image if needed
 if [ -z "$(sudo docker images -q $IMAGE_NAME)" ]; then
-  sudo docker build "$VNDSDIR" -t "$IMAGE_NAME"
+  # HACK: Docker doesn't support absolute paths in COPY
+  #       so we create symlinks instead...
+  #       ...except Docker doesn't like that either,
+  #       so we use mount points...
+  mkdir usr
+  sudo mount --bind /usr usr
+  mkdir lib
+  sudo mount --bind /lib lib
+
+  sudo docker build "$VNDSDIR" --build-arg "kernel_ver=$KERNEL_VER" -t "$IMAGE_NAME"
+
+  #       ... and then delete them
+  sudo umount usr
+  rmdir usr
+  sudo umount lib
+  rmdir lib
 fi
 
-sudo docker run -v "$HEADERS_PATH:$HEADERS_PATH" -i -t "$IMAGE_NAME"
+# Run the container
+sudo docker run -i -t "$IMAGE_NAME"
