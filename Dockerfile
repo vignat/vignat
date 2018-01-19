@@ -27,3 +27,14 @@ RUN /home/vigor/install.sh --force
 # Get the NFs and validator
 COPY nf /home/vigor/nf
 COPY validator /home/vigor/validator
+
+# Give the right permissions
+RUN sudo chown -R vigor:vigor nf \
+ && sudo chown -R vigor:vigor validator
+
+# Set the path
+RUN echo '. /home/vigor/paths.sh' >> /home/vigor/.profile
+
+# Clean up
+RUN sudo rm -rf install \
+ && sudo rm -f install.sh
