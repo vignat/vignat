@@ -5,12 +5,12 @@ This repository contains the Vigor verification toolchain, along with the verifi
 
 ### With Docker
 
-Run `install-docker.sh`, which will create a Docker image and a container with the Vigor toolchain pre-installed.
+Run `install-docker.sh`, which will create a Docker image and launch a container with the Vigor toolchain pre-installed.
 
 ### Manually
 
 Run `install.sh`, which will install the Vigor toolchain and create a file named `paths.sh` containing all necessary environment variables
-(which can be added to your `~/.profile`).
+(which is automatically added to your `~/.profile`).
 
 
 # Compilation, Execution, Verification
