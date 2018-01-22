@@ -81,26 +81,6 @@ index 3fb2188..952aa25 100644
  	if (mem_cfg_fd < 0){
  		mem_cfg_fd = open(pathname, O_RDWR);
  		if (mem_cfg_fd < 0)
-@@ -847,8 +847,10 @@ rte_eal_init(int argc, char **argv)
- 	if (rte_eal_intr_init() < 0)
- 		rte_panic("Cannot init interrupt-handling thread\n");
- 
-+#ifdef KLEE_VERIFICATION
-+		// KLEE doesn't support pthreads or pipes
-+#else
- 	RTE_LCORE_FOREACH_SLAVE(i) {
--
- 		/*
- 		 * create communication pipes between master thread
- 		 * and children
-@@ -882,6 +884,7 @@ rte_eal_init(int argc, char **argv)
- 	 */
- 	rte_eal_mp_remote_launch(sync_func, NULL, SKIP_MASTER);
- 	rte_eal_mp_wait_lcore();
-+#endif
- 
- 	/* Probe & Initialize PCI devices */
- 	if (rte_eal_pci_probe())
 diff --git a/lib/librte_eal/linuxapp/eal/eal_interrupts.c b/lib/librte_eal/linuxapp/eal/eal_interrupts.c
 index 47a3b20..94679e1 100644
 --- a/lib/librte_eal/linuxapp/eal/eal_interrupts.c
