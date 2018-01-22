@@ -1,0 +1,28 @@
+diff --git a/lib/librte_eal/common/eal_common_dev.c b/lib/librte_eal/common/eal_common_dev.c
+index a8a4146..3ea83d9 100644
+--- a/lib/librte_eal/common/eal_common_dev.c
++++ b/lib/librte_eal/common/eal_common_dev.c
+@@ -120,7 +120,9 @@ rte_eal_dev_init(void)
+ 		if (driver->type != PMD_PDEV)
+ 			continue;
+ 		/* PDEV drivers don't get passed any parameters */
+-		driver->init(NULL, NULL);
++		if (driver->init(NULL, NULL)) {
++			return -1;
++		}
+ 	}
+ 	return 0;
+ }
+diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
+index c82e565..34ae73e 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_memory.c
++++ b/lib/librte_eal/linuxapp/eal/eal_memory.c
+@@ -1200,7 +1200,7 @@ rte_eal_hugepage_init(void)
+ 		memset(addr, 0, internal_config.memory);
+ #else
+ 		addr = mmap(NULL, internal_config.memory, PROT_READ | PROT_WRITE,
+-				MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
++				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0); /* according to linux man pages, fd should be -1 if MAP_ANONYMOUS is set */
+ 		if (addr == MAP_FAILED) {
+ 			RTE_LOG(ERR, EAL, "%s: mmap() failed: %s\n", __func__,
+ 					strerror(errno));

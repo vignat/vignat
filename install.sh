@@ -183,9 +183,8 @@ pushd "$BUILDDIR"
   . "$PATHSFILE"
 
   pushd dpdk
-    # Apply the Vigor patches ( :( )
-    patch -p1 < "$VNDSDIR/install/dpdk.patch"
-    patch -p1 < "$VNDSDIR/install/dpdk.config.patch"
+    # Apply the Vigor patches
+    for p in "$VNDSDIR/install/dpdk.*.patch"; do patch -p1 < $p; done
 
     make config T=x86_64-native-linuxapp-gcc
     make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
