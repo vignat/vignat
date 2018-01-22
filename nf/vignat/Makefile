@@ -43,12 +43,12 @@ verify:
 		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
-		`# Platform-independent EAL. cpuflags uses CPU intrinsics, xen_memory is only for Xen` \
-		$(RTE_SDK)/lib/librte_eal/common/!(eal_common_cpuflags|eal_xen_memory).c \
-		`# Linux-specific EAL. xen_memory is only for Xen` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/!(eal_xen_memory).c \
-		`# Other libs. acl and hash use CPU intrinsics, power and ivshmem are broken as of DPDK 16.07` \
-		$(RTE_SDK)/lib/!(librte_acl|librte_hash|librte_power|librte_ivshmem)/*.c \
+		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
+		$(RTE_SDK)/lib/librte_eal/common/!(eal_common_cpuflags).c \
+		`# Linux-specific EAL` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
+		`# Other libs. acl and hash use CPU intrinsics, power is broken as of DPDK 16.07` \
+		$(RTE_SDK)/lib/!(librte_acl|librte_hash|librte_power)/*.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
