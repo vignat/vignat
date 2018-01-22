@@ -1,36 +1,3 @@
-diff --git a/lib/librte_eal/linuxapp/eal/eal_log.c b/lib/librte_eal/linuxapp/eal/eal_log.c
-index d391100..c779475 100644
---- a/lib/librte_eal/linuxapp/eal/eal_log.c
-+++ b/lib/librte_eal/linuxapp/eal/eal_log.c
-@@ -89,6 +89,11 @@ static cookie_io_functions_t console_log_func = {
- int
- rte_eal_log_init(const char *id, int facility)
- {
-+#ifdef KLEE_VERIFICATION
-+	// syslog uses sockets, which KLEE doesn't support
-+	return 0;
-+#endif
-+
- 	FILE *log_stream;
- 
- 	log_stream = fopencookie(NULL, "w+", console_log_func);
-diff --git a/lib/librte_eal/common/eal_common_log.c b/lib/librte_eal/common/eal_common_log.c
-index 7916c78..cdb601b 100644
---- a/lib/librte_eal/common/eal_common_log.c
-+++ b/lib/librte_eal/common/eal_common_log.c
-@@ -145,7 +145,12 @@ int
- rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
- {
- 	int ret;
-+#ifdef KLEE_VERIFICATION
-+	// rte_logs.file hasn't been set since we stubbed out the log init code
-+	FILE *f = stderr;
-+#else
- 	FILE *f = rte_logs.file;
-+#endif
- 
- 	if ((level > rte_logs.level) || !(logtype & rte_logs.type))
- 		return 0;
 diff --git a/lib/librte_eal/common/include/arch/x86/rte_cycles.h b/lib/librte_eal/common/include/arch/x86/rte_cycles.h
 index 6e3c7d8..17d6617 100644
 --- a/lib/librte_eal/common/include/arch/x86/rte_cycles.h
@@ -40,7 +7,7 @@ index 6e3c7d8..17d6617 100644
  #endif
  
 +#ifdef KLEE_VERIFICATION
-+	return 0;
++	return 0; // inline assembly? no way!
 +#else
  	asm volatile("rdtsc" :
  		     "=a" (tsc.lo_32),
@@ -59,22 +26,30 @@ index 47a3b20..94679e1 100644
  rte_eal_intr_init(void)
  {
 +#ifdef KLEE_VERIFICATION
-+	// KLEE doesn't seem to support pipes
++	// we don't support pipes
 +	return 0;
 +#endif
  	int ret = 0, ret_1 = 0;
- 	char thread_name[RTE_MAX_THREAD_NAME_LEN];
+ 	char thread_name[RTE_MAX_THREAD_NAME_LEN]; 
+
+diff --git a/lib/librte_eal/linuxapp/eal/eal_log.c b/lib/librte_eal/linuxapp/eal/eal_log.c
+index c088bd9..11e3c5c 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_log.c
++++ b/lib/librte_eal/linuxapp/eal/eal_log.c
+@@ -88,6 +88,9 @@ static cookie_io_functions_t console_log_func = {
+ int
+ rte_eal_log_init(const char *id, int facility)
+ {
++#ifdef KLEE_VERIFICATION
++	FILE *log_stream = NULL; // use stderr for logging, we don't support syslog...
++#else
+ 	FILE *log_stream;
  
-diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
-index 23b3737..6fcbeb4 100644
---- a/lib/librte_eal/linuxapp/eal/eal_memory.c
-+++ b/lib/librte_eal/linuxapp/eal/eal_memory.c
-@@ -169,7 +169,7 @@ rte_mem_virt2phy(const void *virtaddr)
+ 	log_stream = fopencookie(NULL, "w+", console_log_func);
+@@ -95,6 +98,7 @@ rte_eal_log_init(const char *id, int facility)
+ 		return -1;
  
- 	/* when using dom0, /proc/self/pagemap always returns 0, check in
- 	 * dpdk memory by browsing the memsegs */
--	if (rte_xen_dom0_supported()) {
-+	if (rte_xen_dom0_supported() || !proc_pagemap_readable) { // SOLAL: should not be needed I guess?
- 		struct rte_mem_config *mcfg;
- 		struct rte_memseg *memseg;
- 		unsigned i;
+ 	openlog(id, LOG_NDELAY | LOG_PID, facility);
++#endif
+ 
+ 	eal_log_set_default(log_stream);

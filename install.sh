@@ -199,10 +199,10 @@ touch "$PROGRESSDIR/klee_built"
 ### DPDK
 
 pushd "$BUILDDIR"
-  wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
+  wget -O dpdk.tar.xz https://fast.dpdk.org/rel/dpdk-17.11.tar.xz
   tar xf dpdk.tar.xz
   rm dpdk.tar.xz
-  mv dpdk-16.07 dpdk
+  mv dpdk-17.11 dpdk
 
   echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> "$PATHSFILE"
   echo "export RTE_SDK=$BUILDDIR/dpdk" >> "$PATHSFILE"
