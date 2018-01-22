@@ -4,7 +4,7 @@
 
 // TODO use time_t from time.h - but this is used by VeriFast
 // so even #ifdef-ing the time.h inclusion out doesn't work
-#define time_t uint32_t
+#define time_t int64_t
 
 //@ predicate last_time(time_t t) = true;
 

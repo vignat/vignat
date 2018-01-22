@@ -8,15 +8,16 @@
 
 #include <containers/str-descr.h>
 
-#include <rte_byteorder.h>
-#include <rte_dev.h>
+//#include <rte_byteorder.h>
+//#include <rte_dev.h>
 #include <rte_ethdev.h>
+#include <rte_ethdev_vdev.h>
+#include <rte_malloc.h>
 #include <rte_mbuf.h>
 
 
 // Constant stuff
 static const int stub_devices_count = 2; // more devices = lots more paths in the NF
-static char* stub_devices_names[] = { "stub_0", "stub_1" }; // don't depend on snprintf
 static const char* stub_driver_name = "stub";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
@@ -232,7 +233,7 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		// Keep contrete values for what a driver guarantees
 		// (assignments are in the same order as the rte_mbuf declaration)
 		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
-		bufs[i]->buf_physaddr = rte_mempool_virt2phy(stub_q->mb_pool, bufs[i]) + mbuf_size;
+		bufs[i]->buf_physaddr = rte_mempool_virt2iova(bufs[i]) + mbuf_size;
 		bufs[i]->buf_len = (uint16_t) buf_len;
 		// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
 		// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
@@ -464,7 +465,7 @@ stub_dev_info(struct rte_eth_dev *dev,
 	dev_info->flow_type_rss_offloads = 0;
 }
 
-static void
+static int
 stub_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *igb_stats)
 {
 	klee_abort();
@@ -525,31 +526,33 @@ static const struct eth_dev_ops stub_ops = {
 	.rss_hash_conf_get = stub_rss_hash_conf_get
 };
 
-int
-stub_dev_create(const char* name, unsigned numa_node)
+static int
+stub_driver_probe(struct rte_vdev_device* vdev)
 {
-	int ret = klee_int("dev_create_return");
-	if (ret != 0) {
-		return ret;
+        int ret = klee_int("stub_driver_probe_return");
+        if (ret != 0) {
+                return ret;
+        }
+
+	if (vdev == NULL) {
+		klee_abort();
 	}
 
-	struct stub_device* stub_dev = (struct stub_device*) malloc(sizeof(struct stub_device));
-	if (stub_dev == NULL) {
-		return -ENOMEM;
+	// not sure why this is needed but it's in eth_null
+	if (vdev->device.numa_node == SOCKET_ID_ANY) {
+		vdev->device.numa_node = rte_socket_id();
 	}
 
-	struct rte_eth_dev* dev = rte_eth_dev_allocate(name, RTE_ETH_DEV_PCI);
+	struct rte_eth_dev* dev = rte_eth_vdev_allocate(vdev, sizeof(struct stub_device));
 	if (dev == NULL) {
-		free(stub_dev);
 		return -ENOMEM;
 	}
 
-	memset(stub_dev, 0, sizeof(struct stub_device));
+	struct stub_device* stub_dev = (struct stub_device*) dev->data->dev_private;
 	stub_dev->port_id = dev->data->port_id;
 
 	klee_assert(!device_created[stub_dev->port_id]);
 
-	dev->data->dev_private = stub_dev;
 	dev->data->rx_queues = NULL;
 	dev->data->nb_rx_queues = 0;
 	dev->data->tx_queues = NULL;
@@ -557,14 +560,8 @@ stub_dev_create(const char* name, unsigned numa_node)
 	dev->data->dev_started = 0;
 	dev->data->dev_link = stub_link;
 	dev->data->mac_addrs = &stub_addr;
-	dev->data->dev_flags = 0;
-	dev->data->kdrv = RTE_KDRV_NONE;
-	dev->data->drv_name = stub_driver_name;
-	dev->data->numa_node = numa_node;
 
 	dev->dev_ops = &stub_ops;
-	TAILQ_INIT(&dev->link_intr_cbs);
-	dev->driver = NULL;
 	dev->rx_pkt_burst = stub_rx;
 	dev->tx_pkt_burst = stub_tx;
 
@@ -573,94 +570,40 @@ stub_dev_create(const char* name, unsigned numa_node)
 	return 0;
 }
 
-int
-stub_dev_delete(struct rte_eth_dev* dev)
-{
-	struct stub_device* stub_dev = dev->data->dev_private;
-
-	klee_assert(device_created[stub_dev->port_id]);
-
-	device_created[stub_dev->port_id] = false;
-
-	free(dev->data->dev_private);
-	dev->data->dev_private = NULL;
-	dev->data = NULL;
-
-	return rte_eth_dev_release_port(dev);
-}
-
-static char*
-stub_device_name(int n)
-{
-	return stub_devices_names[n];
-}
-
 static int
-stub_devinit(const char *name, const char *params)
+stub_driver_remove(struct rte_vdev_device* vdev)
 {
-	// name is always NULL
-
-        int ret = klee_int("devinit_return");
-        if (ret != 0) {
-                return ret;
-        }
-
-	unsigned numa_node = rte_socket_id();
-
-	for (int n = 0; n < stub_devices_count; n++) {
-		char* name = stub_device_name(n);
-		if (name == NULL) {
-			return -ENOMEM;
-		}
-
-		int ret = stub_dev_create(name, numa_node);
-		if (ret != 0) {
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
-static int
-stub_devuninit(const char *name)
-{
-	// name is always NULL
-
-	int ret = klee_int("devuninit_return");
+	int ret = klee_int("stub_driver_remove_return");
 	if (ret != 0) {
 		return ret;
 	}
 
-	bool end = false;
-	for (int n = 0; n < stub_devices_count; n++) {
-		char* name = stub_device_name(n);
-		if (name == NULL) {
-			return -ENOMEM;
-		}
-
-		struct rte_eth_dev* dev = rte_eth_dev_allocated(name);
-		if (dev == NULL) {
-			end = true;
-			continue;
-		}
-		if (end) {
-			// There was an unallocated device before
-			// but the current one is allocated - nonsensical!
-			klee_abort();
-		}
-
-		stub_dev_delete(dev);
+	if (vdev == NULL) {
+		klee_abort();
 	}
 
-	return ret;
+	struct rte_eth_dev* dev = rte_eth_dev_allocated(rte_vdev_device_name(vdev));
+	if (dev == NULL) {
+		klee_abort();
+	}
+
+	rte_free(dev->data->dev_private);
+	rte_free(dev->data);
+
+	rte_eth_dev_release_port(dev);
+
+	return 0;
 }
 
-struct rte_driver stub_driver = {
-	.name = RTE_STR(stub_name),
-	.type = PMD_PDEV,
-	.init = stub_devinit,
-	.uninit = stub_devuninit,
+struct rte_vdev_driver stub_driver = {
+	.next = NULL,
+	.driver = {
+		.next = NULL,
+		.name = RTE_STR(stub_driver_name),
+		.alias = NULL,
+	},
+	.probe = stub_driver_probe,
+	.remove = stub_driver_remove,
 };
 
 void
@@ -689,5 +632,5 @@ stub_init(void)
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
 	klee_alias_function_regex("rte_pktmbuf_free.*", "stub_free");
 
-	rte_eal_driver_register(&stub_driver);
+	rte_vdev_register(&stub_driver);
 }

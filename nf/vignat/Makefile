@@ -47,8 +47,9 @@ verify:
 		$(RTE_SDK)/lib/librte_eal/common/!(eal_common_cpuflags).c \
 		`# Linux-specific EAL` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
-		`# Other libs. acl and hash use CPU intrinsics, power is broken as of DPDK 16.07` \
-		$(RTE_SDK)/lib/!(librte_acl|librte_hash|librte_power)/*.c \
+		`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \
+		`#             power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html` \
+		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
