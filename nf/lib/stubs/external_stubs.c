@@ -7,6 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <sys/mman.h>
 #include <sys/syscall.h>
 
 #include <klee/klee.h>
@@ -140,40 +141,6 @@ snprintf(char* str, size_t size, const char* format, ...)
 }
 
 int
-vfprintf(FILE* stream, const char* format, _G_va_list __arg)
-{
-	if (stream == stderr) {
-		return 0; // OK, whatever
-	}
-
-	// Not supported
-	klee_abort();
-}
-
-pthread_t
-pthread_self(void)
-{
-	// We are on CPU 0 - always
-	return 0;
-}
-
-int
-pthread_setaffinity_np(pthread_t thread, size_t cpusetsize, const cpu_set_t* cpuset)
-{
-	// We're running in a symbolic executor anyway, the concept of "affinity" is meaningless...
-	return klee_int("pthread_setaffinity_np_return");
-}
-
-
-FILE*
-fopencookie(void* cookie, const char* mode, cookie_io_functions_t io_funcs)
-{
-	FILE* f = (FILE*) malloc(sizeof(FILE));;
-	klee_forbid_access(f, sizeof(FILE), "fopencookie");
-	return f;
-}
-
-int
 access(const char* pathname, int mode)
 {
 	// Yup, CPU 0 exists!
@@ -245,6 +212,40 @@ close(int fd)
 }
 
 int
+vfprintf(FILE* stream, const char* format, _G_va_list __arg)
+{
+	if (stream == stderr) {
+		return 0; // OK, whatever
+	}
+
+	// Not supported
+	klee_abort();
+}
+
+pthread_t
+pthread_self(void)
+{
+	// We are on CPU 0 - always
+	return 0;
+}
+
+int
+pthread_setaffinity_np(pthread_t thread, size_t cpusetsize, const cpu_set_t* cpuset)
+{
+	// We're running in a symbolic executor anyway, the concept of "affinity" is meaningless...
+	return klee_int("pthread_setaffinity_np_return");
+}
+
+
+FILE*
+fopencookie(void* cookie, const char* mode, cookie_io_functions_t io_funcs)
+{
+	FILE* f = (FILE*) malloc(sizeof(FILE));;
+	klee_forbid_access(f, sizeof(FILE), "fopencookie");
+	return f;
+}
+
+int
 timerfd_create(int clockid, int flags)
 {
 	// OK, its usage implies timerfd_gettime/settime and we don't support those
@@ -285,6 +286,35 @@ getpagesize(void)
 	//return klee_int("page_size"); // TODO - but it propagates a symbol in annoying places
 	return 4096;
 }
+
+void*
+mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
+{
+	// We support a single mapping
+	if (addr == NULL) {
+		// With read/write pages (otherwise it's messy to handle)
+		if (prot & (PROT_READ | PROT_WRITE)) {
+			// and only anonymous and private
+			if (flags == (MAP_PRIVATE | MAP_ANONYMOUS)) {
+				// http://man7.org/linux/man-pages/man2/mmap.2.html
+				// The mapping is not backed by any file; its contents are initialized to zero.
+				// The fd argument is ignored; however, some implementations require fd to be -1
+				// if MAP_ANONYMOUS is specified, and portable applications should ensure this.
+				// The offset argument should be zero.
+				klee_assert(fd == -1);
+				klee_assert(offset == 0);
+
+				void* mem = malloc(length);
+				memset(mem, 0, length);
+				return mem;
+			}
+		}
+	}
+
+	klee_abort();
+}
+
+
 
 // FIXME LLVM uses intrinsics for memmove so we can't use the uclibc one for some reason
 //       (i.e its declaration is not linked in with the rest like e.g. strcmp)
