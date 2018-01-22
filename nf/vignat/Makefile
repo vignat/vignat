@@ -31,12 +31,14 @@ verify:
 	rm -f *.bc # in case previous build failed after generating bc files
 	clang -DKLEE_VERIFICATION \
 		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
+                -DRTE_COMPILE_TIME_CPUFLAGS `# cpuflags requires it, usually passed from the dpdk build system` \
 		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
 		--include=sse_stubs.h --include=builtin_stubs.h \
 		--include=rte_config.h `# required by many DPDK files` \
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		../lib/stubs/device_stub.c \
 		../lib/stubs/external_stubs.c \
+		../lib/stubs/rte_stubs.c \
 		../nf_main.c \
 		../lib/nf_util.c ../lib/nat_config.c \
 		../lib/stubs/my-time-stub.c \
@@ -44,12 +46,14 @@ verify:
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
 		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
-		$(RTE_SDK)/lib/librte_eal/common/!(eal_common_cpuflags).c \
+		$(RTE_SDK)/lib/librte_eal/common/*.c \
 		`# Linux-specific EAL` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
 		`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \
 		`#             power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html` \
 		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
+		`# Virtual devices support` \
+		$(RTE_SDK)/drivers/bus/vdev/*.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc

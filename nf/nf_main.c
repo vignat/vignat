@@ -212,6 +212,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef KLEE_VERIFICATION
+  klee_alias_function("rte_memcpy", "memcpy");
   stub_init();
 #endif
 
