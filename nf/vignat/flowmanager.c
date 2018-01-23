@@ -8,7 +8,7 @@
 #include "lib/expirator.h"
 
 #ifdef KLEE_VERIFICATION
-#  include "lib/stubs/rte_stubs.h" //<- for RTE_MAX_ETHPORTS
+#  include "rte_ethdev.h"
 #  include "lib/stubs/containers/double-map-stub-control.h" //<- for set entry cond
 #endif //KLEE_VERIFICATION
 
@@ -24,6 +24,17 @@ struct DoubleChain** get_dchain_pp(void) {
   return &chain;
 }
 
+void concretize_devices(struct flow* f) {
+    int count = rte_eth_dev_count();
+
+    klee_assume(f->int_device_id >= 0);
+    klee_assume(f->ext_device_id >= 0);
+    klee_assume(f->int_device_id < count);
+    klee_assume(f->ext_device_id < count);
+
+    for(unsigned d = 0; d < count; d++) if (f->int_device_id == d) { f->int_device_id = d; break; }
+    for(unsigned d = 0; d < count; d++) if (f->ext_device_id == d) { f->ext_device_id = d; break; }
+}
 #endif//KLEE_VERIFICATION
 
 int allocate_flowmanager(uint8_t nb_ports,
@@ -71,6 +82,10 @@ static
 void get_and_rejuvenate(int index, uint32_t time, struct flow* flow_out) {
   get_flow(index, flow_out);
   dchain_rejuvenate_index(chain, index, time);
+
+#ifdef KLEE_VERIFICATION
+  concretize_devices(flow_out);
+#endif
 }
 
 int get_flow_by_int_key(struct int_key* key, uint32_t time, struct flow* flow_out) {

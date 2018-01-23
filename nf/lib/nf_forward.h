@@ -1,15 +1,13 @@
 #pragma once
 
 #include <inttypes.h>
+#include "lib/nf_time.h"
 
 struct rte_mbuf;
 
 void nf_core_init(void);
+int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now);
 
-// TODO make the uint32_t a time_t
-int nf_core_process(uint8_t device,
-                    struct rte_mbuf* mbuf,
-                    uint32_t now);
 enum nf_core_special_results {
   FLOOD_FRAME = -1
 };

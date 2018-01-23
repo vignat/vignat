@@ -5,10 +5,6 @@
 
 #include <stdint.h>
 
-#ifdef KLEE_VERIFICATION
-#  include "lib/stubs/rte_stubs.h"
-#else//KLEE_VERIFICATION
-
 #ifdef _NO_VERIFAST_
 #  include <sys/queue.h>
 #  include <rte_common.h>
@@ -112,7 +108,6 @@ struct rte_mbuf {
 #define RTE_MAX_ETHPORTS 32
 #define RTE_MAX_LCORE 128
 #endif //_NO_VERIFAST_
-#endif
 
 #define MAX_PKT_BURST     32
 

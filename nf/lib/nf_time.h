@@ -2,14 +2,18 @@
 #define NF_TIME_H_INCLUDED
 #include <stdint.h>
 
-//@ #include "lib/predicates.gh"
+// TODO use time_t from time.h - but this is used by VeriFast
+// so even #ifdef-ing the time.h inclusion out doesn't work
+#define time_t uint32_t
+
+//@ predicate last_time(time_t t) = true;
 
 /**
-   A wrapper around the system function int time(void*). Returns the number of
+   A wrapper around the system time function. Returns the number of
    seconds since the Epoch (1970-01-01 00:00:00 +0000 (UTC)).
    @returns the number of seconds since Epoch.
 */
-uint32_t current_time(void);
+time_t current_time(void);
 //@ requires last_time(?x);
 //@ ensures x <= result &*& last_time(result);
 

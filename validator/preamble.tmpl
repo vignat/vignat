@@ -1,20 +1,92 @@
 #include <stdint.h>
+#include "rte_config.h"
 #include "lib/expirator.h"
-#include "lib/nf_time.h"
 #include "lib/stubs/my-time-stub-control.h"
 #include "lib/containers/double-map.h"
 #include "lib/containers/double-chain.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
-
-#include "lib/containers/batcher.h"
-
-#include "lib/containers/array-bat.h"
-#include "lib/containers/array-rq.h"
-#include "lib/containers/array-u16.h"
-#include "lib/containers/array-lcc.h"
 #include "vignat/loop.h"
+#include "lib/include_ignored_by_verifast.h"
+#include "lib/nf_time.h"
 
 //@ #include "lib/abstract-state.h"
+
+// DPDK driver stub - copy/pasted here because VeriFast's C parser is awful so #ifdefs are painful
+//                    (it seems it even parses stuff inside an #ifdef that it won't use...)
+struct stub_mbuf_content {
+	struct ether_hdr ether;
+	struct ipv4_hdr ipv4;
+	struct tcp_hdr tcp;
+};
+struct stub_queue {
+	struct rte_mempool* mb_pool;
+	uint16_t port_id;
+};
+struct stub_device {
+	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
+	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
+};
+// DPDK stuff - but since this is used by VeriFast, we can't include rte_ things (VeriFast's preprocessor is lacking)
+struct rte_mempool;
+struct rte_mbuf {
+	struct stub_mbuf_content* buf_addr; // <- WARNING this has changed from void* to struct stub_mbuf_content* !!!
+	uint64_t buf_physaddr;
+	uint16_t buf_len;
+	uint16_t data_off;
+	uint16_t refcnt;
+	uint8_t nb_segs;
+	uint8_t port;
+	uint64_t ol_flags;
+	uint32_t packet_type;
+	uint32_t pkt_len;
+	uint16_t data_len;
+	uint16_t vlan_tci;
+	uint32_t hash;
+	uint32_t seqn;
+	uint16_t vlan_tci_outer;
+	uint64_t udata64;
+	struct rte_mempool* pool;
+	struct rte_mbuf* next;
+	uint64_t tx_offload;
+	uint16_t priv_size;
+	uint16_t timesync;
+};
+struct ether_addr {
+        uint8_t a;
+        uint8_t b;
+        uint8_t c;
+        uint8_t d;
+        uint8_t e;
+        uint8_t f;
+};
+struct ether_hdr {
+	struct ether_addr d_addr;
+	struct ether_addr s_addr;
+	uint16_t ether_type;
+};
+struct ipv4_hdr {
+	uint8_t  version_ihl;
+	uint8_t  type_of_service;
+	uint16_t total_length;
+	uint16_t packet_id;
+	uint16_t fragment_offset;
+	uint8_t  time_to_live;
+	uint8_t  next_proto_id;
+	uint16_t hdr_checksum;
+	uint32_t src_addr;
+	uint32_t dst_addr;
+};
+struct tcp_hdr {
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint32_t sent_seq;
+	uint32_t recv_ack;
+	uint8_t  data_off;
+	uint8_t  tcp_flags;
+	uint16_t rx_win;
+	uint16_t cksum;
+	uint16_t tcp_urp;
+};
 
 int flow_consistency(void* key_a, void* key_b, int index, void* value)
 /*@ requires true; @*/
@@ -23,7 +95,6 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
    return 0;
 }
 
-//@ predicate a_packet(struct rte_mbuf *mbuf);
 /*@
     inductive ether_addri = eaddrc(int, int, int, int, int, int);
     inductive ether_hdri = ether_hdrc(ether_addri, ether_addri, int);
@@ -79,7 +150,7 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
     inductive user_bufi = user_bufc(ether_hdri, ipv4_hdri, tcp_hdri);
 
-    predicate user_bufferp(struct user_buf *buf; user_bufi ub) =
+    predicate user_bufferp(struct stub_mbuf_content *buf; user_bufi ub) =
       ether_hdrp(&buf->ether, ?hdr) &*&
       ipv4_hdrp(&buf->ipv4, ?ipv4) &*&
       tcp_hdrp(&buf->tcp, ?tcp) &*&
@@ -113,24 +184,31 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       val == rte_mbufc(ub, port, ptype, doff) &*&
       doff == 0;
       //TODO: ^^^ is it really always so?
+
+   // This is pretty and useful, but annoying since mbufp doesn't auto-open in that case
+   // TODO use this!
+   predicate packets(struct rte_mbuf** bufs, uint16_t start, uint16_t end; list<rte_mbufi> vals) =
+     start == end ? vals == nil : (pointer(bufs + start, ?buf) &*& mbufp(buf, ?head) &*& packets(bufs, start + 1, end, ?tail) &*& vals == cons(head, tail));
 @*/
 
-int send_single_packet(struct rte_mbuf *m, uint8_t port);
-//@ requires a_packet(m) &*& mbufp(m, _);
-//@ ensures result != 0 ? true : (a_packet(m) &*& mbufp(m, _));
+// TODO a lot of assumptions about only sending 1 packet here :(
+
+// Most of the ensures is a convoluted way to say "*bufs is null iff result == 0, otherwise it points to a valid mbuf"
+uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
+//@ requires nb_bufs == 1 &*& *bufs |-> _;
+//@ ensures result <= nb_bufs &*& *bufs |-> ?mb &*& (result == 0 ? true : mbufp(mb, _)) &*& (result == nb_bufs ? mb != 0 : mb == 0);
+
+uint16_t stub_tx(void* q, struct rte_mbuf* bufs, uint16_t nb_bufs);
+//@ requires nb_bufs == 1 &*&  mbufp(bufs, _);
+//@ ensures result <= nb_bufs &*& (result == 0 ? mbufp(bufs, _) : true);
+
+void stub_free(struct rte_mbuf* mbuf);
+//@ requires mbufp(mbuf,_);
+//@ ensures true;
 
 void flood(struct rte_mbuf *m, uint8_t skip_device,
            uint8_t nb_devices);
-//@ requires a_packet(m) &*& mbufp(m, _);
-//@ ensures true;
-
-void received_packet(uint8_t portid,
-                     struct rte_mbuf **mbuf);
-//@ requires *mbuf |-> _;
-//@ ensures *mbuf |-> ?mb &*& a_packet(mb) &*& mbufp(mb, _);
-
-void rte_pktmbuf_free(struct rte_mbuf *mbuf);
-//@ requires a_packet(mbuf) &*& mbufp(mbuf, _);
+//@ requires mbufp(m,_);
 //@ ensures true;
 
 /*@

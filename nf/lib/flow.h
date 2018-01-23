@@ -1,6 +1,7 @@
 #ifndef _FLOW_H_INCLUDED_
 #define _FLOW_H_INCLUDED_
 #include <stdint.h>
+#include <stdbool.h>
 
 /**
   The "internal" key - the part of the flow ID, related to the internal network.
@@ -62,7 +63,6 @@ void log_flow(const struct flow *f);
 
 #include <klee/klee.h>
 #include "lib/stubs/containers/double-map-stub-control.h"
-#include "lib/static-component-params.h"
 
 //TODO: this is dirty.
 extern uint16_t starting_port;
@@ -249,9 +249,9 @@ int flow_consistency(void* key_a, void* key_b,
   @param b - pointer to second int_key
   @returns 1 if *a equals *b; and 1 otherwise.
 */
-int int_key_eq(void* a, void* b);
+bool int_key_eq(void* a, void* b);
 //@ requires [?f1]int_k_p(a, ?ak) &*& [?f2]int_k_p(b, ?bk);
-//@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+//@ ensures [f1]int_k_p(a, ak) &*& [f2]int_k_p(b, bk) &*& (false == result ? (ak != bk) : (ak == bk));
 
 /**
   Equality comparison function for the ext_key's.
@@ -260,9 +260,9 @@ int int_key_eq(void* a, void* b);
   @param b - pointer to second ext_key
   @returns 1 if *a equals *b; and 1 otherwise.
 */
-int ext_key_eq(void* a, void* b);
+bool ext_key_eq(void* a, void* b);
 //@ requires [?f1]ext_k_p(a, ?ak) &*& [?f2]ext_k_p(b, ?bk);
-//@ ensures [f1]ext_k_p(a, ak) &*& [f2]ext_k_p(b, bk) &*& (0 == result ? (ak != bk) : (ak == bk));
+//@ ensures [f1]ext_k_p(a, ak) &*& [f2]ext_k_p(b, bk) &*& (false == result ? (ak != bk) : (ak == bk));
 
 
 /**

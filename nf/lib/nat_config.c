@@ -1,16 +1,12 @@
 #include <getopt.h>
 #include <inttypes.h>
 
-#if KLEE_VERIFICATION
-	#include "stubs/rte_stubs.h"
-#else
-	// DPDK needs these but doesn't include them. :|
-	#include <linux/limits.h>
-	#include <sys/types.h>
+// DPDK needs these but doesn't include them. :|
+#include <linux/limits.h>
+#include <sys/types.h>
 
-	#include <rte_common.h>
-	#include <rte_ethdev.h>
-#endif
+#include <rte_common.h>
+#include <rte_ethdev.h>
 
 #include <cmdline_parse_etheraddr.h>
 #include <cmdline_parse_ipaddr.h>
@@ -114,7 +110,7 @@ void nat_config_init(struct nat_config* config,
 
 void nat_config_cmdline_print_usage(void)
 {
-	printf("Usage:\n"
+	NF_INFO("Usage:\n"
 		"[DPDK EAL options] --\n"
 		"\t--eth-dest <device>,<mac>: MAC address of the endpoint linked to a device.\n"
 		"\t--expire <time>: flow expiration time.\n"
@@ -129,9 +125,6 @@ void nat_config_cmdline_print_usage(void)
 void nat_print_config(struct nat_config* config)
 {
 	NF_INFO("\n--- NAT Config ---\n");
-
-// TODO see remark in lcore_main
-//	NF_INFO("Batch size: %" PRIu16, BATCH_SIZE);
 
 	NF_INFO("Main LAN device: %" PRIu8, config->lan_main_device);
 	NF_INFO("WAN device: %" PRIu8, config->wan_device);

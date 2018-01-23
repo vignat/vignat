@@ -1,7 +1,7 @@
 #include <string.h>
 #include "bridge_data.h"
 
-int ether_addr_eq(void* k1, void* k2) {
+bool ether_addr_eq(void* k1, void* k2) {
   struct ether_addr* a = (struct ether_addr*)k1;
   struct ether_addr* b = (struct ether_addr*)k2;
   return 0 == memcmp(a->addr_bytes,
@@ -9,7 +9,7 @@ int ether_addr_eq(void* k1, void* k2) {
                      6);
 }
 
-int static_key_eq(void* k1, void* k2) {
+bool static_key_eq(void* k1, void* k2) {
   struct StaticKey* a = (struct StaticKey*) k1;
   struct StaticKey* b = (struct StaticKey*) k2;
   return a->device == b->device && ether_addr_eq(&a->addr, &b->addr);

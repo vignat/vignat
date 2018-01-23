@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Ir
 
 let do_log = true
@@ -18,7 +18,7 @@ let lprint_list lst =
   List.iter lst ~f:(fun vn -> lprintf "%s\n" vn)
 
 let expand_fixpoints_in_tterm
-    (fixpoints : Ir.tterm Core.Std.String.Map.t) tterm =
+    (fixpoints : Ir.tterm Core.String.Map.t) tterm =
   let impl tterm =
     match tterm with
     | Apply (fname,args) ->
@@ -111,21 +111,6 @@ let make_assignments_for_eqs equalities =
   List.map equalities ~f:(fun {lhs;rhs} ->
       {lhs=rhs;rhs=lhs})
 
-let verifast_struct_field_predicates =
-  String.Map.of_alist_exn
-    [("lcore_conf_n_rx_queue","n_rx_queue");
-     ("lcore_rx_queue_port_id","port_id");]
-
-let transform_verifast_structure_predicates spec_constraints =
-  List.map spec_constraints ~f:(function
-      | {t;v=Apply (fname,[arg1;arg2])}
-        when String.Map.find verifast_struct_field_predicates fname <> None ->
-        let field_name =
-          String.Map.find_exn verifast_struct_field_predicates fname
-        in
-        {t;v=Bop (Eq,{t=arg2.t;v=Str_idx (arg1,field_name)}, arg2)}
-      | x -> x)
-
 let are_symbolic_assignments_justified
     spec_constraints assignments model_constraints =
   let updated_model_constraints =
@@ -163,9 +148,6 @@ let split_assignments assignments =
 let is_execution_justified
     model_variables model_constraints
     spec_constraints model_spec_equalities =
-  let spec_constraints =
-    transform_verifast_structure_predicates spec_constraints
-  in
   let assignments = make_assignments_for_eqs model_spec_equalities
   in
   lprintf "Trying these assignments: \n";

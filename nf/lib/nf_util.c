@@ -2,16 +2,12 @@
 
 #include <netinet/in.h>
 
-#ifdef KLEE_VERIFICATION
-#  include "stubs/rte_stubs.h"
-#else//KLEE_VERIFICATION
-#  include <rte_byteorder.h>
-#  include <rte_ether.h>
-#  include <rte_ip.h>
-#  include <rte_mbuf.h>
-#  include <rte_tcp.h>
-#  include <rte_udp.h>
-#endif//KLEE_VERIFICATION
+#include <rte_byteorder.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
+#include <rte_tcp.h>
+#include <rte_udp.h>
 
 #include "nf_util.h"
 
@@ -27,9 +23,9 @@ struct ipv4_hdr*
 nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
 {
 	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
+	// TODO we don't actually need any check besides ether_header->ether_type, the others are for truncated packets
 	if (!RTE_ETH_IS_IPV4_HDR(mbuf->packet_type) &&
-      !(mbuf->packet_type == 0 &&
-        ether_header->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
+		!(mbuf->packet_type == 0 && ether_header->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))) {
 		return NULL;
 	}
 
@@ -39,14 +35,12 @@ nf_get_mbuf_ipv4_header(struct rte_mbuf* mbuf)
 struct tcpudp_hdr*
 nf_get_ipv4_tcpudp_header(struct ipv4_hdr* header)
 {
-	if (header->next_proto_id != IPPROTO_TCP &&
-      header->next_proto_id != IPPROTO_UDP) {
+	if (header->next_proto_id != IPPROTO_TCP && header->next_proto_id != IPPROTO_UDP) {
 		return NULL;
 	}
 
-	uint8_t offset = header->version_ihl & IPV4_HDR_IHL_MASK;
-	// TODO use offset
-	return (struct tcpudp_hdr*)(header + 1);
+	uint8_t offset = (header->version_ihl & IPV4_HDR_IHL_MASK) * IPV4_IHL_MULTIPLIER;
+	return (struct tcpudp_hdr*)((unsigned char*) header + offset);
 }
 
 void

@@ -29,6 +29,7 @@ build/
 TAGS
 .vagrant
 validator/_build
+validator/aaa
 klee-*/
 klee-last
 /nat/testbed/analysis/*

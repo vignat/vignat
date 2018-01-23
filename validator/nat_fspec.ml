@@ -1,5 +1,5 @@
-
-open Core.Std
+open Core
+open Str
 open Fspec_api
 open Ir
 
@@ -11,7 +11,6 @@ let last_indexing_succ_ret_var = ref ""
 let last_device_id = ref ""
 
 let last_time_for_index_alloc = ref ""
-let the_array_lcc_is_local = ref true
 
 
 let gen_get_fp map_name =
@@ -66,17 +65,6 @@ let flw_struct = Ir.Str ("flow", ["ik", int_key_struct;
                                   "int_device_id", Uint8;
                                   "ext_device_id", Uint8;
                                   "protocol", Uint8;])
-let arr_bat_struct = Ir.Str ( "ArrayBat", [] )
-let arr_lcc_struct = Ir.Str ( "ArrayLcc", [] )
-let arr_rq_struct = Ir.Str ( "ArrayRq", [] )
-let arr_u16_struct = Ir.Str ( "ArrayU16", [] )
-let batcher_struct = Ir.Str ( "Batcher", [] )
-let lcore_conf_struct = Ir.Str ( "lcore_conf", ["n_rx_queue", Uint16;
-                                                "rx_queue_list", arr_rq_struct;
-                                                "tx_queue_id", arr_u16_struct;
-                                                "tx_mbufs", arr_bat_struct;])
-let lcore_rx_queue_struct = Ir.Str ( "lcore_rx_queue", ["port_id", Uint8;
-                                                        "queue_id", Uint8;])
 
 let ether_addr_struct = Ir.Str ( "ether_addr", ["a", Uint8;
                                                 "b", Uint8;
@@ -84,7 +72,6 @@ let ether_addr_struct = Ir.Str ( "ether_addr", ["a", Uint8;
                                                 "d", Uint8;
                                                 "e", Uint8;
                                                 "f", Uint8;])
-
 let ether_hdr_struct = Ir.Str ("ether_hdr", ["d_addr", ether_addr_struct;
                                              "s_addr", ether_addr_struct;
                                              "ether_type", Uint16;])
@@ -110,12 +97,17 @@ let tcp_hdr_struct = Ir.Str ("tcp_hdr", ["src_port", Uint16;
                                             "cksum", Uint16; *)
                                          "tcp_urp", Uint16;])
 
-let user_buf_struct = Ir.Str ("user_buf", ["ether", ether_hdr_struct;
-                                           "ipv4", ipv4_hdr_struct;
-                                           "tcp", tcp_hdr_struct;])
+let stub_mbuf_content_struct = Ir.Str ( "stub_mbuf_content",
+                                        ["ether", ether_hdr_struct;
+                                         "ipv4", ipv4_hdr_struct;
+                                         "tcp", tcp_hdr_struct;])
+
+let stub_queue_struct = Ir.Str ( "stub_queue", ["port_id", Uint16] )
+
+let rte_mempool_struct = Ir.Str ( "rte_mempool", [] )
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
-                               ["buf_addr", Ptr user_buf_struct;
-                                "buf_physaddr", Uint64;
+                               ["buf_addr", Ptr stub_mbuf_content_struct;
+                                (* "buf_physaddr", Uint64; FIXME: justify this ignoring *)
                                 "buf_len", Uint16;
                                 "data_off", Uint16;
                                 "refcnt", Uint16;
@@ -130,20 +122,29 @@ let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                 "seqn", Uint32;
                                 "vlan_tci_outer", Uint16;
                                 "udata64", Uint64;
-                                "pool", Ptr Void;
-                                "next", Ptr Void;
+                                (*"pool", Ptr rte_mempool_struct;*)
+                                (*"next", Ptr Void;*)
                                 "tx_offload", Uint64;
                                 "priv_size", Uint16;
                                 "timesync", Uint16] )
 
-let copy_user_buf var_name ptr =
-  ("struct user_buf* tmp_ub_ptr" ^ var_name ^
+(* VeriFast's C parser is quite limited, so simplify stuff... this is very brittle since it does no lookbehind to avoid accidents *)
+let rec simplify_c_string str =
+  let str0 = Str.global_replace (Str.regexp "\\*&") "" str in (* *&a  ==>  a *)
+  let str0 = Str.global_replace (Str.regexp "\\*(&\\([^)]+\\))") "\\1" str0 in (* * (&a)  ==>  a *)
+  let str0 = Str.global_replace (Str.regexp "&(\\([^)]+\\))->\\([^)]+\\)") "\\1.\\2" str0 in (* &a->b  ==>  a.b *)
+  let str0 = Str.global_replace (Str.regexp "(&(\\([^)]+\\)))->\\([^)]+\\)") "\\1.\\2" str0 in (* (&a)->b  ==>  a.b *)
+  let str0 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str0 in (* ( *a ).b  ==>  a->b *)
+  if str = str0 then str else simplify_c_string str0 (* find a fixpoint *)
+
+let copy_stub_mbuf_content var_name ptr =
+  ("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
    " = (" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
-     Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
-                        t=Ptr user_buf_struct};
-               t=user_buf_struct}}
+     Ir.value={v=Deref {v=Ir.Id ("tmp_smc_ptr" ^ var_name);
+                        t=Ptr stub_mbuf_content_struct};
+               t=stub_mbuf_content_struct}}
 
 let fun_types =
   String.Map.of_alist_exn
@@ -289,9 +290,6 @@ let fun_types =
                                   (fun _ ->
                                      "int start_port;\n");];
                                 lemmas_after = [
-                                  (fun params ->
-                                     the_array_lcc_is_local := false;
-                                     "");
                                   (fun params ->
                                      "/*@ open evproc_loop_invariant(?mp, \
                                       ?chp, *" ^
@@ -587,24 +585,6 @@ let fun_types =
                         capture_chain "cur_ch" 0;
                         capture_map_ex "cur_map" "vk1" "vk2" 1;
                         (fun {args;tmp_gen;_} ->
-                           if String.equal !last_index_gotten "" then ""
-                           else (*FIXME: looks lit it is dead code*)
-                           "/*@ { \n\
-                            dmap_erase_all_has_trans(" ^
-                           (tmp_gen "cur_map") ^
-                           ", ikc(reset_arr20_34,\
-                            reset_arr20_36, reset_arr20_26, reset_arr20_30, " ^
-                           !last_device_id ^
-                           ", user_buf_23),\n\
-                            dchain_get_expired_indexes_fp(" ^
-                           (tmp_gen "cur_ch") ^ ", " ^
-                           (List.nth_exn args 2) ^
-                           "), " ^ (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^
-                           ");\n\
-                            coherent_same_cap(" ^
-                           (tmp_gen "cur_map") ^ ", " ^ (tmp_gen "cur_ch") ^
-                           ");\n } @*/");
-                        (fun {args;tmp_gen;_} ->
                            "//@ expire_flows_abstract(" ^ (tmp_gen "cur_map") ^
                            ", " ^ (tmp_gen "cur_ch") ^
                            ", " ^ (List.nth_exn args 2) ^ ");");
@@ -726,160 +706,48 @@ let fun_types =
                                       "int the_index_rejuvenated = " ^
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
-     "array_bat_init", {ret_type = Static Void;
-                        arg_types = stt [Ptr arr_bat_struct;];
-                        extra_ptr_types = [];
-                        lemmas_before = [];
-                        lemmas_after = [];};
-     "array_bat_begin_access", {ret_type = Static (Ptr batcher_struct);
-                                arg_types = stt [Ptr arr_bat_struct; Sint32;];
-                                extra_ptr_types = [];
-                                lemmas_before = [];
-                                lemmas_after = [];};
-     "array_bat_end_access", {ret_type = Static Void;
-                              arg_types = stt [Ptr arr_bat_struct;];
-                              extra_ptr_types = [];
-                              lemmas_before = [];
-                              lemmas_after = [];};
-     "array_lcc_init", {ret_type = Static Void;
-                        arg_types = stt [Ptr arr_lcc_struct;];
-                        extra_ptr_types = [];
-                        lemmas_before = [];
-                        lemmas_after = [
-                          (fun params ->
-                             the_array_lcc_is_local := true;
-                             "");];};
-     "array_lcc_begin_access", {ret_type = Static (Ptr lcore_conf_struct);
-                                arg_types = stt [Ptr arr_lcc_struct; Sint32;];
-                                extra_ptr_types = [];
-                                lemmas_before = [];
-                                lemmas_after = [
-                                  (fun params ->
-                                     "last_lcc = " ^ params.ret_name ^ ";\n");
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ open lcore_confp(_, last_lcc);"
-                                     else "");
-                                  (fun params ->
-                                     if params.is_tip then "" else
-                                       "//@ open lcore_confp(_, last_lcc);");
-                                ];};
-     "array_lcc_end_access", {ret_type = Static Void;
-                              arg_types = stt [Ptr arr_lcc_struct;];
-                              extra_ptr_types = estt ["returned_cell",
-                                                      lcore_conf_struct];
-                              lemmas_before = [
-                               tx_bl "close lcore_confp(_, last_lcc);";
-                              ];
-                              lemmas_after = [];};
-     "array_rq_begin_access", {ret_type = Static (Ptr lcore_rx_queue_struct);
-                               arg_types = stt [Ptr arr_rq_struct; Sint32;];
-                               extra_ptr_types = [];
-                               lemmas_before = [];
-                               lemmas_after = [
-                                 (fun params ->
-                                    "last_rq = " ^ params.ret_name ^ ";\n");
-                                 (fun params ->
-                                    "//@ open rx_queuep(_, last_rq);");
-                               ];};
-     "array_rq_end_access", {ret_type = Static Void;
-                             arg_types = stt [Ptr arr_rq_struct;];
-                             extra_ptr_types = estt ["returned_rq_cell",
-                                                     lcore_rx_queue_struct];
-                             lemmas_before = [
-                               tx_bl "close rx_queuep(_, last_rq);";
-                             ];
-                             lemmas_after = [];};
-     "array_u16_begin_access", {ret_type = Static (Ptr Uint16);
-                                arg_types = stt [Ptr arr_u16_struct; Sint32;];
-                                extra_ptr_types = [];
-                                lemmas_before = [];
-                                lemmas_after = [
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ close some_u16p(" ^ params.ret_val ^ ");"
-                                     else "");
-                                  (fun params ->
-                                     if params.is_tip then
-                                       "//@ close some_u16p(" ^ params.ret_name ^ ");"
-                                     else "")];};
-     "array_u16_end_access", {ret_type = Static Void;
-                              arg_types = stt [Ptr arr_u16_struct;];
-                              extra_ptr_types = estt ["returned_u16_cell",
-                                                      Uint16];
-                              lemmas_before = [];
-                              lemmas_after = [];};
-     "batcher_push", {ret_type = Static Void;
-                      arg_types = stt [Ptr batcher_struct; Ptr rte_mbuf_struct;];
-                      extra_ptr_types = [];
-                      lemmas_before = [];
-                      lemmas_after = [];};
-     "batcher_take_all", {ret_type = Static Void;
-                          arg_types = stt [Ptr batcher_struct;
-                                       Ptr (Ptr (Ptr rte_mbuf_struct));
-                                       Ptr Sint32];
-                          extra_ptr_types = [];
-                          lemmas_before = [];
-                          lemmas_after = [];};
-     "batcher_empty", {ret_type = Static Void;
-                       arg_types = stt [Ptr batcher_struct;];
-                       extra_ptr_types = [];
-                       lemmas_before = [];
-                       lemmas_after = [];};
-     "batcher_full", {ret_type = Static Sint32;
-                      arg_types = stt [Ptr batcher_struct;];
-                      extra_ptr_types = [];
-                      lemmas_before = [];
-                      lemmas_after = [];};
-     "batcher_is_empty", {ret_type = Static Sint32;
-                          arg_types = stt [Ptr batcher_struct;];
-                          extra_ptr_types = [];
-                          lemmas_before = [];
-                          lemmas_after = [];};
-     "received_packet", {ret_type = Static Void;
-                         arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];
-                         extra_ptr_types = estt ["user_buf_addr",
-                                                 user_buf_struct;
-                                                 "incoming_package",
-                                                 rte_mbuf_struct];
-                         lemmas_before = [];
-                         lemmas_after = [(fun _ -> "a_packet_received = true;\n");
-                                         (fun params ->
-                                            let recv_pkt =
-                                              "*" ^ (List.nth_exn params.args 1)
-                                            in
-                                            "received_on_port = " ^
-                                            (List.nth_exn params.args 0) ^ ";\n" ^
-                                            "received_packet_type = (" ^
-                                            recv_pkt ^ ")->packet_type;\n" ^
-                                            (copy_user_buf "the_received_packet"
-                                               recv_pkt));
-                                           ];};
-     "send_single_packet", {ret_type = Static Ir.Sint32;
-                            arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
-                            extra_ptr_types = estt ["user_buf_addr",
-                                                    user_buf_struct];
-                            lemmas_before = [
-                              (fun params ->
-                                 let sent_pkt =
-                                   (List.nth_exn params.args 0)
-                                 in
-                                 (copy_user_buf "sent_packet"
-                                    sent_pkt) ^ "\n" ^
-                                 "sent_on_port = " ^
-                                 (List.nth_exn params.args 1) ^
-                                 ";\n" ^
-                                 "sent_packet_type = (" ^
-                                 sent_pkt ^ ")->packet_type;")
-                            ];
-                            lemmas_after = [(fun _ -> "a_packet_sent = true;\n");
-                                            ];};
-     "rte_pktmbuf_free", {ret_type = Static Void;
-                          arg_types = stt [Ptr rte_mbuf_struct;];
-                          extra_ptr_types = estt ["user_buf_addr",
-                                                  user_buf_struct];
-                          lemmas_before = [];
-                          lemmas_after = [];}
+     "stub_rx", {ret_type = Static Ir.Uint16;
+                 arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
+                 extra_ptr_types = estt ["user_buf_addr",
+                                         stub_mbuf_content_struct;
+                                         "incoming_package",
+                                         rte_mbuf_struct];
+                 lemmas_before = [];
+                 lemmas_after = [(fun params -> "if (" ^ params.ret_name ^ " == 1) { a_packet_received = true;\n" ^
+                                       simplify_c_string (
+                                         "received_on_port = " ^
+                                         (List.nth_exn params.args 0) ^ "->port_id;\n" ^
+                                         "received_packet_type = (" ^
+                                         "*" ^ (List.nth_exn params.args 1) ^ ")->packet_type;\n" ^
+                                         (copy_stub_mbuf_content "the_received_packet"
+                                          ("*" ^ (List.nth_exn params.args 1)))) ^ "}");
+                                 ];};
+     "stub_tx", {ret_type = Static Ir.Uint16;
+                 arg_types = stt [Ptr stub_queue_struct; Ptr rte_mbuf_struct; Ir.Uint16;];
+                 extra_ptr_types = estt ["user_buf_addr",
+                                         stub_mbuf_content_struct];
+                 lemmas_before = [
+                     (fun params ->
+                          let sent_pkt =
+                            (List.nth_exn params.args 1)
+                          in
+                            simplify_c_string (
+                              (copy_stub_mbuf_content "sent_packet"
+                               (sent_pkt)) ^ "\n" ^
+                              "sent_on_port = " ^
+                              (List.nth_exn params.args 0) ^ "->port_id;\n" ^
+                              "sent_packet_type = (" ^
+                              sent_pkt ^ ")->packet_type;"));];
+                 (* TODO use a_packet_sent somehow *)
+                 lemmas_after = [(fun params -> "a_packet_send_attempted = true;\n" ^ 
+                                                "if (" ^ params.ret_name ^ " == 1 ) { a_packet_sent = true; }\n");];
+                 };
+     "stub_free", {ret_type = Static Void;
+                   arg_types = stt [Ptr rte_mbuf_struct;];
+                   extra_ptr_types = estt ["user_buf_addr",
+                                           stub_mbuf_content_struct];
+                   lemmas_before = [];
+                   lemmas_after = [];}
     ]
 
 let fixpoints =
@@ -951,15 +819,14 @@ struct
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
                   uint32_t external_ip = 0;\n\
-                  struct lcore_conf *last_lcc;\n\
-                  struct lcore_rx_queue *last_rq;\n\
-                  uint8_t received_on_port;\n\
+                  uint16_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
-                  struct user_buf the_received_packet;\n\
+                  struct stub_mbuf_content the_received_packet;\n\
                   bool a_packet_received = false;\n\
-                  struct user_buf sent_packet;\n\
-                  uint8_t sent_on_port;\n\
+                  struct stub_mbuf_content sent_packet;\n\
+                  uint16_t sent_on_port;\n\
                   uint32_t sent_packet_type;\n\
+                  bool a_packet_send_attempted = false;\n\
                   bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints

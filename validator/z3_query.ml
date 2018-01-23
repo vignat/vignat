@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Z3
 open Z3.Symbol
 open Z3.Sort

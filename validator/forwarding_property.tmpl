@@ -51,7 +51,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
         if (flowtable_contains_ext_flow_id(after_expiration_ft,
                                            external_flow_id)) {
           // flow is present in the table
-          assert true == a_packet_sent;
+          assert true == a_packet_send_attempted;
           flw flow = flowtable_get_by_ext_flow_id(after_expiration_ft,
                                                   external_flow_id);
           assert final_ft ==
@@ -73,7 +73,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
           }
         } else {
           // no flow in the table
-          assert false == a_packet_sent;
+          assert false == a_packet_send_attempted;
           assert final_ft == after_expiration_ft;
         }
       } else {
@@ -87,7 +87,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
         if (flowtable_contains_int_flow_id(after_expiration_ft,
                                            internal_flow_id)) {
           // flow present in the table
-          assert true == a_packet_sent;
+          assert true == a_packet_send_attempted;
           flw flow = flowtable_get_by_int_flow_id(after_expiration_ft,
                                                   internal_flow_id);
           assert final_ft ==
@@ -111,11 +111,11 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
           // No flow in the table
           if (flowtable_out_of_space(after_expiration_ft)) {
             // Flowtable overflow
-            assert false == a_packet_sent;
+            assert false == a_packet_send_attempted;
             assert final_ft == after_expiration_ft;
           } else {
             // The flow must have been inserted
-            assert true == a_packet_sent;
+            assert true == a_packet_send_attempted;
             assert final_ft == flowtable_add_flow(after_expiration_ft,
                                                   the_inserted_flow,
                                                   now);
@@ -139,10 +139,10 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
       }
     } else {
       // Non TCP or UDP packet
-      assert false == a_packet_sent;
+      assert false == a_packet_send_attempted;
     }
   } else {
     // Non IPv4 packet
-    assert false == a_packet_sent;
+    assert false == a_packet_send_attempted;
   }
 }

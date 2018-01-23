@@ -151,9 +151,10 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    void *key_a = 0;
-    void *key_b = 0;
+    void* key_a = NULL;
+    void* key_b = NULL;
     dexk_g(value, &key_a, &key_b);
+
     klee_assume(eq_a_g(key_a, key));
     if (ent_cond)
       klee_assume(ent_cond(key_a, key_b,
@@ -185,8 +186,8 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   klee_assert(map == allocated_map_ptr);
   if (has_this_key) {
     klee_assert(!entry_claimed);
-    void *key_a = 0;
-    void *key_b = 0;
+    void* key_a = NULL;
+    void* key_b = NULL;
     dexk_g(value, &key_a, &key_b);
     klee_assume(eq_b_g(key_b, key));
     if (ent_cond) klee_assume(ent_cond(key_a, key_b,
@@ -265,22 +266,24 @@ void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
   klee_trace_param_i32(index, "index");
-  klee_trace_param_ptr(value_out, value_size_g, "value_out");
+  klee_trace_param_ptr_directed(value_out, value_size_g, "value_out", TD_OUT);
   {
     for (int i = 0; i < value_field_count; ++i) {
-      klee_trace_param_ptr_field(value_out,
-                                 value_fields[i].offset,
-                                 value_fields[i].width,
-                                 value_fields[i].name);
+      klee_trace_param_ptr_field_directed(value_out,
+                                          value_fields[i].offset,
+                                          value_fields[i].width,
+                                          value_fields[i].name,
+                                          TD_OUT);
     }
   }
   {
     for (int i = 0; i < value_nests_count; ++i) {
-      klee_trace_param_ptr_nested_field(value_out,
-                                        value_nests[i].base_offset,
-                                        value_nests[i].offset,
-                                        value_nests[i].width,
-                                        value_nests[i].name);
+      klee_trace_param_ptr_nested_field_directed(value_out,
+                                                 value_nests[i].base_offset,
+                                                 value_nests[i].offset,
+                                                 value_nests[i].width,
+                                                 value_nests[i].name,
+                                                 TD_OUT);
     }
   }
   klee_assert(allocation_succeeded);

@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Trace_prefix
 open Ir
 open Fspec_api
@@ -126,12 +126,6 @@ let expand_shorted_sexp sexp =
   let defs = cross_expand_defs_fixp defs in
   if (map_expandable defs defs) then begin
     lprintf "failed expansion on sexp: \n%s\n" (Sexp.to_string sexp);
-    lprintf "defs: ";
-    Map.iter (get_defs sexp) ~f:(fun ~key ~data ->
-        lprintf "%s ::: %s\n" key (Sexp.to_string data));
-    lprintf "expanded defs: ";
-    Map.iter defs ~f:(fun ~key ~data ->
-        lprintf "%s ::: %s\n" key (Sexp.to_string data));
     failwith ("incomplete map expansion for " ^ (Sexp.to_string sexp));
   end;
   (fst (expand_exp (remove_defs sexp) defs))
@@ -434,7 +428,7 @@ let rec guess_type_l exps t =
     end
   | [] -> Unknown
 
-let find_first_known_address_comply addr tt at property =
+let find_first_known_address_comply addr tt at property ~earliest =
   let legit_candidates lst =
     List.filter lst ~f:(fun x ->
         (match x.callid, at with
@@ -444,12 +438,12 @@ let find_first_known_address_comply addr tt at property =
         &&
         (match x.tt, tt with
          | _, Unknown
-         | _, Void -> true
+         | _, Void ->
          (* TODO: should not really occur.
                          but left here for the sake of void** output pointers,
                          that are not concretized yet. *)
-         (* failwith ("Searching for a void instantiation of addr" ^ *)
-         (*         (Int64.to_string addr)) *)
+          failwith ("Searching for a void instantiation of addr" ^
+                  (Int64.to_string addr) ^ " x.tt:" ^ (ttype_to_str x.tt) ^ " tt:" ^ (ttype_to_str tt))
          | t1, t2 ->
            if (t1 <> t2) then
              lprintf "discarding: %s != %s\n"
@@ -458,26 +452,42 @@ let find_first_known_address_comply addr tt at property =
         &&
         (property x))
   in
-  let find_the_earliest candidates =
-    List.reduce ~f:(fun prev cand ->
-        match prev.callid, cand.callid with
-        | Beginning, _ -> prev
-        | _, Beginning -> cand
-        | After x1, After x2 ->
-          if x1 < x2 then cand
-          else if x2 < x1 then prev
-          else if prev.str_depth < cand.str_depth then prev
-          else cand)
-      candidates
+  let find_the_right candidates =
+    if earliest then (* HACK HACK HACK *)
+      List.reduce ~f:(fun prev cand ->
+          match prev.callid, cand.callid with
+          | Beginning, _ -> prev
+          | _, Beginning -> cand
+          | After x1, After x2 ->
+            if x1 < x2 then prev
+            else if x2 < x1 then cand
+            else if prev.str_depth < cand.str_depth then prev
+            else cand)
+        candidates
+    else
+      List.reduce ~f:(fun prev cand ->
+          match prev.callid, cand.callid with
+          | Beginning, _ -> cand
+          | _, Beginning -> prev
+          | After x1, After x2 ->
+            if x1 < x2 then cand
+            else if x2 < x1 then prev
+            else if prev.str_depth < cand.str_depth then prev
+            else cand)
+        candidates      
   in
   Option.bind (Int64.Map.find !known_addresses addr)
     (fun lst ->
        Option.map ~f:(fun addr_sp -> addr_sp.value)
-         (find_the_earliest (legit_candidates lst)))
+         (find_the_right (legit_candidates lst)))
 
 let find_first_known_address addr tt at =
   lprintf "looking for first *%Ld\n" addr;
-  find_first_known_address_comply addr tt at (fun _ -> true)
+  find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:true
+
+let find_last_known_address addr tt at =
+  lprintf "looking for last *%Ld\n" addr;
+  find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:false
 
 let find_first_symbol_by_address addr tt at =
   lprintf "looking for a first symbol at *%Ld\n" addr;
@@ -490,8 +500,7 @@ let find_first_symbol_by_address addr tt at =
       lprintf "rejecting: %s\n" (render_tterm cand);
       false
   in
-  find_first_known_address_comply addr tt at
-    (fun candidate -> is_addressable candidate.value)
+  find_first_known_address_comply addr tt at (fun candidate -> is_addressable candidate.value) ~earliest:true
 
 let find_first_known_address_or_dummy addr t at =
   match find_first_known_address addr t at with
@@ -1083,7 +1092,7 @@ let rec is_empty_struct_val {sname;full;break_down} =
   (List.for_all break_down ~f:(fun {fname;value;addr} ->
      is_empty_struct_val value))
 
-let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
+let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args =
   List.filter_mapi call.args ~f:(fun i arg ->
       match arg.ptr with
       | Nonptr -> None
@@ -1091,23 +1100,26 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of =
       | Apathptr -> None
       | Curioptr ptee ->
         if is_empty_struct_val ptee.after then None
-          else
+        else match ptee.after.full with
+        | Some x when (Sexp.to_string x = "0" && arg.aname = "mbuf") ->
+            begin match List.nth_exn fun_args i with
+            | {v=Addr fun_arg_val;t=_} ->
+                Some {lhs=fun_arg_val;rhs={v=Int 0;t=Uint32}}
+            | _ -> failwith "Write your own special case. Sorry." end
+        | _ ->
             let key = Int64.of_string (Sexp.to_string arg.value) in
             let arg_type = (get_fun_arg_type ftype_of call i) in
             match find_first_known_address key (get_pointee arg_type) (After call.id) with
             | Some out_arg ->
-              lprintf "processing %s argptr: %s| strval: %s\n"
-                arg.aname (ttype_to_str out_arg.t)
-                (render_tterm (get_struct_val_value
-                                 ptee.after (get_pointee out_arg.t)));
-              begin match get_struct_val_value
-                            ptee.after (get_pointee out_arg.t) with
+              lprintf "processing %s argptr: %s| strval: %s\n" 
+                      arg.aname (ttype_to_str out_arg.t)
+                      (render_tterm (get_struct_val_value ptee.after (get_pointee out_arg.t)));
+              begin match get_struct_val_value ptee.after (get_pointee out_arg.t) with
               | {v=Utility (Ptr_placeholder addr);t=Ptr ptee} ->
                 begin
                   match find_first_known_address addr ptee (After call.id) with
                   | Some value ->
-                    lprintf "found an interesting pointer value: %s\n"
-                      (render_tterm value);
+                    lprintf "found an interesting pointer value: %s\n" (render_tterm value);
                     Some {lhs=deref_tterm out_arg;
                           rhs=value}
                   | None -> None
@@ -1170,13 +1182,12 @@ let take_extra_ptrs_into_pre_cond ptrs call ftype_of =
               (get_fun_extra_ptr_type ftype_of call pname)
               moment_before
       with
-      | None -> lprintf "not found. ignoring\n";
+      | None -> lprintf "not found extra: %s %s. ignoring\n" call.fun_name pname;
         None
       | Some x ->
-        lprintf "settled on %s : %s\n"
-          (render_tterm x) (ttype_to_str x.t);
+        lprintf "settled on extra %s %s => %s : %s\n" call.fun_name pname (render_tterm x) (ttype_to_str x.t);
         match ptee with
-        | Opening _ -> None
+        | Opening _ -> lprintf "scratch that..."; None
         | Closing o -> gen_eq_by_struct_val x o
         | Changing (o,_) -> gen_eq_by_struct_val x o)
 
@@ -1194,13 +1205,12 @@ let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
                   (get_pointee (get_fun_arg_type ftype_of call i))
                   moment_before
           with
-          | None -> lprintf "not found. ignoring\n";
+          | None -> lprintf "not found: %s %s. ignoring\n" call.fun_name arg.aname;
             None
           | Some x ->
-            lprintf "arg. settled on %s : %s\n"
-              (render_tterm x) (ttype_to_str x.t);
+            lprintf "arg. settled on %s %s => %s : %s\n" call.fun_name arg.aname (render_tterm x) (ttype_to_str x.t);
             match get_struct_val_value ptee.before (get_pointee x.t) with
-            | {v=Undef;t=_} -> None
+            | {v=Undef;t=_} -> lprintf "scratch that..."; None
             | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
         end)
 
@@ -1251,7 +1261,7 @@ let extract_common_call_context
 
 let extract_hist_call ftype_of call rets free_vars =
   let args = extract_fun_args ftype_of call in
-  let args_post_conditions = compose_args_post_conditions call ftype_of in
+  let args_post_conditions = compose_args_post_conditions call ftype_of args in
   (* XXX: what does it mean extra_ptrs post conditions?
      when is it applicable? *)
   (* let args_post_conditions = *)
@@ -1295,28 +1305,11 @@ let extract_tip_calls ftype_of calls rets free_vars =
   let results =
     match calls with
     | [] -> failwith "There must be at least one tip call."
-    | tip :: [] ->
-      let args_post_conditions = compose_args_post_conditions tip ftype_of in
-      [{args_post_conditions;
-        ret_val=get_ret_val tip;
-        post_statements=convert_ctxt_list tip.ret_context;}]
-    | tip1 :: tip2 :: [] ->
-      let args_post_conditions1 = compose_args_post_conditions tip1 ftype_of in
-      let args_post_conditions2 = compose_args_post_conditions tip2 ftype_of in
-      [{args_post_conditions=args_post_conditions1;
-        ret_val=get_ret_val tip1;
-        post_statements=convert_ctxt_list tip1.ret_context;};
-       {args_post_conditions=args_post_conditions2;
-        ret_val=get_ret_val tip2;
-        post_statements=convert_ctxt_list tip2.ret_context;}]
     | _ ->
       List.map calls ~f:(fun tip ->
-          {args_post_conditions = compose_args_post_conditions tip ftype_of;
+          {args_post_conditions = compose_args_post_conditions tip ftype_of args;
            ret_val = get_ret_val tip;
            post_statements = convert_ctxt_list tip.ret_context})
-      (* failwith ("More than two tip calls (" ^ *)
-      (*           (string_of_int (List.length calls)) ^ *)
-      (*           ") is not supported.") *)
   in
   lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
@@ -1431,7 +1424,13 @@ let fixup_placeholder_ptrs_in_tterm moment tterm =
   let replace_placeholder = function
     | {v=Utility (Ptr_placeholder addr); t=Ptr ptee_t} ->
       lprintf "fixing placeholder for %Ld\n" addr;
-      begin match ptee_t, find_first_known_address addr ptee_t moment with
+      (* HORRIBLE HACK I think find_first_known_address is buggy somehow so... *)
+      let known_addr =
+        match moment with
+        | After x when x > 5 -> find_last_known_address addr ptee_t moment
+        | _ -> find_first_known_address addr ptee_t moment
+      in
+      begin match ptee_t, known_addr with
         | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
                                   (render_tterm tterm))
         | _, Some x -> Some x

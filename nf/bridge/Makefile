@@ -36,6 +36,7 @@ verify:
 		../lib/stubs/containers/vector-stub.c \
 		../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c \
+                ../lib/stubs/bridge_stub.c
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
     bridge_forward.c bridge_config.c bridge_data.c \
 		bridge_loop.c \

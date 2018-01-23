@@ -1,3 +1,6 @@
+# allow the use of extglob in paths
+SHELL=/bin/bash -O extglob -c
+
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
@@ -25,26 +28,48 @@ CFLAGS += -Wno-nested-externs
 include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
+	rm -f *.bc # in case previous build failed after generating bc files
 	clang -DKLEE_VERIFICATION \
-		-I . -I .. -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
-		../lib/stubs/rte_stubs.c ../lib/nat_config.c ../lib/nf_util.c \
+		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
+		-I . -I .. -I ../lib/stubs -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
+		--include=sse_stubs.h --include=builtin_stubs.h \
+		--include=rte_config.h `# required by many DPDK files` \
+		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
+		../lib/stubs/device_stub.c \
+		../lib/stubs/external_stubs.c \
+		../nf_main.c \
+		../lib/nf_util.c ../lib/nat_config.c \
 		../lib/stubs/my-time-stub.c \
 		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
 		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
-		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
-		../lib/nat_config.c nat_forward_vignat.c  ../nf_main.c\
-		-c -g -emit-llvm -fsanitize=unsigned-integer-overflow -fsanitize=signed-integer-overflow
-	llvm-link -o veri.bc \
-		rte_stubs.bc nat_forward_vignat.bc \
-		nf_main.bc nf_util.bc nat_config.bc \
-		my-time-stub.bc \
-		flowtable.bc flowmanager.bc flow.bc flow-log.bc \
-		loop-stub.bc double-chain-stub.bc expirator-stub.bc double-map-stub.bc \
-		cmdline_parse*addr.bc
-	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=12000 --dump-call-trace-prefixes \
-		veri.bc --devs-mask 0x3 --wan 1 --lan-dev 0 --expire 10 --starting-port 0 --max-flows 65536
-	rm *.bc
+		`# Platform-independent EAL. cpuflags uses CPU intrinsics, xen_memory is only for Xen` \
+		$(RTE_SDK)/lib/librte_eal/common/!(eal_common_cpuflags|eal_xen_memory).c \
+		`# Linux-specific EAL. xen_memory is only for Xen` \
+		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/!(eal_xen_memory).c \
+		`# Other libs. acl and hash use CPU intrinsics, power and ivshmem are broken as of DPDK 16.07` \
+		$(RTE_SDK)/lib/!(librte_acl|librte_hash|librte_power|librte_ivshmem)/*.c \
+		nat_forward_vignat.c  \
+		-c -g -emit-llvm -fsanitize=signed-integer-overflow
+	llvm-link -o veri.bc *.bc
+	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
+        # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
+	klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
+		veri.bc \
+		--no-pci `# disable PCI enumeration since PCI is not available, we don't it use anyway` \
+		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \
+		--no-shconf `# don't mmap the config` \
+		-- \
+		`# TODO make those parameters symbolic` \
+		--lan-dev 0 \
+		--wan 1 \
+		--expire 10 \
+		--starting-port 0 \
+		--max-flows 65536 \
+		--extip 0.0.0.0 \
+		--eth-dest 0,01:23:45:67:89:00 \
+		--eth-dest 1,01:23:45:67:89:01
+	rm -f *.bc
 
 verifast:
 	verifast -I . -I .. -allow_assume -shared \

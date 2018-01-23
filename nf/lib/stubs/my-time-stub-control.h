@@ -2,8 +2,7 @@
 #define _MY_TIME_STUB_CONTROL_H_INCLUDED_
 
 #include <stdint.h>
-
-//@ #include "lib/predicates.gh"
+#include "lib/nf_time.h"
 
 uint32_t start_time(void);
 //@ requires true;

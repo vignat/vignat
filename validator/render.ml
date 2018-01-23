@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
@@ -11,18 +11,23 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
       ptee
   | Struct (_, fields) ->
     assert(out_val.t = out_arg.t);
+    (match out_arg with
+     | {v=Deref {v=Id arg_name;t=_};t=_} -> "//@ " ^ head ^ "(" ^ arg_name ^ "!= 0 );\n" (* can be important to know the arg can be read *)
+     | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^
-         (render_tterm out_val) ^ ");\n"
+  | Undef -> failwith "// render_eq_sttmt undef...\n"
+  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
-let render_fcall_with_lemmas context =
+let render_fcall_with_prelemmas context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
   (match context.ret_name with
    | Some name -> (ttype_to_str context.ret_type) ^
                   " " ^ name ^ " = "
    | None -> "") ^
-  (render_term context.application) ^ ";\n" ^
+  (render_term context.application) ^ ";\n"
+
+let render_postlemmas context =
   (String.concat ~sep:"\n" context.post_lemmas) ^ "\n"
 
 let render_args_post_conditions ~is_assert apk =
@@ -43,7 +48,7 @@ let render_ret_equ_sttmt ~is_assert ret_name ret_val =
   | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
   | None -> "\n"
 
-let rec render_assignment {lhs;rhs;} =
+let render_assignment {lhs;rhs;} =
   match rhs.v with
   | Undef -> "";
   | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
@@ -101,10 +106,17 @@ let rec gen_plain_equalities {lhs;rhs} =
                t=Boolean}}]
   | Uint16, Cast (Uint16, {v=Id _;t=_}) -> [{lhs;rhs}]
   | Ptr _, Zeroptr -> []
-  | _ -> failwith ("unsupported output type: " ^
-                   (ttype_to_str rhs.t) ^
-                   " : " ^
-                   (render_tterm rhs))
+  | _, Undef -> []
+  | _ -> match lhs.v, rhs.v with
+         | Deref lref, Deref rref -> gen_plain_equalities {lhs=lref; rhs=rref}
+         | _ -> failwith ("unsupported output type:rhs.t=" ^
+                          (ttype_to_str rhs.t) ^
+                          " : rhs=" ^
+                          (render_tterm rhs) ^
+                          " : lhs.t=" ^
+                          (ttype_to_str lhs.t) ^
+                          " : lhs=" ^
+                          (render_tterm lhs))
 
 let render_extra_pre_conditions context =
   String.concat ~sep:"\n"
@@ -115,17 +127,18 @@ let render_extra_pre_conditions context =
 
 let render_hist_fun_call {context;result} =
   (render_extra_pre_conditions context) ^
-  (render_fcall_with_lemmas context) ^
-  (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^
-  match result.ret_val.t with
-  | Ptr _ -> (if result.ret_val.v = Zeroptr then
-                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
-                " == " ^ "0);\n"
-              else
-                "//@ assume(" ^ (Option.value_exn context.ret_name) ^
-                " != " ^ "0);\n") ^
-             "/* Do not render the return ptee assumption for hist calls */\n"
-  | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val
+  (render_fcall_with_prelemmas context) ^
+  (match result.ret_val.t with
+   | Ptr _ -> (if result.ret_val.v = Zeroptr then
+                 "//@ assume(" ^ (Option.value_exn context.ret_name) ^
+                 " == " ^ "0);\n"
+               else
+                 "//@ assume(" ^ (Option.value_exn context.ret_name) ^
+                 " != " ^ "0);\n") ^
+              "/* Do not render the return ptee assumption for hist calls */\n"
+   | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val) ^
+  (render_postlemmas context) (* postlemmas can depend on the return value *) ^
+  (render_args_post_conditions ~is_assert:false result.args_post_conditions) (* ret can influence whether args are accessible *)
 
 let find_known_complementaries (sttmts:tterm list) =
   List.filter_map sttmts ~f:(fun sttmt ->
@@ -257,6 +270,8 @@ let is_there_device_constraint constraints =
       | _ -> false)
 
 let guess_support_assignments constraints symbs =
+  (* printf "guess constraints\n"; *)
+  (* List.iter constraints ~f:(fun xxx -> printf "%s\n" (render_tterm xxx)); *)
   (* printf "symbols:\n"; *)
   (* Set.iter symbs ~f:(fun name -> printf "%s\n" name;); *)
   let there_is_a_device_constraint = is_there_device_constraint constraints in
@@ -270,11 +285,14 @@ let guess_support_assignments constraints symbs =
         | Bop (Eq, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
-        | Bop (Le, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
-              ({lhs={v=Id x;t};rhs={v=Int 1;t=lhs.t}}::assignments, String.Set.remove symbs x)
+        | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
+          (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+1 *)
+          if List.exists constraints (fun cstr -> match cstr with {v=Bop (Eq,{v=Bool false;_},{v=Bop (Eq,{v=Id _;_},{v=Id r;_});_});_} when r = x -> true | _ -> false) then
+              ({lhs={v=Id x;t};rhs={v=Int (i+1);t=lt}}::assignments, String.Set.remove symbs x)
+          else if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
+              ({lhs={v=Id x;t};rhs={v=Int 1;t=lt}}::assignments, String.Set.remove symbs x)
           else
-              ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
+              ({lhs={v=Id x;t};rhs={v=Int i;t=lt}}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | _ -> (assignments, symbs))
@@ -297,6 +315,7 @@ let fix_mistyped_tip_ret tterm =
     -> {v=Not {v=Bop (Eq,{v=Int 0;t=Sint32},tterm);
                t=Boolean};
         t=Boolean}
+  | Bop (Bit_and, _, _) -> {v=Not {v=Bop (Eq,{v=Int 0;t=Sint32},tterm);t=Boolean};t=Boolean}
   | _ -> tterm
 
 
@@ -374,41 +393,19 @@ let statements_aligned_with_constraint constr sttmts =
         true
       | _ -> term_eq constr.v sttmt.v)
 
-let one_sttmt_list_is_subset_of_another sttmts1 sttmts2 =
-  let is_subset sttmts1 sttmts2 =
-    List.for_all sttmts1 ~f:(fun sttmt1 ->
-      List.exists sttmts2 ~f:(fun sttmt2 -> term_eq sttmt1.v sttmt2.v))
-  in
-  if is_subset sttmts1 sttmts2 then Some `first
-  else if is_subset sttmts2 sttmts1 then Some `second
-  else None
-
 let rec build_decision_tree results =
-  match results with
-  | [] -> failwith "There must be at least one tip-call result"
-  | hd :: [] -> Single_result hd
-  | hd1 :: hd2 :: tl ->
-    if term_eq hd1.ret_val.v hd2.ret_val.v then
-      match find_complementary_sttmts
-              hd1.post_statements
-              hd2.post_statements with
-      | None -> begin match one_sttmt_list_is_subset_of_another
-                              hd1.post_statements hd2.post_statements with
-        | Some `first -> build_decision_tree (hd2 :: tl)
-        | Some `second -> build_decision_tree (hd1 :: tl)
-        | None ->
-          printf "Failed to differentiate tip-call results:\n%s\nVS\n%s\n"
-            (tterm_list_to_string hd1.post_statements)
-            (tterm_list_to_string hd2.post_statements);
-        failwith ("Can not differentiate tip-call results.")
-        end
-      | Some (sttmt1,sttmt2) ->
-        let results_pro1 = List.filter results ~f:(fun res ->
-            statements_aligned_with_constraint sttmt1 res.post_statements)
-        in
-        let results_pro2 = List.filter results ~f:(fun res ->
-            statements_aligned_with_constraint sttmt2 res.post_statements)
-        in
+  let handle_two_constraints hd1 hd2 =
+    let results = hd1::hd2::[] in
+    match find_complementary_sttmts hd1.post_statements hd2.post_statements with
+    | None ->
+      failwith ("No complementary statements found.")
+    | Some (sttmt1,sttmt2) ->
+      let results_pro1 = List.filter results ~f:(fun res ->
+          statements_aligned_with_constraint sttmt1 res.post_statements)
+      in
+      let results_pro2 = List.filter results ~f:(fun res ->
+          statements_aligned_with_constraint sttmt2 res.post_statements)
+      in
       assert (0 < List.length results_pro1);
       assert (0 < List.length results_pro2);
       if (List.length results_pro1) + (List.length results_pro2) <>
@@ -424,8 +421,14 @@ let rec build_decision_tree results =
                           not (statements_aligned_with_constraint
                                  sttmt2 res.post_statements)))
                          ~f:(fun res -> tterm_list_to_string res.post_statements))));
-        Alternative_by_constraint ((sttmt1, build_decision_tree results_pro1),
-                                   (sttmt2, build_decision_tree results_pro2))
+      Alternative_by_constraint ((sttmt1, build_decision_tree results_pro1),(sttmt2, build_decision_tree results_pro2))
+  in
+  match results with
+  | [] -> failwith "There must be at least one tip-call result"
+  | hd :: [] -> Single_result hd
+  | hd1 :: hd2 :: [] ->
+    if term_eq hd1.ret_val.v hd2.ret_val.v then
+      handle_two_constraints hd1 hd2
     else
       let results_pro1 = List.filter results ~f:(fun res ->
         term_eq res.ret_val.v hd1.ret_val.v) in
@@ -437,20 +440,76 @@ let rec build_decision_tree results =
               (List.length results));
       Alternative_by_ret ((hd1.ret_val, build_decision_tree results_pro1),
                           (hd2.ret_val, build_decision_tree results_pro2))
+  | _ ->
+    assert (4 = List.length results); (* This is special-cased. *)
+    assert (List.for_all results ~f:(fun res -> term_eq res.ret_val.v (List.nth_exn results 0).ret_val.v)); (* No alternative by ret *)
+    (* All results have 2 statements except one *)
+    let single_statement_result = List.find_exn results ~f:(fun rs -> List.length rs.post_statements = 1) in
+    (* Add a statement to make the rest easier - it is implied by the existing statement, anyway *)
+    let results = List.map results ~f:(fun rs -> 
+      if rs = single_statement_result then
+        match rs.post_statements with
+          (* 0 != (x & N) for any N implies 0 != x *)
+        | {v=Bop (Bit_and, {v=Id var_v;t=var_t}, {v=_;t=_});t=_} :: [] ->
+            let new_post = {v=Id var_v;t=var_t} in
+            {args_post_conditions=rs.args_post_conditions;
+             ret_val=rs.ret_val;
+             post_statements=new_post::rs.post_statements}
+        | _ -> failwith "Sorry, you're on your own, welcome to special-case world!"
+      else rs)
+    in
+    assert (List.for_all results ~f:(fun res -> List.length res.post_statements = 2));
+    (* From the given 'results', find the element that has a matching post-statement with 'result' *)
+    (* Return (the matching element, the matching statement, the other elements) *)
+    let rec find_matching_result res results =
+      match results with
+      | hd :: tl ->
+          begin
+          match List.find res.post_statements ~f:(fun st ->
+                  List.exists hd.post_statements ~f:(fun st2 -> term_eq st2.v st.v)) with
+          | Some st -> (hd, st, tl)
+          | None ->
+              let (mate, mats, rest) = find_matching_result res tl in
+              (mate, mats, hd :: rest)
+          end
+      | [] -> failwith "Can't find a matching result!"
+    in
+    let remove_statement res stmt =
+      {args_post_conditions=res.args_post_conditions;
+       ret_val=res.ret_val;
+       post_statements=List.filter res.post_statements ~f:(fun st -> not(term_eq st.v stmt.v))}
+    in
+    match results with
+    | hd1 :: tl1 ->
+        begin
+        let (mat1, st1, rest) = find_matching_result hd1 tl1 in
+        assert (2 = List.length rest);
+        match rest with
+        | hd2 :: tl2 ->
+            let (mat2, st2, rest) = find_matching_result hd2 tl2 in
+            assert (0 = List.length rest);
+            (* Now that we have cleanly grouped our 4 statements into 2, we make a proper 2-level decision tree *)
+            Alternative_by_constraint ((st1,
+                                        (handle_two_constraints (remove_statement hd1 st1) (remove_statement mat1 st1))),
+                                       (st2,
+                                        (handle_two_constraints (remove_statement hd2 st2) (remove_statement mat2 st2))))
+        | _ -> failwith "should not happen"
+        end
+    | _ -> failwith "should not happen, bis"
 
 let rec render_post_assertions dtree ret_name ret_type hist_symbs cmplxs =
   match dtree with
   | Single_result res ->
-    (render_output_check
+   (render_args_post_conditions ~is_assert:false res.args_post_conditions) ^ "\n" ^
+   (render_output_check
        res.ret_val ret_name ret_type
        res.post_statements hist_symbs
        res.args_post_conditions cmplxs) ^ "\n"
-  | Alternative_by_constraint ((sttmt1,dtree1),
-                               (sttmt2,dtree2)) ->
+  | Alternative_by_constraint ((sttmt1,dtree1),(sttmt2,dtree2)) ->
     "if (" ^ (render_tterm sttmt1) ^ ") {\n" ^
-    (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
+      (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
     "} else {\n" ^
-    (render_post_assertions dtree2 ret_name ret_type hist_symbs cmplxs) ^
+      (render_post_assertions dtree2 ret_name ret_type hist_symbs cmplxs) ^
     "}\n"
   | Alternative_by_ret ((ret1,dtree1),(ret2,dtree2)) ->
     let rname = match ret_name with
@@ -493,7 +552,8 @@ let render_tip_fun_call
     export_point free_vars hist_symbols
     ~render_assertions
     cmplxs =
-  (render_fcall_with_lemmas context) ^
+  (render_fcall_with_prelemmas context) ^
+  (render_postlemmas context) ^
   (* "// The legibility of these assignments is ensured by analysis.ml\n" ^ *)
   (* (render_equality_assumptions free_vars) ^ "\n" ^ *)
   (render_export_point export_point) ^

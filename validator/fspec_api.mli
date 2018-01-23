@@ -5,7 +5,7 @@ type lemma_params = {
   tmp_gen : bytes -> bytes;
   is_tip : bool;
   arg_types : Ir.ttype list;
-  exptr_types : Ir.ttype Core.Std.String.Map.t;
+  exptr_types : Ir.ttype Core.String.Map.t;
   ret_type : Ir.ttype;
 }
 type blemma_params = {
@@ -13,7 +13,7 @@ type blemma_params = {
   tmp_gen : bytes -> bytes;
   is_tip : bool;
   arg_types : Ir.ttype list;
-  exptr_types : Ir.ttype Core.Std.String.Map.t;
+  exptr_types : Ir.ttype Core.String.Map.t;
   ret_type : Ir.ttype;
 }
 type lemma = lemma_params -> bytes
@@ -37,8 +37,8 @@ type fun_spec = {
 module type Spec =
   sig
     val preamble : bytes
-    val fun_types : fun_spec Core.Std.String.Map.t
-    val fixpoints : Ir.tterm Core.Std.String.Map.t
+    val fun_types : fun_spec Core.String.Map.t
+    val fixpoints : Ir.tterm Core.String.Map.t
     val boundary_fun : bytes
     val finishing_fun : bytes
     val eventproc_iteration_begin : bytes

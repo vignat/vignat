@@ -3,7 +3,6 @@
 #include "lib/stubs/my-time-stub-control.h"
 #include "lib/stubs/containers/double-chain-stub-control.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
-#include "lib/stubs/rte-stubs-control.h"
 
 //TODO: this is a copy-paste from array_lcc.h and other array headers
 //. Move it to a separate file.
@@ -12,7 +11,6 @@ void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
                                 unsigned int lcore_id,
                                 uint32_t time, int max_flows, int start_port)
 {
-  rte_reset();
   dchain_reset(*ch, max_flows);
   dmap_reset(*m, max_flows);
 }

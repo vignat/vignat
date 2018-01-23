@@ -1,20 +1,12 @@
-#include <inttypes.h>
-
-#ifdef KLEE_VERIFICATION
-#  include <klee/klee.h>
-#  include "lib/stubs/rte_stubs.h"
-#  include "loop.h"
-#else
 // DPDK requires these but doesn't include them. :|
-#  include <linux/limits.h>
-#  include <sys/types.h>
-#  include <unistd.h>
+#include <linux/limits.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#  include <rte_ethdev.h>
-#  include <rte_ether.h>
-#  include <rte_ip.h>
-#  include <rte_mbuf.h>
-#endif
+#include <rte_ethdev.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
 
 #include "lib/flow.h"
 #include "flowmanager.h"
@@ -38,9 +30,7 @@ void nf_core_init()
 	}
 }
 
-int nf_core_process(uint8_t device,
-                    struct rte_mbuf* mbuf,
-                    uint32_t now)
+int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
@@ -64,7 +54,7 @@ int nf_core_process(uint8_t device,
 	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
 
 	uint8_t dst_device;
-  int allocated = 0;
+
 	if (device == config.wan_device) {
 		NF_DEBUG("Device %" PRIu8 " is external", device);
 
@@ -89,10 +79,6 @@ int nf_core_process(uint8_t device,
 			ipv4_header->dst_addr = f.int_src_ip;
 			tcpudp_header->dst_port = f.int_src_port;
 			dst_device = f.int_device_id;
-      //klee_assert(f.ik.int_device_id == f.int_device_id);
-      //klee_assert(f.ek.ext_device_id == f.ext_device_id);
-      //klee_assert(f.int_device_id != f.ext_device_id);
-      allocated = 1;
 		} else {
 			NF_DEBUG("Unknown flow, dropping");
 			return device;
@@ -129,24 +115,12 @@ int nf_core_process(uint8_t device,
 		ipv4_header->src_addr = f.ext_src_ip;
 		tcpudp_header->src_port = f.ext_src_port;
 		dst_device = f.ext_device_id;
-    //klee_assert(f.ik.int_device_id == f.int_device_id);
-    //klee_assert(f.ek.ext_device_id == f.ext_device_id);
-    //klee_assert(f.int_device_id != f.ext_device_id);
-    allocated = 1;
 	}
-
-	#ifdef KLEE_VERIFICATION
-		klee_assert(dst_device >= 0);
-		klee_assert(dst_device < RTE_MAX_ETHPORTS);
-	#endif
 
 	ether_header->s_addr = config.device_macs[dst_device];
 	ether_header->d_addr = config.endpoint_macs[dst_device];
-
 	nf_set_ipv4_checksum(ipv4_header);
 
-  //klee_assert(allocated);
-  //klee_assert(device != dst_device);
 	return dst_device;
 }
 
@@ -164,6 +138,7 @@ void nf_print_config() {
 }
 
 #ifdef KLEE_VERIFICATION
+#include "loop.h"
 
 void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
@@ -188,6 +163,5 @@ void nf_loop_iteration_end(unsigned lcore_id,
                      config.max_flows,
                      config.start_port);
 }
-
-#endif //KLEE_VERIFICATION
+#endif
 

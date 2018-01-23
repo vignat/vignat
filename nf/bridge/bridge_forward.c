@@ -331,7 +331,7 @@ void nf_core_init(void) {
 
 int nf_core_process(uint8_t device,
                     struct rte_mbuf* mbuf,
-                    uint32_t now) {
+                    time_t now) {
   struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 
   bridge_expire_entries(now);
