@@ -1,10 +1,13 @@
 #!/bin/bash
 # Tested on Ubuntu 16.04, Debian Stretch, and the Linux Subsystem for Windows
+# TODO: use the $PROGRESSDIR files to skip the relevant parts of the script.
 
 # Setup
 
 VNDSDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 BUILDDIR=`pwd`
+PATHSFILE="$BUILDDIR/paths.sh"
+PROGRESSDIR="$BUILDDIR/install-progress"
 
 # Detect Docker or the Windows Subsystem for Linux
 OS='linux'
@@ -31,8 +34,8 @@ fi
 # Bash "strict mode"
 set -euxo pipefail
 
-PATHSFILE="$BUILDDIR/paths.sh"
 echo '# The configuration paths for VNDS dependencies' > "$PATHSFILE"
+mkdir -p "$PROGRESSDIR"
 
 ### General
 
@@ -49,6 +52,30 @@ sudo apt-get install -y \
                      libpcap-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
+# for VeriFast
+# directly from VeriFast's readme
+sudo apt-get install -y --no-install-recommends \
+                     ca-certificates m4 \
+                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
+                     valac gtksourceview2.0-dev \
+                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
+
+# for DPDK
+# On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
+KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
+
+# Install the right headers; we do *not* install headers on Docker since it uses the underlying kernel
+if [ "$OS" = 'microsoft' ]; then
+  # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
+  sudo apt install "linux-headers-$KERNEL_VER-generic"
+  export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
+elif [ "$OS" = 'linux' ]; then
+  sudo apt-get install -y "linux-headers-$KERNEL_VER"
+fi
+
+touch "$PROGRESSDIR/system_packages_installed"
+
+
  # OCaml uses variables in its scripts without defining it first - we're in strict mode!
 if [ -z ${PERL5LIB+x} ]; then
   export PERL5LIB=''
@@ -63,39 +90,48 @@ echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> "$PATHSFILE"
 echo ". $HOME/.opam/opam-init/init.sh" >> "$PATHSFILE"
 . "$PATHSFILE"
 
+touch "$PROGRESSDIR/opam_initialized"
 
-### Z3 v4.5
-
+# For Z3 ml bindings
 # VeriFast requires Z3 in ocamlfind; install it now so that it puts itself in ocamlfind
 # Num is required for Big_int
 opam install ocamlfind num -y
+
+# for VeriFast
+# Not mentioned by VeriFast's readme, required anyway
+opam install ocamlfind camlp4 -y
+
+### Validator dependencies
+opam install ocamlfind core sexplib menhir -y
+
+touch "$PROGRESSDIR/opam_packages_installed"
+
+### Z3 v4.5
 
 git clone --depth 1 --branch z3-4.5.0 https://github.com/Z3Prover/z3 "$BUILDDIR/z3"
 pushd "$BUILDDIR/z3"
   python scripts/mk_make.py --ml -p "$BUILDDIR/z3/build"
   pushd build
+    make -k -j $(nproc) || true
     # -jN here may break the make (hidden deps or something)
     make
     make install
 
-    # Weird, but required sometimes
-    sudo ln -s "$BUILDDIR/z3/build/libz3.so" "/usr/lib/libz3.so"
-    sudo ldconfig
+    # Weird, but required sometimes TODO: do it only when required
+    # TODO find a way to bring it up together with other sudo lines
+      # Remove the outdated libz3.so
+      sudo apt-get remove libz3-dev || true
+      sudo rm -f /usr/lib/x86_64-linux-gnu/libz3.so || true
+      sudo rm -f /usr/lib/x86_64-linux-gnu/libz3.so.4 || true
+      # Install the new libz3.so
+      sudo ln -s "$BUILDDIR/z3/build/libz3.so" "/usr/lib/libz3.so"
+      sudo ldconfig
   popd
 popd
 
+touch "$PROGRESSDIR/z3_installed"
 
 ### VeriFast
-
-# directly from VeriFast's readme
-sudo apt-get install -y --no-install-recommends \
-                     ca-certificates m4 \
-                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
-                     valac gtksourceview2.0-dev \
-                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
-
-# Not mentioned by VeriFast's readme, required anyway
-opam install ocamlfind camlp4 -y
 
 git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast "$BUILDDIR/verifast"
 pushd "$BUILDDIR/verifast/src"
@@ -104,6 +140,7 @@ pushd "$BUILDDIR/verifast/src"
   . "$PATHSFILE"
 popd
 
+touch "$PROGRESSDIR/verifast_built"
 
 ### KLEE
 
@@ -156,21 +193,10 @@ pushd "$BUILDDIR/klee"
   popd
 popd
 
+touch "$PROGRESSDIR/klee_built"
+
 
 ### DPDK
-
-
-# On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
-KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
-
-# Install the right headers; we do *not* install headers on Docker since it uses the underlying kernel
-if [ "$OS" = 'microsoft' ]; then
-  # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
-  sudo apt install "linux-headers-$KERNEL_VER-generic"
-  export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
-elif [ "$OS" = 'linux' ]; then
-  sudo apt-get install -y "linux-headers-$KERNEL_VER"
-fi
 
 pushd "$BUILDDIR"
   wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
@@ -193,11 +219,7 @@ pushd "$BUILDDIR"
   popd
 popd
 
-
-### Validator dependencies
-
-opam install ocamlfind core sexplib menhir -y
-
+touch "$PROGRESSDIR/dpdk_built"
 
 # Source the paths file at login
 echo ". $PATHSFILE" >> "$HOME/.profile"
