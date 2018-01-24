@@ -225,7 +225,7 @@ main(int argc, char* argv[])
   argc -= ret;
   argv += ret;
 
-#ifdef KLEE_VERIFICARTION
+#ifdef KLEE_VERIFICATION
   stub_device_attach();
 #endif
 
@@ -249,7 +249,7 @@ main(int argc, char* argv[])
     rte_exit(EXIT_FAILURE, "Cannot create mbuf pool: %s\n",
              rte_strerror(rte_errno));
   }
-klee_abort();
+
 #ifndef KLEE_VERIFICATION
   // Create another pool for the flood() cloning
   init_clone_pool();

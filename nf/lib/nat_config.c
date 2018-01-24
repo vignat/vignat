@@ -79,8 +79,6 @@ void nat_config_init(struct nat_config* config,
 
 			case 'l':
 				config->lan_main_device = nf_util_parse_int(optarg, "lan-dev", 10, '\0');
-klee_print_expr("lan main", config->lan_main_device);
-klee_print_expr("nb devices", nb_devices);
 				if (config->lan_main_device >= nb_devices) {
 					PARSE_ERROR("Main LAN device does not exist.\n");
 				}

@@ -202,9 +202,7 @@ read(int fd, void *buf, size_t count)
 				*((char*) buf) = '0';
 				return 1;
 			}
-			klee_print_expr("read_bytes", CPU_ID_ZERO_FD_READ_BYTES);
 		}
-		klee_print_expr("count", count);
 	}
 
 	// Not supported!

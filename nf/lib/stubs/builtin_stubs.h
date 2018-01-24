@@ -1,7 +1,7 @@
 #pragma once
 
 // Pretend that everything is known to be a compile-time constant, so DPDK uses less fancy tricks
-//#define __builtin_constant_p(x) 1
+#define __builtin_constant_p(x) 1
 
 
 // Standard CAS (but of course we don't need atomicity)

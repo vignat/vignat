@@ -57,6 +57,8 @@ verify:
 		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
 		`# Virtual devices support` \
 		$(RTE_SDK)/drivers/bus/vdev/*.c \
+		`# Stacks for mempool` \
+		$(RTE_SDK)/drivers/mempool/stack/*.c \
 		nat_forward_vignat.c  \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc

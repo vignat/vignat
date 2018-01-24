@@ -8,8 +8,6 @@
 
 #include <containers/str-descr.h>
 
-//#include <rte_byteorder.h>
-//#include <rte_dev.h>
 #include <rte_ethdev.h>
 #include <rte_ethdev_vdev.h>
 #include <rte_malloc.h>
@@ -19,8 +17,8 @@
 
 
 // Constant stuff
-#define stub_driver_name "stub"
-static const int stub_devices_count = 2; // more devices = lots more paths in the NF
+#define STUB_DEVICE_COUNT 2 // more devices = lots more paths in the NF
+static const char* stub_device_names[] = { "stub0", "stub1" }; // don't rely on snprintf
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
@@ -31,11 +29,15 @@ static struct rte_eth_link stub_link = {
 
 
 // Sanity checks
-bool device_created[RTE_MAX_ETHPORTS];
-bool device_configured[RTE_MAX_ETHPORTS];
-bool device_started[RTE_MAX_ETHPORTS];
-bool device_rx_setup[RTE_MAX_ETHPORTS]; // we support 1 queue per device
-bool device_tx_setup[RTE_MAX_ETHPORTS];
+static bool device_created[RTE_MAX_ETHPORTS];
+static bool device_configured[RTE_MAX_ETHPORTS];
+static bool device_started[RTE_MAX_ETHPORTS];
+static bool device_rx_setup[RTE_MAX_ETHPORTS]; // we support only 1 queue per device
+static bool device_tx_setup[RTE_MAX_ETHPORTS];
+
+
+// Globals
+static struct rte_vdev_driver stub_devices[STUB_DEVICE_COUNT];
 
 
 // Tracing
@@ -456,7 +458,7 @@ stub_dev_info(struct rte_eth_dev *dev,
 
 	klee_assert(device_created[stub_dev->port_id]);
 
-	dev_info->driver_name = stub_driver_name;
+	dev_info->driver_name = "stub";
 	dev_info->max_mac_addrs = 1;
 	dev_info->max_rx_pktlen = (uint32_t) -1;
 	dev_info->max_rx_queues = RTE_DIM(stub_dev->rx_queues);
@@ -544,13 +546,13 @@ stub_driver_probe(struct rte_vdev_device* vdev)
 	if (vdev->device.numa_node == SOCKET_ID_ANY) {
 		vdev->device.numa_node = rte_socket_id();
 	}
-klee_print_expr("yes?",0);
+
 	struct rte_eth_dev* dev = rte_eth_vdev_allocate(vdev, sizeof(struct stub_device));
-klee_print_expr("LALALAA",1);
+
 	if (dev == NULL) {
 		return -ENOMEM;
 	}
-klee_print_expr("uh...",-1);
+
 	struct stub_device* stub_dev = (struct stub_device*) dev->data->dev_private;
 	stub_dev->port_id = dev->data->port_id;
 
@@ -569,7 +571,7 @@ klee_print_expr("uh...",-1);
 	dev->tx_pkt_burst = stub_tx;
 
 	device_created[stub_dev->port_id] = true;
-klee_print_expr("YAY",0);
+
 	return 0;
 }
 
@@ -598,16 +600,7 @@ stub_driver_remove(struct rte_vdev_device* vdev)
 	return 0;
 }
 
-struct rte_vdev_driver stub_driver = {
-	.next = NULL,
-	.driver = {
-		.next = NULL,
-		.name = stub_driver_name,
-		.alias = NULL,
-	},
-	.probe = stub_driver_probe,
-	.remove = stub_driver_remove,
-};
+
 
 void
 stub_device_init(void)
@@ -616,16 +609,28 @@ stub_device_init(void)
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
 	klee_alias_function_regex("rte_pktmbuf_free.*", "stub_free");
 
-	rte_vdev_register(&stub_driver);
+	for (int n = 0; n < STUB_DEVICE_COUNT; n++) {
+		struct rte_vdev_driver stub_device = {
+			.next = NULL,
+			.driver = {
+				.next = NULL,
+				.name = stub_device_names[n],
+				.alias = NULL,
+			},
+			.probe = stub_driver_probe,
+			.remove = stub_driver_remove,
+		};
+		stub_devices[n] = stub_device;
+		rte_vdev_register(&stub_devices[n]);
+	}
 }
 
 void
 stub_device_attach(void)
 {
-	int ret = rte_vdev_init(stub_driver_name, NULL);
-	// should be 0, or the symbol returned by probe
-	if (ret != 0 && !klee_is_symbolic(ret)) {
-		klee_abort();
+	for (int n = 0; n < STUB_DEVICE_COUNT; n++) {
+		int ret = rte_vdev_init(stub_device_names[n], NULL);
+		// should be 0, or the symbol returned by probe
+		klee_assert(ret == 0 || klee_is_symbolic(ret));
 	}
-	klee_abort();
 }

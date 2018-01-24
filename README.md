@@ -31,7 +31,7 @@ $ make verify
 
 # Verify the traces
 $ cd ../../validator
-$ make clean && ./test_all.sh ../nf/vignat/klee-last aaa ../nf nat_fspec.cmo
+$ make nat
 ```
 
 

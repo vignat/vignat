@@ -31,6 +31,12 @@ get_tsc_freq_arch(void)
 }
 
 
+const char *
+stub_strerror(int errnum)
+{
+	return "<fake error description>";
+}
+
 void
 stub_abort(void)
 {
@@ -41,8 +47,20 @@ stub_abort(void)
 void
 stub_rte_init(void)
 {
+	// Manually call the stack mempool initialization, since it's a constructor function
+	// (which KLEE doesn't execute)
+	// Except the function isn't in any header, only in the C file for stack mempools...
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-function-declaration"
+	mp_hdlr_init_ops_stack();
+#pragma clang diagnostic pop
+
 	// rte_memcpy uses fancy-schmancy intrinsics
 	klee_alias_function("rte_memcpy", "memcpy");
+
+	// Don't bother trying to translate error codes
+	// note: this is just to avoid an snprintf, we could support it I guess...
+	klee_alias_function("rte_strerror", "stub_strerror");
 
 	// Don't let symbex die...
 	klee_alias_function("abort", "stub_abort");
