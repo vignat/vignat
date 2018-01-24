@@ -4,6 +4,7 @@
 #include <klee/klee.h>
 #include "lib/stubs/my-time-stub-control.h"
 #include "lib/stubs/device_stub.h"
+#include "lib/stubs/rte_stub.h"
 #endif
 
 
@@ -212,8 +213,8 @@ int
 main(int argc, char* argv[])
 {
 #ifdef KLEE_VERIFICATION
-  klee_alias_function("rte_memcpy", "memcpy");
-  stub_init();
+  stub_rte_init();
+  stub_device_init();
 #endif
 
   // Initialize the Environment Abstraction Layer (EAL)
@@ -223,6 +224,10 @@ main(int argc, char* argv[])
   }
   argc -= ret;
   argv += ret;
+
+#ifdef KLEE_VERIFICARTION
+  stub_device_attach();
+#endif
 
   nf_config_init(argc, argv);
 
@@ -244,7 +249,7 @@ main(int argc, char* argv[])
     rte_exit(EXIT_FAILURE, "Cannot create mbuf pool: %s\n",
              rte_strerror(rte_errno));
   }
-
+klee_abort();
 #ifndef KLEE_VERIFICATION
   // Create another pool for the flood() cloning
   init_clone_pool();

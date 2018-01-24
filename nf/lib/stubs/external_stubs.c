@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 
 #include <klee/klee.h>
@@ -158,6 +159,17 @@ access(const char* pathname, int mode)
 }
 
 int
+stat(const char* path, struct stat* buf)
+{
+	// Nope, we don't have modules
+	if (!strcmp(path, "/sys/module")) {
+		return -1;
+	}
+
+	klee_abort();
+}
+
+int
 open(const char* file, int oflag, ...)
 {
 	// CPU 0
@@ -223,6 +235,12 @@ vfprintf(FILE* stream, const char* format, _G_va_list __arg)
 	klee_abort();
 }
 
+int
+vprintf(const char *format, va_list arg)
+{
+	return 0; // OK, whatever, we don't care about stdout
+}
+
 pthread_t
 pthread_self(void)
 {
@@ -231,9 +249,26 @@ pthread_self(void)
 }
 
 int
+pthread_getaffinity_np(pthread_t thread, size_t cpusetsize, cpu_set_t* cpuset)
+{
+	// We're running in a symbolic executor. the concept of "affinity" is meaningless
+	int ret = klee_int("pthread_getaffinity_np_return");
+
+	// However, we might be given uninitialized memory, so we need to set it
+	if (ret >= 0) {
+		// TODO all bits should be symbols...
+		CPU_ZERO(cpuset);
+		CPU_SET(0, cpuset);
+	}
+
+	return ret;
+}
+
+
+int
 pthread_setaffinity_np(pthread_t thread, size_t cpusetsize, const cpu_set_t* cpuset)
 {
-	// We're running in a symbolic executor anyway, the concept of "affinity" is meaningless...
+	// Same remark as getaffinity
 	return klee_int("pthread_setaffinity_np_return");
 }
 
@@ -288,8 +323,9 @@ getpagesize(void)
 	return 4096;
 }
 
+// note that uclibc defines mmap as mmap64 in its sys/mman.h
 void*
-mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
+mmap64(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
 	// We support a single mapping
 	if (addr == NULL) {

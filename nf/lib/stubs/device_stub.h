@@ -30,4 +30,6 @@ struct stub_device {
 	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
 };
 
-void stub_init(void);
+void stub_device_init(void);
+
+void stub_device_attach(void);

@@ -11,3 +11,19 @@ index c82e565..34ae73e 100644
  		if (addr == MAP_FAILED) {
  			RTE_LOG(ERR, EAL, "%s: mmap() failed: %s\n", __func__,
  					strerror(errno));
+diff --git a/lib/librte_eal/common/eal_common_options.c b/lib/librte_eal/common/eal_common_options.c
+index 05bc77d..32bdd2f 100644
+--- a/lib/librte_eal/common/eal_common_options.c
++++ b/lib/librte_eal/common/eal_common_options.c
+@@ -1210,6 +1210,11 @@ eal_adjust_config(struct internal_config *internal_cfg)
+ 	/* default master lcore is the first one */
+ 	if (!master_lcore_parsed) {
+ 		cfg->master_lcore = rte_get_next_lcore(-1, 0, 0);
++		if (cfg->master_lcore >= RTE_MAX_LCORE) {
++			RTE_LOG(ERR, EAL, "Could not find master lcore\n");
++			return -1;
++		}
++
+ 		lcore_config[cfg->master_lcore].core_role = ROLE_RTE;
+ 	}
+ 

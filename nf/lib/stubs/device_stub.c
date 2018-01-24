@@ -15,10 +15,12 @@
 #include <rte_malloc.h>
 #include <rte_mbuf.h>
 
+#include <rte_bus_vdev.h>
+
 
 // Constant stuff
+#define stub_driver_name "stub"
 static const int stub_devices_count = 2; // more devices = lots more paths in the NF
-static const char* stub_driver_name = "stub";
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
@@ -542,12 +544,13 @@ stub_driver_probe(struct rte_vdev_device* vdev)
 	if (vdev->device.numa_node == SOCKET_ID_ANY) {
 		vdev->device.numa_node = rte_socket_id();
 	}
-
+klee_print_expr("yes?",0);
 	struct rte_eth_dev* dev = rte_eth_vdev_allocate(vdev, sizeof(struct stub_device));
+klee_print_expr("LALALAA",1);
 	if (dev == NULL) {
 		return -ENOMEM;
 	}
-
+klee_print_expr("uh...",-1);
 	struct stub_device* stub_dev = (struct stub_device*) dev->data->dev_private;
 	stub_dev->port_id = dev->data->port_id;
 
@@ -566,7 +569,7 @@ stub_driver_probe(struct rte_vdev_device* vdev)
 	dev->tx_pkt_burst = stub_tx;
 
 	device_created[stub_dev->port_id] = true;
-
+klee_print_expr("YAY",0);
 	return 0;
 }
 
@@ -599,7 +602,7 @@ struct rte_vdev_driver stub_driver = {
 	.next = NULL,
 	.driver = {
 		.next = NULL,
-		.name = RTE_STR(stub_driver_name),
+		.name = stub_driver_name,
 		.alias = NULL,
 	},
 	.probe = stub_driver_probe,
@@ -607,30 +610,22 @@ struct rte_vdev_driver stub_driver = {
 };
 
 void
-stub_exit(int exit_code, const char *format, ...)
+stub_device_init(void)
 {
-	klee_silent_exit(exit_code);
-}
-
-void
-stub_panic(const char *funcname, const char *format, ...)
-{
-	klee_silent_exit(1);
-}
-
-void
-stub_init(void)
-{
-	// If DPDK tries to commit suicide, translate that in KLEE terms
-	klee_alias_function("__rte_panic", "stub_panic");
-
-	// rte_exit does formatting on its arguments; if one of them is a symbol,
-	// we get tons of useless paths...
-	klee_alias_function("rte_exit", "stub_exit");
-
 	// Trace the packet free; need a regex to alias the duplicated functions
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
 	klee_alias_function_regex("rte_pktmbuf_free.*", "stub_free");
 
 	rte_vdev_register(&stub_driver);
+}
+
+void
+stub_device_attach(void)
+{
+	int ret = rte_vdev_init(stub_driver_name, NULL);
+	// should be 0, or the symbol returned by probe
+	if (ret != 0 && !klee_is_symbolic(ret)) {
+		klee_abort();
+	}
+	klee_abort();
 }
