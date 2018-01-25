@@ -74,6 +74,9 @@ let rec gen_plain_equalities {lhs;rhs} =
              {lhs={v=Str_idx (lhs, name);t=ttype};
               rhs={v=Str_idx (rhs, name);t=ttype}}))
   | Uint64, Int _
+  | Sint64, Str_idx _
+  | Sint64, Id _
+  | Sint64, Int _
   | Sint32, Int _
   | Sint32, Bop (Add, {v=Id _;t=_}, {v=Int _; t=_})
   | Sint8, Int _

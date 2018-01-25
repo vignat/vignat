@@ -5,7 +5,7 @@
 
 /*@
 
-inductive entry = entry(int_k, ext_k, flw, uint32_t tstmp);
+inductive entry = entry(int_k, ext_k, flw, time_t tstmp);
 inductive flowtable = flowtable(int, list<entry>);
 
 fixpoint int_k entry_ik(entry e) {
@@ -25,7 +25,7 @@ fixpoint flw entry_flow(entry e) {
   }
 }
 
-fixpoint uint32_t entry_tstamp(entry e) {
+fixpoint time_t entry_tstamp(entry e) {
   switch(e) { case entry(ik, ek, flw, tstmp):
     return tstmp;
   }
@@ -40,7 +40,7 @@ fixpoint t alist_get_by_right<t>(list<pair<t, int> > alist, int idx) {
   }
 }
 
-fixpoint list<entry> gen_entries(list<pair<int, uint32_t> > indices,
+fixpoint list<entry> gen_entries(list<pair<int, time_t> > indices,
                                  list<pair<int_k, int> > ikeys,
                                  list<pair<ext_k, int> > ekeys,
                                  list<option<flw> > flows) {
@@ -106,7 +106,7 @@ fixpoint bool entry_matches_flow(flw f, entry e) {
   return entry_flow(e) == f;
 }
 
-fixpoint flowtable flowtable_add_flow(flowtable table, flw flow, uint32_t time) {
+fixpoint flowtable flowtable_add_flow(flowtable table, flw flow, time_t time) {
   switch(table) { case flowtable(size, entries):
     return flowtable(size, append(entries,
                                   cons(entry(flw_get_ik(flow),
@@ -123,7 +123,7 @@ fixpoint flowtable flowtable_remove_flow(flowtable table, flw flow) {
   }
 }
 
-fixpoint list<entry> expire_entries(list<entry> entries, uint32_t time) {
+fixpoint list<entry> expire_entries(list<entry> entries, time_t time) {
   switch(entries) {
     case nil: return nil;
     case cons(h,t): return entry_tstamp(h) < time           ?
@@ -132,13 +132,13 @@ fixpoint list<entry> expire_entries(list<entry> entries, uint32_t time) {
   }
 }
 
-fixpoint flowtable flowtable_expire_flows(flowtable table, uint32_t time) {
+fixpoint flowtable flowtable_expire_flows(flowtable table, time_t time) {
   switch(table) { case flowtable(size, entries):
     return flowtable(size, expire_entries(entries, time));
   }
 }
 
-fixpoint list<entry> expire_n_entries(list<entry> entries, uint32_t time,
+fixpoint list<entry> expire_n_entries(list<entry> entries, time_t time,
                                       int to_expire) {
   switch(entries) {
     case nil: return nil;
@@ -151,7 +151,7 @@ fixpoint list<entry> expire_n_entries(list<entry> entries, uint32_t time,
   }
 }
 
-fixpoint flowtable flowtable_expire_n_flows(flowtable table, uint32_t time,
+fixpoint flowtable flowtable_expire_n_flows(flowtable table, time_t time,
                                             int count) {
   switch(table) { case flowtable(size, entries):
     return flowtable(size, expire_n_entries(entries, time, count));
@@ -161,7 +161,7 @@ fixpoint flowtable flowtable_expire_n_flows(flowtable table, uint32_t time,
 
 
 /*@
-  lemma void dchain_allocated_mem_map(list<pair<int, uint32_t> > entries,
+  lemma void dchain_allocated_mem_map(list<pair<int, time_t> > entries,
                                       int index_range, int low, int high,
                                       int index)
   requires true;
@@ -181,7 +181,7 @@ fixpoint flowtable flowtable_expire_n_flows(flowtable table, uint32_t time,
 
 /*@
   lemma void gen_entries_has_ik_ek_flow_by_index
-    (list<pair<int, uint32_t> > entries,
+    (list<pair<int, time_t> > entries,
      list<pair<int_k, int> > ikeys,
      list<pair<ext_k, int> > ekeys,
      list<option<flw> > vals,
@@ -245,7 +245,7 @@ fixpoint flowtable flowtable_expire_n_flows(flowtable table, uint32_t time,
 
 
 /*@
-  lemma void gen_entries_also_no_ek(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_also_no_ek(list<pair<int, time_t> > entries,
                                     list<pair<int_k, int> > ikeys,
                                     list<pair<ext_k, int> > ekeys,
                                     list<option<flw> > vals,
@@ -317,7 +317,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 @*/
 
 /*@
-  lemma void gen_entries_also_no_ik(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_also_no_ik(list<pair<int, time_t> > entries,
                                     list<pair<int_k, int> > ikeys,
                                     list<pair<ext_k, int> > ekeys,
                                     list<option<flw> > vals,
@@ -389,7 +389,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void gen_entries_same_len(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_same_len(list<pair<int, time_t> > entries,
                                   list<pair<int_k,int> > ikeys,
                                   list<pair<ext_k,int> > ekeys,
                                   list<option<flw> > vals)
@@ -422,13 +422,13 @@ ensures flowtable_out_of_space(abstract_function(m, ch)) ==
 @*/
 
 /*@
-  lemma void gen_entries_add_flow(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_add_flow(list<pair<int, time_t> > entries,
                                   list<pair<int_k,int> > ikeys,
                                   list<pair<ext_k,int> > ekeys,
                                   list<option<flw> > vals,
                                   int index,
                                   flw flow,
-                                  uint32_t time)
+                                  time_t time)
   requires false == exists(entries, (same_index)(index))&*&
            false == map_has_fp(ikeys, flw_get_ik(flow)) &*&
            false == map_has_fp(ekeys, flw_get_ek(flow)) &*&
@@ -483,7 +483,7 @@ ensures flowtable_out_of_space(abstract_function(m, ch)) ==
 /*@
 // Head lemma #
 lemma void add_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
-                             int index, uint32_t t)
+                             int index, time_t t)
 requires false == dchain_out_of_space_fp(ch) &*&
          false == dchain_allocated_fp(ch, index) &*&
          dmap_dchain_coherent(m, ch) &*&
@@ -584,7 +584,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void gen_entries_get_flow_int(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_get_flow_int(list<pair<int, time_t> > entries,
                                       list<pair<int_k,int> > ikeys,
                                       list<pair<ext_k,int> > ekeys,
                                       list<option<flw> > vals,
@@ -649,7 +649,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void gen_entries_get_flow_ext(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_get_flow_ext(list<pair<int, time_t> > entries,
                                       list<pair<int_k,int> > ikeys,
                                       list<pair<ext_k,int> > ekeys,
                                       list<option<flw> > vals,
@@ -732,12 +732,12 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void gen_entries_add_flow_light(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_add_flow_light(list<pair<int, time_t> > entries,
                                         list<pair<int_k,int> > ikeys,
                                         list<pair<ext_k,int> > ekeys,
                                         list<option<flw> > vals,
                                         int index,
-                                        uint32_t time,
+                                        time_t time,
                                         flw flow)
   requires nth(index, vals) == some(flow) &*&
            0 <= index &*& index < length(vals) &*&
@@ -763,12 +763,12 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void gen_entries_rejuvenate(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_rejuvenate(list<pair<int, time_t> > entries,
                                     list<pair<int_k,int> > ikeys,
                                     list<pair<ext_k,int> > ekeys,
                                     list<option<flw> > vals,
                                     int index,
-                                    uint32_t time,
+                                    time_t time,
                                     flw flow)
   requires nth(index, vals) == some(flow) &*&
            true == mem(index, map(fst, entries)) &*&
@@ -844,7 +844,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 /*@
 // Head lemma #
 lemma void rejuvenate_flow_abstract(dmap<int_k,ext_k,flw> m, dchain ch, flw flow,
-                                    int index, uint32_t time)
+                                    int index, time_t time)
 requires dmap_get_val_fp(m, index) == flow &*&
          true == dmap_index_used_fp(m, index) &*&
          dmap_dchain_coherent(m, ch) &*&
@@ -910,7 +910,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 }
 @*/
 /*@
-  fixpoint list<entry> expire_one_entry(list<entry> entries, uint32_t time) {
+  fixpoint list<entry> expire_one_entry(list<entry> entries, time_t time) {
     switch(entries) {
       case nil: return nil;
       case cons(h,t):
@@ -920,13 +920,13 @@ ensures dmap_dchain_coherent(m, ch) &*&
     }
 
   }
-  fixpoint flowtable flowtable_expire_one(flowtable ft, uint32_t time) {
+  fixpoint flowtable flowtable_expire_one(flowtable ft, time_t time) {
     switch(ft) { case flowtable(size, entries):
       return flowtable(size, expire_one_entry(entries, time));
     }
   }
 
-  fixpoint bool has_expired_entry(list<entry> entries, uint32_t time) {
+  fixpoint bool has_expired_entry(list<entry> entries, time_t time) {
     switch(entries) {
       case nil: return false;
       case cons(h,t):
@@ -934,7 +934,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
     }
   }
 
-  fixpoint bool flowtable_has_expired_flow(flowtable ft, uint32_t time) {
+  fixpoint bool flowtable_has_expired_flow(flowtable ft, time_t time) {
     switch(ft) { case flowtable(size, entries):
       return has_expired_entry(entries, time);
     }
@@ -942,7 +942,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void expire_0_entries(list<entry> entries, uint32_t time)
+  lemma void expire_0_entries(list<entry> entries, time_t time)
   requires true;
   ensures expire_n_entries(entries, time, 0) == entries;
   {
@@ -957,7 +957,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void expire_one_more_entry(list<entry> entries, uint32_t time, int count)
+  lemma void expire_one_more_entry(list<entry> entries, time_t time, int count)
   requires true == has_expired_entry(expire_n_entries(entries, time, count),
                                      time) &*&
            0 <= count;
@@ -988,7 +988,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void flowtable_expire_one_more_plus1(flowtable ft, uint32_t time,
+  lemma void flowtable_expire_one_more_plus1(flowtable ft, time_t time,
                                              int count)
   requires true == flowtable_has_expired_flow
                      (flowtable_expire_n_flows(ft, time, count), time) &*&
@@ -1024,7 +1024,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void gen_entries_remove_extra(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_remove_extra(list<pair<int, time_t> > entries,
                                       list<pair<int_k,int> > ikeys,
                                       list<pair<ext_k,int> > ekeys,
                                       list<option<flw> > vals,
@@ -1059,13 +1059,13 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void gen_entries_expire_just_one(pair<int, uint32_t> hdentry,
-                                         list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_expire_just_one(pair<int, time_t> hdentry,
+                                         list<pair<int, time_t> > entries,
                                          list<pair<int_k,int> > ikeys,
                                          list<pair<ext_k,int> > ekeys,
                                          list<option<flw> > vals,
                                          int index,
-                                         uint32_t time,
+                                         time_t time,
                                          flw flow)
   requires fst(hdentry) == index &*&
            nth(index, vals) == some(flow) &*&
@@ -1099,7 +1099,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 /*@
   lemma void expire_just_one_abstract(dmap<int_k,ext_k,flw> m,
-                                      dchain ch, uint32_t time)
+                                      dchain ch, time_t time)
   requires false == dchain_is_empty_fp(ch) &*&
            dchain_get_oldest_time_fp(ch) < time &*&
            true == dmap_self_consistent_integral_fp(m, flw_get_ik,
@@ -1138,7 +1138,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void remove_by_index_dec_len(list<pair<int, uint32_t> > alist, int i)
+  lemma void remove_by_index_dec_len(list<pair<int, time_t> > alist, int i)
   requires true;
   ensures length(alist) <= 1 + length(remove_by_index_fp(alist, i));
   {
@@ -1153,7 +1153,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void fold_remove_by_index_dec_len(list<pair<int, uint32_t> > alist,
+  lemma void fold_remove_by_index_dec_len(list<pair<int, time_t> > alist,
                                           list<int> indices)
   requires true;
   ensures length(alist) <=
@@ -1170,8 +1170,8 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void expired_indexes_sublen(list<pair<int, uint32_t> > alist,
-                                    uint32_t time)
+  lemma void expired_indexes_sublen(list<pair<int, time_t> > alist,
+                                    time_t time)
   requires true;
   ensures length(get_expired_indexes_fp(time, alist)) <= length(alist);
   {
@@ -1187,10 +1187,10 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 /*@
   lemma void sorted_head_non_expired_no_expired(int ind,
-                                                uint32_t tstmp,
-                                                list<pair<int, uint32_t> > tl,
-                                                uint32_t time,
-                                                uint32_t low, uint32_t high)
+                                                time_t tstmp,
+                                                list<pair<int, time_t> > tl,
+                                                time_t time,
+                                                time_t low, time_t high)
   requires time <= tstmp &*&
            true == bnd_sorted_fp(map(snd, cons(pair(ind,tstmp),tl)), low, high);
   ensures get_expired_indexes_fp(time, cons(pair(ind,tstmp),tl)) == nil;
@@ -1207,9 +1207,9 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void expired_indexes_just_take_first(list<pair<int, uint32_t> > alist,
-                                             uint32_t time,
-                                             uint32_t low, uint32_t high)
+  lemma void expired_indexes_just_take_first(list<pair<int, time_t> > alist,
+                                             time_t time,
+                                             time_t low, time_t high)
   requires true == bnd_sorted_fp(map(snd, alist), low, high);
   ensures get_expired_indexes_fp(time, alist) ==
           take(length(get_expired_indexes_fp(time, alist)), map(fst, alist));
@@ -1231,7 +1231,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void remove_by_first_index_is_tail(list<pair<int, uint32_t> > lst)
+  lemma void remove_by_first_index_is_tail(list<pair<int, time_t> > lst)
   requires true;
   ensures remove_by_index_fp(lst, head(map(fst, lst))) == tail(lst);
   {
@@ -1260,9 +1260,9 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void sorted_remove_by_indexes_is_drop(list<pair<int, uint32_t> > alist,
-                                              uint32_t time, int n,
-                                              uint32_t low, uint32_t high)
+  lemma void sorted_remove_by_indexes_is_drop(list<pair<int, time_t> > alist,
+                                              time_t time, int n,
+                                              time_t low, time_t high)
   requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
            true == bnd_sorted_fp(map(snd, alist), low, high);
   ensures fold_left(alist, remove_by_index_fp,
@@ -1297,9 +1297,9 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void drop_too_few_still_expired(list<pair<int, uint32_t> > alist,
-                                        uint32_t time, int n,
-                                        uint32_t low, uint32_t high)
+  lemma void drop_too_few_still_expired(list<pair<int, time_t> > alist,
+                                        time_t time, int n,
+                                        time_t low, time_t high)
   requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
            true == bnd_sorted_fp(map(snd, alist), low, high);
   ensures n < length(alist) &*& snd(nth(n, alist)) < time;
@@ -1323,9 +1323,9 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void alist_expire_some_still_olds_left(list<pair<int, uint32_t> > alist,
-                                               uint32_t time, int n,
-                                               uint32_t low, uint32_t high)
+  lemma void alist_expire_some_still_olds_left(list<pair<int, time_t> > alist,
+                                               time_t time, int n,
+                                               time_t low, time_t high)
   requires 0 <= n &*& n < length(get_expired_indexes_fp(time, alist)) &*&
            true == bnd_sorted_fp(map(snd, alist), low, high);
   ensures snd(head(fold_left(alist, remove_by_index_fp,
@@ -1342,7 +1342,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 /*@
   lemma void dchain_expire_some_still_olds_left(dchain ch,
-                                                uint32_t time, int count)
+                                                time_t time, int count)
   requires 0 <= count &*&
            count < length(dchain_get_expired_indexes_fp(ch, time)) &*&
            true == dchain_sorted_fp(ch);
@@ -1363,7 +1363,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 /*@
   lemma void dchain_has_expired_ft_also(dmap<int_k,ext_k,flw> m,
-                                        dchain ch, uint32_t time)
+                                        dchain ch, time_t time)
   requires false == dchain_is_empty_fp(ch) &*&
            dchain_get_oldest_time_fp(ch) < time;
   ensures true == flowtable_has_expired_flow(abstract_function(m, ch), time);
@@ -1382,9 +1382,9 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void alist_remove_other_same_mem(list<pair<int, uint32_t> > alist,
+  lemma void alist_remove_other_same_mem(list<pair<int, time_t> > alist,
                                          int i1,
-                                         uint32_t tstmp,
+                                         time_t tstmp,
                                          int i2)
   requires i1 != i2;
   ensures mem(pair(i1,tstmp), alist) == mem(pair(i1,tstmp),
@@ -1405,7 +1405,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void alist_remove_one_subset(list<pair<int, uint32_t> > alist, int idx)
+  lemma void alist_remove_one_subset(list<pair<int, time_t> > alist, int idx)
   requires true;
   ensures true == subset(remove_by_index_fp(alist, idx), alist);
   {
@@ -1429,7 +1429,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void alist_remove_many_subset(list<pair<int, uint32_t> > alist,
+  lemma void alist_remove_many_subset(list<pair<int, time_t> > alist,
                                       list<int> indices)
   requires true;
   ensures true == subset(fold_left(alist, remove_by_index_fp, indices),
@@ -1448,7 +1448,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void alist_indices_remove_subset(list<pair<int, uint32_t> > alist,
+  lemma void alist_indices_remove_subset(list<pair<int, time_t> > alist,
                                          list<int> indices)
   requires true;
   ensures true == subset(map(fst, fold_left(alist,
@@ -1461,7 +1461,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void dchain_indexes_expire_n_subset(dchain ch, uint32_t time, int n)
+  lemma void dchain_indexes_expire_n_subset(dchain ch, time_t time, int n)
   requires true;
   ensures true == subset(dchain_indexes_fp(expire_n_indexes(ch, time, n)),
                          dchain_indexes_fp(ch));
@@ -1475,7 +1475,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 
 /*@
-  lemma void remove_by_index_still_nonmem(list<pair<int, uint32_t> > l,
+  lemma void remove_by_index_still_nonmem(list<pair<int, time_t> > l,
                                           int x, int y)
   requires false == mem(x, map(fst, l));
   ensures false == mem(x, map(fst, remove_by_index_fp(l, y)));
@@ -1491,7 +1491,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void remove_by_index_still_distinct(list<pair<int, uint32_t> > l, int i)
+  lemma void remove_by_index_still_distinct(list<pair<int, time_t> > l, int i)
   requires true == distinct(map(fst, l));
   ensures true == distinct(map(fst, remove_by_index_fp(l, i)));
   {
@@ -1510,7 +1510,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void dchain_expire_n_still_distinct(dchain ch, uint32_t time, int n)
+  lemma void dchain_expire_n_still_distinct(dchain ch, time_t time, int n)
   requires true == distinct(dchain_indexes_fp(ch)) &*&
            0 <= n &*& n <= length(dchain_get_expired_indexes_fp(ch, time));
   ensures true == distinct(dchain_indexes_fp(expire_n_indexes(ch, time, n)));
@@ -1687,7 +1687,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void remove_by_index_map_remove(list<pair<int, uint32_t> > alist,
+  lemma void remove_by_index_map_remove(list<pair<int, time_t> > alist,
                                         int idx)
   requires true;
   ensures map(fst, remove_by_index_fp(alist, idx)) ==
@@ -1783,7 +1783,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 /*@
   lemma void indices_used_expire_some<t1,t2,vt>(dchain ch,
                                                 dmap<t1,t2,vt> m,
-                                                uint32_t time,
+                                                time_t time,
                                                 fixpoint (vt,t1) vk1,
                                                 fixpoint (vt,t2) vk2,
                                                 int n)
@@ -1860,7 +1860,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 /*@
   lemma void expire_one_more_flow(dmap<int_k,ext_k,flw> m,
-                                  dchain ch, uint32_t time,
+                                  dchain ch, time_t time,
                                   int count)
   requires dmap_dchain_coherent(m, ch) &*&
            dchain_is_sortedp(ch) &*&
@@ -1950,7 +1950,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void expire_0_indexes(dchain ch, uint32_t time)
+  lemma void expire_0_indexes(dchain ch, time_t time)
   requires true;
   ensures ch == expire_n_indexes(ch, time, 0);
   {
@@ -1961,7 +1961,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void flowtable_expire_0_flows(flowtable ft, uint32_t time)
+  lemma void flowtable_expire_0_flows(flowtable ft, time_t time)
   requires true;
   ensures flowtable_expire_n_flows(ft, time, 0) == ft;
   {
@@ -1972,11 +1972,11 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void gen_entries_expire_them_all(list<pair<int, uint32_t> > entries,
+  lemma void gen_entries_expire_them_all(list<pair<int, time_t> > entries,
                                          list<pair<int_k,int> > ikeys,
                                          list<pair<ext_k,int> > ekeys,
                                          list<option<flw> > vals,
-                                         uint32_t time)
+                                         time_t time)
   requires true;
   ensures expire_n_entries(gen_entries(entries, ikeys, ekeys, vals), time,
                            length(get_expired_indexes_fp(time, entries))) ==
@@ -2003,7 +2003,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 
 /*@
   lemma void flowtable_expire_them_all(dmap<int_k,ext_k,flw> m,
-                                       dchain ch, uint32_t time)
+                                       dchain ch, time_t time)
   requires true;
   ensures flowtable_expire_n_flows
             (abstract_function(m, ch), time,
@@ -2019,7 +2019,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
   @*/
 
 /*@
-  lemma void dchain_expire_them_all(dchain ch, uint32_t time)
+  lemma void dchain_expire_them_all(dchain ch, time_t time)
   requires true;
   ensures expire_n_indexes(ch, time,
                            length(dchain_get_expired_indexes_fp(ch, time))) ==
@@ -2033,7 +2033,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 /*@
 // Head lemma #
 lemma void expire_flows_abstract(dmap<int_k,ext_k,flw> m,
-                                 dchain ch, uint32_t time)
+                                 dchain ch, time_t time)
 requires dmap_dchain_coherent(m, ch) &*&
          double_chainp(ch, ?ppp) &*&
          dmappingp(m, ?kp1, ?kp2, ?hsh1, ?hsh2,

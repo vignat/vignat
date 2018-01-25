@@ -1,6 +1,6 @@
 #pragma once
 
-// Pretend we suport those
+// Pretend we support those
 #define __SSE3__
 #define __SSSE3__
 #define __SSE4_1__

@@ -24,7 +24,7 @@ fixpoint bool nat_ext_fp(int start_port, ext_k ek, int index) {
 
 predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
                                 unsigned int lcore_id,
-                                uint32_t time, int max_flows, int start_port) =
+                                time_t time, int max_flows, int start_port) =
           dmappingp<int_k,ext_k,flw>(?m, int_k_p, ext_k_p, int_hash, ext_hash,
                                      flw_p, flow_p, flow_keys_offsets_fp,
                                      sizeof(struct flow), flw_get_ik, flw_get_ek,
@@ -40,15 +40,15 @@ predicate evproc_loop_invariant(struct DoubleMap* mp, struct DoubleChain *chp,
 
 void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
                                 unsigned int lcore_id,
-                                uint32_t time, int max_flows, int start_port);
+                                time_t time, int max_flows, int start_port);
 
 void loop_iteration_assertions(struct DoubleMap** m, struct DoubleChain** ch,
                                unsigned int lcore_id,
-                               uint32_t time, int max_flows, int start_port);
+                               time_t time, int max_flows, int start_port);
 
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
                             unsigned int lcore_id,
-                            uint32_t time, int max_flows, int start_port);
+                            time_t time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              evproc_loop_invariant(mp, chp, lcore_id,
                                    time, max_flows, start_port); @*/
@@ -56,7 +56,7 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
 
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
                             unsigned int* lcore_id,
-                            uint32_t *time, int max_flows, int start_port);
+                            time_t *time, int max_flows, int start_port);
 /*@ requires *m |-> ?mp &*& *ch |-> ?chp &*&
              *lcore_id |-> _ &*&
              *time |-> _; @*/
@@ -68,22 +68,22 @@ void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
 
 void loop_iteration_begin(struct DoubleMap** m, struct DoubleChain** ch,
                           unsigned int lcore_id,
-                          uint32_t time, int max_flows, int start_port);
+                          time_t time, int max_flows, int start_port);
 
 void loop_iteration_end(struct DoubleMap** m, struct DoubleChain** ch,
                         unsigned int lcore_id,
-                        uint32_t time, int max_flows, int start_port);
+                        time_t time, int max_flows, int start_port);
 
 void loop_enumeration_begin(struct DoubleMap** m, struct DoubleChain** ch,
                             unsigned int lcore_id,
-                            uint32_t time, int max_flows, int start_port,
+                            time_t time, int max_flows, int start_port,
                             int cnt);
 //@ requires true;
 //@ ensures true;
 
 void loop_enumeration_end(struct DoubleMap** m, struct DoubleChain** ch,
                           unsigned int lcore_id,
-                          uint32_t time, int max_flows, int start_port);
+                          time_t time, int max_flows, int start_port);
 //@ requires true;
 //@ ensures true;
 

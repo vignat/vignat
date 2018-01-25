@@ -56,7 +56,7 @@ int allocate_flowmanager(uint8_t nb_ports,
     return 1;
 }
 
-int allocate_flow(struct int_key *k, uint32_t time, struct flow* out) {
+int allocate_flow(struct int_key *k, time_t time, struct flow* out) {
     int index = -1;
     int alloc_rez = dchain_allocate_new_index(chain, &index, time);
     if (0 == alloc_rez) return 0; //Out of resources.
@@ -79,7 +79,7 @@ int allocate_flow(struct int_key *k, uint32_t time, struct flow* out) {
 }
 
 static
-void get_and_rejuvenate(int index, uint32_t time, struct flow* flow_out) {
+void get_and_rejuvenate(int index, time_t time, struct flow* flow_out) {
   get_flow(index, flow_out);
   dchain_rejuvenate_index(chain, index, time);
 
@@ -88,7 +88,7 @@ void get_and_rejuvenate(int index, uint32_t time, struct flow* flow_out) {
 #endif
 }
 
-int get_flow_by_int_key(struct int_key* key, uint32_t time, struct flow* flow_out) {
+int get_flow_by_int_key(struct int_key* key, time_t time, struct flow* flow_out) {
   int index = -1;
   if (!get_flow_int(key, &index))
     return 0;
@@ -96,7 +96,7 @@ int get_flow_by_int_key(struct int_key* key, uint32_t time, struct flow* flow_ou
   return 1;
 }
 
-int get_flow_by_ext_key(struct ext_key* key, uint32_t time, struct flow* flow_out) {
+int get_flow_by_ext_key(struct ext_key* key, time_t time, struct flow* flow_out) {
   int index = -1;
   if (!get_flow_ext(key, &index))
     return 0;
@@ -104,9 +104,17 @@ int get_flow_by_ext_key(struct ext_key* key, uint32_t time, struct flow* flow_ou
   return 1;
 }
 
-int expire_flows(uint32_t time) {
+int expire_flows(time_t time) {
   //VV too early, nothing can expire yet.
-  if (time < expiration_time) return 0;
-  uint32_t last_time = time - expiration_time;
+  if (time < (time_t) expiration_time) return 0;
+
+  // This is convoluted - we want to make sure the sanitization doesn't
+  // extend our time_t value in 128 bits, which would confuse the validator.
+  // So we "prove" by hand that it's OK...
+  if (time < 0) return 0; // we don't support the past
+  uint64_t time_u = (uint64_t) time; // OK because time > 0
+  uint64_t last_time_u = time_u - expiration_time; // OK because time >= expiration_time >= 0
+  assert(sizeof(uint64_t) <= sizeof(time_t));
+  time_t last_time = (time_t) last_time_u; // OK since the assert above passed
   return expire_items(chain, get_flow_table(), last_time);
 }

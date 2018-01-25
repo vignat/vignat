@@ -30,26 +30,27 @@ struct stub_device {
 struct rte_mempool;
 struct rte_mbuf {
 	struct stub_mbuf_content* buf_addr; // <- WARNING this has changed from void* to struct stub_mbuf_content* !!!
-	uint64_t buf_physaddr;
-	uint16_t buf_len;
+	uint64_t buf_iova;
 	uint16_t data_off;
 	uint16_t refcnt;
-	uint8_t nb_segs;
-	uint8_t port;
+	uint16_t nb_segs;
+	uint16_t port;
 	uint64_t ol_flags;
 	uint32_t packet_type;
 	uint32_t pkt_len;
 	uint16_t data_len;
 	uint16_t vlan_tci;
 	uint32_t hash;
-	uint32_t seqn;
 	uint16_t vlan_tci_outer;
+	uint16_t buf_len;
+	uint64_t timestamp;
 	uint64_t udata64;
 	struct rte_mempool* pool;
 	struct rte_mbuf* next;
 	uint64_t tx_offload;
 	uint16_t priv_size;
 	uint16_t timesync;
+	uint32_t seqn;
 };
 struct ether_addr {
         uint8_t a;
@@ -160,8 +161,7 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
     predicate mbufp(struct rte_mbuf *mbuf; rte_mbufi val) =
       mbuf->buf_addr |-> ?ba &*&
-      mbuf->buf_physaddr |-> ?bfa &*&
-      mbuf->buf_len |-> ?bl &*&
+      mbuf->buf_iova |-> ?bfa &*&
       mbuf->data_off |-> ?doff &*&
       mbuf->refcnt |-> ?rcnt &*&
       mbuf->nb_segs |-> ?nbsegs &*&
@@ -172,14 +172,16 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
       mbuf->data_len |-> ?dlen &*&
       mbuf->vlan_tci |-> ?vlantci &*&
       mbuf->hash |-> ?hash &*&
-      mbuf->seqn |-> ?seqn &*&
       mbuf->vlan_tci_outer |-> ?vtcio &*&
+      mbuf->buf_len |-> ?bl &*&
+      mbuf->timestamp |-> ?tmstp &*&
       mbuf->udata64 |-> ?udata64 &*&
       mbuf->pool |-> ?pool &*&
       mbuf->next |-> ?next &*&
       mbuf->tx_offload |-> ?txoff &*&
       mbuf->priv_size |-> ?psize &*&
       mbuf->timesync |-> ?ts &*&
+      mbuf->seqn |-> ?seqn &*&
       user_bufferp(ba, ?ub) &*&
       val == rte_mbufc(ub, port, ptype, doff) &*&
       doff == 0;

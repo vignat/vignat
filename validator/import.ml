@@ -14,7 +14,7 @@ let lprintf fmt = ksprintf log fmt
 
 type 'x confidence = Sure of 'x | Tentative of 'x | Noidea
 
-type t_width = W1 | W8 | W16 | W32
+type t_width = W1 | W8 | W16 | W32 | W64
 type t_sign = Sgn | Unsgn
 type type_guess = {w:t_width confidence;
                    s:t_sign confidence;
@@ -36,12 +36,14 @@ type guessed_types = {ret_type: ttype;
 let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
 let infer_signed_type w =
-  if String.equal w "w32" then Sint32
+  if String.equal w "w64" then Sint64
+  else if String.equal w "w32" then Sint32
   else if String.equal w "w8" then Sint8
-  else Sunknown
+  else failwith (w ^ " signed is not supported")
 
 let infer_unsigned_type w =
-  if String.equal w "w32" then Uint32
+  if String.equal w "w64" then Uint64
+  else if String.equal w "w32" then Uint32
   else if String.equal w "w16" then Uint16
   else if String.equal w "w8" then Uint8
   else failwith (w ^ " unsigned is not supported")
@@ -204,7 +206,7 @@ let rec guess_sign_l exps known_vars =
 let update_tterm (known:tterm) (given:tterm) =
   let t_final = match known.t with
     | Unknown -> given.t
-    | Sunknown | Uunknown -> if given.t = Unknown then known.t else given.t
+    | Sunknown | Uunknown -> failwith "s/uunknown..." (*if given.t = Unknown then known.t else given.t*)
     | _ -> known.t in
   let v_final = match known.v with
     | Undef -> given.v
@@ -243,6 +245,7 @@ let convert_str_to_width_confidence w =
   else if String.equal w "w8" then Sure W8
   else if String.equal w "w16" then Sure W16
   else if String.equal w "w32" then Sure W32
+  else if String.equal w "w64" then Sure W64
   else Noidea
 
 let is_bool_fun fname =
@@ -277,7 +280,7 @@ let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.M
       (get_var_decls_of_sexp lhs {s;w=Noidea;precise=Unknown;} known_vars) @
       (get_var_decls_of_sexp rhs {s;w=Noidea;precise=Unknown;} known_vars)
     | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
-      when (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
+      when (String.equal w "w64") || (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
       if String.equal f "ZExt" then
         match tl with
         | [tl] -> get_var_decls_of_sexp
@@ -307,6 +310,7 @@ let get_vars_from_plain_val v type_guess known_vars =
   map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
 
 let type_guess_of_ttype t = match t with
+  | Sint64 -> {s=Sure Sgn;w=Sure W64;precise=t}
   | Sint32 -> {s=Sure Sgn;w=Sure W32;precise=t}
   | Sint8 -> {s=Sure Sgn;w=Sure W8;precise=t}
   | Uint32 -> {s=Sure Unsgn;w=Sure W32;precise=t}
@@ -415,6 +419,8 @@ let guess_type exp t =
   | Uunknown -> begin match exp with
       | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
         when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
+      | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
+        when (String.equal f "Concat") && (String.equal w "w64") -> failwith "guess_type w64 not supported yet"
       | _ -> t
     end
   | _ -> t
@@ -518,6 +524,7 @@ let rec get_sexp_value exp ?(at=Beginning) t =
         |_ -> t
       in
       match t with
+      | Sint64 -> failwith "get_sexp_value atom Sint64 not supported yet"
       | Sint32 -> {v=Int (get_sint_in_bounds v);t}
       | _ ->
         if String.equal v "true" then {v=Bool true;t=Boolean}
@@ -539,6 +546,8 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     (*FIXME: pass a right type to get_sexp_value and llocate_tmp here*)
     if (String.equal w "w32") then
       get_sexp_value src t ~at
+    else if (String.equal w "w64") then
+      failwith "get_sexp_value extract w64 not supported"
     else
       {v=Cast (t, allocate_tmp (get_sexp_value src Sint32 ~at));t}
   | Sexp.List [Sexp.Atom f; Sexp.Atom offset; src;]
@@ -1214,27 +1223,9 @@ let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
             | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
         end)
 
-let insert_type_casts (free_vars:var_spec String.Map.t) = function
-  | {v=Id name; t} -> begin
-      match String.Map.find free_vars name with
-      | Some v_spec ->
-        if v_spec.value.t <> t then begin
-          lprintf "add type cast %s -> %s for %s\n"
-            (ttype_to_str v_spec.value.t)
-            (ttype_to_str t)
-            (render_tterm v_spec.value);
-          Some {v=Cast (t, {v=Id name;t=v_spec.value.t});t=t}
-        end else None
-      | _ -> None
-    end
-  | _ -> None
-
 let extract_common_call_context
     ~is_tip ftype_of call ret_spec args unique_postfix
     (free_vars:var_spec String.Map.t) =
-  let args =
-    List.map args ~f:(call_recursively_on_tterm (insert_type_casts free_vars))
-  in
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call in
   let arg_names = List.map args ~f:render_tterm in
@@ -1390,6 +1381,7 @@ let ttype_of_guess = function
       | Sure W8 | Tentative W8 -> Sint8
       | Sure W16 | Tentative W16 -> Sunknown
       | Sure W32 | Tentative W32 -> Sint32
+      | Sure W64 | Tentative W64 -> Sint64
       end
   | {precise=Unknown;s=Tentative Unsgn;w;}
   | {precise=Unknown;s=Sure Unsgn;w;} -> begin match w with
@@ -1398,6 +1390,7 @@ let ttype_of_guess = function
       | Sure W8 | Tentative W8 -> Uint8
       | Sure W16 | Tentative W16 -> Uint16
       | Sure W32 | Tentative W32 -> Uint32
+      | Sure W64 | Tentative W64 -> Uint64
       end
   | {precise=Unknown;s=Noidea;w=Sure W1;}
   | {precise=Unknown;s=Noidea;w=Tentative W1;} -> Boolean

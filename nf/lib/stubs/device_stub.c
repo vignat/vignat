@@ -43,26 +43,27 @@ static struct rte_vdev_driver stub_devices[STUB_DEVICE_COUNT];
 // Tracing
 struct str_field_descr mbuf_descrs[] = {
   //Do not forget about "buf_addr" -- it is a pointer that is why it is not listed here.
-  {offsetof(struct rte_mbuf, buf_physaddr), sizeof(uint64_t), "buf_physaddr"},
-  {offsetof(struct rte_mbuf, buf_len), sizeof(uint16_t), "buf_len"},
+  {offsetof(struct rte_mbuf, buf_iova), sizeof(rte_iova_t), "buf_iova"},
   {offsetof(struct rte_mbuf, data_off), sizeof(uint16_t), "data_off"},
   {offsetof(struct rte_mbuf, refcnt), sizeof(uint16_t), "refcnt"},
-  {offsetof(struct rte_mbuf, nb_segs), sizeof(uint8_t), "nb_segs"},
-  {offsetof(struct rte_mbuf, port), sizeof(uint8_t), "port"},
+  {offsetof(struct rte_mbuf, nb_segs), sizeof(uint16_t), "nb_segs"},
+  {offsetof(struct rte_mbuf, port), sizeof(uint16_t), "port"},
   {offsetof(struct rte_mbuf, ol_flags), sizeof(uint64_t), "ol_flags"},
   {offsetof(struct rte_mbuf, packet_type), sizeof(uint32_t), "packet_type"},
   {offsetof(struct rte_mbuf, pkt_len), sizeof(uint32_t), "pkt_len"},
   {offsetof(struct rte_mbuf, data_len), sizeof(uint16_t), "data_len"},
   {offsetof(struct rte_mbuf, vlan_tci), sizeof(uint16_t), "vlan_tci"},
   {offsetof(struct rte_mbuf, hash), sizeof(uint32_t), "hash"},
-  {offsetof(struct rte_mbuf, seqn), sizeof(uint32_t), "seqn"},
   {offsetof(struct rte_mbuf, vlan_tci_outer), sizeof(uint16_t), "vlan_tci_outer"},
+  {offsetof(struct rte_mbuf, buf_len), sizeof(uint16_t), "buf_len"},
+  {offsetof(struct rte_mbuf, timestamp), sizeof(uint64_t), "timestamp"},
   {offsetof(struct rte_mbuf, udata64), sizeof(uint64_t), "udata64"},
-  /*{offsetof(struct rte_mbuf, pool), sizeof(void*), "pool"}, TODO no real reason this is commented out? */
+  /*{offsetof(struct rte_mbuf, pool), sizeof(rte_mempool*), "pool"}, TODO no real reason this is commented out? */
   /*{offsetof(struct rte_mbuf, next), sizeof(struct rte_mbuf*), "next"}, - we ban access to it, so let's not trace it */
   {offsetof(struct rte_mbuf, tx_offload), sizeof(uint64_t), "tx_offload"},
   {offsetof(struct rte_mbuf, priv_size), sizeof(uint16_t), "priv_size"},
   {offsetof(struct rte_mbuf, timesync), sizeof(uint16_t), "timesync"},
+  {offsetof(struct rte_mbuf, seqn), sizeof(uint32_t), "seqn"},
 };
 struct nested_field_descr stub_mbuf_content_nested[] = {
   {offsetof(struct stub_mbuf_content, ether), offsetof(struct ether_hdr, ether_type), sizeof(uint16_t), "ether_type"},
@@ -225,6 +226,45 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		memcpy((char*) bufs[i] + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
 		free(buf_content_symbol);
 
+		// Keep concrete values for what a driver guarantees
+		// (assignments are in the same order as the rte_mbuf declaration)
+
+		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
+
+		bufs[i]->buf_iova = rte_mempool_virt2iova(bufs[i]) + mbuf_size;
+
+		// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
+		// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
+		bufs[i]->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
+
+		bufs[i]->refcnt = 1;
+
+		bufs[i]->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
+
+		bufs[i]->port = stub_q->port_id;
+
+		bufs[i]->ol_flags = 0;
+
+		// packet_type is symbolic
+
+		bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
+
+		bufs[i]->data_len = sizeof(struct stub_mbuf_content); // TODO ideally those should be symbolic...
+
+		// vlan_tci is symbolic
+
+		// hash is symbolic
+
+		// vlan_tci_outer is symbolic
+
+		bufs[i]->buf_len = (uint16_t) buf_len;
+
+		// timestamp is symbolic
+
+		bufs[i]->userdata = NULL;
+
+		bufs[i]->pool = stub_q->mb_pool;
+
 		// We do not support chained mbufs for now, make sure the NF doesn't touch them
 		struct rte_mbuf* buf_next = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
                 if (buf_next == NULL) {
@@ -234,30 +274,14 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		bufs[i]->next = buf_next;
 		klee_forbid_access(bufs[i]->next, stub_q->mb_pool->elt_size, "buf_next");
 
-		// Keep contrete values for what a driver guarantees
-		// (assignments are in the same order as the rte_mbuf declaration)
-		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
-		bufs[i]->buf_physaddr = rte_mempool_virt2iova(bufs[i]) + mbuf_size;
-		bufs[i]->buf_len = (uint16_t) buf_len;
-		// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
-		// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
-		bufs[i]->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
-		bufs[i]->refcnt = 1;
-		bufs[i]->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
-		bufs[i]->port = stub_q->port_id;
-		bufs[i]->ol_flags = 0;
-		// packet_type is symbolic
-		bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
-		bufs[i]->data_len = sizeof(struct stub_mbuf_content); // TODO ideally those should be symbolic...
-		// vlan_tci is symbolic
-		// hash is symbolic
-		// seqn is symbolic
-		// vlan_tci_outer is symbolic
-		bufs[i]->userdata = NULL;
-		bufs[i]->pool = stub_q->mb_pool;
 		// tx_offload is symbolic
+
 		bufs[i]->priv_size = priv_size;
+
 		// timesync is symbolic
+
+		// seqn is symbolic
+
 
 		rte_mbuf_sanity_check(bufs[i], 1 /* is head mbuf */);
 

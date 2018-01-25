@@ -20,7 +20,7 @@
  */
 int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
                                  struct DoubleMap* map,
-                                 uint32_t time);
+                                 time_t time);
 /*@ requires dmappingp<K1,K2,V>(?m, ?kp1, ?kp2, ?hsh1, ?hsh2,
                                 ?fvp, ?bvp, ?rof, ?vsz,
                                 ?vk1, ?vk2, ?rp1, ?rp2, map) &*&
