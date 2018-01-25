@@ -107,7 +107,7 @@ let stub_queue_struct = Ir.Str ( "stub_queue", ["port_id", Uint16] )
 let rte_mempool_struct = Ir.Str ( "rte_mempool", [] )
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                ["buf_addr", Ptr stub_mbuf_content_struct;
-                                (* "buf_physaddr", Uint64; FIXME: justify this ignoring *)
+                                "buf_physaddr", Uint64;
                                 "buf_len", Uint16;
                                 "data_off", Uint16;
                                 "refcnt", Uint16;

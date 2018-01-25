@@ -38,7 +38,7 @@ bool device_tx_setup[RTE_MAX_ETHPORTS];
 // Tracing
 struct str_field_descr mbuf_descrs[] = {
   //Do not forget about "buf_addr" -- it is a pointer that is why it is not listed here.
-  //{offsetof(struct rte_mbuf, buf_physaddr), sizeof(uint64_t), "buf_physaddr"}, TODO: justify this ignore
+  {offsetof(struct rte_mbuf, buf_physaddr), sizeof(uint64_t), "buf_physaddr"},
   {offsetof(struct rte_mbuf, buf_len), sizeof(uint16_t), "buf_len"},
   {offsetof(struct rte_mbuf, data_off), sizeof(uint16_t), "data_off"},
   {offsetof(struct rte_mbuf, refcnt), sizeof(uint16_t), "refcnt"},
