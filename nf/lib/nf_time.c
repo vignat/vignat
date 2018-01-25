@@ -1,11 +1,12 @@
 #include "nf_time.h"
 
-#include <stddef.h>
+#include <time.h>
 
 time_t current_time(void)
 //@ requires last_time(?x);
-//@ ensures x <= result &*& last_time(result);
+//@ ensures result >= 0 &*& x <= result &*& last_time(result);
 {
-  // see https://github.com/verifast/verifast/issues/35
-  return time(NULL);
+  struct timespec tp;
+  clock_gettime(CLOCK_MONOTONIC, &tp);
+  return tp.tv_sec;
 }

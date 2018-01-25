@@ -9,12 +9,14 @@ time_t start_time(void) {
     klee_trace_ret();
     time_t starting_time;
     klee_make_symbolic(&starting_time, sizeof(time_t), "starting_time");
+    klee_assume(starting_time >= 0);
     last_time = starting_time;
     return last_time;
 }
 
 time_t restart_time(void) {
   klee_make_symbolic(&starting_time, sizeof(time_t), "restarting_time");
+  klee_assume(starting_time >= 0);
   last_time = starting_time;
   return last_time;
 }

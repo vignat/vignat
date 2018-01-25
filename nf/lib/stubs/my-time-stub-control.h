@@ -6,7 +6,7 @@
 
 time_t start_time(void);
 //@ requires true;
-//@ ensures last_time(result);
+//@ ensures result >= 0 &*& last_time(result);
 
 time_t restart_time(void);
 
