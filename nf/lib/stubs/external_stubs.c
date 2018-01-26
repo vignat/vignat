@@ -321,9 +321,8 @@ getpagesize(void)
 	return 4096;
 }
 
-// note that uclibc defines mmap as mmap64 in its sys/mman.h
 void*
-mmap64(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
+mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
 	// We support a single mapping
 	if (addr == NULL) {
