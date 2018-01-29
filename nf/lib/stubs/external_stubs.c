@@ -1,3 +1,4 @@
+#include <dirent.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -15,24 +16,35 @@
 #include <klee/klee.h>
 
 
-// Common values
+// Common constants
 // TODO: We pretend CPU 0 / NUMA node 0 exist, but what about others?
 static const char* CPU_ID_PATH_FORMAT = "/sys/devices/system/cpu/cpu%u/topology/core_id";
 static const char* CPU_ID_VALUE_ZERO = "/sys/devices/system/cpu/cpu0/topology/core_id";
 static const char* CPU_PATH_FORMAT = "/sys/devices/system/cpu/cpu%u/%s";
 static const char* CPU_ID_PATH = "topology/core_id";
 
-static int CPU_ID_ZERO_FD;
-static ssize_t CPU_ID_ZERO_FD_READ_BYTES = 0;
-
 static const char* NUMA_PATH_FORMAT = "%s/node%u/cpu%u";
 static const char* NUMA_PATH_PREFIX = "/sys/devices/system/node";
 static const char* NUMA_VALUE_ZERO = "/sys/devices/system/node/node0/cpu0";
 
-static const char* PAGEMAP_PATH = "/proc/self/pagemap";
+static const int PCI_DEVICES_COUNT = 2;
+static const char* PCI_DEVICE_NAMES[] = { "0000:00:00.0", "0000:00:00.1" };
+static const char* PCI_FILE_PREFIX = "/sys/bus/pci/devices/";
 
-static const char* CPUINFO_PATH = "/proc/cpuinfo";
 
+// Globals
+// TODO this is kind of hacky - we should have some kind of "symbol that is never equal to anything"
+static int CPU_ID_ZERO_FD = 42;
+static ssize_t CPU_ID_ZERO_FD_READ_BYTES = 0;
+
+static int PCI_DIR_FD = 4242;
+static int PCI_DIR_FD_READ_ENTRIES = 0;
+
+static int PCI_SIMPLE_FD = 424242;
+static int PCI_SIMPLE_FD_READ_BYTES = 0;
+
+static int PCI_RESOURCE_FD = 42424242;
+static int PCI_RESOURCE_FD_READ_BYTES = 0;
 
 int
 snprintf(char* str, size_t size, const char* format, ...)
@@ -47,7 +59,7 @@ snprintf(char* str, size_t size, const char* format, ...)
 		unsigned core = va_arg(args, unsigned);
 		if (core == 0 && size >= strlen(CPU_ID_VALUE_ZERO)) {
 			strcpy(str, CPU_ID_VALUE_ZERO);
-			return strlen(CPU_ID_VALUE_ZERO) - 1;
+			return strlen(CPU_ID_VALUE_ZERO);
 		}
 
 		return -1; // TODO support it
@@ -56,10 +68,10 @@ snprintf(char* str, size_t size, const char* format, ...)
 	// Same, but for some reason the second part is a %s as well
 	// TODO: If we end up upstreaming DPDK patches, might as well do this...
 	if (!strcmp(format, CPU_PATH_FORMAT)) {
-		if (va_arg(args, unsigned) == 0 && size >= strlen(CPU_ID_VALUE_ZERO)) {
+		if (va_arg(args, unsigned) == 0 && strlen(CPU_ID_VALUE_ZERO) < size) {
 			if (!strcmp(va_arg(args, char*), CPU_ID_PATH)) {
 				strcpy(str, CPU_ID_VALUE_ZERO);
-				return strlen(CPU_ID_VALUE_ZERO) - 1;
+				return strlen(CPU_ID_VALUE_ZERO);
 			}
 		}
 	}
@@ -69,9 +81,9 @@ snprintf(char* str, size_t size, const char* format, ...)
 		if (!strcmp(va_arg(args, char*), NUMA_PATH_PREFIX)) {
 			unsigned socket = va_arg(args, unsigned);
 			unsigned core = va_arg(args, unsigned);
-			if (socket == 0 && core == 0 && size >= strlen(NUMA_VALUE_ZERO)) {
+			if (socket == 0 && core == 0 && strlen(NUMA_VALUE_ZERO) < size) {
 				strcpy(str, NUMA_VALUE_ZERO);
-				return strlen(NUMA_VALUE_ZERO) - 1;
+				return strlen(NUMA_VALUE_ZERO);
 			}
 
 			return -1; // TODO not supported yet
@@ -83,9 +95,9 @@ snprintf(char* str, size_t size, const char* format, ...)
 		unsigned arg = va_arg(args, unsigned);
 		if (arg == 0) {
 			const char* result = "0,";
-			if (size >= strlen(result)) {
+			if (strlen(result) < size) {
 				strcpy(str, result);
-				return strlen(result) - 1;
+				return strlen(result);
 			}
 		}
 	}
@@ -93,11 +105,11 @@ snprintf(char* str, size_t size, const char* format, ...)
 	// Memory pool name
 	if (!strcmp(format, "MP_%s")) {
 		char* name = va_arg(args, char*);
-		if (name != NULL && strlen(name) + 3 <= size) {
+		if (name != NULL && strlen(name) + 3 < size) {
 			strcpy(str, "MP_");
 			str += 3;
 			strcpy(str, name);
-			return strlen(name) + 3 - 1;
+			return strlen(name) + 3;
 		}
 	}
 
@@ -107,7 +119,7 @@ snprintf(char* str, size_t size, const char* format, ...)
 		if (name != NULL) {
 			// NOTE: this is a DPDK bug, format should be %u...
 			unsigned id = va_arg(args, unsigned);
-			if (strlen(name) + 5 <= size) {
+			if (strlen(name) + 5 < size) {
 				strcpy(str, "MP_");
 				str += 3;
 
@@ -121,7 +133,42 @@ snprintf(char* str, size_t size, const char* format, ...)
 					klee_abort();
 				}
 
-				return strlen(name) + 5 - 1;
+				return strlen(name) + 5;
+			}
+		}
+	}
+
+	// Path-like format
+	if (!strcmp(format, "%s/%s")) {
+		char* arg0 = va_arg(args, char*);
+		char* arg1 = va_arg(args, char*);
+		if (arg0 == NULL || arg1 == NULL || strlen(arg0) + 1 + strlen(arg1) >= size) {
+			klee_abort();
+		}
+
+		strcpy(str, arg0);
+		str += strlen(arg0);
+		str[0] = '/';
+		str++;
+		strcpy(str, arg1);
+
+		return strlen(arg0) + 1 + strlen(arg1);
+	}
+
+	// String, then suffix (the observant reader will notice this doesn't handle %% - I don't care)
+	if (strlen(format) > 2 && format[0] == '%' && format[1] == 's') {
+		bool has_percent = false;
+		for (int n = 2; n < strlen(format); n++) {
+			has_percent |= format[n] == '%';
+		}
+		if (!has_percent) {
+			char* arg = va_arg(args, char*);
+			if (strlen(arg) + (strlen(format) - 2) <= size) {
+				strcpy(str, arg);
+				str += strlen(arg);
+				format += 2;
+				strcpy(str, format);
+				return strlen(arg) + strlen(format); // not len(format)-2 cause we just += 2
 			}
 		}
 	}
@@ -137,8 +184,19 @@ snprintf(char* str, size_t size, const char* format, ...)
 		}
 	}
 
-	// snprintf is allowed to return 0 if it fails (e.g. no memory)
-	// So we return 0 unless we really need to
+
+	if (!strcmp(format, "%.4" PRIx16 ":%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8)) {
+		uint32_t domain = va_arg(args, uint32_t);
+		uint8_t bus = va_arg(args, int);
+		uint8_t devid = va_arg(args, int);
+		uint8_t function = va_arg(args, int);
+
+		if (domain == 0 && bus == 0 && devid == 0) {
+			strcpy(str, PCI_DEVICE_NAMES[function]);
+			return strlen(PCI_DEVICE_NAMES[function]);
+		}
+	}
+
 	klee_abort();
 }
 
@@ -152,6 +210,11 @@ access(const char* pathname, int mode)
 
 	// CPU 0 on NUMA node 0 exists too!
 	if (!strcmp(pathname, NUMA_VALUE_ZERO) && mode == F_OK) {
+		return 0;
+	}
+
+	// Yes, /sys stuff is accessible
+	if (strlen(pathname) > 5 && pathname[0] == '/' && pathname[1] == 's' && pathname[2] == 'y' && pathname[3] == 's' && pathname[4] == '/') {
 		return 0;
 	}
 
@@ -170,23 +233,76 @@ stat(const char* path, struct stat* buf)
 }
 
 int
+fstat(int fd, struct stat* buf)
+{
+	if (fd == PCI_DIR_FD) {
+		memset(buf, 0, sizeof(struct stat));
+		return 0;
+	}
+
+	klee_abort();
+}
+
+int
+fcntl(int fd, int cmd, ...)
+{
+        va_list args;
+        va_start(args, cmd);
+
+	if (fd == PCI_DIR_FD && cmd == F_SETFD) {
+		int arg = va_arg(args, int);
+		if (arg == FD_CLOEXEC) {
+			return 0;
+		}
+	}
+
+	klee_abort();
+}
+
+int
 open(const char* file, int oflag, ...)
 {
 	// CPU 0
 	if (!strcmp(file, CPU_ID_VALUE_ZERO) && oflag == O_RDONLY) {
-		if (!klee_is_symbolic(CPU_ID_ZERO_FD)) {
-			CPU_ID_ZERO_FD = klee_int("cpu_id_zero_fd");
-		}
 		return CPU_ID_ZERO_FD;
 	}
 
 	// page map
-	if (!strcmp(file, PAGEMAP_PATH) && oflag == O_RDONLY) {
+	if (!strcmp(file, "/proc/self/pagemap") && oflag == O_RDONLY) {
 		return -1; // TODO
 	}
 
-	if (!strcmp(file, CPUINFO_PATH) && oflag == O_RDONLY) {
+	// cpu info
+	if (!strcmp(file, "/proc/cpuinfo") && oflag == O_RDONLY) {
 		return -1; // TODO
+	}
+
+	// PCI devices
+	if (!strcmp(file, "/sys/bus/pci/devices") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
+		return PCI_DIR_FD;
+	}
+
+	// PCI devices info
+	if (!strncmp(file, PCI_FILE_PREFIX, strlen(PCI_FILE_PREFIX))) {
+		int skip_len = strlen(PCI_FILE_PREFIX) // path suffix
+				+ strlen(PCI_DEVICE_NAMES[0]) // actual name
+				+ 1; // trailing slash
+		if (strlen(file) > skip_len) {
+			file += skip_len;
+
+			const char* simple_files[] = { "vendor", "device", "subsystem_vendor", "subsystem_device", "class", "max_vfs", "numa_node" };
+			for (int n = 0; n < (sizeof(simple_files)/sizeof(simple_files[0])); n++) {
+				if (!strcmp(file, simple_files[n])) {
+					PCI_SIMPLE_FD_READ_BYTES = 0;
+					return PCI_SIMPLE_FD;
+				}
+			}
+
+			if (!strcmp(file, "resource")) {
+				PCI_RESOURCE_FD_READ_BYTES = 0;
+				return PCI_RESOURCE_FD;
+			}
+		}
 	}
 
 	// Not supported!
@@ -196,12 +312,33 @@ open(const char* file, int oflag, ...)
 ssize_t
 read(int fd, void *buf, size_t count)
 {
-	if(fd == CPU_ID_ZERO_FD) {
-		if (count == 1) {
-			if (CPU_ID_ZERO_FD_READ_BYTES == 0) {
-				*((char*) buf) = '0';
-				return 1;
-			}
+	if (fd == CPU_ID_ZERO_FD && count == 1) {
+		if (CPU_ID_ZERO_FD_READ_BYTES == 0) {
+			*((char*) buf) = '0';
+			return 1;
+		}
+	}
+
+	if (fd == PCI_SIMPLE_FD && count == 1) {
+		const char* retval = "0\n";
+		if (PCI_SIMPLE_FD_READ_BYTES < strlen(retval)) {
+			PCI_SIMPLE_FD_READ_BYTES++;
+			*((char*) buf) = retval[PCI_SIMPLE_FD_READ_BYTES];
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	if (fd == PCI_RESOURCE_FD && count == 1) {
+		const char* retval = "0x0000000000000000 0x0000000000000000 0x0000000000000000\n";
+		const int retq = 13;
+		if (PCI_RESOURCE_FD_READ_BYTES < strlen(retval) * retq) {
+			PCI_RESOURCE_FD_READ_BYTES++;
+			*((char*) buf) = retval[PCI_RESOURCE_FD_READ_BYTES % strlen(retval)];
+			return 1;
+		} else {
+			return 0;
 		}
 	}
 
@@ -212,13 +349,85 @@ read(int fd, void *buf, size_t count)
 int
 close(int fd)
 {
+	// TODO: set FDs to -1 so they won't work any more unless re-opened - assume a single fd in flight at any time
+
 	if (fd == CPU_ID_ZERO_FD) {
-		// the FD won't work any more unless it's opened again
-		CPU_ID_ZERO_FD = -1;
+//		CPU_ID_ZERO_FD = -1;
+		return 0;
+	}
+
+	if (fd == PCI_DIR_FD) {
+//		PCI_DIR_FD = -1;
+		return 0;
+	}
+
+	if (fd == PCI_SIMPLE_FD) {
+//		PCI_SIMPLE_FD = -1;
+		return 0;
+	}
+
+	if (fd == PCI_RESOURCE_FD) {
+//		PCI_RESOURCE_FD = -1;
 		return 0;
 	}
 
 	// Not supported!
+	klee_abort();
+}
+
+ssize_t
+readlink(const char* pathname, char* buf, size_t bufsiz)
+{
+	if (!strncmp(pathname, PCI_FILE_PREFIX, strlen(PCI_FILE_PREFIX))) {
+		int skip_len = strlen(PCI_FILE_PREFIX) // path suffix
+				+ strlen(PCI_DEVICE_NAMES[0]) // actual name
+				+ 1; // trailing slash
+                if (strlen(pathname) > skip_len) {
+			pathname += skip_len;
+			if (!strcmp(pathname, "driver")) {
+				// Dirname doesn't matter to DPDK, only filename
+				// TODO can we make it a symbol of sorts? what about returning -1?
+				const char* driver_path = "/drivers/igb_uio";
+				klee_assert(strlen(driver_path) < bufsiz);
+				strcpy(buf, driver_path);
+				return strlen(driver_path);
+			}
+		}
+	}
+
+	klee_abort();
+}
+
+// NOTE: This is a klee-uclibc internal
+//       which is excluded from build because other stuff next to it causes problems with klee
+//       according to a comment in libc/Makefile.in
+//       The gist of it is that it reads N directory entries,
+//       with a limit on the number of bytes, and returns the number of bytes actually read.
+ssize_t
+__getdents (int fd, char* buf, size_t nbytes)
+{klee_stack_trace();
+	if (fd == PCI_DIR_FD) {
+		if (PCI_DIR_FD_READ_ENTRIES >= PCI_DEVICES_COUNT) {
+			return 0;
+		}
+
+		size_t len = sizeof(struct dirent);
+		if (nbytes < len) {
+			klee_abort();
+		}
+
+		struct dirent* de = (struct dirent*) buf;
+		memset(de, 0, len);
+
+		de->d_ino = 1; // just needs to be non-zero
+		strcpy(de->d_name, PCI_DEVICE_NAMES[PCI_DIR_FD_READ_ENTRIES]);
+		de->d_reclen = strlen(de->d_name);
+
+		PCI_DIR_FD_READ_ENTRIES++;
+
+		return len;
+	}
+
 	klee_abort();
 }
 

@@ -38,9 +38,8 @@ verify:
 		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
 		--include=sse_stubs.h --include=builtin_stubs.h \
 		--include=rte_config.h `# required by many DPDK files` \
-		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
-		../lib/stubs/device_stub.c \
 		../lib/stubs/external_stubs.c \
+		../lib/stubs/hardware_stub.c \
 		../lib/stubs/rte_stub.c \
 		../nf_main.c \
 		../lib/nf_util.c ../lib/nat_config.c \
@@ -50,23 +49,29 @@ verify:
 		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
 		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
 		$(RTE_SDK)/lib/librte_eal/common/*.c \
+		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		`# Linux-specific EAL` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
 		`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \
 		`#             power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html` \
 		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
-		`# Virtual devices support` \
-		$(RTE_SDK)/drivers/bus/vdev/*.c \
 		`# Stacks for mempool` \
 		$(RTE_SDK)/drivers/mempool/stack/*.c \
-		nat_forward_vignat.c  \
+		`# PCI driver support` \
+		$(RTE_SDK)/drivers/bus/pci/*.c \
+		$(RTE_SDK)/drivers/bus/pci/linux/*.c \
+		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
+		`# ixgbe driver (except bypass, SSE and ARM NEON stuff)` \
+		$(RTE_SDK)/drivers/net/ixgbe/!(ixgbe_bypass|ixgbe_82599_bypass|ixgbe_rxtx_vec_sse|ixgbe_rxtx_vec_neon).c \
+		$(RTE_SDK)/drivers/net/ixgbe/base/*.c \
+		`# VigNAT` \
+		nat_forward_vignat.c \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
 	klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
-		--no-pci `# disable PCI enumeration since PCI is not available, we don't it use anyway` \
 		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \
 		--no-shconf `# don't mmap the config` \
 		-- \

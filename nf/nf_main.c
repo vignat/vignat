@@ -3,7 +3,7 @@
 #ifdef KLEE_VERIFICATION
 #include <klee/klee.h>
 #include "lib/stubs/my-time-stub-control.h"
-#include "lib/stubs/device_stub.h"
+#include "lib/stubs/hardware_stub.h"
 #include "lib/stubs/rte_stub.h"
 #endif
 
@@ -214,7 +214,7 @@ main(int argc, char* argv[])
 {
 #ifdef KLEE_VERIFICATION
   stub_rte_init();
-  stub_device_init();
+  stub_hardware_init();
 #endif
 
   // Initialize the Environment Abstraction Layer (EAL)
@@ -226,7 +226,8 @@ main(int argc, char* argv[])
   argv += ret;
 
 #ifdef KLEE_VERIFICATION
-  stub_device_attach();
+klee_print_expr("after eal init", 0);
+//  stub_device_attach();
 #endif
 
   nf_config_init(argc, argv);
@@ -234,7 +235,7 @@ main(int argc, char* argv[])
 #ifndef KLEE_VERIFICATION
   nf_print_config();
 #endif
-
+klee_print_expr("creating mempool", 0);
   // Create a memory pool
   unsigned nb_devices = rte_eth_dev_count();
   struct rte_mempool* mbuf_pool = rte_pktmbuf_pool_create(
@@ -254,7 +255,7 @@ main(int argc, char* argv[])
   // Create another pool for the flood() cloning
   init_clone_pool();
 #endif
-
+klee_print_expr("initing devices", 0);
   // Initialize all devices
   for (uint8_t device = 0; device < nb_devices; device++) {
     if (nf_init_device(device, mbuf_pool) == 0) {
