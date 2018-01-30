@@ -27,3 +27,25 @@ index 05bc77d..32bdd2f 100644
  		lcore_config[cfg->master_lcore].core_role = ROLE_RTE;
  	}
  
+diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
+index 440f4d2..6ca1b74 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_memory.c
++++ b/lib/librte_eal/linuxapp/eal/eal_memory.c
+@@ -359,7 +359,7 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi,
+ 	int node_id = -1;
+ 	int essential_prev = 0;
+ 	int oldpolicy;
+-	struct bitmask *oldmask = numa_allocate_nodemask();
++	struct bitmask *oldmask;
+ 	bool have_numa = true;
+ 	unsigned long maxnode = 0;
+ 
+@@ -369,6 +369,8 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi,
+ 		have_numa = false;
+ 	}
+ 
++	oldmask = numa_allocate_nodemask(); // needs to be called AFTER numa_available
++
+ 	if (orig && have_numa) {
+ 		RTE_LOG(DEBUG, EAL, "Trying to obtain current memory policy.\n");
+ 		if (get_mempolicy(&oldpolicy, oldmask->maskp,

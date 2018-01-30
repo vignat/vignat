@@ -1,11 +1,12 @@
-#include <inttypes.h>
-
 #ifdef KLEE_VERIFICATION
-#include <klee/klee.h>
-#include "lib/stubs/my-time-stub-control.h"
+#include "lib/stubs/external_stub.h"
 #include "lib/stubs/hardware_stub.h"
 #include "lib/stubs/rte_stub.h"
+#include <klee/klee.h>
+#include "lib/stubs/my-time-stub-control.h"
 #endif
+
+#include <inttypes.h>
 
 
 #ifdef KLEE_VERIFICATION
@@ -213,6 +214,7 @@ int
 main(int argc, char* argv[])
 {
 #ifdef KLEE_VERIFICATION
+  stub_external_init();
   stub_rte_init();
   stub_hardware_init();
 #endif

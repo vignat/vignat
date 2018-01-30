@@ -38,7 +38,7 @@ verify:
 		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
 		--include=sse_stubs.h --include=builtin_stubs.h \
 		--include=rte_config.h `# required by many DPDK files` \
-		../lib/stubs/external_stubs.c \
+		../lib/stubs/external_stub.c \
 		../lib/stubs/hardware_stub.c \
 		../lib/stubs/rte_stub.c \
 		../nf_main.c \
@@ -72,7 +72,6 @@ verify:
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
 	klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
-		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \
 		--no-shconf `# don't mmap the config` \
 		-- \
 		`# TODO make those parameters symbolic` \
