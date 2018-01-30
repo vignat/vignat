@@ -40,11 +40,36 @@ static ssize_t CPU_ID_ZERO_FD_READ_BYTES = 0;
 static int PCI_DIR_FD = 4242;
 static int PCI_DIR_FD_READ_ENTRIES = 0;
 
-static int PCI_SIMPLE_FD = 424242;
-static int PCI_SIMPLE_FD_READ_BYTES = 0;
+struct stub_pci_file {
+	int fd;
+	const char* name;
+	int pos; // -2 == past EOF, -1 == unopened, >=0 == current pos
+	const char* content;
+};
+static struct stub_pci_file PCI_FILES[] = {
+	{ .fd = 42000, .name = "vendor", .pos = -1, .content = "32902\n" }, // value: ixgbe
+	{ .fd = 42001, .name = "device", .pos = -1, .content = "5546\n" }, // value: ixgbe
+	{ .fd = 42002, .name = "subsystem_vendor", .pos = -1, .content = "0\n" }, // value: any
+	{ .fd = 42003, .name = "subsystem_device", .pos = -1, .content = "0\n" }, // value: any
+	{ .fd = 42004, .name = "class", .pos = -1, .content = "16777215\n" }, // value: ixgbe
+	{ .fd = 42005, .name = "max_vfs", .pos = -1, .content = "0\n" }, // no virtual functions
+	{ .fd = 42006, .name = "numa_node", .pos = -1, .content = "0\n" }, // NUMA node 0
+	{ .fd = 42007, .name = "resource", .pos = -1, .content =
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n" }, // idk what this is
+};
 
-static int PCI_RESOURCE_FD = 42424242;
-static int PCI_RESOURCE_FD_READ_BYTES = 0;
 
 int
 snprintf(char* str, size_t size, const char* format, ...)
@@ -290,17 +315,11 @@ open(const char* file, int oflag, ...)
 		if (strlen(file) > skip_len) {
 			file += skip_len;
 
-			const char* simple_files[] = { "vendor", "device", "subsystem_vendor", "subsystem_device", "class", "max_vfs", "numa_node" };
-			for (int n = 0; n < (sizeof(simple_files)/sizeof(simple_files[0])); n++) {
-				if (!strcmp(file, simple_files[n])) {
-					PCI_SIMPLE_FD_READ_BYTES = 0;
-					return PCI_SIMPLE_FD;
+			for (int n = 0; n < sizeof(PCI_FILES)/sizeof(PCI_FILES[0]); n++) {
+				if (!strcmp(file, PCI_FILES[n].name)) {
+					PCI_FILES[n].pos = 0;
+					return PCI_FILES[n].fd;
 				}
-			}
-
-			if (!strcmp(file, "resource")) {
-				PCI_RESOURCE_FD_READ_BYTES = 0;
-				return PCI_RESOURCE_FD;
 			}
 		}
 	}
@@ -319,26 +338,22 @@ read(int fd, void *buf, size_t count)
 		}
 	}
 
-	if (fd == PCI_SIMPLE_FD && count == 1) {
-		const char* retval = "0\n";
-		if (PCI_SIMPLE_FD_READ_BYTES < strlen(retval)) {
-			PCI_SIMPLE_FD_READ_BYTES++;
-			*((char*) buf) = retval[PCI_SIMPLE_FD_READ_BYTES];
-			return 1;
-		} else {
-			return 0;
-		}
-	}
-
-	if (fd == PCI_RESOURCE_FD && count == 1) {
-		const char* retval = "0x0000000000000000 0x0000000000000000 0x0000000000000000\n";
-		const int retq = 13;
-		if (PCI_RESOURCE_FD_READ_BYTES < strlen(retval) * retq) {
-			PCI_RESOURCE_FD_READ_BYTES++;
-			*((char*) buf) = retval[PCI_RESOURCE_FD_READ_BYTES % strlen(retval)];
-			return 1;
-		} else {
-			return 0;
+	if (count == 1) {
+		for (int n = 0; n < sizeof(PCI_FILES)/sizeof(PCI_FILES[0]); n++) {
+			if (fd == PCI_FILES[n].fd) {
+				if (PCI_FILES[n].pos == -1) {
+					klee_abort(); // not opened!
+				} else if (PCI_FILES[n].pos == -2) {
+					klee_abort(); // past EOF!
+				} else if (PCI_FILES[n].pos < strlen(PCI_FILES[n].content)) {
+					*((char*) buf) = PCI_FILES[n].content[PCI_FILES[n].pos];
+					PCI_FILES[n].pos++;
+					return 1;
+				} else {
+					PCI_FILES[n].pos = -2;
+					return 0;
+				}
+			}
 		}
 	}
 
@@ -361,14 +376,11 @@ close(int fd)
 		return 0;
 	}
 
-	if (fd == PCI_SIMPLE_FD) {
-//		PCI_SIMPLE_FD = -1;
-		return 0;
-	}
-
-	if (fd == PCI_RESOURCE_FD) {
-//		PCI_RESOURCE_FD = -1;
-		return 0;
+	for (int n = 0; n < sizeof(PCI_FILES)/sizeof(PCI_FILES[0]); n++) {
+		if (fd == PCI_FILES[n].fd) {
+			PCI_FILES[n].pos = -1;
+			return 0;
+		}
 	}
 
 	// Not supported!
@@ -405,7 +417,7 @@ readlink(const char* pathname, char* buf, size_t bufsiz)
 //       with a limit on the number of bytes, and returns the number of bytes actually read.
 ssize_t
 __getdents (int fd, char* buf, size_t nbytes)
-{klee_stack_trace();
+{
 	if (fd == PCI_DIR_FD) {
 		if (PCI_DIR_FD_READ_ENTRIES >= PCI_DEVICES_COUNT) {
 			return 0;
