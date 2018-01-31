@@ -67,6 +67,9 @@ static size_t DEV_ZERO_MMAPPED_SIZE = -1;
 static int PCI_DIR_FD = 69020;
 static int PCI_DIR_READ_ENTRIES = -1;
 
+static int PCI_UIO_DIR_FD = 69021;
+static int PCI_UIO_DIR_READ_ENTRIES = -1;
+
 struct stub_file {
 	int fd;
 	bool pci; // if true, name refers to a file inside a pci info
@@ -114,36 +117,19 @@ snprintf(char* str, size_t size, const char* format, ...)
 	va_list args;
 	va_start(args, format);
 
-	// PCI format - special/annoying case
-	if (!strcmp(format, "%.4" PRIx16 ":%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8)) {
-		uint32_t domain = va_arg(args, uint32_t);
-		uint8_t bus = va_arg(args, int);
-		uint8_t devid = va_arg(args, int);
-		uint8_t function = va_arg(args, int);
-
-		if (domain == 0 && bus == 0 && devid == 0) {
-			strcpy(str, PCI_DEVICE_NAMES[function]);
-			return strlen(PCI_DEVICE_NAMES[function]);
-		}
-	}
-
-	// Generic (supports only %s and single-digit %u/%d)
+	// Supports only %s and single-digit %u/%d/%x, and special-cased %.2x and %.4x for 0
 	size_t orig_size = size;
 	int len = strlen(format);
 	for (int f = 0; f < len; f++) {
 		if (format[f] == '%') {
-			if (f == len - 1) {
-				klee_abort(); // no format specified
-			}
+			klee_assert(f < len - 1);
 
 			f++;
 			if (format[f] == 's') {
 				char* arg = va_arg(args, char*);
 				int arg_len = strlen(arg);
 
-				if (size < arg_len) {
-					klee_abort(); // too small!
-				}
+				klee_assert(size >= arg_len);
 
 				strcpy(str, arg);
 				str += arg_len;
@@ -154,9 +140,7 @@ snprintf(char* str, size_t size, const char* format, ...)
 					return -1; // not supported! - TODO but dpdk needs it anyway, fix it...
 				}
 
-				if (size < 1) {
-					klee_abort(); // too small!
-				}
+				klee_assert(size >= 1);
 
 				*str = '0';
 				for (int n = 0; n < arg; n++) {
@@ -165,15 +149,11 @@ snprintf(char* str, size_t size, const char* format, ...)
 
 				str++;
 				size--;
-			} else if (format[f] == 'd') {
+			} else if (format[f] == 'd' || format[f] == 'x') {
 				int arg = va_arg(args, int);
-				if (arg > 10) {
-					klee_abort(); // not supported!
-				}
+				klee_assert(arg < 10); // we only support single digits (thus base doesn't matter)
 
-				if (size < 1) {
-					klee_abort(); // too small!
-				}
+				klee_assert(size >= 1);
 
 				*str = '0';
 				for (int n = 0; n < arg; n++) {
@@ -182,8 +162,21 @@ snprintf(char* str, size_t size, const char* format, ...)
 
 				str++;
 				size--;
+			} else if (f < len - 2 && format[f] == '.' && (format[f + 1] == '2' || format[f + 1] == '4') && format[f + 2] == 'x') {
+				int format_len = format[f + 1] == '2' ? 2 : 4;
+				f += 2;
+
+				int arg = va_arg(args, int);
+				klee_assert(arg == 0); // this is only used for PCI addresses
+
+				klee_assert(size >= format_len);
+
+				for (int n = 0; n < format_len; n++) {
+					*str = '0';
+					str++;
+					size--;
+				}
 			} else {
-				klee_print_expr("UNSUPPORTED FORMAT", format[f]);
 				klee_abort(); // not supported!
 			}
 		} else {
@@ -320,7 +313,7 @@ open(const char* file, int oflag, ...)
 
 	// PCI devices
 	if (!strcmp(file, "/sys/bus/pci/devices") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
-		klee_assert(PCI_DIR_READ_ENTRIES == -1);
+		klee_assert(PCI_DIR_READ_ENTRIES < 0);
 		PCI_DIR_READ_ENTRIES = 0;
 		return PCI_DIR_FD;
 	}
@@ -332,6 +325,12 @@ open(const char* file, int oflag, ...)
 				+ 1; // trailing slash
 		if (strlen(file) > skip_len) {
 			file += skip_len;
+
+			if (!strcmp(file, "uio") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
+				klee_assert(PCI_UIO_DIR_READ_ENTRIES < 0);
+				PCI_UIO_DIR_READ_ENTRIES = 0;
+				return PCI_UIO_DIR_FD;
+			}
 
 			for (int n = 0; n < sizeof(KNOWN_FILES)/sizeof(KNOWN_FILES[0]); n++) {
 				if (KNOWN_FILES[n].pci && !strcmp(file, KNOWN_FILES[n].name)) {
@@ -359,15 +358,10 @@ fcntl(int fd, int cmd, ...)
 	int arg = va_arg(args, int);
 	klee_assert(arg == FD_CLOEXEC);
 
-	if (fd == HUGEPAGES_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == PCI_DIR_FD) {
+	if (fd == HUGEPAGES_DIR_FD
+	 || fd == HUGEPAGES_MOUNTPOINT_DIR_FD
+	 || fd == PCI_DIR_FD
+	 || fd == PCI_UIO_DIR_FD) {
 		return 0;
 	}
 
@@ -403,15 +397,10 @@ fstat(int fd, struct stat* buf)
 {
 	memset(buf, 0, sizeof(struct stat));
 
-	if (fd == HUGEPAGES_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == PCI_DIR_FD) {
+	if (fd == HUGEPAGES_DIR_FD
+	 || fd == HUGEPAGES_MOUNTPOINT_DIR_FD
+	 || fd == PCI_DIR_FD
+	 || fd == PCI_UIO_DIR_FD) {
 		return 0;
 	}
 
@@ -463,11 +452,13 @@ read(int fd, void *buf, size_t count)
 		memset(buf, 0, count);
 
 		// According to https://www.kernel.org/doc/Documentation/vm/pagemap.txt,
-		// the only bit that we must set here is bit 63 "page present"
+		// all we need is a non-null PFN (bits 0-54)
+		// TODO I think DPDK forgets to check whether the page is marked as swapped,
+		//      which changes the meaning of bits 0-54...
 #if __BYTE_ORDER == __BIG_ENDIAN
-		*((char*) buf) = 1 << 7;
+		*((char*) buf + 7) = 1;
 #else
-		*((char*) buf + 7) = 1 << 7;
+		*((char*) buf) = 1;
 #endif
 
 		return count;
@@ -555,6 +546,13 @@ close(int fd)
 		return 0;
 	}
 
+	if (fd == PCI_UIO_DIR_FD) {
+		klee_assert(PCI_UIO_DIR_READ_ENTRIES != -1);
+		PCI_UIO_DIR_READ_ENTRIES = -1;
+		return 0;
+	}
+
+
 	for (int n = 0; n < sizeof(KNOWN_FILES)/sizeof(KNOWN_FILES[0]); n++) {
 		if (fd == KNOWN_FILES[n].fd) {
 			klee_assert(KNOWN_FILES[n].pos != -1);
@@ -562,7 +560,7 @@ close(int fd)
 			return 0;
 		}
 	}
-klee_print_expr("fd",fd);
+
 	// Not supported!
 	klee_abort();
 }
@@ -657,6 +655,23 @@ __getdents (int fd, char* buf, size_t nbytes)
 		de->d_reclen = len; //strlen(de->d_name);
 
 		PCI_DIR_READ_ENTRIES++;
+
+		return len;
+	}
+
+	if (fd == PCI_UIO_DIR_FD) {
+		klee_assert(PCI_UIO_DIR_READ_ENTRIES >= 0);
+
+		if (PCI_UIO_DIR_READ_ENTRIES > 0) {
+			PCI_UIO_DIR_READ_ENTRIES = -2;
+			return 0;
+		}
+
+		strcpy(de->d_name, "uio0");
+		de->d_reclen = len; // strlen(de->d_name);
+		de->d_type = DT_DIR; // it's a directory
+
+		PCI_UIO_DIR_READ_ENTRIES++;
 
 		return len;
 	}
