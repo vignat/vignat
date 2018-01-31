@@ -54,11 +54,19 @@ static int HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES = -1;
 static int HUGEPAGES_MOUNTPOINT_FILE_FD = 69003;
 static bool HUGEPAGES_MOUNTPOINT_FILE_LOCKED = false;
 
+#define HUGEPAGES_MMAP_COUNT 2
+static void* HUGEPAGES_MMAPPED_MEM[HUGEPAGES_MMAP_COUNT] = { NULL, NULL };
+static size_t HUGEPAGES_MMAPPED_SIZE[HUGEPAGES_MMAP_COUNT] = { -1, -1 };
+
 static int HUGEPAGE_FD = 69004;
 
 static int PAGEMAP_FD = 69005;
 
-static int PCI_DIR_FD = 69006;
+static int DEV_ZERO_FD = 69010;
+static void* DEV_ZERO_MMAPPED_MEM = NULL;
+static size_t DEV_ZERO_MMAPPED_SIZE = -1;
+
+static int PCI_DIR_FD = 69020;
 static int PCI_DIR_READ_ENTRIES = -1;
 
 struct stub_file {
@@ -398,7 +406,6 @@ flock(int fd, int operation)
 		return 0;
 	}
 
-klee_print_expr("fd",fd);
 	klee_abort();
 }
 
@@ -443,6 +450,17 @@ open(const char* file, int oflag, ...)
 	// hugepage (note the flags!)
 	if (!strcmp(file, "/dev/hugepages/rte") && oflag == (O_CREAT|O_RDWR)) {
 		return HUGEPAGE_FD;
+	}
+
+	// NUMA map, unsupported for now
+	// TODO support it
+	if (!strcmp(file, "/proc/self/numa_maps") && oflag == O_RDONLY) {
+		return -1;
+	}
+
+	// bunch of zeroes
+	if (!strcmp(file, "/dev/zero") && oflag == O_RDONLY) {
+		return DEV_ZERO_FD;
 	}
 
 	// known non-PCI files
@@ -580,6 +598,11 @@ close(int fd)
 		return 0;
 	}
 
+	if (fd == DEV_ZERO_FD) {
+//		DEV_ZERO_FD = -1;
+		return 0;
+	}
+
 	if (fd == PCI_DIR_FD) {
 		klee_assert(PCI_DIR_READ_ENTRIES != -1);
 		PCI_DIR_READ_ENTRIES = -1;
@@ -658,7 +681,7 @@ __getdents (int fd, char* buf, size_t nbytes)
 		return len;
 	}
 
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {klee_print_expr("oh hai", HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES);
+	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
 		klee_assert(HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES >= 0);
 
 		if (HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES == 1) {
@@ -848,6 +871,13 @@ sleep(unsigned int seconds)
 	return 0;
 }
 
+uid_t
+getuid(void)
+{
+	// No errors: "These functions are always successful." -- http://man7.org/linux/man-pages/man2/getuid.2.html
+	return 0; // We are root! well, we pretend to be, at least
+}
+
 long
 syscall(long number, ...)
 {
@@ -872,26 +902,85 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
 	// http://man7.org/linux/man-pages/man2/mmap.2.html
 
-	// Null address please, let's keep semantics easy to handle
-	klee_assert(addr == NULL);
+	if(fd == DEV_ZERO_FD) {
+		// Null address please, let's keep semantics easy to handle
+		klee_assert(addr == NULL);
 
-	// We only suppport mmapping from the hugepage, which is 2048kB
-	klee_assert(fd == HUGEPAGE_FD);
-	klee_assert(length == 2048 * 1024);
+		// No offset plz
+		klee_assert(offset == 0);
 
-	// We don't support any offset, either
-	klee_assert(offset == 0);
+		// Easy flags
+		klee_assert((flags & MAP_PRIVATE) == MAP_PRIVATE);
 
-	// We support only read/write pages (otherwise it's messy to handle)
-	klee_assert((prot & (PROT_READ|PROT_WRITE)) == (PROT_READ|PROT_WRITE));
+		// Read-only memory, we enforce even stronger semantics by disallowing reads with forbid_access
+		klee_assert((prot & PROT_READ) == PROT_READ);
 
-	// Hard to do proper semantics for these, but we're single-threaded, so...
-	klee_assert((flags & (MAP_SHARED|MAP_POPULATE)) == (MAP_SHARED|MAP_POPULATE));
+		// don't mmap twice
+		klee_assert(DEV_ZERO_MMAPPED_SIZE == -1);
 
-	void* mem = malloc(length);
-	memset(mem, 0, length);
-	return mem;
+		DEV_ZERO_MMAPPED_SIZE = length;
+		DEV_ZERO_MMAPPED_MEM = malloc(DEV_ZERO_MMAPPED_SIZE);
+		memset(DEV_ZERO_MMAPPED_MEM, 0, DEV_ZERO_MMAPPED_SIZE);
+		klee_forbid_access(DEV_ZERO_MMAPPED_MEM, DEV_ZERO_MMAPPED_SIZE, "read-only mmapped memory");
+		return DEV_ZERO_MMAPPED_MEM;
+	}
 
+	if(fd == HUGEPAGE_FD) {
+		// We don't care about the address; TODO should we? maybe at least check it modulo the page size?
+
+		// the hugepage is 2048kB
+		klee_assert(length == 2048 * 1024);
+
+		// We don't support any offset, either
+		klee_assert(offset == 0);
+
+		// R/W is easy to handle
+		klee_assert((prot & (PROT_READ|PROT_WRITE)) == (PROT_READ|PROT_WRITE));
+
+		// Hard to do proper semantics for these, but we're single-threaded, so...
+		klee_assert((flags & (MAP_SHARED|MAP_POPULATE)) == (MAP_SHARED|MAP_POPULATE));
+
+		for (int n = 0; n < HUGEPAGES_MMAP_COUNT; n++) {
+			if (HUGEPAGES_MMAPPED_SIZE[n] == -1) {
+				HUGEPAGES_MMAPPED_SIZE[n] = length;
+				HUGEPAGES_MMAPPED_MEM[n] = malloc(HUGEPAGES_MMAPPED_SIZE[n]);
+				memset(HUGEPAGES_MMAPPED_MEM[n], 0, HUGEPAGES_MMAPPED_SIZE[n]);
+				return HUGEPAGES_MMAPPED_MEM[n];
+			}
+		}
+
+		klee_abort(); // no available pages
+	}
+
+	klee_abort();
+}
+
+int
+munmap(void* addr, size_t length)
+{
+	if (addr == DEV_ZERO_MMAPPED_MEM && addr != NULL) {
+		klee_assert(length == DEV_ZERO_MMAPPED_SIZE);
+
+		klee_allow_access(DEV_ZERO_MMAPPED_MEM, DEV_ZERO_MMAPPED_SIZE);
+		free(DEV_ZERO_MMAPPED_MEM);
+		DEV_ZERO_MMAPPED_SIZE = -1;
+
+		// Upon successful completion, munmap() shall return 0; otherwise, it shall return -1 and set errno to indicate the error.
+		// -- https://linux.die.net/man/3/munmap
+		return 0;
+	}
+
+
+	for (int n = 0; n < HUGEPAGES_MMAP_COUNT; n++) {
+		if (addr == HUGEPAGES_MMAPPED_MEM[n]) {
+			klee_assert(length == HUGEPAGES_MMAPPED_SIZE[n]);
+			HUGEPAGES_MMAPPED_SIZE[n] = -1;
+			free(HUGEPAGES_MMAPPED_MEM[n]);
+			return 0;
+		}
+	}
+
+	klee_abort();
 }
 
 
