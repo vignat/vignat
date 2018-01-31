@@ -24,14 +24,7 @@
 
 // Common constants
 // TODO: We pretend CPU 0 / NUMA node 0 exist, but what about others?
-static const char* CPU_ID_PATH_FORMAT = "/sys/devices/system/cpu/cpu%u/topology/core_id";
 static const char* CPU_ID_VALUE_ZERO = "/sys/devices/system/cpu/cpu0/topology/core_id";
-static const char* CPU_PATH_FORMAT = "/sys/devices/system/cpu/cpu%u/%s";
-static const char* CPU_ID_PATH = "topology/core_id";
-
-static const char* NUMA_PATH_FORMAT = "%s/node%u/cpu%u";
-static const char* NUMA_PATH_PREFIX = "/sys/devices/system/node";
-static const char* NUMA_VALUE_ZERO = "/sys/devices/system/node/node0/cpu0";
 
 static const int PCI_DEVICES_COUNT = 2;
 static const char* PCI_DEVICE_NAMES[] = { "0000:00:00.0", "0000:00:00.1" };
@@ -39,7 +32,7 @@ static const char* PCI_FILE_PREFIX = "/sys/bus/pci/devices/";
 
 
 // Globals
-// TODO this is kind of hacky - we should have some kind of "symbol that is never equal to anything"
+// TODO this is kind of hacky - we should have some kind of "symbol that is never equal to anything" for the FDs
 static bool NUMA_INITIALIZED = false;
 static bool NUMA_NODEMASK_CREATED = false;
 
@@ -59,8 +52,13 @@ static void* HUGEPAGES_MMAPPED_MEM[HUGEPAGES_MMAP_COUNT] = { NULL, NULL };
 static size_t HUGEPAGES_MMAPPED_SIZE[HUGEPAGES_MMAP_COUNT] = { -1, -1 };
 
 static int HUGEPAGE_FD = 69004;
+static int HUGEPAGE_ZERO_FD = 69005;
 
-static int PAGEMAP_FD = 69005;
+static int HUGEPAGE_INFO_FD = 69006;
+static size_t HUGEPAGE_INFO_SIZE = -1;
+static void* HUGEPAGE_INFO_MMAPPED_MEM = NULL;
+
+static int PAGEMAP_FD = 69007;
 
 static int DEV_ZERO_FD = 69010;
 static void* DEV_ZERO_MMAPPED_MEM = NULL;
@@ -113,192 +111,10 @@ static struct stub_file KNOWN_FILES[] = {
 int
 snprintf(char* str, size_t size, const char* format, ...)
 {
-	// NOTE: return value is length, but not including null terminator
-
 	va_list args;
 	va_start(args, format);
 
-	// CPU ID for CPU 0
-	if (!strcmp(format, CPU_ID_PATH_FORMAT)) {
-		unsigned core = va_arg(args, unsigned);
-		if (core == 0 && size >= strlen(CPU_ID_VALUE_ZERO)) {
-			strcpy(str, CPU_ID_VALUE_ZERO);
-			return strlen(CPU_ID_VALUE_ZERO);
-		}
-
-		return -1; // TODO support it
-	}
-
-	// Same, but for some reason the second part is a %s as well
-	// TODO: If we end up upstreaming DPDK patches, might as well do this...
-	if (!strcmp(format, CPU_PATH_FORMAT)) {
-		if (va_arg(args, unsigned) == 0 && strlen(CPU_ID_VALUE_ZERO) < size) {
-			if (!strcmp(va_arg(args, char*), CPU_ID_PATH)) {
-				strcpy(str, CPU_ID_VALUE_ZERO);
-				return strlen(CPU_ID_VALUE_ZERO);
-			}
-		}
-	}
-
-	// NUMA node 0, CPU 0
-	if (!strcmp(format, NUMA_PATH_FORMAT)) {
-		if (!strcmp(va_arg(args, char*), NUMA_PATH_PREFIX)) {
-			unsigned socket = va_arg(args, unsigned);
-			unsigned core = va_arg(args, unsigned);
-			if (socket == 0 && core == 0 && strlen(NUMA_VALUE_ZERO) < size) {
-				strcpy(str, NUMA_VALUE_ZERO);
-				return strlen(NUMA_VALUE_ZERO);
-			}
-
-			return -1; // TODO not supported yet
-		}
-	}
-
-	// CPU 0 with a comma, when dumping affinity
-	if (!strcmp(format, "%u,")) {
-		unsigned arg = va_arg(args, unsigned);
-		if (arg == 0) {
-			const char* result = "0,";
-			if (strlen(result) < size) {
-				strcpy(str, result);
-				return strlen(result);
-			}
-		}
-	}
-
-	// Memory pool name
-	if (!strcmp(format, "MP_%s")) {
-		char* name = va_arg(args, char*);
-		if (name != NULL && strlen(name) + 3 < size) {
-			strcpy(str, "MP_");
-			str += 3;
-			strcpy(str, name);
-			return strlen(name) + 3;
-		}
-	}
-
-	// Memory pool sub-name
-	if (!strcmp(format, "MP_%s_%d")) {
-		char* name = va_arg(args, char*);
-		if (name != NULL) {
-			// NOTE: this is a DPDK bug, format should be %u...
-			unsigned id = va_arg(args, unsigned);
-			if (strlen(name) + 5 < size) {
-				strcpy(str, "MP_");
-				str += 3;
-
-				strcpy(str, name);
-
-				if (id == 0) {
-					strcpy(str, "_0");
-				} else if (id == 2) {
-					strcpy(str, "_2");
-				} else {
-					klee_abort();
-				}
-
-				return strlen(name) + 5;
-			}
-		}
-	}
-
-	// Path-like format, 2 components
-	if (!strcmp(format, "%s/%s")) {
-		char* arg0 = va_arg(args, char*);
-		char* arg1 = va_arg(args, char*);
-
-		klee_assert(arg0 != NULL && arg1 != NULL);
-
-		int len = strlen(arg0) + 1 + strlen(arg1);
-		klee_assert(len < size);
-
-		strcpy(str, arg0);
-		str += strlen(arg0);
-		str[0] = '/';
-		str++;
-		strcpy(str, arg1);
-
-		return len;
-	}
-
-	// Path-like format, 3 components
-	if (!strcmp(format, "%s/%s/%s")) {
-		char* arg0 = va_arg(args, char*);
-		char* arg1 = va_arg(args, char*);
-		char* arg2 = va_arg(args, char*);
-
-		klee_assert(arg0 != NULL && arg1 != NULL && arg2 != NULL);
-
-		int len = strlen(arg0) + 1 + strlen(arg1) + 1 + strlen(arg2);
-		klee_assert(len < size);
-
-		strcpy(str, arg0);
-		str += strlen(arg0);
-		str[0] = '/';
-		str++;
-		strcpy(str, arg1);
-		str += strlen(arg1);
-		str[0] = '/';
-		str++;
-		strcpy(str, arg2);
-
-		return len;
-	}
-
-	// String, then suffix (the observant reader will notice this doesn't handle %% - I don't care)
-	if (strlen(format) > 2 && format[0] == '%' && format[1] == 's') {
-		bool has_percent = false;
-		for (int n = 2; n < strlen(format); n++) {
-			has_percent |= format[n] == '%';
-		}
-		if (!has_percent) {
-			char* arg = va_arg(args, char*);
-			if (strlen(arg) + (strlen(format) - 2) <= size) {
-				strcpy(str, arg);
-				str += strlen(arg);
-				format += 2;
-				strcpy(str, format);
-				return strlen(arg) + strlen(format); // not len(format)-2 cause we just += 2
-			}
-		}
-	}
-
-	// Trivial case: string copy
-	if (!strcmp(format, "%s")) {
-		char* arg = va_arg(args, char*);
-		klee_assert(arg != NULL);
-
-		klee_assert(strlen(arg) < size);
-
-		strcpy(str, arg);
-		return strlen(arg);
-	}
-
-	// Hugepages format
-	if (!strcmp(format, "%s/%smap_%d")) {
-		char* arg0 = va_arg(args, char*);
-		char* arg1 = va_arg(args, char*);
-		int arg2 = va_arg(args, int);
-		klee_assert(arg0 != NULL && arg1 != NULL);
-
-		if(arg2 == 0) {
-			int len = strlen(arg0) + 1 + strlen(arg1) + 5;
-			klee_assert(len < size);
-
-			strcpy(str, arg0);
-			str += strlen(arg0);
-			str[0] = '/';
-			str++;
-			strcpy(str, arg1);
-			str += strlen(arg1);
-			str++;
-			strcpy(str, "map_0");
-
-			return len;
-		}
-	}
-
-	// PCI format
+	// PCI format - special/annoying case
 	if (!strcmp(format, "%.4" PRIx16 ":%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8)) {
 		uint32_t domain = va_arg(args, uint32_t);
 		uint8_t bus = va_arg(args, int);
@@ -311,7 +127,84 @@ snprintf(char* str, size_t size, const char* format, ...)
 		}
 	}
 
-	klee_abort();
+	// Generic (supports only %s and single-digit %u/%d)
+	size_t orig_size = size;
+	int len = strlen(format);
+	for (int f = 0; f < len; f++) {
+		if (format[f] == '%') {
+			if (f == len - 1) {
+				klee_abort(); // no format specified
+			}
+
+			f++;
+			if (format[f] == 's') {
+				char* arg = va_arg(args, char*);
+				int arg_len = strlen(arg);
+
+				if (size < arg_len) {
+					klee_abort(); // too small!
+				}
+
+				strcpy(str, arg);
+				str += arg_len;
+				size -= arg_len;
+			} else if (format[f] == 'u') {
+				unsigned arg = va_arg(args, unsigned);
+				if (arg > 10) {
+					return -1; // not supported! - TODO but dpdk needs it anyway, fix it...
+				}
+
+				if (size < 1) {
+					klee_abort(); // too small!
+				}
+
+				*str = '0';
+				for (int n = 0; n < arg; n++) {
+					*str = *str + 1;
+				}
+
+				str++;
+				size--;
+			} else if (format[f] == 'd') {
+				int arg = va_arg(args, int);
+				if (arg > 10) {
+					klee_abort(); // not supported!
+				}
+
+				if (size < 1) {
+					klee_abort(); // too small!
+				}
+
+				*str = '0';
+				for (int n = 0; n < arg; n++) {
+					*str = *str + 1;
+				}
+
+				str++;
+				size--;
+			} else {
+				klee_print_expr("UNSUPPORTED FORMAT", format[f]);
+				klee_abort(); // not supported!
+			}
+		} else {
+			if (size < 1) {
+				klee_abort(); // too small!
+			}
+
+			*str = format[f];
+			str++;
+			size--;
+		}
+	}
+
+	if (size < 1) {
+		klee_abort(); // too small!
+	}
+
+	*str = '\0';
+	// no size-- here, return value does not include null terminator
+
+	return orig_size - size;
 }
 
 int
@@ -323,7 +216,7 @@ access(const char* pathname, int mode)
 	}
 
 	// CPU 0 on NUMA node 0 exists too!
-	if (!strcmp(pathname, NUMA_VALUE_ZERO) && mode == F_OK) {
+	if (!strcmp(pathname, "/sys/devices/system/node/node0/cpu0") && mode == F_OK) {
 		return 0;
 	}
 
@@ -347,69 +240,6 @@ stat(const char* path, struct stat* buf)
 }
 
 int
-fstat(int fd, struct stat* buf)
-{
-	memset(buf, 0, sizeof(struct stat));
-
-	if (fd == HUGEPAGES_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == PCI_DIR_FD) {
-		return 0;
-	}
-
-	klee_abort();
-}
-
-int
-fcntl(int fd, int cmd, ...)
-{
-        va_list args;
-        va_start(args, cmd);
-
-	klee_assert(cmd == F_SETFD);
-
-	int arg = va_arg(args, int);
-	klee_assert(arg == FD_CLOEXEC);
-
-	if (fd == HUGEPAGES_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
-		return 0;
-	}
-
-	if (fd == PCI_DIR_FD) {
-		return 0;
-	}
-
-	klee_abort();
-}
-
-int
-flock(int fd, int operation)
-{
-	if (fd == HUGEPAGES_MOUNTPOINT_FILE_FD && operation == LOCK_EX) {
-		klee_assert(!HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
-		HUGEPAGES_MOUNTPOINT_FILE_LOCKED = true;
-		return 0;
-	}
-
-	if (fd == HUGEPAGE_FD && operation == (LOCK_SH|LOCK_NB)) {
-		// OK, whatever, it's a shared lock
-		return 0;
-	}
-
-	klee_abort();
-}
-
-int
 open(const char* file, int oflag, ...)
 {
 	// CPU 0
@@ -417,16 +247,21 @@ open(const char* file, int oflag, ...)
 		return CPU_ID_ZERO_FD;
 	}
 
+	// Other CPUs
+	const char* cpu_prefix = "/sys/devices/system/cpu/cpu";
+	if (!strncmp(file, cpu_prefix, strlen(cpu_prefix)) && oflag == O_RDONLY) {
+		return -1; // TODO
+	}
+
+	if (!strcmp(file, "/proc/cpuinfo") && oflag == O_RDONLY) {
+		return -1; // TODO
+	}
+
 	// page map
 	if (!strcmp(file, "/proc/self/pagemap") && oflag == O_RDONLY) {
 		return PAGEMAP_FD;
 	}
-/*
-	// cpu info
-	if (!strcmp(file, "/proc/cpuinfo") && oflag == O_RDONLY) {
-		return -1; // TODO
-	}
-*/
+
 	// all hugepages directory
 	if (!strcmp(file, "/sys/kernel/mm/hugepages") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
 		klee_assert(HUGEPAGES_DIR_READ_ENTRIES < 0 );
@@ -447,9 +282,20 @@ open(const char* file, int oflag, ...)
 		}
 	}
 
-	// hugepage (note the flags!)
+	// hugepage
 	if (!strcmp(file, "/dev/hugepages/rte") && oflag == (O_CREAT|O_RDWR)) {
 		return HUGEPAGE_FD;
+	}
+
+	// hugepage, another
+	if (!strcmp(file, "/dev/hugepages/rtemap_0") && oflag == (O_CREAT|O_RDWR)) {
+		return HUGEPAGE_ZERO_FD;
+	}
+
+	// hugepage info file
+	if (!strcmp(file, "/var/run/.rte_hugepage_info") && oflag == (O_CREAT|O_RDWR)) {
+		HUGEPAGE_INFO_SIZE = -1;
+		return HUGEPAGE_INFO_FD;
 	}
 
 	// NUMA map, unsupported for now
@@ -499,6 +345,90 @@ open(const char* file, int oflag, ...)
 
 for(int n = 0;n<strlen(file);n++){klee_print_expr("x", file[n]);}
 	// Not supported!
+	klee_abort();
+}
+
+int
+fcntl(int fd, int cmd, ...)
+{
+        va_list args;
+        va_start(args, cmd);
+
+	klee_assert(cmd == F_SETFD);
+
+	int arg = va_arg(args, int);
+	klee_assert(arg == FD_CLOEXEC);
+
+	if (fd == HUGEPAGES_DIR_FD) {
+		return 0;
+	}
+
+	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
+		return 0;
+	}
+
+	if (fd == PCI_DIR_FD) {
+		return 0;
+	}
+
+	klee_abort();
+}
+
+int
+flock(int fd, int operation)
+{
+	if (fd == HUGEPAGES_MOUNTPOINT_FILE_FD) {
+		if (operation == LOCK_EX) {
+			klee_assert(!HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
+			HUGEPAGES_MOUNTPOINT_FILE_LOCKED = true;
+			return 0;
+		}
+		if (operation == LOCK_UN) {
+			klee_assert(HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
+			HUGEPAGES_MOUNTPOINT_FILE_LOCKED = false;
+			return 0;
+		}
+	}
+
+	if ((fd == HUGEPAGE_FD || fd == HUGEPAGE_ZERO_FD) && operation == (LOCK_SH|LOCK_NB)) {
+		// OK, whatever, it's a shared lock
+		return 0;
+	}
+
+	klee_abort();
+}
+
+int
+fstat(int fd, struct stat* buf)
+{
+	memset(buf, 0, sizeof(struct stat));
+
+	if (fd == HUGEPAGES_DIR_FD) {
+		return 0;
+	}
+
+	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
+		return 0;
+	}
+
+	if (fd == PCI_DIR_FD) {
+		return 0;
+	}
+
+	klee_abort();
+}
+
+int
+ftruncate(int fd, off_t length)
+{
+	if (fd == HUGEPAGE_INFO_FD) {
+		HUGEPAGE_INFO_SIZE = length;
+
+		// On success, zero is returned. On error, -1 is returned, and errno is set appropriately.
+		// -- https://linux.die.net/man/2/ftruncate
+		return 0;
+	}
+
 	klee_abort();
 }
 
@@ -593,6 +523,22 @@ close(int fd)
 		return 0;
 	}
 
+	if (fd == HUGEPAGE_ZERO_FD) {
+//		HUGEPAGE_ZERO_FD = -1;
+		return 0;
+	}
+
+	if (fd == HUGEPAGE_INFO_FD) {
+//		HUGEPAGE_INFO_FD = -1;
+		return 0;
+	}
+
+	if (fd == HUGEPAGES_MOUNTPOINT_FILE_FD) {
+		klee_assert(!HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
+//		HUGEPAGES_MOUNTPOINT_FILE_FD = -1;
+		return 0;
+	}
+
 	if (fd == PAGEMAP_FD) {
 //		PAGEMAP_FD = -1;
 		return 0;
@@ -616,7 +562,7 @@ close(int fd)
 			return 0;
 		}
 	}
-
+klee_print_expr("fd",fd);
 	// Not supported!
 	klee_abort();
 }
@@ -925,7 +871,7 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 		return DEV_ZERO_MMAPPED_MEM;
 	}
 
-	if(fd == HUGEPAGE_FD) {
+	if(fd == HUGEPAGE_FD || fd == HUGEPAGE_ZERO_FD) {
 		// We don't care about the address; TODO should we? maybe at least check it modulo the page size?
 
 		// the hugepage is 2048kB
@@ -950,6 +896,26 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 		}
 
 		klee_abort(); // no available pages
+	}
+
+	if(fd == HUGEPAGE_INFO_FD) {
+		// Simple semantics: no addr, known length, no offset
+		klee_assert(addr == NULL);
+		klee_assert(length == HUGEPAGE_INFO_SIZE);
+		klee_assert(offset == 0);
+
+		// R/W is easy to handle
+		klee_assert((prot & (PROT_READ|PROT_WRITE)) == (PROT_READ|PROT_WRITE));
+
+		// Hard to do proper semantics for this, but we're single-threaded, so...
+		klee_assert((flags & MAP_SHARED) == MAP_SHARED);
+
+		// Single mmap at a time
+		klee_assert(HUGEPAGE_INFO_MMAPPED_MEM == NULL);
+
+		HUGEPAGE_INFO_MMAPPED_MEM = malloc(HUGEPAGE_INFO_SIZE);
+		memset(HUGEPAGE_INFO_MMAPPED_MEM, 0, HUGEPAGE_INFO_SIZE);
+		return HUGEPAGE_INFO_MMAPPED_MEM;
 	}
 
 	klee_abort();
@@ -978,6 +944,12 @@ munmap(void* addr, size_t length)
 			free(HUGEPAGES_MMAPPED_MEM[n]);
 			return 0;
 		}
+	}
+
+	if (addr == HUGEPAGE_INFO_MMAPPED_MEM) {
+		free(HUGEPAGE_INFO_MMAPPED_MEM);
+		HUGEPAGE_INFO_MMAPPED_MEM = NULL;
+		return 0;
 	}
 
 	klee_abort();
