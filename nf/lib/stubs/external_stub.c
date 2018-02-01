@@ -70,6 +70,10 @@ static int PCI_DIR_READ_ENTRIES = -1;
 static int PCI_UIO_DIR_FD = 69021;
 static int PCI_UIO_DIR_READ_ENTRIES = -1;
 
+static int DEV_UIO0_FD = 69100;
+
+static int DEV_UIO0_CONFIG_FD = 69101;
+
 struct stub_file {
 	int fd;
 	bool pci; // if true, name refers to a file inside a pci info
@@ -77,6 +81,7 @@ struct stub_file {
 	int pos; // -2 == past EOF, -1 == unopened, >=0 == current pos
 	const char* content;
 };
+
 static struct stub_file KNOWN_FILES[] = {
 	{ .fd = 42000, .pci = true, .name = "vendor", .pos = -1, .content = "32902\n" }, // value: ixgbe
 	{ .fd = 42001, .pci = true, .name = "device", .pos = -1, .content = "5546\n" }, // value: ixgbe
@@ -86,19 +91,13 @@ static struct stub_file KNOWN_FILES[] = {
 	{ .fd = 42005, .pci = true, .name = "max_vfs", .pos = -1, .content = "0\n" }, // no virtual functions
 	{ .fd = 42006, .pci = true, .name = "numa_node", .pos = -1, .content = "0\n" }, // NUMA node 0
 	{ .fd = 42007, .pci = true, .name = "resource", .pos = -1, .content =
+		//        phys addr           end addr              flags (flag 0x200 == mem)
+		"0x0000000000000000 0x0000000000000000 0x0000000000000200\n"
 		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
 		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
 		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
 		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n" }, // no resources
+		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n" }, // one single resource
 
 	{ .fd = 43000, .pci = false, .name = "/proc/mounts", .pos = -1,
 	  .content = "hugetlbfs /dev/hugepages hugetlbfs rw,relatime 0 0\n" }, // only hugepages, what DPDK cares about
@@ -300,6 +299,15 @@ open(const char* file, int oflag, ...)
 	// bunch of zeroes
 	if (!strcmp(file, "/dev/zero") && oflag == O_RDONLY) {
 		return DEV_ZERO_FD;
+	}
+
+	// UIO device
+	if (!strcmp(file, "/dev/uio0") && oflag == O_RDWR) {
+		return DEV_UIO0_FD;
+	}
+
+	if (!strcmp(file, "/sys/class/uio/uio0/device/config") && oflag == O_RDWR) {
+		return DEV_UIO0_CONFIG_FD;
 	}
 
 	// known non-PCI files
