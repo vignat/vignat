@@ -22,93 +22,62 @@
 
 #include <klee/klee.h>
 
-// Common constants
-// TODO: We pretend CPU 0 / NUMA node 0 exist, but what about others?
-static const char* CPU_ID_VALUE_ZERO = "/sys/devices/system/cpu/cpu0/topology/core_id";
-
-static const int PCI_DEVICES_COUNT = 2;
-static const char* PCI_DEVICE_NAMES[] = { "0000:00:00.0", "0000:00:00.1" };
-static const char* PCI_FILE_PREFIX = "/sys/bus/pci/devices/";
-
-
 // Globals
 // TODO this is kind of hacky - we should have some kind of "symbol that is never equal to anything" for the FDs
 static bool NUMA_INITIALIZED = false;
 static bool NUMA_NODEMASK_CREATED = false;
 
-static int CPU_ID_ZERO_FD = 69000;
-static ssize_t CPU_ID_ZERO_FD_READ_BYTES = 0;
+static const int POS_UNOPENED = -1;
+static const int POS_EOF = -2;
 
-static int HUGEPAGES_DIR_FD = 69001;
-static int HUGEPAGES_DIR_READ_ENTRIES = -1;
+enum stub_file_kind {
+	KIND_NONE,
+	KIND_FILE,
+	KIND_DIRECTORY,
+	KIND_LINK
+};
 
-static int HUGEPAGES_MOUNTPOINT_DIR_FD = 69002;
-static int HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES = -1;
-static int HUGEPAGES_MOUNTPOINT_FILE_FD = 69003;
-static bool HUGEPAGES_MOUNTPOINT_FILE_LOCKED = false;
-
-#define HUGEPAGES_MMAP_COUNT 2
-static void* HUGEPAGES_MMAPPED_MEM[HUGEPAGES_MMAP_COUNT] = { NULL, NULL };
-static size_t HUGEPAGES_MMAPPED_SIZE[HUGEPAGES_MMAP_COUNT] = { -1, -1 };
-
-static int HUGEPAGE_FD = 69004;
-static int HUGEPAGE_ZERO_FD = 69005;
-
-static int HUGEPAGE_INFO_FD = 69006;
-static size_t HUGEPAGE_INFO_SIZE = -1;
-static void* HUGEPAGE_INFO_MMAPPED_MEM = NULL;
-
-static int PAGEMAP_FD = 69007;
-
-static int DEV_ZERO_FD = 69010;
-static void* DEV_ZERO_MMAPPED_MEM = NULL;
-static size_t DEV_ZERO_MMAPPED_SIZE = -1;
-
-static int PCI_DIR_FD = 69020;
-static int PCI_DIR_READ_ENTRIES = -1;
-
-static int PCI_UIO_DIR_FD = 69021;
-static int PCI_UIO_DIR_READ_ENTRIES = -1;
-
-static int DEV_UIO0_FD = 69100;
-
-static int DEV_UIO0_CONFIG_FD = 69101;
+struct stub_mmap {
+	void* mem;
+	size_t mem_len;
+};
 
 struct stub_file {
-	int fd;
-	bool pci; // if true, name refers to a file inside a pci info
-	const char* name;
-	int pos; // -2 == past EOF, -1 == unopened, >=0 == current pos
-	const char* content;
+	char* name;
+
+	// Either: (file or symlink)
+	char* content;
+	// Or: (folder)
+	int* children;
+	int children_len;
+
+	// In both cases, this keeps track of progress
+	int pos;
+
+	// Files and folders are set to NONE until opened; directories can be opened as files
+	enum stub_file_kind kind;
+
+	// Support flock
+	bool locked;
+
+	// Support mmap (2 max)
+	struct stub_mmap mmaps[2];
+	size_t mmaps_len;
 };
+static struct stub_file FILES[1024];
 
-static struct stub_file KNOWN_FILES[] = {
-	{ .fd = 42000, .pci = true, .name = "vendor", .pos = -1, .content = "32902\n" }, // value: ixgbe
-	{ .fd = 42001, .pci = true, .name = "device", .pos = -1, .content = "5546\n" }, // value: ixgbe
-	{ .fd = 42002, .pci = true, .name = "subsystem_vendor", .pos = -1, .content = "0\n" }, // value: any
-	{ .fd = 42003, .pci = true, .name = "subsystem_device", .pos = -1, .content = "0\n" }, // value: any
-	{ .fd = 42004, .pci = true, .name = "class", .pos = -1, .content = "16777215\n" }, // value: ixgbe
-	{ .fd = 42005, .pci = true, .name = "max_vfs", .pos = -1, .content = "0\n" }, // no virtual functions
-	{ .fd = 42006, .pci = true, .name = "numa_node", .pos = -1, .content = "0\n" }, // NUMA node 0
-	{ .fd = 42007, .pci = true, .name = "resource", .pos = -1, .content =
-		//        phys addr           end addr              flags (flag 0x200 == mem)
-		"0x0000000000000000 0x0000000000000000 0x0000000000000200\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
-		"0x0000000000000000 0x0000000000000000 0x0000000000000000\n" }, // one single resource
+// Special case: the page map
+static char* FILE_CONTENT_PAGEMAP = (char*) -100;
 
-	{ .fd = 43000, .pci = false, .name = "/proc/mounts", .pos = -1,
-	  .content = "hugetlbfs /dev/hugepages hugetlbfs rw,relatime 0 0\n" }, // only hugepages, what DPDK cares about
-	{ .fd = 43001, .pci = false, .name = "/proc/meminfo", .pos = -1,
-	  .content = "Hugepagesize:       2048 kB\n" }, // only hugepages, what DPDK cares about
-	{ .fd = 43002, .pci = false, .name = "/sys/kernel/mm/hugepages/hugepages-2048kB/resv_hugepages", .pos = -1,
-	  .content = "0\n" }, // reserved hugepages
-	{ .fd = 43003, .pci = false, .name = "/sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages", .pos = -1,
-	  .content = "1\n" }, // free hugepages
+// Special case: the hugepage info file, which is truncated
+static char* FILE_CONTENT_HPINFO = (char*) -200;
+
+struct stub_device {
+	char* name;
+	void* mem;
+	size_t mem_len;
 };
-
+static struct stub_device DEVICES[2];
 
 int
 snprintf(char* str, size_t size, const char* format, ...)
@@ -202,19 +171,18 @@ snprintf(char* str, size_t size, const char* format, ...)
 int
 access(const char* pathname, int mode)
 {
-	// Yup, CPU 0 exists!
-	if (!strcmp(pathname, CPU_ID_VALUE_ZERO) && mode == F_OK) {
-		return 0;
-	}
+	if (mode == F_OK) {
+		for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
+			if (FILES[n].name != NULL && !strcmp(pathname, FILES[n].name)) {
+				return 0;
+			}
+		}
 
-	// CPU 0 on NUMA node 0 exists too!
-	if (!strcmp(pathname, "/sys/devices/system/node/node0/cpu0") && mode == F_OK) {
-		return 0;
-	}
-
-	// Yes, /sys stuff is accessible
-	if (strlen(pathname) > 5 && pathname[0] == '/' && pathname[1] == 's' && pathname[2] == 'y' && pathname[3] == 's' && pathname[4] == '/') {
-		return 0;
+		// Other CPUs
+		const char* cpu_prefix = "/sys/devices/system/cpu/cpu";
+		if (!strncmp(pathname, cpu_prefix, strlen(cpu_prefix))) {
+			return -1; // TODO
+		}
 	}
 
 	klee_abort();
@@ -234,120 +202,42 @@ stat(const char* path, struct stat* buf)
 int
 open(const char* file, int oflag, ...)
 {
-	// CPU 0
-	if (!strcmp(file, CPU_ID_VALUE_ZERO) && oflag == O_RDONLY) {
-		return CPU_ID_ZERO_FD;
+	if (!strcmp(file, "/proc/cpuinfo") && oflag == O_RDONLY) {
+		return -1; // TODO
+	}
+
+	// NUMA map, unsupported for now
+	if (!strcmp(file, "/proc/self/numa_maps") && oflag == O_RDONLY) {
+		return -1; // TODO
+	}
+
+	// Generic
+	for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
+		if (!strcmp(file, FILES[n].name)) {
+			klee_assert(FILES[n].pos == POS_UNOPENED);
+
+			if ((oflag & O_DIRECTORY) == O_DIRECTORY) {
+				klee_assert(FILES[n].children != NULL);
+
+				FILES[n].kind = KIND_DIRECTORY;
+			} else {
+				if (FILES[n].children == NULL) {
+					FILES[n].kind = KIND_FILE;
+				} else {
+					FILES[n].kind = KIND_DIRECTORY;
+				}
+			}
+
+			FILES[n].pos = 0;
+
+			return n;
+		}
 	}
 
 	// Other CPUs
 	const char* cpu_prefix = "/sys/devices/system/cpu/cpu";
 	if (!strncmp(file, cpu_prefix, strlen(cpu_prefix)) && oflag == O_RDONLY) {
 		return -1; // TODO
-	}
-
-	if (!strcmp(file, "/proc/cpuinfo") && oflag == O_RDONLY) {
-		return -1; // TODO
-	}
-
-	// page map
-	if (!strcmp(file, "/proc/self/pagemap") && oflag == O_RDONLY) {
-		return PAGEMAP_FD;
-	}
-
-	// all hugepages directory
-	if (!strcmp(file, "/sys/kernel/mm/hugepages") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
-		klee_assert(HUGEPAGES_DIR_READ_ENTRIES < 0 );
-		HUGEPAGES_DIR_READ_ENTRIES = 0;
-		return HUGEPAGES_DIR_FD;
-	}
-
-	// hugepages directory (but sometimes opened like a file)
-	if (!strcmp(file, "/dev/hugepages")) {
-		if (oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
-			klee_assert(HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES < 0);
-			HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES = 0;
-			return HUGEPAGES_MOUNTPOINT_DIR_FD;
-		}
-
-		if (oflag == O_RDONLY) {
-			return HUGEPAGES_MOUNTPOINT_FILE_FD;
-		}
-	}
-
-	// hugepage
-	if (!strcmp(file, "/dev/hugepages/rte") && oflag == (O_CREAT|O_RDWR)) {
-		return HUGEPAGE_FD;
-	}
-
-	// hugepage, another
-	if (!strcmp(file, "/dev/hugepages/rtemap_0") && oflag == (O_CREAT|O_RDWR)) {
-		return HUGEPAGE_ZERO_FD;
-	}
-
-	// hugepage info file
-	if (!strcmp(file, "/var/run/.rte_hugepage_info") && oflag == (O_CREAT|O_RDWR)) {
-		HUGEPAGE_INFO_SIZE = -1;
-		return HUGEPAGE_INFO_FD;
-	}
-
-	// NUMA map, unsupported for now
-	// TODO support it
-	if (!strcmp(file, "/proc/self/numa_maps") && oflag == O_RDONLY) {
-		return -1;
-	}
-
-	// bunch of zeroes
-	if (!strcmp(file, "/dev/zero") && oflag == O_RDONLY) {
-		return DEV_ZERO_FD;
-	}
-
-	// UIO device
-	if (!strcmp(file, "/dev/uio0") && oflag == O_RDWR) {
-		return DEV_UIO0_FD;
-	}
-
-	if (!strcmp(file, "/sys/class/uio/uio0/device/config") && oflag == O_RDWR) {
-		return DEV_UIO0_CONFIG_FD;
-	}
-
-	// known non-PCI files
-	for (int n = 0; n < sizeof(KNOWN_FILES)/sizeof(KNOWN_FILES[0]); n++) {
-		if (!KNOWN_FILES[n].pci && !strcmp(file, KNOWN_FILES[n].name)) {
-			klee_assert(KNOWN_FILES[n].pos < 0);
-			KNOWN_FILES[n].pos = 0;
-			return KNOWN_FILES[n].fd;
-		}
-	}
-
-	// PCI devices
-	if (!strcmp(file, "/sys/bus/pci/devices") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
-		klee_assert(PCI_DIR_READ_ENTRIES < 0);
-		PCI_DIR_READ_ENTRIES = 0;
-		return PCI_DIR_FD;
-	}
-
-	// PCI devices info
-	if (!strncmp(file, PCI_FILE_PREFIX, strlen(PCI_FILE_PREFIX))) {
-		int skip_len = strlen(PCI_FILE_PREFIX) // path suffix
-				+ strlen(PCI_DEVICE_NAMES[0]) // actual name
-				+ 1; // trailing slash
-		if (strlen(file) > skip_len) {
-			file += skip_len;
-
-			if (!strcmp(file, "uio") && oflag == (O_RDONLY|O_NDELAY|O_DIRECTORY)) {
-				klee_assert(PCI_UIO_DIR_READ_ENTRIES < 0);
-				PCI_UIO_DIR_READ_ENTRIES = 0;
-				return PCI_UIO_DIR_FD;
-			}
-
-			for (int n = 0; n < sizeof(KNOWN_FILES)/sizeof(KNOWN_FILES[0]); n++) {
-				if (KNOWN_FILES[n].pci && !strcmp(file, KNOWN_FILES[n].name)) {
-					klee_assert(KNOWN_FILES[n].pos < 0);
-					KNOWN_FILES[n].pos = 0;
-					return KNOWN_FILES[n].fd;
-				}
-			}
-		}
 	}
 
 for(int n = 0;n<strlen(file);n++){klee_print_expr("x", file[n]);}
@@ -358,42 +248,34 @@ for(int n = 0;n<strlen(file);n++){klee_print_expr("x", file[n]);}
 int
 fcntl(int fd, int cmd, ...)
 {
+	klee_assert(cmd == F_SETFD);
+
         va_list args;
         va_start(args, cmd);
-
-	klee_assert(cmd == F_SETFD);
 
 	int arg = va_arg(args, int);
 	klee_assert(arg == FD_CLOEXEC);
 
-	if (fd == HUGEPAGES_DIR_FD
-	 || fd == HUGEPAGES_MOUNTPOINT_DIR_FD
-	 || fd == PCI_DIR_FD
-	 || fd == PCI_UIO_DIR_FD) {
-		return 0;
-	}
+	klee_assert(FILES[fd].children != NULL);
 
-	klee_abort();
+	return 0;
 }
 
 int
 flock(int fd, int operation)
 {
-	if (fd == HUGEPAGES_MOUNTPOINT_FILE_FD) {
-		if (operation == LOCK_EX) {
-			klee_assert(!HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
-			HUGEPAGES_MOUNTPOINT_FILE_LOCKED = true;
-			return 0;
-		}
-		if (operation == LOCK_UN) {
-			klee_assert(HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
-			HUGEPAGES_MOUNTPOINT_FILE_LOCKED = false;
-			return 0;
-		}
+	klee_assert(FILES[fd].kind != KIND_NONE);
+
+	// We assign similar semantics to EX and SH since we're single-threaded
+	if ((operation & LOCK_EX) == LOCK_EX || (operation & LOCK_SH) == LOCK_SH) {
+		klee_assert(!FILES[fd].locked);
+		FILES[fd].locked = true;
+		return 0;
 	}
 
-	if ((fd == HUGEPAGE_FD || fd == HUGEPAGE_ZERO_FD) && operation == (LOCK_SH|LOCK_NB)) {
-		// OK, whatever, it's a shared lock
+	if ((operation & LOCK_UN) == LOCK_UN) {
+		klee_assert(FILES[fd].locked);
+		FILES[fd].locked = false;
 		return 0;
 	}
 
@@ -403,23 +285,21 @@ flock(int fd, int operation)
 int
 fstat(int fd, struct stat* buf)
 {
+	klee_assert(FILES[fd].kind == KIND_DIRECTORY);
+
 	memset(buf, 0, sizeof(struct stat));
 
-	if (fd == HUGEPAGES_DIR_FD
-	 || fd == HUGEPAGES_MOUNTPOINT_DIR_FD
-	 || fd == PCI_DIR_FD
-	 || fd == PCI_UIO_DIR_FD) {
-		return 0;
-	}
-
-	klee_abort();
+	return 0;
 }
 
 int
 ftruncate(int fd, off_t length)
 {
-	if (fd == HUGEPAGE_INFO_FD) {
-		HUGEPAGE_INFO_SIZE = length;
+	klee_assert(FILES[fd].kind == KIND_FILE);
+
+	if (FILES[fd].content == FILE_CONTENT_HPINFO) {
+		FILES[fd].content = (char*) malloc(length);
+		memset(FILES[fd].content, 0, length);
 
 		// On success, zero is returned. On error, -1 is returned, and errno is set appropriately.
 		// -- https://linux.die.net/man/2/ftruncate
@@ -432,7 +312,10 @@ ftruncate(int fd, off_t length)
 off_t
 lseek(int fd, off_t offset, int whence)
 {
-	if (fd == PAGEMAP_FD && whence == SEEK_SET) {
+	klee_assert(FILES[fd].kind == KIND_FILE);
+
+	if (FILES[fd].content == FILE_CONTENT_PAGEMAP) {
+		klee_assert(whence == SEEK_SET);
 		// We pretend the seek was successful - pagemap always returns the same value in our stub
 
 		// Upon successful completion, lseek() returns the resulting offset
@@ -448,14 +331,11 @@ lseek(int fd, off_t offset, int whence)
 ssize_t
 read(int fd, void *buf, size_t count)
 {
-	if (fd == CPU_ID_ZERO_FD && count == 1) {
-		if (CPU_ID_ZERO_FD_READ_BYTES == 0) {
-			*((char*) buf) = '0';
-			return 1;
-		}
-	}
+	klee_assert(FILES[fd].pos >= 0);
+	klee_assert(FILES[fd].kind == KIND_FILE);
 
-	if (fd == PAGEMAP_FD && count == 8) {
+	if (FILES[fd].content == FILE_CONTENT_PAGEMAP) {
+		klee_assert(count == 8);
 		// Read fake pagemap data
 		memset(buf, 0, count);
 
@@ -472,102 +352,28 @@ read(int fd, void *buf, size_t count)
 		return count;
 	}
 
-	if (count == 1) {
-		for (int n = 0; n < sizeof(KNOWN_FILES)/sizeof(KNOWN_FILES[0]); n++) {
-			if (fd == KNOWN_FILES[n].fd) {
-				if (KNOWN_FILES[n].pos == -1) {
-					klee_abort(); // not opened!
-				} else if (KNOWN_FILES[n].pos == -2) {
-					klee_abort(); // past EOF!
-				} else if (KNOWN_FILES[n].pos < strlen(KNOWN_FILES[n].content)) {
-					*((char*) buf) = KNOWN_FILES[n].content[KNOWN_FILES[n].pos];
-					KNOWN_FILES[n].pos++;
-					return 1;
-				} else {
-					KNOWN_FILES[n].pos = -2;
-					return 0;
-				}
-			}
-		}
+	klee_assert(count == 1);
+
+	if (FILES[fd].pos < strlen(FILES[fd].content)) {
+		*((char*) buf) = FILES[fd].content[FILES[fd].pos];
+		FILES[fd].pos++;
+		return 1;
 	}
 
-	// Not supported!
-	klee_abort();
+	FILES[fd].pos = POS_EOF;
+
+	return 0;
 }
 
 int
 close(int fd)
 {
-	// TODO: change FDs so they won't work any more unless re-opened - assume a single fd in flight at any time
+	klee_assert(FILES[fd].kind != KIND_NONE);
 
-	if (fd == CPU_ID_ZERO_FD) {
-//		CPU_ID_ZERO_FD = -1;
-		return 0;
-	}
+	FILES[fd].pos = POS_UNOPENED;
+	FILES[fd].kind = KIND_NONE;
 
-	if (fd == HUGEPAGES_DIR_FD) {
-		klee_assert(HUGEPAGES_DIR_READ_ENTRIES != -1);
-		HUGEPAGES_DIR_READ_ENTRIES = -1;
-		return 0;
-	}
-
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
-		klee_assert(HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES != -1);
-		HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES = -1;
-		return 0;
-	}
-
-	if (fd == HUGEPAGE_FD) {
-//		HUGEPAGE_FD = -1;
-		return 0;
-	}
-
-	if (fd == HUGEPAGE_ZERO_FD) {
-//		HUGEPAGE_ZERO_FD = -1;
-		return 0;
-	}
-
-	if (fd == HUGEPAGE_INFO_FD) {
-//		HUGEPAGE_INFO_FD = -1;
-		return 0;
-	}
-
-	if (fd == HUGEPAGES_MOUNTPOINT_FILE_FD) {
-		klee_assert(!HUGEPAGES_MOUNTPOINT_FILE_LOCKED);
-//		HUGEPAGES_MOUNTPOINT_FILE_FD = -1;
-		return 0;
-	}
-
-	if (fd == PAGEMAP_FD) {
-//		PAGEMAP_FD = -1;
-		return 0;
-	}
-
-	if (fd == DEV_ZERO_FD) {
-//		DEV_ZERO_FD = -1;
-		return 0;
-	}
-
-	if (fd == PCI_DIR_FD) {
-		klee_assert(PCI_DIR_READ_ENTRIES != -1);
-		PCI_DIR_READ_ENTRIES = -1;
-		return 0;
-	}
-
-	if (fd == PCI_UIO_DIR_FD) {
-		klee_assert(PCI_UIO_DIR_READ_ENTRIES != -1);
-		PCI_UIO_DIR_READ_ENTRIES = -1;
-		return 0;
-	}
-
-
-	for (int n = 0; n < sizeof(KNOWN_FILES)/sizeof(KNOWN_FILES[0]); n++) {
-		if (fd == KNOWN_FILES[n].fd) {
-			klee_assert(KNOWN_FILES[n].pos != -1);
-			KNOWN_FILES[n].pos = -1;
-			return 0;
-		}
-	}
+	return 0;
 
 	// Not supported!
 	klee_abort();
@@ -576,20 +382,13 @@ close(int fd)
 ssize_t
 readlink(const char* pathname, char* buf, size_t bufsiz)
 {
-	if (!strncmp(pathname, PCI_FILE_PREFIX, strlen(PCI_FILE_PREFIX))) {
-		int skip_len = strlen(PCI_FILE_PREFIX) // path suffix
-				+ strlen(PCI_DEVICE_NAMES[0]) // actual name
-				+ 1; // trailing slash
-                if (strlen(pathname) > skip_len) {
-			pathname += skip_len;
-			if (!strcmp(pathname, "driver")) {
-				// Dirname doesn't matter to DPDK, only filename
-				// TODO can we make it a symbol of sorts? what about returning -1?
-				const char* driver_path = "/drivers/igb_uio";
-				klee_assert(strlen(driver_path) < bufsiz);
-				strcpy(buf, driver_path);
-				return strlen(driver_path);
-			}
+	for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
+		if (FILES[n].name != NULL && !strcmp(pathname, FILES[n].name)) {
+			klee_assert(FILES[n].kind == KIND_LINK);
+			klee_assert(bufsiz > strlen(FILES[n].content));
+
+			strcpy(buf, FILES[n].content);
+			return strlen(FILES[n].content);
 		}
 	}
 
@@ -616,75 +415,23 @@ __getdents (int fd, char* buf, size_t nbytes)
 	memset(de, 0, len);
 	de->d_ino = 1; // just needs to be non-zero
 
-	if (fd == HUGEPAGES_DIR_FD) {
-		klee_assert(HUGEPAGES_DIR_READ_ENTRIES >= 0);
+	klee_assert(FILES[fd].kind == KIND_DIRECTORY);
+	klee_assert(FILES[fd].pos >= 0);
+	klee_assert(FILES[fd].pos <= FILES[fd].children_len);
 
-		if (HUGEPAGES_DIR_READ_ENTRIES == 1) {
-			HUGEPAGES_DIR_READ_ENTRIES = -2;
-			return 0;
-		}
-
-		const char* entry_name = "hugepages-2048kB";
-		strcpy(de->d_name, entry_name);
-		de->d_reclen = len; // strlen(de->d_name);
-
-		HUGEPAGES_DIR_READ_ENTRIES++;
-
-		return len;
+	if (FILES[fd].pos == FILES[fd].children_len) {
+		FILES[fd].pos = POS_EOF;
+		return 0;
 	}
 
-	if (fd == HUGEPAGES_MOUNTPOINT_DIR_FD) {
-		klee_assert(HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES >= 0);
+	int child_fd = FILES[fd].children[FILES[fd].pos];
+	strcpy(de->d_name, FILES[child_fd].name);
+	de->d_reclen = len; // should bestrlen(de->d_name)
+	de->d_type = FILES[child_fd].content == NULL ? DT_DIR : 0;
 
-		if (HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES == 1) {
-			HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES = -2;
-			return 0;
-		}
+	FILES[fd].pos++;
 
-		// Empty except for '.' (which DPDK relies on...)
-		de->d_name[0] = '.';
-		de->d_name[1] = '\0';
-		de->d_reclen = len; //1;
-
-		HUGEPAGES_MOUNTPOINT_DIR_READ_ENTRIES++;
-
-		return len;
-	}
-
-	if (fd == PCI_DIR_FD) {
-		klee_assert(PCI_DIR_READ_ENTRIES >= 0);
-
-		if (PCI_DIR_READ_ENTRIES >= PCI_DEVICES_COUNT) {
-			PCI_DIR_READ_ENTRIES = -2;
-			return 0;
-		}
-
-		strcpy(de->d_name, PCI_DEVICE_NAMES[PCI_DIR_READ_ENTRIES]);
-		de->d_reclen = len; //strlen(de->d_name);
-
-		PCI_DIR_READ_ENTRIES++;
-
-		return len;
-	}
-
-	if (fd == PCI_UIO_DIR_FD) {
-		klee_assert(PCI_UIO_DIR_READ_ENTRIES >= 0);
-
-		if (PCI_UIO_DIR_READ_ENTRIES > 0) {
-			PCI_UIO_DIR_READ_ENTRIES = -2;
-			return 0;
-		}
-
-		strcpy(de->d_name, "uio0");
-		de->d_reclen = len; // strlen(de->d_name);
-		de->d_type = DT_DIR; // it's a directory
-
-		PCI_UIO_DIR_READ_ENTRIES++;
-
-		return len;
-	}
-
-	klee_abort();
+	return len;
 }
 
 int
@@ -869,110 +616,62 @@ getpagesize(void)
 void*
 mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
+	klee_assert(FILES[fd].kind == KIND_FILE);
+
 	// http://man7.org/linux/man-pages/man2/mmap.2.html
 
-	if(fd == DEV_ZERO_FD) {
-		// Null address please, let's keep semantics easy to handle
+	// We don't really care about flags, since we're single-threaded
+
+	// addr must be NULL, unless we're mmapping hugepages
+	// TODO check the address somehow when it's a hugepage
+	const char* hugepages_prefix = "/dev/hugepages";
+	if (strncmp(FILES[fd].name, hugepages_prefix, strlen(hugepages_prefix))) {
 		klee_assert(addr == NULL);
+		klee_assert(length >= strlen(FILES[fd].content));
+	} else {
+		// if it's a hugepage, length is well-defined
+		klee_assert(length % (2048 * 1024) == 0);
+	}
 
-		// No offset plz
-		klee_assert(offset == 0);
+	// Offsets not supported
+	klee_assert(offset == 0);
 
-		// Easy flags
-		klee_assert((flags & MAP_PRIVATE) == MAP_PRIVATE);
+	// don't mmap too many times
+	klee_assert(FILES[fd].mmaps_len < sizeof(FILES[0].mmaps)/sizeof(FILES[0].mmaps[0]));
 
+	void* mem = malloc(length);
+	if ((prot & PROT_WRITE) != PROT_WRITE) {
 		// Read-only memory, we enforce even stronger semantics by disallowing reads with forbid_access
-		klee_assert((prot & PROT_READ) == PROT_READ);
-
-		// don't mmap twice
-		klee_assert(DEV_ZERO_MMAPPED_SIZE == -1);
-
-		DEV_ZERO_MMAPPED_SIZE = length;
-		DEV_ZERO_MMAPPED_MEM = malloc(DEV_ZERO_MMAPPED_SIZE);
-		memset(DEV_ZERO_MMAPPED_MEM, 0, DEV_ZERO_MMAPPED_SIZE);
-		klee_forbid_access(DEV_ZERO_MMAPPED_MEM, DEV_ZERO_MMAPPED_SIZE, "read-only mmapped memory");
-		return DEV_ZERO_MMAPPED_MEM;
+		klee_forbid_access(mem, length, "mmapped read-only memory");
 	}
 
-	if(fd == HUGEPAGE_FD || fd == HUGEPAGE_ZERO_FD) {
-		// We don't care about the address; TODO should we? maybe at least check it modulo the page size?
+	int m = FILES[fd].mmaps_len;
+	FILES[fd].mmaps[m].mem = mem;
+	FILES[fd].mmaps[m].mem_len = length;
+	FILES[fd].mmaps_len++;
 
-		// the hugepage is 2048kB
-		klee_assert(length == 2048 * 1024);
-
-		// We don't support any offset, either
-		klee_assert(offset == 0);
-
-		// R/W is easy to handle
-		klee_assert((prot & (PROT_READ|PROT_WRITE)) == (PROT_READ|PROT_WRITE));
-
-		// Hard to do proper semantics for these, but we're single-threaded, so...
-		klee_assert((flags & (MAP_SHARED|MAP_POPULATE)) == (MAP_SHARED|MAP_POPULATE));
-
-		for (int n = 0; n < HUGEPAGES_MMAP_COUNT; n++) {
-			if (HUGEPAGES_MMAPPED_SIZE[n] == -1) {
-				HUGEPAGES_MMAPPED_SIZE[n] = length;
-				HUGEPAGES_MMAPPED_MEM[n] = malloc(HUGEPAGES_MMAPPED_SIZE[n]);
-				memset(HUGEPAGES_MMAPPED_MEM[n], 0, HUGEPAGES_MMAPPED_SIZE[n]);
-				return HUGEPAGES_MMAPPED_MEM[n];
-			}
-		}
-
-		klee_abort(); // no available pages
-	}
-
-	if(fd == HUGEPAGE_INFO_FD) {
-		// Simple semantics: no addr, known length, no offset
-		klee_assert(addr == NULL);
-		klee_assert(length == HUGEPAGE_INFO_SIZE);
-		klee_assert(offset == 0);
-
-		// R/W is easy to handle
-		klee_assert((prot & (PROT_READ|PROT_WRITE)) == (PROT_READ|PROT_WRITE));
-
-		// Hard to do proper semantics for this, but we're single-threaded, so...
-		klee_assert((flags & MAP_SHARED) == MAP_SHARED);
-
-		// Single mmap at a time
-		klee_assert(HUGEPAGE_INFO_MMAPPED_MEM == NULL);
-
-		HUGEPAGE_INFO_MMAPPED_MEM = malloc(HUGEPAGE_INFO_SIZE);
-		memset(HUGEPAGE_INFO_MMAPPED_MEM, 0, HUGEPAGE_INFO_SIZE);
-		return HUGEPAGE_INFO_MMAPPED_MEM;
-	}
-
-	klee_abort();
+	return mem;
 }
 
 int
 munmap(void* addr, size_t length)
 {
-	if (addr == DEV_ZERO_MMAPPED_MEM && addr != NULL) {
-		klee_assert(length == DEV_ZERO_MMAPPED_SIZE);
+	// Upon successful completion, munmap() shall return 0; otherwise, it shall return -1 and set errno to indicate the error.
+	// -- https://linux.die.net/man/3/munmap
 
-		klee_allow_access(DEV_ZERO_MMAPPED_MEM, DEV_ZERO_MMAPPED_SIZE);
-		free(DEV_ZERO_MMAPPED_MEM);
-		DEV_ZERO_MMAPPED_SIZE = -1;
+	for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
+		for (int m = 0; m < FILES[n].mmaps_len; m++) {
+			if (FILES[n].mmaps[m].mem == addr) {
+				klee_assert(FILES[n].mmaps[m].mem_len == length);
 
-		// Upon successful completion, munmap() shall return 0; otherwise, it shall return -1 and set errno to indicate the error.
-		// -- https://linux.die.net/man/3/munmap
-		return 0;
-	}
+				free(FILES[n].mmaps[m].mem);
+				memset(&(FILES[n].mmaps[m]), 0, sizeof(struct stub_mmap));
 
+				FILES[n].mmaps_len--;
 
-	for (int n = 0; n < HUGEPAGES_MMAP_COUNT; n++) {
-		if (addr == HUGEPAGES_MMAPPED_MEM[n]) {
-			klee_assert(length == HUGEPAGES_MMAPPED_SIZE[n]);
-			HUGEPAGES_MMAPPED_SIZE[n] = -1;
-			free(HUGEPAGES_MMAPPED_MEM[n]);
-			return 0;
+				return 0;
+			}
 		}
-	}
-
-	if (addr == HUGEPAGE_INFO_MMAPPED_MEM) {
-		free(HUGEPAGE_INFO_MMAPPED_MEM);
-		HUGEPAGE_INFO_MMAPPED_MEM = NULL;
-		return 0;
 	}
 
 	klee_abort();
@@ -1069,8 +768,231 @@ stub_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact
 	return 0;
 }
 
+
+
 void
 stub_external_init(void)
 {
+	// Helper methods declarations
+	char* stub_pci_name(int index);
+	char* stub_pci_file(const char* device_name, const char* file_name);
+	char* stub_pci_addr(size_t addr);
+	int stub_add_file(char* name, char* content);
+	int stub_add_link(char* name, char* content);
+	int stub_add_folder_array(char* name, int children_len, int* children);
+	int stub_add_folder(char* name, int children_len, ...);
+
+
+	// Alias definitions
 	klee_alias_function("sigaction", "stub_sigaction");
+
+
+	// Files initialization
+	int f = 0;
+	memset(FILES, 0, sizeof(FILES));
+
+	// PCI-related files
+	int devices_count = sizeof(DEVICES)/sizeof(DEVICES[0]);
+	int* dev_folders = (int*) malloc(devices_count * sizeof(int));
+	for (int n = 0; n < devices_count; n++) {
+		char* dev = stub_pci_name(n);
+		size_t mem_len = 1 << 20; // 2^20 bytes
+		void* mem = malloc(mem_len);
+
+		struct stub_device stub_dev = {
+			.name = dev,
+			.mem = mem,
+			.mem_len = mem_len
+		};
+		DEVICES[n] = stub_dev;
+
+		// Basic files
+		int vendor_fd = stub_add_file(stub_pci_file(dev, "vendor"), "32902\n"); // ixgbe
+		int device_fd = stub_add_file(stub_pci_file(dev, "device"), "5546\n"); // ixgbe
+		int subvendor_fd = stub_add_file(stub_pci_file(dev, "subsystem_vendor"), "0\n"); // any
+		int subdevice_fd = stub_add_file(stub_pci_file(dev, "subsystem_device"), "0\n"); // any
+		int class_fd = stub_add_file(stub_pci_file(dev, "class"), "16777215\n"); // ixgbe
+		int maxvfs_fd = stub_add_file(stub_pci_file(dev, "max_vfs"), "0\n"); // no virtual functions
+		int numanode_fd = stub_add_file(stub_pci_file(dev, "numa_node"), "0\n"); // NUMA node 0
+
+		// Driver symlink
+		int driver_fd = stub_add_link(stub_pci_file(dev, "driver"), "/drivers/igb_uio");
+
+		// 'uio' folder, itself containing an empty folder 'uio0'
+		// One single entry, called uio0
+		int uio0_fd = stub_add_folder(stub_pci_file(dev, "uio/uio0"), 0);
+		int uio_fd = stub_add_folder(stub_pci_file(dev, "uio"), 1, uio0_fd);
+
+		// Resources file
+		// Multiple lines; each line has the format <start addr> <end addr> <flags>
+		// all of which are 64-bit numbers in hexadecimal notation (starting with 0x)
+		// Flag 0x200 is "memory", i.e. the addresses designate a DMA location
+		// DPDK interprets 6 lines max (PCI_MAX_RESOURCE)
+
+		// One single resource, rest are empty
+		char* resource_format =
+			"%s %s 0x0000000000000200\n"
+			"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+			"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+			"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+			"0x0000000000000000 0x0000000000000000 0x0000000000000000\n"
+			"0x0000000000000000 0x0000000000000000 0x0000000000000000\n";
+		char resource_content[1024];
+		snprintf(resource_content, sizeof(resource_content), resource_format,
+				stub_pci_addr((size_t) DEVICES[n].mem), stub_pci_addr((size_t) DEVICES[n].mem + DEVICES[n].mem_len));
+
+		int resource_fd = stub_add_file(stub_pci_file(dev, "resource"), strdup(resource_content));
+
+		dev_folders[n] = stub_add_folder(dev, 10,
+					vendor_fd, device_fd, subvendor_fd, subdevice_fd,
+					class_fd, maxvfs_fd, numanode_fd, driver_fd,
+					uio_fd, resource_fd);
+	}
+
+	stub_add_folder_array("/sys/bus/pci/devices", devices_count, dev_folders);
+
+
+	// Hugepages properties
+	int huge_res_fd = stub_add_file("/sys/kernel/mm/hugepages/hugepages-2048kB/resv_hugepages", "0\n"); // number of reserved hugepages
+	int huge_free_fd = stub_add_file("/sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages", "1\n"); // number of free hugepages
+	int huge_2048_fd = stub_add_folder("/sys/kernel/mm/hugepages/hugepages-2048kB", 2, huge_res_fd, huge_free_fd);
+	stub_add_folder("/sys/kernel/mm/hugepages", 1, huge_2048_fd);
+
+	// /sys stuff
+	// TODO: We pretend CPU 0 / NUMA node 0 exist, but what about others?
+	stub_add_file("/sys/devices/system/cpu/cpu0/topology/core_id", "0"); // CPU 0 is core ID 0
+	stub_add_folder("/sys/devices/system/node/node0/cpu0", 0);
+
+	// /proc stuff
+	stub_add_file("/proc/mounts", "hugetlbfs /dev/hugepages hugetlbfs rw,relatime 0 0\n"); // only hugepages, what DPDK cares about
+	stub_add_file("/proc/meminfo", "Hugepagesize:       2048 kB\n"); // only hugepages, what DPDK cares about
+	stub_add_file("/proc/self/pagemap", FILE_CONTENT_PAGEMAP);
+
+	// Hugepages folder (empty)
+	int dot_fd = stub_add_file(".", "");
+	stub_add_folder("/dev/hugepages", 1, dot_fd); // DPDK relies on there being at least 1 file in there
+
+	// HACK those two files exist but are not bound to their folder (defined above)...
+	stub_add_file("/dev/hugepages/rte", "");
+	stub_add_file("/dev/hugepages/rtemap_0", "");
+
+	// /var stuff
+	stub_add_file("/var/run/.rte_hugepage_info", FILE_CONTENT_HPINFO);
+
+	// UIO stuff
+	stub_add_file("/sys/class/uio/uio0/device/config", "");
+	stub_add_file("/dev/uio0", ""); // HACK as long as it's not used, we can pretend it's a file (it's a device...)
+
+	// Other devices
+	stub_add_file("/dev/zero", ""); // HACK as long as it's not read, we can pretend it doesn't contain anything
+}
+
+
+// Helper methods - not part of the external stubs
+char*
+stub_pci_name(int index)
+{
+	klee_assert(index >= 0 && index < 10); // simpler
+
+	char buffer[1024];
+	snprintf(buffer, sizeof(buffer), "0000:00:00.%d", index);
+	return strdup(buffer);
+}
+
+char*
+stub_pci_file(const char* device_name, const char* file_name) {
+	char buffer[1024];
+	snprintf(buffer, sizeof(buffer), "/sys/bus/pci/devices/%s/%s", device_name, file_name);
+	return strdup(buffer);
+}
+
+char*
+stub_pci_addr(size_t addr)
+{
+	char* buffer = "0x0000000000000000";
+	int pos = strlen(buffer) - 1;
+	while (addr > 0) {
+		size_t digit = addr % 16;
+		addr /= 16;
+
+		if (digit < 10) {
+			buffer[pos] = '0' + digit;
+		} else {
+			buffer[pos] = 'A' + (digit - 10);
+		}
+
+		pos--;
+	}
+
+	return strdup(buffer);
+}
+
+static int file_counter;
+int
+stub_add_file(char* name, char* content)
+{
+	struct stub_file file = {
+		.name = name,
+		.content = content,
+		.children = NULL,
+		.children_len = 0,
+		.pos = POS_UNOPENED,
+		.kind = KIND_NONE,
+		.locked = false,
+		.mmaps = NULL,
+		.mmaps_len = 0
+	};
+
+
+	int fd = file_counter;
+	file_counter++;
+
+	FILES[fd] = file;
+
+	return fd;
+}
+
+int
+stub_add_link(char* name, char* content)
+{
+	int fd = stub_add_file(name, content);
+	FILES[fd].kind = KIND_LINK;
+	return fd;
+}
+
+int
+stub_add_folder_array(char* name, int children_len, int* children)
+{
+        struct stub_file file = {
+		.name = name,
+		.content = NULL,
+		.children = children,
+		.children_len = children_len,
+		.pos = POS_UNOPENED,
+		.kind = KIND_NONE,
+		.locked = false,
+		.mmaps = NULL,
+		.mmaps_len = 0
+	};
+
+        int fd = file_counter;
+        file_counter++;
+
+	FILES[fd] = file;
+
+        return fd;
+}
+
+int
+stub_add_folder(char* name, int children_len, ...)
+{
+	va_list args;
+	va_start(args, children_len);
+
+	int* children = (int*) malloc(children_len * sizeof(int));
+	for (int n = 0; n < children_len; n++) {
+		children[n] = va_arg(args, int);
+	}
+
+	return stub_add_folder_array(name, children_len, children);
 }
