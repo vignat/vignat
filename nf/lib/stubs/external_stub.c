@@ -614,9 +614,18 @@ getpagesize(void)
 void*
 mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
+	// http://man7.org/linux/man-pages/man2/mmap.2.html
+
 	klee_assert(FILES[fd].kind == KIND_FILE);
 
-	// http://man7.org/linux/man-pages/man2/mmap.2.html
+	// First off, are we trying to mmap device memory?
+	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+		if ((void*) FILES[fd].content == DEVICES[n].mem) {
+			klee_assert(length == DEVICES[n].mem_len);
+
+			return DEVICES[n].mem;
+		}
+	}
 
 	// We don't really care about flags, since we're single-threaded
 
@@ -797,6 +806,7 @@ stub_external_init(void)
 		char* dev = stub_pci_name(n);
 		size_t mem_len = 1 << 20; // 2^20 bytes
 		void* mem = malloc(mem_len);
+		memset(mem, 0, mem_len);
 
 		struct stub_device stub_dev = {
 			.name = dev,
@@ -838,14 +848,17 @@ stub_external_init(void)
 			"0x0000000000000000 0x0000000000000000 0x0000000000000000\n";
 		char resource_content[1024];
 		snprintf(resource_content, sizeof(resource_content), resource_format,
-				stub_pci_addr((size_t) DEVICES[n].mem), stub_pci_addr((size_t) DEVICES[n].mem + DEVICES[n].mem_len));
+				stub_pci_addr((size_t) DEVICES[n].mem), stub_pci_addr((size_t) DEVICES[n].mem + DEVICES[n].mem_len - 1));
 
 		int resource_fd = stub_add_file(stub_pci_file(dev, "resource"), strdup(resource_content));
 
-		dev_folders[n] = stub_add_folder(stub_pci_folder(dev), 10,
+		// Since we say we have one resource, we need to create it...
+		int resource0_fd = stub_add_file(stub_pci_file(dev, "resource0"), (char*) DEVICES[n].mem);
+
+		dev_folders[n] = stub_add_folder(stub_pci_folder(dev), 11,
 					vendor_fd, device_fd, subvendor_fd, subdevice_fd,
 					class_fd, maxvfs_fd, numanode_fd, driver_fd,
-					uio_fd, resource_fd);
+					uio_fd, resource_fd, resource0_fd);
 	}
 
 	stub_add_folder_array("/sys/bus/pci/devices", devices_count, dev_folders);
