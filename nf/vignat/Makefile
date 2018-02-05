@@ -30,8 +30,8 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 verify:
 	rm -f *.bc # in case previous build failed after generating bc files
 	clang \
+		-D_GNU_SOURCE `# TODO find a way to remove this from here, not clean` \
 		-DKLEE_VERIFICATION `# for a few ifdefs` \
-		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
 		`# Include directories` \
 		-I . -I .. -I ../lib/stubs \
@@ -46,16 +46,16 @@ verify:
 		../lib/stubs/externals/*.c \
 		../lib/stubs/rte_stub.c \
 		../lib/stubs/time_stub.c \
-		`# NF stubs`
+		`# NF stubs` \
 		../lib/stubs/containers/double-chain-stub.c \
 		../lib/stubs/containers/double-map-stub.c \
 		../lib/stubs/containers/expirator-stub.c \
-		`# NAT-specific stubs
+		`# NAT-specific stubs` \
 		loop-stub.c \
-		`# NF base`
+		`# NF base` \
 		../nf_main.c \
 		../lib/nf_util.c \
-		`# NAT-specific`
+		`# NAT-specific` \
 		nat_forward_vignat.c \
 		../lib/nat_config.c \
 		flowtable.c flowmanager.c \

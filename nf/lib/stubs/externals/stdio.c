@@ -1,5 +1,9 @@
-#include <stdarg.h>
+// GNU_SOURCE for fopencookie (TODO define here, not on compile line)
+//#define _GNU_SOURCE
 #include <stdio.h>
+//#undef _GNU_SOURCE
+
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
