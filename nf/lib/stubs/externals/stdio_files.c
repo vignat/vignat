@@ -315,8 +315,6 @@ __getdents (int fd, char* buf, size_t nbytes)
 	}
 
 	int child_fd = FILES[fd].children[FILES[fd].pos];
-klee_print_expr("child_fd", child_fd);
-for(int n = 0;n<strlen(FILES[child_fd].path);n++){klee_print_expr("x", FILES[child_fd].path[n]);}
 	char* filename = strrchr(FILES[child_fd].path, '/') + 1;
 	strcpy(de->d_name, filename);
 	de->d_reclen = len; // should bestrlen(de->d_name)
@@ -379,6 +377,16 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 int
 munmap(void* addr, size_t length)
 {
+	// First off, are we trying to unmap device memory?
+	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+		if (addr == DEVICES[n].mem) {
+			klee_assert(length == DEVICES[n].mem_len);
+
+			// Do nothing - the memory still exists!
+			return 0;
+		}
+	}
+
 	// Upon successful completion, munmap() shall return 0; otherwise, it shall return -1 and set errno to indicate the error.
 	// -- https://linux.die.net/man/3/munmap
 
