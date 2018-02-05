@@ -31,7 +31,6 @@ static const int POS_UNOPENED = -1;
 static const int POS_EOF = -2;
 
 enum stub_file_kind {
-	KIND_NONE,
 	KIND_FILE,
 	KIND_DIRECTORY,
 	KIND_LINK
@@ -43,7 +42,9 @@ struct stub_mmap {
 };
 
 struct stub_file {
-	char* name;
+	// Folders MUST NOT have a trailing slash
+	// Unix-like multi-slash simplification (e.g. /a//b == /a/b) is NOT supported
+	char* path;
 
 	// Either: (file or symlink)
 	char* content;
@@ -51,10 +52,10 @@ struct stub_file {
 	int* children;
 	int children_len;
 
-	// In both cases, this keeps track of progress
+	// In the file and folder cases, this keeps track of progress
 	int pos;
 
-	// Files and folders are set to NONE until opened; directories can be opened as files
+	// Set at creation time
 	enum stub_file_kind kind;
 
 	// Support flock
@@ -173,7 +174,7 @@ access(const char* pathname, int mode)
 {
 	if (mode == F_OK) {
 		for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
-			if (FILES[n].name != NULL && !strcmp(pathname, FILES[n].name)) {
+			if (FILES[n].path != NULL && !strcmp(pathname, FILES[n].path)) {
 				return 0;
 			}
 		}
@@ -212,21 +213,10 @@ open(const char* file, int oflag, ...)
 	}
 
 	// Generic
+	enum stub_file_kind desired_kind = ((oflag & O_DIRECTORY) == O_DIRECTORY) ? KIND_DIRECTORY : KIND_FILE;
 	for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
-		if (!strcmp(file, FILES[n].name)) {
+		if (FILES[n].path != NULL && !strcmp(file, FILES[n].path) && FILES[n].kind == desired_kind) {
 			klee_assert(FILES[n].pos == POS_UNOPENED);
-
-			if ((oflag & O_DIRECTORY) == O_DIRECTORY) {
-				klee_assert(FILES[n].children != NULL);
-
-				FILES[n].kind = KIND_DIRECTORY;
-			} else {
-				if (FILES[n].children == NULL) {
-					FILES[n].kind = KIND_FILE;
-				} else {
-					FILES[n].kind = KIND_DIRECTORY;
-				}
-			}
 
 			FILES[n].pos = 0;
 
@@ -264,11 +254,11 @@ fcntl(int fd, int cmd, ...)
 int
 flock(int fd, int operation)
 {
-	klee_assert(FILES[fd].kind != KIND_NONE);
+	klee_assert(FILES[fd].pos != POS_UNOPENED);
 
 	// We assign similar semantics to EX and SH since we're single-threaded
 	if ((operation & LOCK_EX) == LOCK_EX || (operation & LOCK_SH) == LOCK_SH) {
-		klee_assert(!FILES[fd].locked);
+		// POSIX locks are re-entrant
 		FILES[fd].locked = true;
 		return 0;
 	}
@@ -285,6 +275,7 @@ flock(int fd, int operation)
 int
 fstat(int fd, struct stat* buf)
 {
+	klee_assert(FILES[fd].pos != POS_UNOPENED);
 	klee_assert(FILES[fd].kind == KIND_DIRECTORY);
 
 	memset(buf, 0, sizeof(struct stat));
@@ -295,6 +286,7 @@ fstat(int fd, struct stat* buf)
 int
 ftruncate(int fd, off_t length)
 {
+	klee_assert(FILES[fd].pos != POS_UNOPENED);
 	klee_assert(FILES[fd].kind == KIND_FILE);
 
 	if (FILES[fd].content == FILE_CONTENT_HPINFO) {
@@ -312,6 +304,7 @@ ftruncate(int fd, off_t length)
 off_t
 lseek(int fd, off_t offset, int whence)
 {
+	klee_assert(FILES[fd].pos != POS_UNOPENED);
 	klee_assert(FILES[fd].kind == KIND_FILE);
 
 	if (FILES[fd].content == FILE_CONTENT_PAGEMAP) {
@@ -331,7 +324,7 @@ lseek(int fd, off_t offset, int whence)
 ssize_t
 read(int fd, void *buf, size_t count)
 {
-	klee_assert(FILES[fd].pos >= 0);
+	klee_assert(FILES[fd].pos != POS_UNOPENED);
 	klee_assert(FILES[fd].kind == KIND_FILE);
 
 	if (FILES[fd].content == FILE_CONTENT_PAGEMAP) {
@@ -368,22 +361,24 @@ read(int fd, void *buf, size_t count)
 int
 close(int fd)
 {
-	klee_assert(FILES[fd].kind != KIND_NONE);
+	klee_assert(FILES[fd].pos != POS_UNOPENED);
 
 	FILES[fd].pos = POS_UNOPENED;
-	FILES[fd].kind = KIND_NONE;
+	FILES[fd].locked = false;
+
+	// We do not remove mmapings:
+	// "The mmap() function adds an extra reference to the file associated with the file descriptor fildes
+	//  which is not removed by a subsequent close() on that file descriptor. This reference is removed when there are no more mappings to the file."
+	// -- http://pubs.opengroup.org/onlinepubs/7908799/xsh/mmap.html
 
 	return 0;
-
-	// Not supported!
-	klee_abort();
 }
 
 ssize_t
 readlink(const char* pathname, char* buf, size_t bufsiz)
 {
 	for (int n = 0; n < sizeof(FILES)/sizeof(FILES[0]); n++) {
-		if (FILES[n].name != NULL && !strcmp(pathname, FILES[n].name)) {
+		if (FILES[n].path != NULL && !strcmp(pathname, FILES[n].path)) {
 			klee_assert(FILES[n].kind == KIND_LINK);
 			klee_assert(bufsiz > strlen(FILES[n].content));
 
@@ -425,7 +420,10 @@ __getdents (int fd, char* buf, size_t nbytes)
 	}
 
 	int child_fd = FILES[fd].children[FILES[fd].pos];
-	strcpy(de->d_name, FILES[child_fd].name);
+klee_print_expr("child_fd", child_fd);
+for(int n = 0;n<strlen(FILES[child_fd].path);n++){klee_print_expr("x", FILES[child_fd].path[n]);}
+	char* filename = strrchr(FILES[child_fd].path, '/') + 1;
+	strcpy(de->d_name, filename);
 	de->d_reclen = len; // should bestrlen(de->d_name)
 	de->d_type = FILES[child_fd].content == NULL ? DT_DIR : 0;
 
@@ -625,7 +623,7 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 	// addr must be NULL, unless we're mmapping hugepages
 	// TODO check the address somehow when it's a hugepage
 	const char* hugepages_prefix = "/dev/hugepages";
-	if (strncmp(FILES[fd].name, hugepages_prefix, strlen(hugepages_prefix))) {
+	if (strncmp(FILES[fd].path, hugepages_prefix, strlen(hugepages_prefix))) {
 		klee_assert(addr == NULL);
 		klee_assert(length >= strlen(FILES[fd].content));
 	} else {
@@ -776,11 +774,12 @@ stub_external_init(void)
 	// Helper methods declarations
 	char* stub_pci_name(int index);
 	char* stub_pci_file(const char* device_name, const char* file_name);
+	char* stub_pci_folder(const char* device_name);
 	char* stub_pci_addr(size_t addr);
-	int stub_add_file(char* name, char* content);
-	int stub_add_link(char* name, char* content);
-	int stub_add_folder_array(char* name, int children_len, int* children);
-	int stub_add_folder(char* name, int children_len, ...);
+	int stub_add_file(char* path, char* content);
+	int stub_add_link(char* path, char* content);
+	int stub_add_folder_array(char* path, int children_len, int* children);
+	int stub_add_folder(char* path, int children_len, ...);
 
 
 	// Alias definitions
@@ -843,7 +842,7 @@ stub_external_init(void)
 
 		int resource_fd = stub_add_file(stub_pci_file(dev, "resource"), strdup(resource_content));
 
-		dev_folders[n] = stub_add_folder(dev, 10,
+		dev_folders[n] = stub_add_folder(stub_pci_folder(dev), 10,
 					vendor_fd, device_fd, subvendor_fd, subdevice_fd,
 					class_fd, maxvfs_fd, numanode_fd, driver_fd,
 					uio_fd, resource_fd);
@@ -869,8 +868,11 @@ stub_external_init(void)
 	stub_add_file("/proc/self/pagemap", FILE_CONTENT_PAGEMAP);
 
 	// Hugepages folder (empty)
-	int dot_fd = stub_add_file(".", "");
+	int dot_fd = stub_add_file("./.", ""); // need a / in the name, see remark in stub_file
 	stub_add_folder("/dev/hugepages", 1, dot_fd); // DPDK relies on there being at least 1 file in there
+
+	// HACK this folder is opened as a file for locking and as a folder for enumerating...
+	stub_add_file("/dev/hugepages", "");
 
 	// HACK those two files exist but are not bound to their folder (defined above)...
 	stub_add_file("/dev/hugepages/rte", "");
@@ -907,6 +909,13 @@ stub_pci_file(const char* device_name, const char* file_name) {
 }
 
 char*
+stub_pci_folder(const char* device_name) {
+	char buffer[1024];
+	snprintf(buffer, sizeof(buffer), "/sys/bus/pci/devices/%s", device_name);
+	return strdup(buffer);
+}
+
+char*
 stub_pci_addr(size_t addr)
 {
 	char* buffer = "0x0000000000000000";
@@ -929,15 +938,15 @@ stub_pci_addr(size_t addr)
 
 static int file_counter;
 int
-stub_add_file(char* name, char* content)
+stub_add_file(char* path, char* content)
 {
 	struct stub_file file = {
-		.name = name,
+		.path = path,
 		.content = content,
 		.children = NULL,
 		.children_len = 0,
 		.pos = POS_UNOPENED,
-		.kind = KIND_NONE,
+		.kind = KIND_FILE,
 		.locked = false,
 		.mmaps = NULL,
 		.mmaps_len = 0
@@ -953,23 +962,23 @@ stub_add_file(char* name, char* content)
 }
 
 int
-stub_add_link(char* name, char* content)
+stub_add_link(char* path, char* content)
 {
-	int fd = stub_add_file(name, content);
+	int fd = stub_add_file(path, content);
 	FILES[fd].kind = KIND_LINK;
 	return fd;
 }
 
 int
-stub_add_folder_array(char* name, int children_len, int* children)
+stub_add_folder_array(char* path, int children_len, int* children)
 {
         struct stub_file file = {
-		.name = name,
+		.path = path,
 		.content = NULL,
 		.children = children,
 		.children_len = children_len,
 		.pos = POS_UNOPENED,
-		.kind = KIND_NONE,
+		.kind = KIND_DIRECTORY,
 		.locked = false,
 		.mmaps = NULL,
 		.mmaps_len = 0
@@ -984,7 +993,7 @@ stub_add_folder_array(char* name, int children_len, int* children)
 }
 
 int
-stub_add_folder(char* name, int children_len, ...)
+stub_add_folder(char* path, int children_len, ...)
 {
 	va_list args;
 	va_start(args, children_len);
@@ -994,5 +1003,5 @@ stub_add_folder(char* name, int children_len, ...)
 		children[n] = va_arg(args, int);
 	}
 
-	return stub_add_folder_array(name, children_len, children);
+	return stub_add_folder_array(path, children_len, children);
 }
