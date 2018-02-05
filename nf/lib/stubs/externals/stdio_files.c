@@ -11,6 +11,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "lib/stubs/hardware_stub.h"
+
 #include <klee/klee.h>
 
 // Globals
@@ -61,12 +63,6 @@ static char* FILE_CONTENT_PAGEMAP = (char*) -100;
 // Special case: the hugepage info file, which is truncated
 static char* FILE_CONTENT_HPINFO = (char*) -200;
 
-struct stub_device {
-	char* name;
-	void* mem;
-	size_t mem_len;
-};
-static struct stub_device DEVICES[2];
 
 int
 access(const char* pathname, int mode)
@@ -410,7 +406,6 @@ static void
 stub_stdio_files_init(void)
 {
 	// Helper methods declarations
-	char* stub_pci_name(int index);
 	char* stub_pci_file(const char* device_name, const char* file_name);
 	char* stub_pci_folder(const char* device_name);
 	char* stub_pci_addr(size_t addr);
@@ -428,17 +423,7 @@ stub_stdio_files_init(void)
 	int devices_count = sizeof(DEVICES)/sizeof(DEVICES[0]);
 	int* dev_folders = (int*) malloc(devices_count * sizeof(int));
 	for (int n = 0; n < devices_count; n++) {
-		char* dev = stub_pci_name(n);
-		size_t mem_len = 1 << 20; // 2^20 bytes
-		void* mem = malloc(mem_len);
-		memset(mem, 0, mem_len);
-
-		struct stub_device stub_dev = {
-			.name = dev,
-			.mem = mem,
-			.mem_len = mem_len
-		};
-		DEVICES[n] = stub_dev;
+		char* dev = DEVICES[n].name;
 
 		// Basic files
 		int vendor_fd = stub_add_file(stub_pci_file(dev, "vendor"), "32902\n"); // ixgbe
@@ -529,15 +514,6 @@ stub_stdio_files_init(void)
 
 
 // Helper methods - not part of the external stubs
-char*
-stub_pci_name(int index)
-{
-	klee_assert(index >= 0 && index < 10); // simpler
-
-	char buffer[1024];
-	snprintf(buffer, sizeof(buffer), "0000:00:00.%d", index);
-	return strdup(buffer);
-}
 
 char*
 stub_pci_file(const char* device_name, const char* file_name) {
