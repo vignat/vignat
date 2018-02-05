@@ -29,24 +29,38 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
 	rm -f *.bc # in case previous build failed after generating bc files
-	clang -DKLEE_VERIFICATION \
+	clang \
+		-DKLEE_VERIFICATION `# for a few ifdefs` \
 		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
+		`# Include directories` \
 		-I . -I .. -I ../lib/stubs \
 		-I $(KLEE_INCLUDE) \
 		-I $(RTE_SDK)/$(RTE_TARGET)/include \
 		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
-		--include=sse_stubs.h --include=builtin_stubs.h \
+		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
+		`# Special included files` \
+		--include=builtin_stub.h \
 		--include=rte_config.h `# required by many DPDK files` \
-		../lib/stubs/external_stub.c \
-		../lib/stubs/hardware_stub.c \
+		`# General stubs` \
+		../lib/stubs/externals/*.c \
 		../lib/stubs/rte_stub.c \
+		../lib/stubs/time_stub.c \
+		`# NF stubs`
+		../lib/stubs/containers/double-chain-stub.c \
+		../lib/stubs/containers/double-map-stub.c \
+		../lib/stubs/containers/expirator-stub.c \
+		`# NAT-specific stubs
+		loop-stub.c \
+		`# NF base`
 		../nf_main.c \
-		../lib/nf_util.c ../lib/nat_config.c \
-		../lib/stubs/my-time-stub.c \
-		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
-		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
-		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
+		../lib/nf_util.c \
+		`# NAT-specific`
+		nat_forward_vignat.c \
+		../lib/nat_config.c \
+		flowtable.c flowmanager.c \
+		../lib/flow.c ../lib/flow-log.c \
+		`# DPDK` \
 		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
 		$(RTE_SDK)/lib/librte_eal/common/*.c \
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
@@ -60,12 +74,10 @@ verify:
 		`# PCI driver support` \
 		$(RTE_SDK)/drivers/bus/pci/*.c \
 		$(RTE_SDK)/drivers/bus/pci/linux/*.c \
-		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
 		`# ixgbe driver (except bypass, SSE and ARM NEON stuff)` \
 		$(RTE_SDK)/drivers/net/ixgbe/!(ixgbe_bypass|ixgbe_82599_bypass|ixgbe_rxtx_vec_sse|ixgbe_rxtx_vec_neon).c \
 		$(RTE_SDK)/drivers/net/ixgbe/base/*.c \
-		`# VigNAT` \
-		nat_forward_vignat.c \
+		`# Compile flags` \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex

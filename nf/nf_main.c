@@ -1,9 +1,6 @@
 #ifdef KLEE_VERIFICATION
-#include "lib/stubs/external_stub.h"
-#include "lib/stubs/hardware_stub.h"
-#include "lib/stubs/rte_stub.h"
+#include "lib/stubs/time_stub_control.h"
 #include <klee/klee.h>
-#include "lib/stubs/my-time-stub-control.h"
 #endif
 
 #include <inttypes.h>
@@ -213,12 +210,6 @@ void flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
 int
 main(int argc, char* argv[])
 {
-#ifdef KLEE_VERIFICATION
-  stub_external_init();
-  stub_rte_init();
-  stub_hardware_init();
-#endif
-
   // Initialize the Environment Abstraction Layer (EAL)
   int ret = rte_eal_init(argc, argv);
   if (ret < 0) {
@@ -266,7 +257,7 @@ klee_print_expr("initing devices", 0);
       rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
     }
   }
-
+klee_print_expr("running",0);
   // Run!
   // ...in single-threaded mode, that is.
   lcore_main();

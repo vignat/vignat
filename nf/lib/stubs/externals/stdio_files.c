@@ -1,32 +1,20 @@
 #include <dirent.h>
 #include <endian.h>
 #include <fcntl.h>
-#include <fnmatch.h>
-#include <numa.h>
-#include <numaif.h>
-#include <pthread.h>
-#include <setjmp.h>
-#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <sys/types.h>
 
 #include <klee/klee.h>
 
 // Globals
 // TODO this is kind of hacky - we should have some kind of "symbol that is never equal to anything" for the FDs
-static bool NUMA_INITIALIZED = false;
-static bool NUMA_NODEMASK_CREATED = false;
-
 static const int POS_UNOPENED = -1;
 static const int POS_EOF = -2;
 
@@ -79,95 +67,6 @@ struct stub_device {
 	size_t mem_len;
 };
 static struct stub_device DEVICES[2];
-
-int
-snprintf(char* str, size_t size, const char* format, ...)
-{
-	va_list args;
-	va_start(args, format);
-
-	// Supports only %s and single-digit %u/%d/%x, and special-cased %.2x and %.4x for 0
-	size_t orig_size = size;
-	int len = strlen(format);
-	for (int f = 0; f < len; f++) {
-		if (format[f] == '%') {
-			klee_assert(f < len - 1);
-
-			f++;
-			if (format[f] == 's') {
-				char* arg = va_arg(args, char*);
-				int arg_len = strlen(arg);
-
-				klee_assert(size >= arg_len);
-
-				strcpy(str, arg);
-				str += arg_len;
-				size -= arg_len;
-			} else if (format[f] == 'u') {
-				unsigned arg = va_arg(args, unsigned);
-				if (arg > 10) {
-					return -1; // not supported! - TODO but dpdk needs it anyway, fix it...
-				}
-
-				klee_assert(size >= 1);
-
-				*str = '0';
-				for (int n = 0; n < arg; n++) {
-					*str = *str + 1;
-				}
-
-				str++;
-				size--;
-			} else if (format[f] == 'd' || format[f] == 'x') {
-				int arg = va_arg(args, int);
-				klee_assert(arg < 10); // we only support single digits (thus base doesn't matter)
-
-				klee_assert(size >= 1);
-
-				*str = '0';
-				for (int n = 0; n < arg; n++) {
-					*str = *str + 1;
-				}
-
-				str++;
-				size--;
-			} else if (f < len - 2 && format[f] == '.' && (format[f + 1] == '2' || format[f + 1] == '4') && format[f + 2] == 'x') {
-				int format_len = format[f + 1] == '2' ? 2 : 4;
-				f += 2;
-
-				int arg = va_arg(args, int);
-				klee_assert(arg == 0); // this is only used for PCI addresses
-
-				klee_assert(size >= format_len);
-
-				for (int n = 0; n < format_len; n++) {
-					*str = '0';
-					str++;
-					size--;
-				}
-			} else {
-				klee_abort(); // not supported!
-			}
-		} else {
-			if (size < 1) {
-				klee_abort(); // too small!
-			}
-
-			*str = format[f];
-			str++;
-			size--;
-		}
-	}
-
-	if (size < 1) {
-		klee_abort(); // too small!
-	}
-
-	*str = '\0';
-	// no size-- here, return value does not include null terminator
-
-	return orig_size - size;
-}
 
 int
 access(const char* pathname, int mode)
@@ -432,185 +331,6 @@ for(int n = 0;n<strlen(FILES[child_fd].path);n++){klee_print_expr("x", FILES[chi
 	return len;
 }
 
-int
-vfprintf(FILE* stream, const char* format, _G_va_list __arg)
-{
-	if (stream == stderr) {
-		return 0; // OK, whatever
-	}
-
-	// Not supported
-	klee_abort();
-}
-
-int
-vprintf(const char *format, va_list arg)
-{
-	return 0; // OK, whatever, we don't care about stdout
-}
-
-int
-fnmatch(const char *pattern, const char *string, int flags)
-{
-	if (!strcmp(pattern, "*map_*") && !strcmp(string, ".") && flags == 0) {
-		// Return value:
-		// Zero if string matches pattern, FNM_NOMATCH if there is no match or
-		// another nonzero value if there is an error.
-		// -- http://man7.org/linux/man-pages/man3/fnmatch.3.html
-		return FNM_NOMATCH;
-	}
-
-	klee_abort();
-}
-
-pthread_t
-pthread_self(void)
-{
-	// We are on CPU 0 - always
-	return 0;
-}
-
-int
-pthread_getaffinity_np(pthread_t thread, size_t cpusetsize, cpu_set_t* cpuset)
-{
-	// We're running in a symbolic executor. the concept of "affinity" is meaningless
-	int ret = klee_int("pthread_getaffinity_np_return");
-
-	// However, we might be given uninitialized memory, so we need to set it
-	if (ret >= 0) {
-		// TODO all bits should be symbols...
-		CPU_ZERO(cpuset);
-		CPU_SET(0, cpuset);
-	}
-
-	return ret;
-}
-
-int
-pthread_setaffinity_np(pthread_t thread, size_t cpusetsize, const cpu_set_t* cpuset)
-{
-	// Same remark as getaffinity
-	return klee_int("pthread_setaffinity_np_return");
-}
-
-int
-numa_available(void)
-{
-	// Before any other calls in this library can be used numa_available() must be called.
-	// If it returns -1, all other functions in this library are undefined.
-	NUMA_INITIALIZED = true;
-	return 0;
-}
-
-struct bitmask*
-numa_allocate_nodemask()
-{
-	klee_assert(NUMA_INITIALIZED);
-
-	klee_assert(!NUMA_NODEMASK_CREATED);
-	NUMA_NODEMASK_CREATED = true;
-
-	struct bitmask* mask = (struct bitmask*) malloc(sizeof(struct bitmask));
-	// The bitmask is zero-filled.
-	// -- https://linux.die.net/man/3/numa_alloc_onnode
-	memset(mask, 0, sizeof(struct bitmask));
-	return mask;
-}
-
-void
-numa_bitmask_free(struct bitmask *bmp)
-{
-	klee_assert(NUMA_INITIALIZED);
-
-	// It is an error to attempt to free this bitmask twice.
-	// --https://linux.die.net/man/3/numa_alloc_onnode
-	klee_assert(NUMA_NODEMASK_CREATED);
-	NUMA_NODEMASK_CREATED = false;
-
-	free(bmp);
-}
-
-long
-get_mempolicy(int *policy, const unsigned long* nmask,
-		unsigned long maxnode, void* addr, int flags)
-{
-	// http://man7.org/linux/man-pages/man2/get_mempolicy.2.html
-	if (flags == 0) {
-		// When flags is 0, addr must be specified as NULL.
-		klee_assert(addr == NULL);
-
-		// If flags is specified as 0, then information about the calling
-		// thread's default policy (as set by set_mempolicy(2)) is returned, in
-		// the buffers pointed to by mode and nodemask.  The value returned in
-		// these arguments may be used to restore the thread's policy to its
-		// state at the time of the call to get_mempolicy() using set_mempolicy(2).
-		*policy = 0;
-
-		// On success, get_mempolicy() returns 0; on error, -1 is returned and
-		// errno is set to indicate the error.
-		return 0;
-	}
-
-	klee_abort();
-}
-
-FILE*
-fopencookie(void* cookie, const char* mode, cookie_io_functions_t io_funcs)
-{
-	FILE* f = (FILE*) malloc(sizeof(FILE));;
-	klee_forbid_access(f, sizeof(FILE), "fopencookie");
-	return f;
-}
-
-int
-timerfd_create(int clockid, int flags)
-{
-	// OK, its usage implies timerfd_gettime/settime and we don't support those
-	// so we know the app doesn't actually need a timer
-	return 0;
-}
-
-int
-clock_gettime(clockid_t clk_id, struct timespec* tp)
-{
-	// Not supported!
-	return -1;
-}
-
-unsigned int
-sleep(unsigned int seconds)
-{
-	// Whatever, code shouldn't use sleep anyway
-	// If this exposes bugs, great!
-	return 0;
-}
-
-uid_t
-getuid(void)
-{
-	// No errors: "These functions are always successful." -- http://man7.org/linux/man-pages/man2/getuid.2.html
-	return 0; // We are root! well, we pretend to be, at least
-}
-
-long
-syscall(long number, ...)
-{
-	// 0 is a kernel thing, 1 is init, so let's say 2
-	if (number == SYS_gettid) {
-		return 2;
-	}
-
-	// Not supported!
-	klee_abort();
-}
-
-int
-getpagesize(void)
-{
-	//return klee_int("page_size"); // TODO - but it propagates a symbol in annoying places
-	return 4096;
-}
-
 void*
 mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
@@ -685,100 +405,9 @@ munmap(void* addr, size_t length)
 }
 
 
-
-// FIXME LLVM uses intrinsics for memmove so we can't use the uclibc one for some reason
-//       (i.e its declaration is not linked in with the rest like e.g. strcmp)
-//       so for now we just copy/paste it from uclibc...
-void*
-memmove(void* s1, const void* s2, size_t n)
-{
-        char* s = (char*) s1;
-        const char* p = (const char*) s2;
-
-        if (p >= s) {
-                while (n) {
-                        *s++ = *p++;
-                        --n;
-                }
-        } else {
-                while (n) {
-                        --n;
-                        s[n] = p[n];
-                }
-        }
-
-        return s1;
-}
-
-
-// We need __ctype_b_loc, but klee-uclibc doesn't give it to us unless we also enable other settings
-// (such as enabling stdio)
-// From the musl libc, Copyright © 2005-2014 Rich Felker, et al.
-// File src/ctype/__ctype_b_loc.c
-#if __BYTE_ORDER == __BIG_ENDIAN
-#define X(x) x
-#else
-#define X(x) (((x)/256 | (x)*256) % 65536)
-#endif
-static const unsigned short table[] = {
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),
-X(0x200),X(0x320),X(0x220),X(0x220),X(0x220),X(0x220),X(0x200),X(0x200),
-X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),
-X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),X(0x200),
-X(0x160),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),
-X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),
-X(0x8d8),X(0x8d8),X(0x8d8),X(0x8d8),X(0x8d8),X(0x8d8),X(0x8d8),X(0x8d8),
-X(0x8d8),X(0x8d8),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),
-X(0x4c0),X(0x8d5),X(0x8d5),X(0x8d5),X(0x8d5),X(0x8d5),X(0x8d5),X(0x8c5),
-X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),
-X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),X(0x8c5),
-X(0x8c5),X(0x8c5),X(0x8c5),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),
-X(0x4c0),X(0x8d6),X(0x8d6),X(0x8d6),X(0x8d6),X(0x8d6),X(0x8d6),X(0x8c6),
-X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),
-X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),X(0x8c6),
-X(0x8c6),X(0x8c6),X(0x8c6),X(0x4c0),X(0x4c0),X(0x4c0),X(0x4c0),X(0x200),
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-};
-#undef X
-static const unsigned short* const ptable = table+128;
-const unsigned short** __ctype_b_loc(void)
-{
-	return (void*) &ptable;
-}
-
-
-int
-sigsetjmp(sigjmp_buf env, int savesigs)
-{
-	// We don't support longjmp, so nothing to do here
-
-	// setjmp() and sigsetjmp() return 0 if returning directly, and nonzero when returning from longjmp(3) or siglongjmp(3) using the saved context.
-	// -- https://linux.die.net/man/3/sigsetjmp
-	return 0;
-}
-
-// sigaction is implemented in klee-uclibc as a forward to a syscall, but it's easier to stub it directly
-int
-stub_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
-{
-	// Signals aren't supported, just return success
-
-	// sigaction() returns 0 on success; on error, -1 is returned, and errno is set to indicate the error.
-	// -- http://man7.org/linux/man-pages/man2/sigaction.2.html
-	return 0;
-}
-
-
-
-void
-stub_external_init(void)
+__attribute__((constructor))
+static void
+stub_stdio_files_init(void)
 {
 	// Helper methods declarations
 	char* stub_pci_name(int index);
@@ -789,10 +418,6 @@ stub_external_init(void)
 	int stub_add_link(char* path, char* content);
 	int stub_add_folder_array(char* path, int children_len, int* children);
 	int stub_add_folder(char* path, int children_len, ...);
-
-
-	// Alias definitions
-	klee_alias_function("sigaction", "stub_sigaction");
 
 
 	// Files initialization

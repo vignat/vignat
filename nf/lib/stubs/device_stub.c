@@ -604,8 +604,9 @@ stub_driver_remove(struct rte_vdev_device* vdev)
 }
 
 
-
-void
+// First part of init
+__attribute__((constructor))
+static void
 stub_device_init(void)
 {
 	// Trace the packet free; need a regex to alias the duplicated functions
@@ -628,6 +629,7 @@ stub_device_init(void)
 	}
 }
 
+// Second part of init, after DPDK EAL init
 void
 stub_device_attach(void)
 {

@@ -4,7 +4,7 @@
 #include "lib/stubs/containers/double-chain-stub-control.h"
 #include "lib/stubs/containers/map-stub-control.h"
 #include "lib/stubs/containers/vector-stub-control.h"
-#include "lib/stubs/my-time-stub-control.h"
+#include "lib/stubs/time_stub_control.h"
 
 
 

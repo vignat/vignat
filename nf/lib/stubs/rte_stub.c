@@ -44,7 +44,8 @@ stub_abort(void)
 }
 
 
-void
+__attribute__((constructor))
+static void
 stub_rte_init(void)
 {
 	// rte_memcpy uses fancy-schmancy intrinsics
