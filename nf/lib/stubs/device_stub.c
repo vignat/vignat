@@ -226,62 +226,41 @@ stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		memcpy((char*) bufs[i] + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
 		free(buf_content_symbol);
 
-		// Keep concrete values for what a driver guarantees
-		// (assignments are in the same order as the rte_mbuf declaration)
-
-		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
-
-		bufs[i]->buf_iova = rte_mempool_virt2iova(bufs[i]) + mbuf_size;
-
-		// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
-		// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
-		bufs[i]->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
-
-		bufs[i]->refcnt = 1;
-
-		bufs[i]->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
-
-		bufs[i]->port = stub_q->port_id;
-
-		bufs[i]->ol_flags = 0;
-
-		// packet_type is symbolic
-
-		bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
-
-		bufs[i]->data_len = sizeof(struct stub_mbuf_content); // TODO ideally those should be symbolic...
-
-		// vlan_tci is symbolic
-
-		// hash is symbolic
-
-		// vlan_tci_outer is symbolic
-
-		bufs[i]->buf_len = (uint16_t) buf_len;
-
-		// timestamp is symbolic
-
-		bufs[i]->userdata = NULL;
-
-		bufs[i]->pool = stub_q->mb_pool;
-
 		// We do not support chained mbufs for now, make sure the NF doesn't touch them
 		struct rte_mbuf* buf_next = (struct rte_mbuf*) malloc(stub_q->mb_pool->elt_size);
                 if (buf_next == NULL) {
                         rte_pktmbuf_free(bufs[i]);
                         break;
                 }
+		klee_forbid_access(buf_next, stub_q->mb_pool->elt_size, "buf_next");
+
+		// Keep concrete values for what a driver guarantees
+		// (assignments are in the same order as the rte_mbuf declaration)
+
+		bufs[i]->buf_addr = (char*) bufs[i] + mbuf_size;
+		bufs[i]->buf_iova = rte_mempool_virt2iova(bufs[i]) + mbuf_size;
+		// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
+		// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
+		bufs[i]->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
+		bufs[i]->refcnt = 1;
+		bufs[i]->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
+		bufs[i]->port = stub_q->port_id;
+		bufs[i]->ol_flags = 0;
+		// packet_type is symbolic
+		bufs[i]->pkt_len = sizeof(struct stub_mbuf_content);
+		bufs[i]->data_len = sizeof(struct stub_mbuf_content); // TODO ideally those should be symbolic...
+		// vlan_tci is symbolic
+		// hash is symbolic
+		// vlan_tci_outer is symbolic
+		bufs[i]->buf_len = (uint16_t) buf_len;
+		// timestamp is symbolic
+		bufs[i]->userdata = NULL;
+		bufs[i]->pool = stub_q->mb_pool;
 		bufs[i]->next = buf_next;
-		klee_forbid_access(bufs[i]->next, stub_q->mb_pool->elt_size, "buf_next");
-
 		// tx_offload is symbolic
-
 		bufs[i]->priv_size = priv_size;
-
 		// timesync is symbolic
-
 		// seqn is symbolic
-
 
 		rte_mbuf_sanity_check(bufs[i], 1 /* is head mbuf */);
 
