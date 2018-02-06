@@ -1,5 +1,6 @@
 #include "nf_time.h"
 
+#undef time_t // catch potential mismatch
 #include <time.h>
 
 time_t current_time(void)
