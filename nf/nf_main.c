@@ -1,5 +1,6 @@
 #ifdef KLEE_VERIFICATION
 #include "lib/stubs/time_stub_control.h"
+#include "lib/stubs/driver_stub.h"
 #include <klee/klee.h>
 #endif
 
@@ -218,9 +219,8 @@ main(int argc, char* argv[])
   argc -= ret;
   argv += ret;
 
-#ifdef KLEE_VERIFICATION
-klee_print_expr("after eal init", 0);
-//  stub_device_attach();
+#if defined(KLEE_VERIFICATION) && !defined(ENABLE_HARDWARE_STUBS)
+  stub_driver_attach();
 #endif
 
   nf_config_init(argc, argv);
@@ -228,7 +228,7 @@ klee_print_expr("after eal init", 0);
 #ifndef KLEE_VERIFICATION
   nf_print_config();
 #endif
-klee_print_expr("creating mempool", 0);
+
   // Create a memory pool
   unsigned nb_devices = rte_eth_dev_count();
   struct rte_mempool* mbuf_pool = rte_pktmbuf_pool_create(
@@ -248,7 +248,7 @@ klee_print_expr("creating mempool", 0);
   // Create another pool for the flood() cloning
   init_clone_pool();
 #endif
-klee_print_expr("initing devices", 0);
+
   // Initialize all devices
   for (uint8_t device = 0; device < nb_devices; device++) {
     if (nf_init_device(device, mbuf_pool) == 0) {
@@ -257,7 +257,7 @@ klee_print_expr("initing devices", 0);
       rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
     }
   }
-klee_print_expr("running",0);
+
   // Run!
   // ...in single-threaded mode, that is.
   lcore_main();

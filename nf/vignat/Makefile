@@ -32,6 +32,7 @@ verify:
 	clang \
 		-D_GNU_SOURCE `# TODO find a way to remove this from here, not clean` \
 		-DKLEE_VERIFICATION `# for a few ifdefs` \
+		`#-DENABLE_HARDWARE_STUBS to enable hardware stubs instead of using driver stubs` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
 		`# Include directories` \
 		-I . -I .. \
@@ -45,6 +46,7 @@ verify:
 		--include=rte_config.h `# required by many DPDK files` \
 		`# General stubs` \
 		../lib/stubs/externals/*.c \
+		../lib/stubs/driver_stub.c \
 		../lib/stubs/hardware_stub.c \
 		../lib/stubs/rte_stub.c \
 		../lib/stubs/time_stub.c \
@@ -72,6 +74,8 @@ verify:
 		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
 		`# Stacks for mempool` \
 		$(RTE_SDK)/drivers/mempool/stack/*.c \
+		`# Virtual devices support` \
+		$(RTE_SDK)/drivers/bus/vdev/*.c \
 		`# PCI driver support` \
 		$(RTE_SDK)/drivers/bus/pci/*.c \
 		$(RTE_SDK)/drivers/bus/pci/linux/*.c \
