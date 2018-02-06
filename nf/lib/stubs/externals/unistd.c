@@ -40,21 +40,12 @@ getpagesize(void)
 	return 4096;
 }
 
-// sigaction is implemented in klee-uclibc as a forward to a syscall, but it's easier to stub it directly
 int
-stub_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
-{
-	// Signals aren't supported, just return success
+__syscall_rt_sigaction(int signum, const struct sigaction *act,
+			struct sigaction *oldact, size_t _something) {
+	// We don't support signals, so no need to do anything
 
 	// sigaction() returns 0 on success; on error, -1 is returned, and errno is set to indicate the error.
 	// -- http://man7.org/linux/man-pages/man2/sigaction.2.html
 	return 0;
-}
-
-
-__attribute__((constructor))
-static void
-stub_unistd_init(void)
-{
-	klee_alias_function("sigaction", "stub_sigaction");
 }
