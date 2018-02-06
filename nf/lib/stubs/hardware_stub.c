@@ -10,10 +10,40 @@
 #include <klee/klee.h>
 
 
+// All citations here refer to https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
+
+
 static void
 stub_delay_us(unsigned int us)
 {
 klee_print_expr("DELAY", us);
+}
+
+static void
+stub_memory_init(void* mem)
+{
+	// page 552
+	// EEPROM/Flash Control Register — EEC (0x10010; RW)
+	// 0: Clock input (0 - not enabled)
+	// 1: Chip select (0 - not enabled)
+	// 2: Data input (0 - not enabled)
+	// 3: Data output (X - don't care)
+	// 4-5: Flash Write Enable Control (11 - not allowed)
+	// 6: Request EEPROM Access (0 - not enabled)
+	// 7: Grant EEPROM Access (0 - not enabled)
+	// 8: EEPROM Present (1 - present, correct signature)
+	// 9: EEPROM Auto-Read Done (1 - done, since we fake hardware...)
+	// 10: Reservee (1 - Reserved)
+	// 11-14: EEPROM Size (0100 - Default)
+	// 15: PCIe Analog Done (0 - not done)
+	// 16: PCIe Core Done (0 - not done)
+	// 17: PCIe General Done (0 - not done)
+	// 18: PCIe Function Done (0 - not done)
+	// 19: Core Done (0 - not done)
+	// 20: Core CSR Done (0 - not done)
+	// 21: MAC Done (0 - not done)
+	// 22-31: Reserved (0x0 - reads as 0b)
+	((uint32_t*) mem)[0x10010] = 0b00000000000000000001011100110000;
 }
 
 
@@ -27,7 +57,7 @@ stub_hardware_init(void)
 	// Device initialization
 	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
 		char* dev = stub_pci_name(n);
-		size_t mem_len = 1 << 20; // 2^20 bytes
+		size_t mem_len = 1 << 20; // 2^20 bytes - should be enough
 		void* mem = malloc(mem_len);
 		memset(mem, 0, mem_len);
 
@@ -39,6 +69,8 @@ klee_print_expr("DEVICE", n);klee_print_expr("start",mem);
 			.mem_len = mem_len
 		};
 		DEVICES[n] = stub_dev;
+
+		stub_memory_init(mem);
 	}
 
 	// DPDK "delay" method override
