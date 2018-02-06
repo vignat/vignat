@@ -208,7 +208,7 @@ main(int argc, char* argv[])
   argv += ret;
 
   // Attach stub driver if needed (note that hardware stub is autodetected, no need to attach)
-#if defined(KLEE_VERIFICATION) && !defined(ENABLE_HARDWARE_STUBS)
+#if defined(KLEE_VERIFICATION) && !defined(ENABLE_HARDWARE_STUB)
   stub_driver_attach();
 #endif
 
