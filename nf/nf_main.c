@@ -224,10 +224,7 @@ main(int argc, char* argv[])
 #endif
 
   nf_config_init(argc, argv);
-
-#ifndef KLEE_VERIFICATION
   nf_print_config();
-#endif
 
   // Create a memory pool
   unsigned nb_devices = rte_eth_dev_count();
