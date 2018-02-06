@@ -112,7 +112,8 @@ int expire_flows(time_t time) {
   // extend our time_t value in 128 bits, which would confuse the validator.
   // So we "prove" by hand that it's OK...
   if (time < 0) return 0; // we don't support the past
-  uint64_t time_u = (uint64_t) time; // OK because time > 0
+  assert(sizeof(time_t) <= sizeof(uint64_t));
+  uint64_t time_u = (uint64_t) time; // OK since assert above passed and time > 0
   uint64_t last_time_u = time_u - expiration_time; // OK because time >= expiration_time >= 0
   assert(sizeof(uint64_t) <= sizeof(time_t));
   time_t last_time = (time_t) last_time_u; // OK since the assert above passed
