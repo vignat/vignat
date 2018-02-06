@@ -24,5 +24,5 @@ clean:
 	find -iname '*.log' -delete
 	rm -f validator.byte
 
-nat: clean
+validate-nat: clean
 	./test_all.sh ../nf/vignat/klee-last out ../nf nat_fspec.cmo

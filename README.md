@@ -31,7 +31,7 @@ $ make verify
 
 # Verify the traces
 $ cd ../../validator
-$ make nat
+$ make validate-nat
 ```
 
 
