@@ -19,11 +19,31 @@ stub_delay_us(unsigned int us)
 klee_print_expr("DELAY", us);
 }
 
+// TODO some check at each delay that read-only bits are not changed
+
 static void
-stub_memory_init(void* mem)
+stub_memory_init(char* mem)
 {
+#define SET(addr, val) do { klee_print_expr("setting", ((uint32_t*) (mem + addr))); *((uint32_t*) (mem + addr)) = val; } while(0);
+
+	// page 544
+	// Device Status Register — STATUS (0x00008; RO)
+
+	// 0-1: Reserved (00)
+	// 2-3: Lan ID (00 - Lan 0 / 01 - Lan 1)
+	// 4-6: Reserved (00)
+	// 7: Linkup Status Indication (0 - ???)
+	// 8-9: Reserved (00)
+	// 10-17: Num VFs (0 - no VFs; note: "Bit 17 is always 0b")
+	// 18: IO Active (0 - not active; note: "reflects the value of the VF Enable (VFE) bit in the IOV Control/Status register")
+	// 19: Status (0 - not issuing any master requests)
+	// 20-31: Reserved (0x00)
+	SET(0x00008, 0b00000000000000000000000000000000);
+
+
 	// page 552
 	// EEPROM/Flash Control Register — EEC (0x10010; RW)
+
 	// 0: Clock input (0 - not enabled)
 	// 1: Chip select (0 - not enabled)
 	// 2: Data input (0 - not enabled)
@@ -42,8 +62,45 @@ stub_memory_init(void* mem)
 	// 19: Core Done (0 - not done)
 	// 20: Core CSR Done (0 - not done)
 	// 21: MAC Done (0 - not done)
-	// 22-31: Reserved (0x0 - reads as 0b)
-	((uint32_t*) mem)[0x10010] = 0b00000000000000000001011100110000;
+	// 22-31: Reserved (0x0)
+	SET(0x10010, 0b00000000000000000001011100110000);
+
+
+	// page 565
+	// Function Active and Power State to Manageability — FACTPS (0x10150; RO)
+
+	// 0-1: Power state indication of function 0 (00 - DR)
+	// 2: Lan 0 Enable (1 - enabled)
+	// 3: Function 0 Auxiliary Power PM Enable (0 - ???)
+	// 4-5: Reserved (00)
+	// 6-7: Power state indication of function 1 (00 - disabled)
+	// 8: Lan 1 Enable (0 - disabled)
+	// 9: Function 1 Auxiliary Power PM Enable (0 - disabled)
+	// 10-28: Reserved (0x0)
+	// 29: Manageability Clock Gated (0 - not gated)
+	// 30: LAN Function Sel (0 - not inverted) TODO enable
+	// 31: PM State Changed (0 - not changed)
+	SET(0x10150, 0b00000000000000000000000000000100);
+
+
+	// pages 567-568
+	// Firmware Semaphore Register — FWSM (0x10148; RW)
+	// "This register should be written only by the manageability firmware.
+	//  The device driver should only read this register."
+
+	// 0: Firmware semaphore (0 - not accessing)
+	// 1-3: Firmware mode (000 - none, manageability off)
+	// 4-5: Reserved (00)
+	// 6: EEPROM Reloaded Indication (1 - has been reloaded)
+	// 7-14: Reserved (0x0)
+	// 15: Firmware Valid Bit (1 - ready, boot has finished) TODO make it 0
+	// 16-18: Reset Counter (000 - not reset)
+	// 19-24: External Error Indication (0x00 - No error)
+	// 25: PCIe Configuration Error Indication (0 - no error)
+	// 26: PHY/SERDES0 Configuration Error Indication (0 - no error, LAN0 is fine)
+	// 27: PHY/SERDES1 Configuration Error Indication (0 - no error, LAN1 is fine)
+	// 28-31: Reserved (0000)
+	SET(0x10148, 0b00000000000000001000000001000000);
 }
 
 
