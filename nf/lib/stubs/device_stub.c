@@ -17,8 +17,8 @@
 
 
 // Constant stuff
-#define STUB_DEVICE_COUNT 2 // more devices = lots more paths in the NF
-static const char* stub_device_names[] = { "stub0", "stub1" }; // don't rely on snprintf
+static const int STUB_DEVICE_COUNT = 2; // more devices = lots more paths in the NF
+static const char* stub_device_names[STUB_DEVICE_COUNT] = { "stub0", "stub1" }; // don't rely on snprintf
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
