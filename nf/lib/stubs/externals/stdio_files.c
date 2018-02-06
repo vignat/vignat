@@ -361,6 +361,7 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 	klee_assert(FILES[fd].mmaps_len < sizeof(FILES[0].mmaps)/sizeof(FILES[0].mmaps[0]));
 
 	void* mem = malloc(length);
+	memset(mem, 0, length);
 	if ((prot & PROT_WRITE) != PROT_WRITE) {
 		// Read-only memory, we enforce even stronger semantics by disallowing reads with forbid_access
 		klee_forbid_access(mem, length, "mmapped read-only memory");

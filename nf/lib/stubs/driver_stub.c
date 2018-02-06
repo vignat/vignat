@@ -431,22 +431,7 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 static void
 stub_queue_release(void *queue)
 {
-	// Queues' creation and deletion is somewhat counter-intuitive.
-	//
-	// Drivers can say how many RX/TX queues they support per device;
-	// then, they have to initialize their devices' queues arrays to NULL,
-	// and the arrays are malloc'ed by DPDK when the app initializes the device,
-	// at which point DPDK also sets the "nb_rx/tx_queues" fields.
-	//
-	// However, queues aren't created until the app creates them;
-	// and if some part of the initialization fails, DPDK will request
-	// the deletion of all queues, even those who haven't been initialized yet.
-	//
-	// Thus, the queue "release" method can be given uninitialized memory,
-	// i.e. a pointer that could be null, could point to nowhere, etc.
-	if (queue == NULL) {
-		return;
-	}
+	klee_assert(queue != NULL);
 
 	struct stub_queue* stub_queue = queue;
 

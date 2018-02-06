@@ -43,3 +43,27 @@ index 4d7dbac..bcca599 100644
  		RTE_LOG(ERR, EAL, "Invalid char, '%%', in --"OPT_FILE_PREFIX" "
  			"option\n");
  		return -1;
+diff --git a/lib/librte_ether/rte_ethdev.c b/lib/librte_ether/rte_ethdev.c
+index 318af28..02b8ad8 100644
+--- a/lib/librte_ether/rte_ethdev.c
++++ b/lib/librte_ether/rte_ethdev.c
+@@ -485,7 +485,8 @@ rte_eth_dev_rx_queue_config(struct rte_eth_dev *dev, uint16_t nb_queues)
+ 		rxq = dev->data->rx_queues;
+ 
+ 		for (i = nb_queues; i < old_nb_queues; i++)
+-			(*dev->dev_ops->rx_queue_release)(rxq[i]);
++			if (rxq[i] != NULL)
++				(*dev->dev_ops->rx_queue_release)(rxq[i]);
+ 
+ 		rte_free(dev->data->rx_queues);
+ 		dev->data->rx_queues = NULL;
+@@ -639,7 +640,8 @@ rte_eth_dev_tx_queue_config(struct rte_eth_dev *dev, uint16_t nb_queues)
+ 		txq = dev->data->tx_queues;
+ 
+ 		for (i = nb_queues; i < old_nb_queues; i++)
+-			(*dev->dev_ops->tx_queue_release)(txq[i]);
++			if (txq[i] != NULL)
++				(*dev->dev_ops->tx_queue_release)(txq[i]);
+ 
+ 		rte_free(dev->data->tx_queues);
+ 		dev->data->tx_queues = NULL;
