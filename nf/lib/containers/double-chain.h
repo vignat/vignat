@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "lib/nf_time.h"
+
 //@ #include <listex.gh>
 //@ #include "stdex.gh"
 
@@ -11,8 +13,6 @@ struct DoubleChain;
    32 bit address space. @*/
 #define IRANG_LIMIT (1048576)
 
-// from nf_time - not sure this file should depend on it...
-#define time_t int64_t
 // kinda hacky, but makes the proof independent of time_t... sort of
 #define malloc_block_time malloc_block_llongs
 #define time_integer llong_integer
