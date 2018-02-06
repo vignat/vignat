@@ -34,13 +34,14 @@ verify:
 		-DKLEE_VERIFICATION `# for a few ifdefs` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
 		`# Include directories` \
-		-I . -I .. -I ../lib/stubs \
+		-I . -I .. \
 		-I $(KLEE_INCLUDE) \
 		-I $(RTE_SDK)/$(RTE_TARGET)/include \
+		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
 		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
 		`# Special included files` \
-		--include=builtin_stub.h \
+		--include=lib/stubs/builtin_stub.h `# compiler builtin stubs` \
 		--include=rte_config.h `# required by many DPDK files` \
 		`# General stubs` \
 		../lib/stubs/externals/*.c \
@@ -58,13 +59,12 @@ verify:
 		../lib/nf_util.c \
 		`# NAT-specific` \
 		nat_forward_vignat.c \
-		../lib/nat_config.c \
 		flowtable.c flowmanager.c \
+		../lib/nat_config.c \
 		../lib/flow.c ../lib/flow-log.c \
 		`# DPDK` \
 		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
 		$(RTE_SDK)/lib/librte_eal/common/*.c \
-		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		`# Linux-specific EAL` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
 		`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \

@@ -1,6 +1,6 @@
 #include <klee/klee.h>
 #include "lib/expirator.h"
-#include "containers/double-chain-stub-control.h"
+#include "lib/stubs/containers/double-chain-stub-control.h"
 
 int expire_items(struct DoubleChain* chain, struct DoubleMap* map,
                  time_t time) {

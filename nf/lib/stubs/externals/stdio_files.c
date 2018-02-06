@@ -409,7 +409,7 @@ munmap(void* addr, size_t length)
 }
 
 
-__attribute__((constructor))
+__attribute__((constructor(150))) // High prio, must execute after other stuff since it relies on hardware stubs
 static void
 stub_stdio_files_init(void)
 {

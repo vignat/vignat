@@ -17,7 +17,7 @@ klee_print_expr("DELAY", us);
 }
 
 
-__attribute__((constructor))
+__attribute__((constructor(101))) // Low prio, must execute before other stuff
 static void
 stub_hardware_init(void)
 {
