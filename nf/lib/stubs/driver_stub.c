@@ -442,7 +442,8 @@ stub_queue_release(void *queue)
 	// and if some part of the initialization fails, DPDK will request
 	// the deletion of all queues, even those who haven't been initialized yet.
 	//
-	// Thus, the queue "release" method can be given a null pointer.
+	// Thus, the queue "release" method can be given uninitialized memory,
+	// i.e. a pointer that could be null, could point to nowhere, etc.
 	if (queue == NULL) {
 		return;
 	}
@@ -450,31 +451,27 @@ stub_queue_release(void *queue)
 	struct stub_queue* stub_queue = queue;
 
 	// First, find the queue we're releasing
-	bool queue_found = false;
 	for (int d = 0; d < DEVICES_COUNT; d++) {
 		struct rte_eth_dev* dev = rte_eth_dev_allocated(stub_drivers[d].driver.name);
 		struct stub_driver* stub_drv = dev->data->dev_private;
 
 		for (int q = 0; q < RTE_MAX_QUEUES_PER_PORT; q++) {
 			// Second, reset the associated state and progress
-			if (&(stub_drv->rx_queues[q]) == stub_queue) {
+			if (&stub_drv->rx_queues[q] == stub_queue) {
 				klee_assert(device_rx_setup[stub_drv->port_id]);
 
 				dev->data->rx_queues[q] = NULL;
 				device_rx_setup[stub_drv->port_id] = false;
-			} else if (&(stub_drv->tx_queues[q]) == stub_queue) {
+				memset(stub_queue, 0, sizeof(struct stub_queue));
+			} else if (&stub_drv->tx_queues[q] == stub_queue) {
 				klee_assert(device_tx_setup[stub_drv->port_id]);
 
 				dev->data->tx_queues[q] = NULL;
 				device_tx_setup[stub_drv->port_id] = false;
+				memset(stub_queue, 0, sizeof(struct stub_queue));
 			}
 		}
 	}
-
-	klee_assert(queue_found);
-
-	// Third, zero it out for possible future use
-	memset(stub_queue, 0, sizeof(struct stub_queue));
 }
 
 static void
