@@ -103,6 +103,24 @@ stub_memory_init(char* mem)
 	SET(0x10148, 0b00000000000000001000000001000000);
 }
 
+static uint64_t
+stub_hardware_read(uint64_t addr, unsigned offset, unsigned size)
+{
+klee_print_expr("READ", addr);
+klee_print_expr("off", offset);
+klee_print_expr("size", size);
+return 0;
+}
+
+static void
+stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t value)
+{
+klee_print_expr("WRITE", addr);
+klee_print_expr("off", offset);
+klee_print_expr("size", size);
+klee_print_expr("value", value);
+}
+
 
 __attribute__((constructor(101))) // Low prio, must execute before other stuff
 static void
@@ -114,9 +132,15 @@ stub_hardware_init(void)
 	// Device initialization
 	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
 		char* dev = stub_pci_name(n);
+
 		size_t mem_len = 1 << 20; // 2^20 bytes - should be enough
+
 		void* mem = malloc(mem_len);
 		memset(mem, 0, mem_len);
+		stub_memory_init(mem);
+
+		klee_intercept_reads(mem, stub_hardware_read);
+		klee_intercept_writes(mem, stub_hardware_write);
 
 klee_print_expr("DEVICE", n);klee_print_expr("start",mem);
 
@@ -127,7 +151,6 @@ klee_print_expr("DEVICE", n);klee_print_expr("start",mem);
 		};
 		DEVICES[n] = stub_dev;
 
-		stub_memory_init(mem);
 	}
 
 	// DPDK "delay" method override
