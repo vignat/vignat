@@ -1,5 +1,6 @@
 #include "lib/stubs/hardware_stub.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +9,19 @@
 #include "generic/rte_cycles.h" // for rte_delay_us_callback_register
 
 #include <klee/klee.h>
+
+
+typedef uint32_t (*stub_register_read)(uint32_t current_value);
+
+struct stub_register {
+	bool present; // to distinguish registers we model from others
+	uint32_t initial_value;
+	uint32_t writable_mask; // 0 = readonly, 1 = writeable
+	stub_register_read read; // possibly NULL
+// TODO do we need handling for writes besides permissions?
+};
+
+static struct stub_register REGISTERS[0x20000]; // index == address
 
 
 // All citations here refer to https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
@@ -19,21 +33,24 @@ stub_delay_us(unsigned int us)
 klee_print_expr("DELAY", us);
 }
 
-// TODO some check at each delay that read-only bits are not changed
+static uint32_t
+stub_register_semaphore_read(uint32_t current_value)
+{
+	return current_value & 1; // LSB is the semaphore bit - always set after a read
+}
 
 static void
-stub_device_init(struct stub_device dev)
+stub_registers_init(void)
 {
-	// "Fake" memory, intercepted
-	dev.mem = malloc(dev.mem_len);
-	klee_intercept_reads(dev.mem, "stub_hardware_read");
-	klee_intercept_writes(dev.mem, "stub_hardware_write");
-
-	// Real backing store
-	dev.mem_shadow = malloc(dev.mem_len);
-	memset(dev.mem_shadow, 0, dev.mem_len);
-
-#define SET(addr, val) *((uint32_t*) (dev.mem_shadow + addr)) = val;
+	#define REG(addr, val, mask) do {                      \
+				struct stub_register reg = {   \
+					.present = true,       \
+					.initial_value = val,  \
+					.writable_mask = mask, \
+					.read = NULL           \
+				};                             \
+				REGISTERS[addr] = reg;         \
+			} while(0);
 
 	// page 544
 	// Device Status Register — STATUS (0x00008; RO)
@@ -47,7 +64,8 @@ stub_device_init(struct stub_device dev)
 	// 18: IO Active (0 - not active; note: "reflects the value of the VF Enable (VFE) bit in the IOV Control/Status register")
 	// 19: Status (0 - not issuing any master requests)
 	// 20-31: Reserved (0x00)
-	SET(0x00008, 0b00000000000000000000000000000000);
+	REG(0x00008, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000000);
 
 
 	// page 552
@@ -62,7 +80,7 @@ stub_device_init(struct stub_device dev)
 	// 7: Grant EEPROM Access (0 - not enabled)
 	// 8: EEPROM Present (1 - present, correct signature)
 	// 9: EEPROM Auto-Read Done (1 - done, since we fake hardware...)
-	// 10: Reservee (1 - Reserved)
+	// 10: Reserved (1 - Reserved)
 	// 11-14: EEPROM Size (0100 - Default)
 	// 15: PCIe Analog Done (0 - not done)
 	// 16: PCIe Core Done (0 - not done)
@@ -72,7 +90,8 @@ stub_device_init(struct stub_device dev)
 	// 20: Core CSR Done (0 - not done)
 	// 21: MAC Done (0 - not done)
 	// 22-31: Reserved (0x0)
-	SET(0x10010, 0b00000000000000000001011100110000);
+	REG(0x10010, 0b00000000000000000001011100110000,
+		     0b00000000000000000000000000000000);
 
 
 	// page 565
@@ -89,7 +108,8 @@ stub_device_init(struct stub_device dev)
 	// 29: Manageability Clock Gated (0 - not gated)
 	// 30: LAN Function Sel (0 - not inverted) TODO enable
 	// 31: PM State Changed (0 - not changed)
-	SET(0x10150, 0b00000000000000000000000000000100);
+	REG(0x10150, 0b00000000000000000000000000000100,
+		     0b00000000000000000000000000000000);
 
 
 	// pages 567-568
@@ -109,7 +129,28 @@ stub_device_init(struct stub_device dev)
 	// 26: PHY/SERDES0 Configuration Error Indication (0 - no error, LAN0 is fine)
 	// 27: PHY/SERDES1 Configuration Error Indication (0 - no error, LAN1 is fine)
 	// 28-31: Reserved (0000)
-	SET(0x10148, 0b00000000000000001000000001000000);
+	REG(0x10148, 0b00000000000000001000000001000000,
+		     0b00000000000000000000000000000001);
+	REGISTERS[0x10148].read = stub_register_semaphore_read;
+}
+
+static void
+stub_device_init(struct stub_device dev)
+{
+	// "Fake" memory, intercepted
+	dev.mem = malloc(dev.mem_len);
+	klee_intercept_reads(dev.mem, "stub_hardware_read");
+	klee_intercept_writes(dev.mem, "stub_hardware_write");
+
+	// Real backing store
+	dev.mem_shadow = malloc(dev.mem_len);
+	memset(dev.mem_shadow, 0, dev.mem_len);
+
+	for (int n = 0; n < sizeof(REGISTERS)/sizeof(REGISTERS[0]); n++) {
+		if (REGISTERS[n].present) {
+			*((uint32_t*) (dev.mem_shadow + n)) = REGISTERS[n].initial_value;
+		}
+	}
 }
 
 static struct stub_device
@@ -140,7 +181,16 @@ klee_print_expr("size", size);
 		return *((uint16_t*) (dev.mem_shadow + offset));
 	}
 	if (size == 4) {
-		return *((uint32_t*) (dev.mem_shadow + offset));
+		uint32_t current_value = *((uint32_t*) (dev.mem_shadow + offset));
+
+		struct stub_register reg = REGISTERS[offset];
+		klee_assert(reg.present);
+
+		if (reg.read != NULL) {
+			*((uint32_t*) (dev.mem_shadow + offset)) = reg.read(current_value);
+		}
+
+		return current_value;
 	}
 	if (size == 8) {
 		return *((uint64_t*) (dev.mem_shadow + offset));
@@ -164,7 +214,18 @@ klee_print_expr("value", value);
 	} else if (size == 2) {
 		*((uint16_t*) (dev.mem_shadow + offset)) = (uint16_t) value;
 	} else if (size == 4) {
-		*((uint32_t*) (dev.mem_shadow + offset)) = (uint32_t) value;
+		struct stub_register reg = REGISTERS[offset];
+		klee_assert(reg.present);
+
+		uint32_t current_value = *((uint32_t*) (dev.mem_shadow + offset));
+		uint32_t new_value = (uint32_t) value;
+		uint32_t changed = current_value ^ new_value;
+
+		if ((changed & ~reg.writable_mask) != 0) {
+			klee_print_expr("changed", changed);
+			klee_abort();
+		}
+		*((uint32_t*) (dev.mem_shadow + offset)) = new_value;
 	} else if (size == 8) {
 		*((uint64_t*) (dev.mem_shadow + offset)) = (uint64_t) value;
 	} else {
@@ -179,6 +240,9 @@ stub_hardware_init(void)
 {
 	// Helper method declarations
 	char* stub_pci_name(int index);
+
+	// Register models initializations
+	stub_registers_init();
 
 	// Device initialization
 	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
