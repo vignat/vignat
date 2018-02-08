@@ -435,6 +435,8 @@ stub_queue_release(void *queue)
 
 	struct stub_queue* stub_queue = queue;
 
+	bool queue_found = false;
+
 	// First, find the queue we're releasing
 	for (int d = 0; d < DEVICES_COUNT; d++) {
 		struct rte_eth_dev* dev = rte_eth_dev_allocated(stub_drivers[d].driver.name);
@@ -443,20 +445,26 @@ stub_queue_release(void *queue)
 		for (int q = 0; q < RTE_MAX_QUEUES_PER_PORT; q++) {
 			// Second, reset the associated state and progress
 			if (&stub_drv->rx_queues[q] == stub_queue) {
+				klee_assert(!queue_found);
 				klee_assert(device_rx_setup[stub_drv->port_id]);
 
 				dev->data->rx_queues[q] = NULL;
 				device_rx_setup[stub_drv->port_id] = false;
 				memset(stub_queue, 0, sizeof(struct stub_queue));
+				queue_found = true;
 			} else if (&stub_drv->tx_queues[q] == stub_queue) {
+				klee_assert(!queue_found);
 				klee_assert(device_tx_setup[stub_drv->port_id]);
 
 				dev->data->tx_queues[q] = NULL;
 				device_tx_setup[stub_drv->port_id] = false;
 				memset(stub_queue, 0, sizeof(struct stub_queue));
+				queue_found = true;
 			}
 		}
 	}
+
+	klee_assert(queue_found);
 }
 
 static void

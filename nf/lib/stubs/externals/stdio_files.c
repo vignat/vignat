@@ -16,7 +16,6 @@
 #include <klee/klee.h>
 
 // Globals
-// TODO this is kind of hacky - we should have some kind of "symbol that is never equal to anything" for the FDs
 static const int POS_UNOPENED = -1;
 static const int POS_EOF = -2;
 
@@ -55,6 +54,8 @@ struct stub_file {
 	struct stub_mmap mmaps[2];
 	size_t mmaps_len;
 };
+// Files indexed by FD
+// TODO what if the code under verification branches on an FD with a hardcoded comparison?
 static struct stub_file FILES[1024];
 
 // Special case: the page map
@@ -125,7 +126,6 @@ open(const char* file, int oflag, ...)
 		return -1; // TODO
 	}
 
-for(int n = 0;n<strlen(file);n++){klee_print_expr("x", file[n]);}
 	// Not supported!
 	klee_abort();
 }

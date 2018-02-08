@@ -4,7 +4,7 @@
 
 #include <klee/klee.h>
 
-static bool NUMA_INITIALIZED = false;
+static bool NUMA_AVAILABLE = false;
 static bool NUMA_NODEMASK_CREATED = false;
 
 int
@@ -12,14 +12,14 @@ numa_available(void)
 {
 	// Before any other calls in this library can be used numa_available() must be called.
 	// If it returns -1, all other functions in this library are undefined.
-	NUMA_INITIALIZED = true;
-	return 0;
+	NUMA_AVAILABLE = true; // TODO klee_int("numa_available") != 0;
+	return NUMA_AVAILABLE ? 0 : -1;
 }
 
 struct bitmask*
 numa_allocate_nodemask()
 {
-	klee_assert(NUMA_INITIALIZED);
+	klee_assert(NUMA_AVAILABLE);
 
 	klee_assert(!NUMA_NODEMASK_CREATED);
 	NUMA_NODEMASK_CREATED = true;
@@ -34,7 +34,7 @@ numa_allocate_nodemask()
 void
 numa_bitmask_free(struct bitmask *bmp)
 {
-	klee_assert(NUMA_INITIALIZED);
+	klee_assert(NUMA_AVAILABLE);
 
 	// It is an error to attempt to free this bitmask twice.
 	// --https://linux.die.net/man/3/numa_alloc_onnode
