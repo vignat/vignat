@@ -12,8 +12,9 @@ static const int DEVICES_COUNT = 0;
 
 struct stub_device {
 	char* name;
-	void* mem;
+	void* mem; // intercepted by stubs
 	size_t mem_len;
+	void* mem_shadow; // used as the backing store
 };
 
 struct stub_device DEVICES[DEVICES_COUNT];

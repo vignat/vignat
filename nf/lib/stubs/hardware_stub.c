@@ -22,9 +22,18 @@ klee_print_expr("DELAY", us);
 // TODO some check at each delay that read-only bits are not changed
 
 static void
-stub_memory_init(char* mem)
+stub_device_init(struct stub_device dev)
 {
-#define SET(addr, val) do { klee_print_expr("setting", ((uint32_t*) (mem + addr))); *((uint32_t*) (mem + addr)) = val; } while(0);
+	// "Fake" memory, intercepted
+	dev.mem = malloc(dev.mem_len);
+	klee_intercept_reads(dev.mem, "stub_hardware_read");
+	klee_intercept_writes(dev.mem, "stub_hardware_write");
+
+	// Real backing store
+	dev.mem_shadow = malloc(dev.mem_len);
+	memset(dev.mem_shadow, 0, dev.mem_len);
+
+#define SET(addr, val) *((uint32_t*) (dev.mem_shadow + addr)) = val;
 
 	// page 544
 	// Device Status Register — STATUS (0x00008; RO)
@@ -103,22 +112,64 @@ stub_memory_init(char* mem)
 	SET(0x10148, 0b00000000000000001000000001000000);
 }
 
-static uint64_t
+static struct stub_device
+stub_device_get(uint64_t addr)
+{
+	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+		if (addr == (uint64_t) DEVICES[n].mem) {
+			return DEVICES[n];
+		}
+	}
+
+	klee_abort();
+}
+
+uint64_t
 stub_hardware_read(uint64_t addr, unsigned offset, unsigned size)
 {
 klee_print_expr("READ", addr);
 klee_print_expr("off", offset);
 klee_print_expr("size", size);
-return 0;
+
+	struct stub_device dev = stub_device_get(addr);
+
+	if (size == 1) {
+		return *((uint8_t*) (dev.mem_shadow + offset));
+	}
+	if (size == 2) {
+		return *((uint16_t*) (dev.mem_shadow + offset));
+	}
+	if (size == 4) {
+		return *((uint32_t*) (dev.mem_shadow + offset));
+	}
+	if (size == 8) {
+		return *((uint64_t*) (dev.mem_shadow + offset));
+	}
+
+	klee_abort();
 }
 
-static void
+void
 stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t value)
 {
 klee_print_expr("WRITE", addr);
 klee_print_expr("off", offset);
 klee_print_expr("size", size);
 klee_print_expr("value", value);
+
+	struct stub_device dev = stub_device_get(addr);
+
+	if (size == 1) {
+		*((uint8_t*) (dev.mem_shadow + offset)) = (uint8_t) value;
+	} else if (size == 2) {
+		*((uint16_t*) (dev.mem_shadow + offset)) = (uint16_t) value;
+	} else if (size == 4) {
+		*((uint32_t*) (dev.mem_shadow + offset)) = (uint32_t) value;
+	} else if (size == 8) {
+		*((uint64_t*) (dev.mem_shadow + offset)) = (uint64_t) value;
+	} else {
+		klee_abort();
+	}
 }
 
 
@@ -131,24 +182,13 @@ stub_hardware_init(void)
 
 	// Device initialization
 	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
-		char* dev = stub_pci_name(n);
-
-		size_t mem_len = 1 << 20; // 2^20 bytes - should be enough
-
-		void* mem = malloc(mem_len);
-		memset(mem, 0, mem_len);
-		stub_memory_init(mem);
-
-		klee_intercept_reads(mem, stub_hardware_read);
-		klee_intercept_writes(mem, stub_hardware_write);
-
-klee_print_expr("DEVICE", n);klee_print_expr("start",mem);
-
 		struct stub_device stub_dev = {
-			.name = dev,
-			.mem = mem,
-			.mem_len = mem_len
+			.name = stub_pci_name(n),
+			.mem = NULL,
+			.mem_len = 1 << 20, // 2^20 bytes
+			.mem_shadow = NULL
 		};
+		stub_device_init(stub_dev);
 		DEVICES[n] = stub_dev;
 
 	}
