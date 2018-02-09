@@ -56,9 +56,8 @@ stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32
 	// Cannot set the semaphore bit to 1, only clear it
 	klee_assert(!(GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 0) == 1));
 
-	// Can only write to the software semaphore bit if the semaphore is taken
-	// TODO: Can the driver clear both semaphore bits at once?
-	if (GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 1) == 1) {
+	// Can only take the software semaphore bit if the semaphore is taken
+	if (GET_BIT(current_value, 1) == 0 && GET_BIT(new_value, 1) == 1) {
 		klee_assert(GET_BIT(current_value, 0) == 1);
 	}
 }

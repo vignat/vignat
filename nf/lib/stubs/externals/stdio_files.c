@@ -435,11 +435,11 @@ stub_stdio_files_init(void)
 		char* dev = DEVICES[n].name;
 
 		// Basic files
-		int vendor_fd = stub_add_file(stub_pci_file(dev, "vendor"), "32902\n"); // ixgbe
-		int device_fd = stub_add_file(stub_pci_file(dev, "device"), "5546\n"); // ixgbe
+		int vendor_fd = stub_add_file(stub_pci_file(dev, "vendor"), "32902\n"); // Intel (0x8086)
+		int device_fd = stub_add_file(stub_pci_file(dev, "device"), "4347\n"); // Intel 82599ES (0x10fb)
 		int subvendor_fd = stub_add_file(stub_pci_file(dev, "subsystem_vendor"), "0\n"); // any
 		int subdevice_fd = stub_add_file(stub_pci_file(dev, "subsystem_device"), "0\n"); // any
-		int class_fd = stub_add_file(stub_pci_file(dev, "class"), "16777215\n"); // ixgbe
+		int class_fd = stub_add_file(stub_pci_file(dev, "class"), "131072\n"); // Intel 82599ES (0x020000)
 		int maxvfs_fd = stub_add_file(stub_pci_file(dev, "max_vfs"), "0\n"); // no virtual functions
 		int numanode_fd = stub_add_file(stub_pci_file(dev, "numa_node"), "0\n"); // NUMA node 0
 
