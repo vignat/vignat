@@ -11,17 +11,27 @@
 #include <klee/klee.h>
 
 
-typedef uint32_t (*stub_register_read)(uint32_t current_value);
+typedef uint32_t (*stub_register_read)(struct stub_device* dev, uint32_t current_value);
+typedef void (*stub_register_write)(struct stub_device* dev, uint32_t current_value, uint32_t new_value);
 
 struct stub_register {
 	bool present; // to distinguish registers we model from others
 	uint32_t initial_value;
 	uint32_t writable_mask; // 0 = readonly, 1 = writeable
 	stub_register_read read; // possibly NULL
-// TODO do we need handling for writes besides permissions?
+	stub_register_write write; // possibly NULL
 };
 
 static struct stub_register REGISTERS[0x20000]; // index == address
+
+
+// Helper bit macros
+#define GET_BIT(n, k) (((n) << (k)) & 1)
+#define SET_BIT(n, k, v) if (v == 0) { n = (n & ~(1 << (k))); } else { n = (n | (1 << (k))); }
+
+// Helper register macros
+#define DEV_MEM(dev, offset, type) *((type*) ((dev).mem_shadow + (offset)))
+#define DEV_REG(dev, offset) DEV_MEM(dev, offset, uint32_t)
 
 
 // All citations here refer to https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
@@ -33,11 +43,38 @@ stub_delay_us(unsigned int us)
 klee_print_expr("DELAY", us);
 }
 
+
 static uint32_t
-stub_register_semaphore_read(uint32_t current_value)
+stub_register_swsm_read(struct stub_device* dev, uint32_t current_value)
 {
 	return current_value & 1; // LSB is the semaphore bit - always set after a read
 }
+
+static void
+stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+{
+	// Cannot set the semaphore bit to 1, only clear it
+	klee_assert(!(GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 0) == 1));
+
+	// Can only write to the software semaphore bit if the semaphore is taken
+	if (GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 1) == 1) {
+		klee_assert(GET_BIT(current_value, 0) == 1);
+	}
+}
+
+
+static void
+stub_register_swfwsync_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+{
+	// Cannot write to this register unless the software semaphore bit of SWSM is taken
+	klee_assert(GET_BIT(DEV_REG(*dev, 0x10140), 1) == 1);
+
+	// Cannot write 1 to a bit in this register if the firmware set the corresponding bit
+	for (int n = 0; n < 5; n++) {
+		klee_assert(GET_BIT(new_value, n) + GET_BIT(current_value, n + 5) <= 1);
+	}
+}
+
 
 static void
 stub_registers_init(void)
@@ -47,7 +84,8 @@ stub_registers_init(void)
 					.present = true,       \
 					.initial_value = val,  \
 					.writable_mask = mask, \
-					.read = NULL           \
+					.read = NULL,          \
+					.write = NULL          \
 				};                             \
 				REGISTERS[addr] = reg;         \
 			} while(0);
@@ -94,22 +132,19 @@ stub_registers_init(void)
 		     0b00000000000000000000000000000000);
 
 
-	// page 565
-	// Function Active and Power State to Manageability — FACTPS (0x10150; RO)
+	// page 567
+	// Software Semaphore Register — SWSM (0x10140; RW)
+	// "This register is shared for both LAN ports."
+	// NOTE: Bit 0 is automatically set to 1 by the hardware after a read
+	// NOTE: See SW_FW_SYNC dance described below
 
-	// 0-1: Power state indication of function 0 (00 - DR)
-	// 2: Lan 0 Enable (1 - enabled)
-	// 3: Function 0 Auxiliary Power PM Enable (0 - ???)
-	// 4-5: Reserved (00)
-	// 6-7: Power state indication of function 1 (00 - disabled)
-	// 8: Lan 1 Enable (0 - disabled)
-	// 9: Function 1 Auxiliary Power PM Enable (0 - disabled)
-	// 10-28: Reserved (0x0)
-	// 29: Manageability Clock Gated (0 - not gated)
-	// 30: LAN Function Sel (0 - not inverted) TODO enable
-	// 31: PM State Changed (0 - not changed)
-	REG(0x10150, 0b00000000000000000000000000000100,
-		     0b00000000000000000000000000000000);
+	// 0: Semaphore (0 - not accessing)
+	// 1: Software Semaphore (0 - not set)
+	// 2-31: Reserved (0x0)
+	REG(0x10140, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000011);
+	REGISTERS[0x10140].read = stub_register_swsm_read;
+	REGISTERS[0x10140].write = stub_register_swsm_write;
 
 
 	// pages 567-568
@@ -130,8 +165,54 @@ stub_registers_init(void)
 	// 27: PHY/SERDES1 Configuration Error Indication (0 - no error, LAN1 is fine)
 	// 28-31: Reserved (0000)
 	REG(0x10148, 0b00000000000000001000000001000000,
-		     0b00000000000000000000000000000001);
-	REGISTERS[0x10148].read = stub_register_semaphore_read;
+		     0b00000000000000000000000000000000);
+
+
+	// page 565
+	// Function Active and Power State to Manageability — FACTPS (0x10150; RO)
+
+	// 0-1: Power state indication of function 0 (00 - DR)
+	// 2: Lan 0 Enable (1 - enabled)
+	// 3: Function 0 Auxiliary Power PM Enable (0 - ???)
+	// 4-5: Reserved (00)
+	// 6-7: Power state indication of function 1 (00 - disabled)
+	// 8: Lan 1 Enable (0 - disabled)
+	// 9: Function 1 Auxiliary Power PM Enable (0 - disabled)
+	// 10-28: Reserved (0x0)
+	// 29: Manageability Clock Gated (0 - not gated)
+	// 30: LAN Function Sel (0 - not inverted) TODO enable
+	// 31: PM State Changed (0 - not changed)
+	REG(0x10150, 0b00000000000000000000000000000100,
+		     0b00000000000000000000000000000000);
+
+
+	// page 569
+	// Software–Firmware Synchronization — SW_FW_SYNC (0x10160; RW)
+	// "This register is shared for both LAN ports."
+	// NOTE: See 0x10140 and 0x10148
+	// NOTE: See Section 10.5.4 "Software and Firmware Synchronization"
+	//       The SW_FW_SYNC dance's happy path is:
+	//       - Software locks SWSM.SMBI by reading and getting 0 (hardware automatically sets it to 1)
+	//       - Software locks SWSM.SWESMBI by writing 1 then reading 1
+	//       - Software sets/clears the SW_FW_SYNC access bits it wants to by writing 1/0
+	//         (locks only if firmware hasn't sets the counterpart bits)
+	//       - Software clears SWSM.SWESMBI by writing 0
+	//       - Software clears SWSM.SMBI by writing 0
+
+	// 0: EEPROM software access
+	// 1: PHY 0 software access
+	// 2: PHY 1 software access
+	// 3: Shared CSRs software access
+	// 4: Flash software access
+	// 5: EEPROM firmware access
+	// 6: PHY 0 firmware access
+	// 7: PHY 1 firmware access
+	// 8: Shared CSRs firmware access
+	// 9: Flash firmware access (note: "Currently the FW does not access the FLASH")
+	// 10-31: Reserved
+	REG(0x10160, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000011111);
+	REGISTERS[0x10160].write = stub_register_swfwsync_write;
 }
 
 static void
@@ -187,7 +268,7 @@ klee_print_expr("size", size);
 		klee_assert(reg.present);
 
 		if (reg.read != NULL) {
-			*((uint32_t*) (dev.mem_shadow + offset)) = reg.read(current_value);
+			*((uint32_t*) (dev.mem_shadow + offset)) = reg.read(&dev, current_value);
 		}
 
 		return current_value;
@@ -225,6 +306,11 @@ klee_print_expr("value", value);
 			klee_print_expr("changed", changed);
 			klee_abort();
 		}
+
+		if (reg.write != NULL) {
+			reg.write(&dev, current_value, new_value);
+		}
+
 		*((uint32_t*) (dev.mem_shadow + offset)) = new_value;
 	} else if (size == 8) {
 		*((uint64_t*) (dev.mem_shadow + offset)) = (uint64_t) value;
