@@ -57,6 +57,7 @@ stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32
 	klee_assert(!(GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 0) == 1));
 
 	// Can only write to the software semaphore bit if the semaphore is taken
+	// TODO: Can the driver clear both semaphore bits at once?
 	if (GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 1) == 1) {
 		klee_assert(GET_BIT(current_value, 0) == 1);
 	}
@@ -229,7 +230,7 @@ stub_device_init(struct stub_device dev)
 
 	for (int n = 0; n < sizeof(REGISTERS)/sizeof(REGISTERS[0]); n++) {
 		if (REGISTERS[n].present) {
-			*((uint32_t*) (dev.mem_shadow + n)) = REGISTERS[n].initial_value;
+			DEV_REG(dev, n) = REGISTERS[n].initial_value;
 		}
 	}
 }
@@ -256,25 +257,25 @@ klee_print_expr("size", size);
 	struct stub_device dev = stub_device_get(addr);
 
 	if (size == 1) {
-		return *((uint8_t*) (dev.mem_shadow + offset));
+		return DEV_MEM(dev, offset, uint8_t);
 	}
 	if (size == 2) {
-		return *((uint16_t*) (dev.mem_shadow + offset));
+		return DEV_MEM(dev, offset, uint16_t);
 	}
 	if (size == 4) {
-		uint32_t current_value = *((uint32_t*) (dev.mem_shadow + offset));
+		uint32_t current_value = DEV_REG(dev, offset);
 
 		struct stub_register reg = REGISTERS[offset];
 		klee_assert(reg.present);
 
 		if (reg.read != NULL) {
-			*((uint32_t*) (dev.mem_shadow + offset)) = reg.read(&dev, current_value);
+			DEV_REG(dev, offset) = reg.read(&dev, current_value);
 		}
 
 		return current_value;
 	}
 	if (size == 8) {
-		return *((uint64_t*) (dev.mem_shadow + offset));
+		return DEV_MEM(dev, offset, uint64_t);
 	}
 
 	klee_abort();
@@ -291,14 +292,14 @@ klee_print_expr("value", value);
 	struct stub_device dev = stub_device_get(addr);
 
 	if (size == 1) {
-		*((uint8_t*) (dev.mem_shadow + offset)) = (uint8_t) value;
+		DEV_MEM(dev, offset, uint8_t) = (uint8_t) value;
 	} else if (size == 2) {
-		*((uint16_t*) (dev.mem_shadow + offset)) = (uint16_t) value;
+		DEV_MEM(dev, offset, uint16_t) = (uint16_t) value;
 	} else if (size == 4) {
 		struct stub_register reg = REGISTERS[offset];
 		klee_assert(reg.present);
 
-		uint32_t current_value = *((uint32_t*) (dev.mem_shadow + offset));
+		uint32_t current_value = DEV_REG(dev, offset);
 		uint32_t new_value = (uint32_t) value;
 		uint32_t changed = current_value ^ new_value;
 
@@ -311,9 +312,9 @@ klee_print_expr("value", value);
 			reg.write(&dev, current_value, new_value);
 		}
 
-		*((uint32_t*) (dev.mem_shadow + offset)) = new_value;
+		DEV_REG(dev, offset) = new_value;
 	} else if (size == 8) {
-		*((uint64_t*) (dev.mem_shadow + offset)) = (uint64_t) value;
+		DEV_MEM(dev, offset, uint64_t) = (uint64_t) value;
 	} else {
 		klee_abort();
 	}
