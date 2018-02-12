@@ -26,7 +26,7 @@ static struct stub_register REGISTERS[0x20000]; // index == address
 
 
 // Helper bit macros
-#define GET_BIT(n, k) (((n) << (k)) & 1)
+#define GET_BIT(n, k) (((n) >> (k)) & 1)
 #define SET_BIT(n, k, v) if (v == 0) { n = (n & ~(1 << (k))); } else { n = (n | (1 << (k))); }
 
 // Helper register macros
@@ -47,7 +47,7 @@ klee_print_expr("DELAY", us);
 static uint32_t
 stub_register_swsm_read(struct stub_device* dev, uint32_t current_value)
 {
-	return current_value & 1; // LSB is the semaphore bit - always set after a read
+	return current_value | 1; // LSB is the semaphore bit - always set after a read
 }
 
 static void
@@ -190,6 +190,7 @@ stub_registers_init(void)
 	// Software–Firmware Synchronization — SW_FW_SYNC (0x10160; RW)
 	// "This register is shared for both LAN ports."
 	// NOTE: See 0x10140 and 0x10148
+	// NOTE: Also known as "General Software Semaphore Register", or GSSR
 	// NOTE: See Section 10.5.4 "Software and Firmware Synchronization"
 	//       The SW_FW_SYNC dance's happy path is:
 	//       - Software locks SWSM.SMBI by reading and getting 0 (hardware automatically sets it to 1)
