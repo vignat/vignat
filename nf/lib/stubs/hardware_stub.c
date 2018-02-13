@@ -12,11 +12,12 @@
 
 
 typedef uint32_t (*stub_register_read)(struct stub_device* dev, uint32_t current_value);
-typedef void (*stub_register_write)(struct stub_device* dev, uint32_t current_value, uint32_t new_value);
+typedef uint32_t (*stub_register_write)(struct stub_device* dev, uint32_t current_value, uint32_t new_value);
 
 struct stub_register {
 	bool present; // to distinguish registers we model from others
 	uint32_t initial_value;
+	bool readable;
 	uint32_t writable_mask; // 0 = readonly, 1 = writeable
 	stub_register_read read; // possibly NULL
 	stub_register_write write; // possibly NULL
@@ -45,12 +46,48 @@ klee_print_expr("DELAY", us);
 
 
 static uint32_t
-stub_register_swsm_read(struct stub_device* dev, uint32_t current_value)
+stub_register_eerd_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
 {
-	return current_value | 1; // LSB is the semaphore bit - always set after a read
+	// Cannot set the done bit to 1, only clear it
+	klee_assert(!(GET_BIT(current_value, 1) == 0 && GET_BIT(new_value, 1) == 1));
+	// Same with the data
+	for (int n = 16; n <= 31; n++) {
+		klee_assert(!(GET_BIT(current_value, n) == 0 && GET_BIT(new_value, n) == 1));
+	}
+
+	bool read = GET_BIT(new_value, 0);
+	uint16_t addr = (new_value >> 2) & 0b11111111111111;
+klee_print_expr("EEPROM READ", read);
+klee_print_expr("addr", addr);
+
+	// Clear read bit
+	SET_BIT(new_value, 0, 0);
+	// Clear data bits
+	for (int n = 16; n <= 31; n++) {
+		SET_BIT(new_value, n, 0);
+	}
+
+	// Checksum word - sum of all words from 0x00 to 0x3F (including words pointed to if any) must be 0xBABA
+	if (addr == 0x3F) {
+		new_value |= (0xBABA << 16);
+	}
+
+	// Mark read as done
+	// TODO some timeouts?
+	SET_BIT(new_value, 1, 1);
+
+	return new_value;
 }
 
-static void
+
+static uint32_t
+stub_register_swsm_read(struct stub_device* dev, uint32_t current_value)
+{
+	SET_BIT(current_value, 1, 1); // LSB is the semaphore bit - always set after a read
+	return current_value;
+}
+
+static uint32_t
 stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
 {
 	// Cannot set the semaphore bit to 1, only clear it
@@ -60,10 +97,12 @@ stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32
 	if (GET_BIT(current_value, 1) == 0 && GET_BIT(new_value, 1) == 1) {
 		klee_assert(GET_BIT(current_value, 0) == 1);
 	}
+
+	return new_value; // OK, we only check
 }
 
 
-static void
+static uint32_t
 stub_register_swfwsync_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
 {
 	// Cannot write to this register unless the software semaphore bit of SWSM is taken
@@ -73,6 +112,8 @@ stub_register_swfwsync_write(struct stub_device* dev, uint32_t current_value, ui
 	for (int n = 0; n < 5; n++) {
 		klee_assert(GET_BIT(new_value, n) + GET_BIT(current_value, n + 5) <= 1);
 	}
+
+	return new_value; // OK, we only check
 }
 
 
@@ -83,6 +124,7 @@ stub_registers_init(void)
 				struct stub_register reg = {   \
 					.present = true,       \
 					.initial_value = val,  \
+					.readable = true,      \
 					.writable_mask = mask, \
 					.read = NULL,          \
 					.write = NULL          \
@@ -104,6 +146,25 @@ stub_registers_init(void)
 	// 20-31: Reserved (0x00)
 	REG(0x00008, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000000000);
+
+
+	// page 574
+	// Extended Interrupt Mask Clear Register- EIMC (0x00888; WO)
+	// TODO do we model interrupts?
+
+	// 0-30: Interrupt Mask (0 - don't care, write-only register)
+	// 31: Reserved
+	REG(0x00888, 0b00000000000000000000000000000000,
+		     0b01111111111111111111111111111111);
+	REGISTERS[0x00888].readable = false;
+
+	// page 600
+	// Receive Control Register — RXCTRL (0x03000; RW)
+
+	// 0: Receive Enable (0 - not yet enabled)
+	// 1-31: Reserved
+	REG(0x03000, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000001);
 
 
 	// page 552
@@ -131,6 +192,18 @@ stub_registers_init(void)
 	REG(0x10010, 0b00000000000000000001011100110000,
 		     0b00000000000000000000000000000000);
 
+
+	// page 554
+	// EEPROM Read Register — EERD (0x10014; RW)
+	// "This register is used by software to cause the 82599 to read individual words in the EEPROM."
+
+	// 0: Start (0 - not started)
+	// 1: Done (0 - no read perfomed yet)
+	// 2-15: Address (0x0 - no read performed yet)
+	// 16-31: Data (0x0 - no read performed yet)
+	REG(0x10014, 0b00000000000000000000000000000000,
+		     0b11111111111111111111111111111111);
+	REGISTERS[0x10014].write = stub_register_eerd_write;
 
 	// page 567
 	// Software Semaphore Register — SWSM (0x10140; RW)
@@ -267,6 +340,7 @@ klee_print_expr("size", size);
 
 		struct stub_register reg = REGISTERS[offset];
 		klee_assert(reg.present);
+		klee_assert(reg.readable);
 
 		if (reg.read != NULL) {
 			DEV_REG(dev, offset) = reg.read(&dev, current_value);
@@ -304,12 +378,13 @@ klee_print_expr("value", value);
 		uint32_t changed = current_value ^ new_value;
 
 		if ((changed & ~reg.writable_mask) != 0) {
+			klee_print_expr("old", current_value);
 			klee_print_expr("changed", changed);
 			klee_abort();
 		}
 
 		if (reg.write != NULL) {
-			reg.write(&dev, current_value, new_value);
+			new_value = reg.write(&dev, current_value, new_value);
 		}
 
 		DEV_REG(dev, offset) = new_value;
