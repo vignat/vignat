@@ -1,0 +1,13 @@
+diff --git a/drivers/net/ixgbe/base/ixgbe_type.h b/drivers/net/ixgbe/base/ixgbe_type.h
+index bda8558..af90462 100644
+--- a/drivers/net/ixgbe/base/ixgbe_type.h
++++ b/drivers/net/ixgbe/base/ixgbe_type.h
+@@ -2007,7 +2007,7 @@ enum {
+ #define IXGBE_FTQF_QUEUE_ENABLE		0x80000000
+ 
+ /* Interrupt clear mask */
+-#define IXGBE_IRQ_CLEAR_MASK	0xFFFFFFFF
++#define IXGBE_IRQ_CLEAR_MASK	0x7FFFFFFF
+ 
+ /* Interrupt Vector Allocation Registers */
+ #define IXGBE_IVAR_REG_NUM		25

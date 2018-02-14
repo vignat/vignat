@@ -87,7 +87,7 @@ verify:
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
-	klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
+	gdb -ex run --args klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
 		--no-shconf `# don't mmap the config` \
 		-- \

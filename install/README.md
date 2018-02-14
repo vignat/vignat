@@ -5,5 +5,7 @@ This folder contains patches and configuration files for dependencies of the Vig
   - `config` patches the DPDK default config
   - `features` disables DPDK features that are hard to verify
 - DPDK patches for the `ixgbe` driver:
+  - `avoid_bit_bang` avoids unnecessary usage of bit-banging during initialization
+  - `unknown_eimc_bit` removes the usage of an undocumented bit in the EIMC register
   - `unknown_swfw_sync_bit` removes the usage of an undocumented bit in the SWFW_SYNC (a.k.a. GSSR) register
 - A minimalistic config file for `klee-uclibc`

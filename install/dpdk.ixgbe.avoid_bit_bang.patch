@@ -1,0 +1,14 @@
+diff --git a/drivers/net/ixgbe/ixgbe_ethdev.c b/drivers/net/ixgbe/ixgbe_ethdev.c
+index b1b39eb..b09957f 100644
+--- a/drivers/net/ixgbe/ixgbe_ethdev.c
++++ b/drivers/net/ixgbe/ixgbe_ethdev.c
+@@ -1216,6 +1216,9 @@ eth_ixgbe_dev_init(struct rte_eth_dev *eth_dev)
+ 	}
+ 	hw->fc.send_xon = 1;
+ 
++	/* Initialize the params, so we don't bit-bang for the checksum if we don't need to */
++	hw->eeprom.ops.init_params(hw);
++
+ 	/* Make sure we have a good EEPROM before we read from it */
+ 	diag = ixgbe_validate_eeprom_checksum(hw, &csum);
+ 	if (diag != IXGBE_SUCCESS) {
