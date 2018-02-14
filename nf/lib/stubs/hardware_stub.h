@@ -25,6 +25,8 @@ struct stub_device {
 	uint64_t i2c_start_time; // time of last START
 	uint64_t i2c_clock_time; // time of last clock change
 	uint64_t i2c_stop_time; // time of last stop
+
+	uint8_t sfp_address; // see i2cctl sfp implementation
 };
 
 struct stub_device DEVICES[DEVICES_COUNT];
