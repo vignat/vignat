@@ -181,9 +181,7 @@ stub_register_i2cctl_write(struct stub_device* dev, uint32_t current_value, uint
 			// Part of the address or the RW bit - read a bit
 			dev->i2c_address = dev->i2c_address << 1;
 			dev->i2c_address = dev->i2c_address | sda_new;
-klee_print_expr("started; bit",sda_new);
 		} else {
-klee_print_expr("started, ACK", 0);
 			// "Each byte is followed by an acknowledgement bit"
 			// "The Acknowledge signal is defined as follows: the transmitter releases the SDA line
 			//  during the acknowledge clock pulse so the receiver can pull the SDA line LOW
@@ -439,6 +437,8 @@ stub_register_msca_write(struct stub_device* dev, uint32_t current_value, uint32
 	// page 135
 	// MDIO Direct Access
 
+	// TODO figure out which addresses are which registers... where's the spec?
+
 	// Bit 30 is "MDI Command", 1 means perform operation
 	if (GET_BIT(new_value, 30) == 0) {
 		// bit cleared, nothing to do
@@ -460,15 +460,38 @@ klee_print_expr("ADDR PHY", dev->current_mdi_address);
 		} else if (opcode == 0b11) { // read operation
 klee_print_expr("dev", *dev);
 klee_print_expr("READ PHY", dev->current_mdi_address);
-
 			klee_assert(dev->current_mdi_address != -1);
 
 			int phy_addr = (new_value >> 21) & 0b11111;
-			klee_print_expr("phy addr", phy_addr);
-			dev->current_mdi_address = -1;
+			int addr = new_value & 0xFF;
 
-			uint32_t result = 0; // return value is always 0...
-			DEV_REG(dev, 0x04260) = result; // register MSRWD holds the result
+			uint32_t result = 0;
+			if (dev->current_mdi_address == 0) { // control byte
+				result = 0x8000; // reset flag set
+			} else if (dev->current_mdi_address == 2) { // ID high byte
+				result = 1; // just needs to be nonzero
+			}
+
+klee_print_expr("phy addr", phy_addr);
+klee_print_expr("addr", addr);
+klee_print_expr("result", result);
+			DEV_REG(dev, 0x04260) = result << 16; // register MSRWD holds the result in the upper 16 bits
+
+			dev->current_mdi_address = -1;
+		} else if (opcode == 0b01) { // write operation
+klee_print_expr("WRITE PHY", dev->current_mdi_address);
+klee_print_expr("dev", *dev);
+			klee_assert(dev->current_mdi_address != -1);
+
+			int phy_addr = (new_value >> 21) & 0b11111;
+			int data = new_value & 0xFF;
+klee_print_expr("phy addr", phy_addr);
+klee_print_expr("data", data);
+
+			// only support the reset register - we just pretend that it's been reset all the time
+			klee_assert(dev->current_mdi_address == 0);
+
+			dev->current_mdi_address = -1;
 		} else {
 			klee_abort(); // unsupported
 		}
@@ -485,9 +508,7 @@ static uint32_t
 stub_register_txdctl_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
 {
 	// Bit 26 is self-clearing
-	if (GET_BIT(new_value, 26) == 1) {
-		SET_BIT(new_value, 26, 0);
-	}
+	SET_BIT(new_value, 26, 0);
 
 	return new_value;
 }
@@ -527,6 +548,19 @@ stub_register_swfwsync_write(struct stub_device* dev, uint32_t current_value, ui
 	}
 
 	return new_value; // OK, we only check
+}
+
+
+static uint32_t
+stub_register_autoc_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+{
+	// Cannot write to this register unless the software semaphore bit of SWSM is taken
+	klee_assert(GET_BIT(DEV_REG(dev, 0x10140), 1) == 1);
+
+	// Bit 12 is self-clearing
+	SET_BIT(new_value, 12, 0);
+
+	return new_value;
 }
 
 
@@ -588,6 +622,30 @@ stub_registers_init(void)
 	REG(0x00028, 0b00000000000000000000000000001111, // in a pull-up system like I2C, 1 is the default
 		     0b00000000000000000000000000001111); // NOTE: 0 and 2 are RW, see i2cctl_write for an explanation
 	REGISTERS[0x00028].write = stub_register_i2cctl_write;
+
+
+	// page 549
+	// LED Control — LEDCTL (0x00200; RW)
+
+	// 0-3: LED0 Mode (0000 - LINK_UP)
+	// 4: Reserved (0)
+	// 5: GLOBAL Blink Mode (0 - blink for 200 ms on/200ms off)
+	// 6: LED0 Invert (0 - LED output is active low)
+	// 7: LED0 Blink (0 - do not blink)
+	// 8-11: LED1 Mode (0001 - 10 Gb/s link)
+	// 12-13: Reserved (00)
+	// 14: LED1 Invert (0 - LED output is active low)
+	// 15: LED1 Blink (0 - do not blink)
+	// 16-19: LED2 Mode (0100 - LINK/ACTIVITY)
+	// 20-21: Reserved (00)
+	// 22: LED2 Invert (0 - LED output is active low)
+	// 23: LED2 Blink (0 - do not blink)
+	// 24-27: LED3 Mode (0101 - 1 Gb/s link)
+	// 28-29: Reserved (00)
+	// 30: LED3 Invert (0 - LED output is active low)
+	// 31: LED3 Blink (0 - do not blink)
+	REG(0x00200, 0b00000101000001000000000100000000,
+		     0b00000000000000000000000000000000);
 
 
 	// page 572
@@ -678,6 +736,89 @@ stub_registers_init(void)
 		     0b00000000000000001111111111111111);
 
 
+	// page 680
+	// MAC Manageability Control Register — MMNGC (0x042D0; Host-RO/MNG-RW)
+
+	// 0: MNG_VETO (0 - no veto)
+	// 1-31: Reserved (0)
+	REG(0x042D0, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000000);
+
+
+	// pages 674-676
+	// Auto Negotiation Control Register — AUTOC (0x042A0; RW)
+	// NOTE: "The 82599 Device Firmware may access AUTOC register in parallel
+	//        to software driver and a synchronization between them is needed"
+
+	// 0: Force Link Up (0 - normal mode)
+	// 1: Auto-negotiation Acknowledge2 field (0 - ???)
+	// 2-6: Auto-negotiation Selector field (00001 - default value according to 802.3ap-2007)
+	// 7-8: "Define 10 GbE PMA/PMD over four differential pairs" (01 - KX4 PMA/PMD, default value)
+	// 9: PMA/PMD used for 1GbE (1 - KX or BX PMA/PMD, default value)
+	// 10: Disables 10GbE Parallel Detect On Dx without main power (0 - no specific action)
+	// 11: Restarts auto-negotiation on transition to Dx (0 - does not restart)
+	// 12: Applies new settings and restarts relative auto-negotiation process (self-clearing)
+	// 13-15: Link Mode Select (100 - KX/KX4/KR backplane auto-negotiation enable, Clause 37 negotiation disabled, default value)
+	// 16: Configures the A2 bit of the TAF in the auto-negotiation word... blah blah blah... (1 - default)
+	// 17: FEC Requested (0 - not requested)
+	// 18: FEC Ability; should be set to 1 only if bit 16 is 1 (1 - supported)
+	// 19-22: Backplane Auto-Negotiation Rx Align Treshold (0011 - default value)
+	// 23: Auto-Negotiation Rx Drift Mode (1 - enabled)
+	// 24: Auto-Negotiation Rx Loose Mode (1 - enabled)
+	// 25-26: Auto-Negotiation Parallel Detect Timer (00 - 1ms)
+	// 27: RF (0 - default)
+	// 28-29: Pause Bits (00 - default)
+	// 30-31: ...i don't even know what this description means (11 - KX supported, KX4 supported)
+	REG(0x042A0, 0b11000001100111011000001010000100,
+		     0b00000000000000000001000000000000);
+	REGISTERS[0x042A0].write = stub_register_autoc_write;
+
+
+	// pages 676-678
+	// Link Status Register — LINKS (0x042A4; RO)
+
+	// 0: Signal Detect of 1 GbE and 100 Mb/s (1 - signal present, OK)
+	// 1: Signal detect of FEC (1 - signal detected, good)
+	// 2: 10 GbE serial PCS FEC block lock (0 - no lock)
+	// 3: 10 GbE serial KR_PCS high error rate (0 - low)
+	// 4: 10 GbE serial PCS block lock (0 - no lock)
+	// 5: KX/KX4/KR AN Next Page Received (0 - not received; clears on read)
+	// 6: KX/KX4/KR Backplane Auto Negotiation Page Received (0 - not receifed; clears on read)
+	// 7: Link Status (1 - link up; self-set on read to proper value)
+	// 8-11: Signal Detect of 10 GbE Parallel (1111 - signal present for lanes 0,1,2,3 respectively, good)
+	// 12: Signal Detet of 10 GbE serial (1 - signal detected, good)
+	// 13-16: 10G Parallel lane sync status (1111 - sync status OK for lanes 0,1,2,3 respectively, good)
+	// 17: 10 GbE align_status (1 - good)
+	// 18: 1G sync_status (1 - good)
+	// 19: KX/KX4/KR Baclplane Auto Negotiation Rx Idle (0 - good)
+	// 20: PCS_1 GbE auto-negotiation enabled, aka clause 37 (0 - not enabled, see AUTOC bits 13-15)
+	// 21: 1 GbE PCS enabled for 1 GbE and SGMII operation (0 - not enabled)
+	// 22: 10G link enabled (1 - enabled)
+	// 23: Forward Error Correction status in 10 GbE serial link (0 - disabled)
+	// 24: Status of 10 GbE serial PCS (0 - disabled)
+	// 25: Status of SGMII operation (0 - disabled)
+	// 26-27: MAC link mode status (11 - auto-negotiation)
+	// 28-29: MAC link speec status (11 - 10 GbE)
+	// 30: Link Up (1 - link is up)
+	// 31: KX/KX4/KR backplane auto-negotiation completed (1 - completed)
+	REG(0x042A4, 0b11111100010001111111111110000011,
+		     0b00000000000000000001000000000000);
+
+	// page 679
+	// Auto Negotiation Control 2 Register — AUTOC2 (0x042A8; RW)
+
+	// 0-15: Reserved (0)
+	// 16-17: PMAPMD used for 10 GbE serial link operation (00 - KR; note that 01 and 11 are reserved)
+	// 18: Disable DME Pages Transmit (0 - not disabled)
+	// 19-27: Reserved (0)
+	// 28: Force auto-negotiation arbitration state machine to idle (0 - no force)
+	// 29: Reserved (0)
+	// 30: Disable parallel detect in KX/KX4/KR (0 - not disabled)
+	// 31: Reserved (0)
+	REG(0x042A8, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000000);
+
+
 	// page 606
 	// Transmit Descriptor Control — TXDCTL[n] (0x06028+0x40*n, n=0...127; RW)
 	for (int n = 0; n <= 127; n++) {
@@ -694,6 +835,25 @@ stub_registers_init(void)
 				      0b00000110000000000000000000000000);
 		REGISTERS[0x06028 + 0x40*n].write = stub_register_txdctl_write;
 	}
+
+
+	// page 587
+	// Receive Address Low — RAL[n] (0x0A200 + 8*n, n=0...127; RW)
+	// NOTE: "The first Receive Address register [...] RAR0 should always be used to store the individual Ethernet MAC address of the adapter."
+
+	// 0-31: Receive Address Low, lower 32 bits of the MAC addr ("field is defined in big endian")
+	REG(0x0A200, 0x45678900, // NOTE: see VigNAT makefile
+		     0x00000000);
+
+	// page 587-588
+	// Receive Address High — RAH[n] (0x0A204 + 8*n, n=0...127; RW)
+	// NOTE: see note for RAL
+
+	// 0-15: Receive Address High, upper 16 bits of MAC addr ("field is defined in big endian)
+	// 16-30: Reserved (0)
+	// 31: Address Valid (0 - valid)
+	REG(0x0A204, 0x00000123,
+		     0x00000000);
 
 
 	// page 552
@@ -834,6 +994,11 @@ stub_device_init(struct stub_device* dev)
 		if (REGISTERS[n].present) {
 			DEV_REG(dev, n) = REGISTERS[n].initial_value;
 		}
+	}
+
+	// 1 bit diff between MAC addresses; see registers init and VigNAT makefile
+	if (dev == &DEVICES[1]) {
+		DEV_REG(dev, 0x0A200) |= 1;
 	}
 }
 
