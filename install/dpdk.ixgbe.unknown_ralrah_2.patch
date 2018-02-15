@@ -1,0 +1,15 @@
+diff --git a/drivers/net/ixgbe/base/ixgbe_common.c b/drivers/net/ixgbe/base/ixgbe_common.c
+index 04f9d82..b0602c7 100644
+--- a/drivers/net/ixgbe/base/ixgbe_common.c
++++ b/drivers/net/ixgbe/base/ixgbe_common.c
+@@ -2512,8 +2510,8 @@ s32 ixgbe_init_rx_addrs_generic(struct ixgbe_hw *hw)
+ 	/* Zero out the other receive addresses. */
+ 	DEBUGOUT1("Clearing RAR[1-%d]\n", rar_entries - 1);
+ 	for (i = 1; i < rar_entries; i++) {
+-		IXGBE_WRITE_REG(hw, IXGBE_RAL(i), 0);
+-		IXGBE_WRITE_REG(hw, IXGBE_RAH(i), 0);
++		IXGBE_WRITE_REG(hw, IXGBE_RAL_82599(i), 0);
++		IXGBE_WRITE_REG(hw, IXGBE_RAH_82599(i), 0);
+ 	}
+ 
+ 	/* Clear the MTA */

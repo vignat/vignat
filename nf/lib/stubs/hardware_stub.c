@@ -77,6 +77,14 @@ stub_register_rw1c_write(struct stub_device* dev, uint32_t current_value, uint32
 }
 
 
+// RC means a register is cleared on read
+static uint32_t
+stub_register_rc_read(struct stub_device* dev, uint32_t current_value)
+{
+	return 0;
+}
+
+
 static uint32_t
 stub_register_i2cctl_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
 {
@@ -567,16 +575,17 @@ stub_register_autoc_write(struct stub_device* dev, uint32_t current_value, uint3
 static void
 stub_registers_init(void)
 {
-	#define REG(addr, val, mask) do {                      \
-				struct stub_register reg = {   \
-					.present = true,       \
-					.initial_value = val,  \
-					.readable = true,      \
-					.writable_mask = mask, \
-					.read = NULL,          \
-					.write = NULL          \
-				};                             \
-				REGISTERS[addr] = reg;         \
+	#define REG(addr, val, mask) do {                              \
+				klee_assert(!REGISTERS[addr].present); \
+				struct stub_register reg = {           \
+					.present = true,               \
+					.initial_value = val,          \
+					.readable = true,              \
+					.writable_mask = mask,         \
+					.read = NULL,                  \
+					.write = NULL                  \
+				};                                     \
+				REGISTERS[addr] = reg;                 \
 			} while(0);
 
 	// page 543
@@ -609,6 +618,23 @@ stub_registers_init(void)
 	// 20-31: Reserved (0x00)
 	REG(0x00008, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000000000);
+
+
+	// pages 544-545
+	// Extended Device Control Register — CTRL_EXT (0x00018; RW)
+
+	// 0-13: Reserved (0)
+	// 14: PF Reset Done (0 - not reset)
+	// 15: Reserved (0)
+	// 16: No Snoop Disable (0 - not disabled)
+	// 17: Relaxed Ordering Disable (0 - not disabled)
+	// 18-25: Reserved (0)
+	// 26: Extended VLAN (0 - not set)
+	// 27: Reserved (0)
+	// 28: Driver loaded (0 - not loaded; note: set by the software)
+	// 29-31: Reserved
+	REG(0x00018, 0b00000000000000000000000000000000,
+		     0b00010100000000110100000000000000);
 
 
 	// page 549
@@ -683,6 +709,52 @@ stub_registers_init(void)
 	REGISTERS[0x00888].readable = false;
 
 
+	// page 621
+	// Rx DCA Control Register — DCA_RXCTRL[n] (0x0100C + 0x40*n, n=0...63 and 0x0D00C + 0x40*(n-64), n=64...127 / 0x02200 + 4*n, [n=0...15]; RW)
+	// NOTE: "DCA_RXCTRL[0...15] are also mapped to address 0x02200... to maintain compatibility with the 82598."
+	//       We do not implement the 0..15 at 0x0100C, which the ixgbe driver doesn't use
+	for (int n = 0; n <= 127; n++) {
+		int address = n <= 15 ? (0x02200 + 4*n)
+			    : n <= 63 ? (0x0100C + 0x40*n)
+				      : (0x0D00C + 0x40*(n-64));
+
+		// 0-4: Reserved (0)
+		// 5: Descriptor DCA EN (0 - not enabled)
+		// 6: RX Header DCA EN (0 - not enabled)
+		// 7: Payload DCA EN (0 - not enabled)
+		// 8: Reserved (0)
+		// 9: RX Descriptor Read Relax Order Enable (1 - enabled)
+		// 10: Reserved (0)
+		// 11: RX Descriptor Write Back Relax Order Enabled (0 - read-only; "this bit must be 0 to enable correct functionality")
+		// 12: Reserved (0)
+		// 13: RX Data Write Relax Order Enable (1 - enabled)
+		// 14: Reserved (0)
+		// 15: RX Split Header Relax Order Enable (1 - enabled)
+		// 16-23: Reserved (0)
+		// 24-31: CPU ID (0 - not set)
+		REG(address, 0b00000000000000001010001000000000,
+			     0b11111111000000000000000000000000);
+	}
+
+	// page 622
+	// Tx DCA Control Registers — DCA_TXCTRL[n] (0x0600C + 0x40*n, n=0...127; RW)
+
+	// 0-4: Reserved (0)
+	// 5: Descriptor DCA Enable (0 - not enabled)
+	// 6-8: Reserved (0)
+	// 9: TX Descriptor Read Relax Order Enable (1 - enabled)
+	// 10: Reserved (0)
+	// 11: Relax Order Enable of TX Descriptor (1 - enabled)
+	// 12: Reserved (0)
+	// 13: TX Data Read Relax Order Enable (1 - enabled)
+	// 14-23: Reserved (0)
+	// 24-31: CPU ID (0 - not set)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x0600C + 0x40*n, 0b00000000000000000010101000000000,
+				      0b11111111000000000000000000000000);
+	}
+
+
 	// page 597
 	// Receive Descriptor Control — RXDCTL[n] (0x01028 + 0x40*n, n=0...63 and 0x0D028 + 0x40*(n-64), n=64...127; RW)
 	for (int n = 0; n <= 127; n++) {
@@ -710,6 +782,38 @@ stub_registers_init(void)
 	// 1-31: Reserved
 	REG(0x03000, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000000001);
+
+
+	// page 661
+	// PCG_1G link Control Register — PCS1GLCTL (0x04208; RW)
+
+	// 0: Forced Link 1 GbE value (0 - default value)
+	// 1-4: Reserved (0)
+	// 5: Force 1GbE link (0 - not forced)
+	// 6: Link Latch Low Enable (0 - not enabled)
+	// 7-17: Reserved (0)
+	// 18: Auto Negotiation 1 GbE Timeout Enable (1 - enabled)
+	// 19-24: Reserved (0)
+	// 25: Link OK Fix En (1 - "should be set to 1b for nominal operation")
+	// 26-31: Reserved
+	REG(0x04208, 0b00000010000001000000000000000000,
+		     0b00000000000001000000000000000000);
+
+
+	// page 663
+	// PCS_1 Gb/s Auto Negotiation Advanced Register — PCS1GANA (0x04218; RW)
+
+	// 0-4: Reserved (0)
+	// 5: Full-Duplex (1 - capable)
+	// 6: Reserved (0)
+	// 7-8: Local PAUSE capabilities (11 - both symmetric and asymmetric toward local device)
+	// 9-11: Reserved (0)
+	// 12-13: Remote Fault (00 - no error, link good)
+	// 14: Reserved (0)
+	// 15: Next Page Capable (0 - no next pages left)
+	// 16-31: Reserved
+	REG(0x04218, 0b00000000000000000000000110100000,
+		     0b00000000000000001011000110100000);
 
 
 	// page 668
@@ -819,6 +923,46 @@ stub_registers_init(void)
 		     0b00000000000000000000000000000000);
 
 
+	// page 618
+	// DCB Transmit Descriptor Plane Queue Select — RTTDQSEL (0x04904; RW)
+
+	// 0-6: TX Descriptor Queue Index or TX Pool of Queues Index (0 - default value)
+	// 7-31: Reserved (0)
+	REG(0x04904, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000001111111);
+
+
+	// page 619
+	// DCB Transmit  Rate-Scheduler Config — RTTBCNRC (0x04984; RW)
+
+	// 0-13: TX rate-scheduler rate factor hexadecimal part (0 - default)
+	// 14-23: TX rate-scheduler rate factor integral part (0 - default)
+	// 24-30: Reserved (0)
+	// 31: TX rate-scheduler enable (0 - not enabled)
+	REG(0x04984, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000000);
+
+
+	// page 583
+	// Multicast Control Register — MCSTCTRL (0x05090; RW)
+
+	// 0-1: Multicast Offset (00 - [47:36])
+	// 2: Multicast Filter Enable (0 - disabled)
+	// 3-31: Reserved (0)
+	REG(0x05090, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000000);
+
+
+	// page 587
+	// Multicast Table Array — MTA[n] (0x05200 + 4*n, n=0...127; RW)
+
+	// 0-31: Bit Vector (0 - we do not care in this model... TODO?)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x05200 + 4*n, 0b00000000000000000000000000000000,
+				   0b11111111111111111111111111111111);
+	}
+
+
 	// page 606
 	// Transmit Descriptor Control — TXDCTL[n] (0x06028+0x40*n, n=0...127; RW)
 	for (int n = 0; n <= 127; n++) {
@@ -837,6 +981,17 @@ stub_registers_init(void)
 	}
 
 
+	// page 588
+	// VLAN Filter Table Array — VFTA[n] (0x0A000 + 4*n, n=0...127; RW)
+
+	// 0-31: VLAN Filter. Each bit i in register n ffects packets with VLAN tags equal to 32n+i
+	//	 When set, the bit enables packet with the associated VLAN tag to pass.
+	for (int n = 0; n <= 127; n++) {
+		REG(0x0A000 + 4*n, 0b00000000000000000000000000000000,
+				   0b11111111111111111111111111111111);
+	}
+
+
 	// page 587
 	// Receive Address Low — RAL[n] (0x0A200 + 8*n, n=0...127; RW)
 	// NOTE: "The first Receive Address register [...] RAR0 should always be used to store the individual Ethernet MAC address of the adapter."
@@ -844,16 +999,66 @@ stub_registers_init(void)
 	// 0-31: Receive Address Low, lower 32 bits of the MAC addr ("field is defined in big endian")
 	REG(0x0A200, 0x45678900, // NOTE: see VigNAT makefile
 		     0x00000000);
+	for (int n = 1; n <= 127; n++) {
+		REG(0x0A200 + 8*n, 0x00000000,
+				   0x11111111);
+	}
 
 	// page 587-588
 	// Receive Address High — RAH[n] (0x0A204 + 8*n, n=0...127; RW)
 	// NOTE: see note for RAL
 
-	// 0-15: Receive Address High, upper 16 bits of MAC addr ("field is defined in big endian)
+	// 0-15: Receive Address High, upper 16 bits of MAC addr ("field is defined in big endian")
 	// 16-30: Reserved (0)
 	// 31: Address Valid (0 - valid)
-	REG(0x0A204, 0x00000123,
+	REG(0x0A204, 0x00000123, // NOTE: see RAL
 		     0x00000000);
+	for (int n = 1; n <= 127; n++) {
+		REG(0x0A204 + 8*n, 0x00000000,
+				   0x11111111);
+	}
+
+
+	// page 588
+	// MAC Pool Select Array — MPSAR[n] (0x0A600 + 4*n, n=0...255; RW)
+
+	// 0-31: Bit i enables pool i/32+i in register 2n/2n+1 for MAC filter n
+	for (int n = 0; n <= 255; n++) {
+		REG(0x0A600 + 4*n, 0b00000000000000000000000000000000,
+				   0b11111111111111111111111111111111);
+	}
+
+
+	// pages 730-731
+	// PF VM VLAN Pool Filter — PFVLVF[n] (0x0F100 + 4*n, n=0...63; RW)
+
+	// 0-11: VLAN ID for pool filter n. (0 - no pools; note: "appears in little endian order")
+	// 12-30: Reserved (0)
+	// 31: VLAN ID Enable (0 - not enabled)
+	for (int n = 0; n <= 63; n++) {
+		REG(0x0F100 + 4*n, 0b00000000000000000000000000000000,
+				   0b10000000000000000000111111111111);
+	}
+
+
+	// page 731
+	// PF VM VLAN Pool Filter Bitmap — PFVLVFB[n] (0x0F200 + 4*n, n=0...127; RW)
+
+	// 0-31: Pool Enable Bit Array. Bit i in 2n/2n+1 is associated with pool i/32+i (0 - nothing)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x0F200 + 4*n, 0b00000000000000000000000000000000,
+				   0b11111111111111111111111111111111);
+	}
+
+
+	// page 731
+	// PF Unicast Table Array — PFUTA[n] (0x0F400 + 4*n, n=0...127; RW)
+
+	// 0-31: Word-wide bit vector in the unicast destination address filter table (0 - models don't care; TODO?)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x0F400 + 4*n, 0b00000000000000000000000000000000,
+				   0b11111111111111111111111111111111);
+	}
 
 
 	// page 552
@@ -976,6 +1181,201 @@ stub_registers_init(void)
 	REG(0x10160, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000011111);
 	REGISTERS[0x10160].write = stub_register_swfwsync_write;
+
+
+	// starting at page 687
+	// Statistics registers; all of them are 32-bit numbers and cleared on read
+	const int stat_regs[] = {
+		0x04000, // CRC Error Count — CRCERRS
+		0x04004, // Illegal Byte Error Count — ILLERRC
+		0x04008, // Error Byte Packet Count — ERRBC
+		0x03FA0, // Rx Missed Packets Count — RXMPC[0]
+		0x03FA4, // Rx Missed Packets Count — RXMPC[1]
+		0x03FA8, // Rx Missed Packets Count — RXMPC[2]
+		0x03FAC, // Rx Missed Packets Count — RXMPC[3]
+		0x03FB0, // Rx Missed Packets Count — RXMPC[4]
+		0x03FB4, // Rx Missed Packets Count — RXMPC[5]
+		0x03FB8, // Rx Missed Packets Count — RXMPC[6]
+		0x03FBC, // Rx Missed Packets Count — RXMPC[7]
+		0x04034, // MAC Local Fault Count — MLFC
+		0x04038, // MAC Remote Fault Count — MRFC
+		0x04040, // Receive Length Error Count — RLEC
+		0x08780, // Switch Security Violation Packet Count — SSVPC
+		0x03F60, // Link XON Transmitted Count — LXONTXC
+		0x041A4, // Link XON Received Count — LXONRXCNT
+		0x03F68, // Link XOFF Transmitted Count — LXOFFTXC
+		0x041A8, // Link XOFF Received Count — LXOFFRXCNT
+		0x03F00, // Priority XON Transmitted Count — PXONTXC[0]
+		0x03F04, // Priority XON Transmitted Count — PXONTXC[1]
+		0x03F08, // Priority XON Transmitted Count — PXONTXC[2]
+		0x03F0C, // Priority XON Transmitted Count — PXONTXC[3]
+		0x03F10, // Priority XON Transmitted Count — PXONTXC[4]
+		0x03F14, // Priority XON Transmitted Count — PXONTXC[5]
+		0x03F18, // Priority XON Transmitted Count — PXONTXC[6]
+		0x03F1C, // Priority XON Transmitted Count — PXONTXC[7]
+		0x04140, // Priority XON Received Count — PXONRXCNT[0]
+		0x04144, // Priority XON Received Count — PXONRXCNT[1]
+		0x04148, // Priority XON Received Count — PXONRXCNT[2]
+		0x0414C, // Priority XON Received Count — PXONRXCNT[3]
+		0x04150, // Priority XON Received Count — PXONRXCNT[4]
+		0x04154, // Priority XON Received Count — PXONRXCNT[5]
+		0x04158, // Priority XON Received Count — PXONRXCNT[6]
+		0x0415C, // Priority XON Received Count — PXONRXCNT[7]
+		0x03F20, // Priority XOFF Transmitted Count — PXOFFTXCNT[0]
+		0x03F24, // Priority XOFF Transmitted Count — PXOFFTXCNT[1]
+		0x03F28, // Priority XOFF Transmitted Count — PXOFFTXCNT[2]
+		0x03F2C, // Priority XOFF Transmitted Count — PXOFFTXCNT[3]
+		0x03F30, // Priority XOFF Transmitted Count — PXOFFTXCNT[4]
+		0x03F34, // Priority XOFF Transmitted Count — PXOFFTXCNT[5]
+		0x03F38, // Priority XOFF Transmitted Count — PXOFFTXCNT[6]
+		0x03F3C, // Priority XOFF Transmitted Count — PXOFFTXCNT[7]
+		0x04160, // Priority XOFF Received Count — PXOFFRXCNT[0]
+		0x04164, // Priority XOFF Received Count — PXOFFRXCNT[1]
+		0x04168, // Priority XOFF Received Count — PXOFFRXCNT[2]
+		0x0416C, // Priority XOFF Received Count — PXOFFRXCNT[3]
+		0x04170, // Priority XOFF Received Count — PXOFFRXCNT[4]
+		0x04174, // Priority XOFF Received Count — PXOFFRXCNT[5]
+		0x04178, // Priority XOFF Received Count — PXOFFRXCNT[6]
+		0x0417C, // Priority XOFF Received Count — PXOFFRXCNT[7]
+		0x03240, // Priority XON to XOFF Count — PXON2OFFCNT[0]
+		0x03244, // Priority XON to XOFF Count — PXON2OFFCNT[1]
+		0x03248, // Priority XON to XOFF Count — PXON2OFFCNT[2]
+		0x0324C, // Priority XON to XOFF Count — PXON2OFFCNT[3]
+		0x03250, // Priority XON to XOFF Count — PXON2OFFCNT[4]
+		0x03254, // Priority XON to XOFF Count — PXON2OFFCNT[5]
+		0x03258, // Priority XON to XOFF Count — PXON2OFFCNT[6]
+		0x0325C, // Priority XON to XOFF Count — PXON2OFFCNT[7]
+		0x041B0, // Good Rx Non-Filtered Packet Counter — RXNFGPC
+		0x041B4, // Good Rx Non-Filter Byte Counter Low — RXNFGBCL
+		0x041B8, // Good Rx Non-Filter Byte Counter High — RXNFGBCH
+		0x02F50, // DMA Good Rx Packet Counter — RXDGPC
+		0x02F54, // DMA Good Rx Byte Counter Low — RXDGBCL
+		0x02F58, // DMA Good Rx Byte Counter High — RXDGBCH
+		0x02F5C, // DMA Duplicated Good Rx Packet Counter — RXDDPC
+		0x02F60, // DMA Duplicated Good Rx Byte Counter Low — RXDDBCL
+		0x02F64, // DMA Duplicated Good Rx Byte Counter High — RXDDBCH
+		0x02F68, // DMA Good Rx LPBK Packet Counter — RXLPBKPC
+		0x02F6C, // DMA Good Rx LPBK Byte Counter Low — RXLPBKBCL
+		0x02F70, // DMA Good Rx LPBK Byte Counter High — RXLPBKBCH
+		0x02F74, // DMA Duplicated Good Rx LPBK Packet Counter — RXDLPBKPC
+		0x02F78, // DMA Duplicated Good Rx LPBK Byte Counter Low — RXDLPBKBCL
+		0x02F7C, // DMA Duplicated Good Rx LPBK Byte Counter High — RXDLPBKBCH
+		0x04080, // Good Packets Transmitted Count — GPTC
+		0x04090, // Good Octets Transmitted Count Low — GOTCL
+		0x04094, // Good Octets Transmitted Count High — GOTCH
+		0x087A0, // DMA Good Tx Packet Counter – TXDGPC
+		0x087A4, // DMA Good Tx Byte Counter Low – TXDGBCL
+		0x087A8, // DMA Good Tx Byte Counter High – TXDGBCH
+		0x040A4, // Receive Undersize Count — RUC
+		0x040A8, // Receive Fragment Count — RFC
+		0x040AC, // Receive Oversize Count — ROC
+		0x040B0, // Receive Jabber Count — RJC
+		0x040C0, // Total Octets Received Low — TORL
+		0x040C4, // Total Octets Received High — TORH
+		0x040D0, // Total Packets Received — TPR
+		0x040D4, // Total Packets Transmitted — TPT
+		0x040D8, // Packets Transmitted (64 Bytes) Count — PTC64
+		0x040DC, // Packets Transmitted [65–127 Bytes] Count — PTC127
+		0x040E0, // Packets Transmitted [128–255 Bytes] Count — PTC255
+		0x040E4, // Packets Transmitted [256–511 Bytes] Count — PTC511
+		0x040E8, // Packets Transmitted [512–1023 Bytes] Count — PTC1023
+		0x040EC, // Packets Transmitted [Greater Than 1024 Bytes] Count — PTC1522
+		0x040F0, // Multicast Packets Transmitted Count — MPTC
+		0x040F4, // Broadcast Packets Transmitted Count — BPTC
+		0x04010, // MAC Short Packet Discard Count — MSPDC
+		0x04120, // XSUM Error Count — XEC
+		0x05118, // FC CRC Error Count — FCCRC
+		0x0241C, // FCoE Rx Packets Dropped Count — FCOERPDC
+		0x02424, // FC Last Error Count — FCLAST
+		0x02428, // FCoE Packets Received Count — FCOEPRC
+		0x0242C, // FCOE DWord Received Count — FCOEDWRC
+		0x08784, // FCoE Packets Transmitted Count — FCOEPTC
+		0x08788  // FCoE DWord Transmitted Count — FCOEDWTC
+	};
+	for (int n = 0; n < sizeof(stat_regs)/sizeof(stat_regs[0]); n++) {
+		REG(stat_regs[n], 0b00000000000000000000000000000000,
+				  0b00000000000000000000000000000000);
+		REGISTERS[stat_regs[n]].read = stub_register_rc_read;
+	}
+	// these are RW
+	const int stat_regs_rw[] = {
+		0x0405C, // Packets Received [64 Bytes] Count — PRC64
+		0x04060, // Packets Received [65–127 Bytes] Count — PRC127
+		0x04064, // Packets Received [128–255 Bytes] Count — PRC255
+		0x04068, // Packets Received [256–511 Bytes] Count — PRC511
+		0x0406C, // Packets Received [512–1023 Bytes] Count — PRC1023
+		0x04070, // Packets Received [1024 to Max Bytes] Count — PRC1522
+		0x02F40  // Rx DMA Statistic Counter Control — RXDSTATCTRL
+	};
+	for (int n = 0; n < sizeof(stat_regs_rw)/sizeof(stat_regs_rw[0]); n++) {
+		REG(stat_regs_rw[n], 0b00000000000000000000000000000000,
+				     0b11111111111111111111111111111111);
+	}
+	// these are RO
+	const int stat_regs_ro[] = {
+		0x04078, // Broadcast Packets Received Count — BPRC
+		0x0407C, // Multicast Packets Received Count — MPRC
+		0x04074, // Good Packets Received Count — GPRC
+		0x04088, // Good Octets Received Count Low — GORCL
+		0x0408C, // Good Octets Received Count High — GORCH
+		0x040B4, // Management Packets Received Count — MNGPRC
+		0x040B8, // Management Packets Dropped Count — MNGPDC
+		0x0CF90  // Management Packets Transmitted Count — MNGPTC
+	};
+	for (int n = 0; n < sizeof(stat_regs_ro)/sizeof(stat_regs_ro[0]); n++) {
+		REG(stat_regs_ro[n], 0b00000000000000000000000000000000,
+				     0b00000000000000000000000000000000);
+	}
+	// Transmit Queue Statistic Mapping Registers — TQSM[n] (0x08600 + 4*n, n=0...31; RW)
+	for (int n = 0; n <= 31; n++) {
+		REG(0x08600 + 4*n, 0b00000000000000000000000000000000,
+				   0b00001111000011110000111100001111);
+	}
+	// Queue Packets Received Count — QPRC[n] (0x01030 + 0x40*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x01030 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000000000000000000000);
+		REGISTERS[0x01030 + 0x40*n].read = stub_register_rc_read;
+	}
+	// Queue Packets Received Drop Count — QPRDC[n] (0x01430 + 0x40*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x01430 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000000000000000000000);
+		REGISTERS[0x01430 + 0x40*n].read = stub_register_rc_read;
+	}
+	// Queue Bytes Received Count Low — QBRC_L[n] (0x01034 + 0x40*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x01034 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000000000000000000000);
+		REGISTERS[0x01034 + 0x40*n].read = stub_register_rc_read;
+	}
+	// Queue Bytes Received Count High — QBRC_H[n] (0x01038 + 0x40*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x01038 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000000000000000000000);
+		REGISTERS[0x01038 + 0x40*n].read = stub_register_rc_read;
+	}
+	// Queue Packets Transmitted Count — QPTC[n] (0x08680 + 0x4*n, n=0...15 / 0x06030 + 0x40*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x08680 + 0x4*n, 0b00000000000000000000000000000000,
+				     0b00000000000000000000000000000000);
+		REGISTERS[0x08680 + 0x4*n].read = stub_register_rc_read;
+		REG(0x06030 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000000000000000000000);
+		REGISTERS[0x06030 + 0x40*n].read = stub_register_rc_read;
+	}
+	// Queue Bytes Transmitted Count Low — QBTC_L[n] (0x08700 + 0x8*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x08700 + 0x8*n, 0b00000000000000000000000000000000,
+				     0b00000000000000000000000000000000);
+		REGISTERS[0x08700 + 0x8*n].read = stub_register_rc_read;
+	}
+	// Queue Bytes Transmitted Count High — QBTC_H[n] (0x08704 + 0x8*n, n=0...15; RC)
+	for (int n = 0; n <= 15; n++) {
+		REG(0x08704 + 0x8*n, 0b00000000000000000000000000000000,
+				     0b00000000000000000000000000000000);
+		REGISTERS[0x08704 + 0x8*n].read = stub_register_rc_read;
+	}
 }
 
 static void
@@ -1063,6 +1463,7 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 		uint32_t changed = current_value ^ new_value;
 
 		if ((changed & ~reg.writable_mask) != 0) {
+			klee_print_expr("offset", offset);
 			klee_print_expr("old", current_value);
 			klee_print_expr("changed", changed);
 			klee_abort();
