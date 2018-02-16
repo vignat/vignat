@@ -1,22 +1,3 @@
-diff --git a/lib/librte_eal/common/include/arch/x86/rte_cycles.h b/lib/librte_eal/common/include/arch/x86/rte_cycles.h
-index 6e3c7d8..17d6617 100644
---- a/lib/librte_eal/common/include/arch/x86/rte_cycles.h
-+++ b/lib/librte_eal/common/include/arch/x86/rte_cycles.h
-@@ -98,10 +98,14 @@ rte_rdtsc(void)
- 	}
- #endif
- 
-+#ifdef KLEE_VERIFICATION
-+	return 0; // inline assembly? no way!
-+#else
- 	asm volatile("rdtsc" :
- 		     "=a" (tsc.lo_32),
- 		     "=d" (tsc.hi_32));
- 	return tsc.tsc_64;
-+#endif
- }
- 
- static inline uint64_t
 diff --git a/lib/librte_eal/linuxapp/eal/eal_log.c b/lib/librte_eal/linuxapp/eal/eal_log.c
 index c088bd9..11e3c5c 100644
 --- a/lib/librte_eal/linuxapp/eal/eal_log.c

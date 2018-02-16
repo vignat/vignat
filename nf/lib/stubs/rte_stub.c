@@ -44,6 +44,14 @@ ixgbe_txq_vec_setup(struct ixgbe_tx_queue *txq)
 }
 
 
+uint64_t
+stub_rdtsc(void)
+{
+	uint64_t value;
+	klee_make_symbolic(&value, sizeof(uint64_t), "tsc");
+	return value;
+}
+
 const char *
 stub_strerror(int errnum)
 {
@@ -63,6 +71,10 @@ stub_rte_init(void)
 {
 	// rte_memcpy uses fancy-schmancy intrinsics
 	klee_alias_function("rte_memcpy", "memcpy");
+
+	// rte_rdtsc uses assembly; we remain sound by modeling it as an unconstrained symbol
+	// note that rte_rdtsc
+	klee_alias_function_regex("rte_rdtsc[0-9]*", "stub_rdtsc");
 
 	// Don't bother trying to translate error codes
 	// note: this is just to avoid an snprintf, we could support it I guess...
