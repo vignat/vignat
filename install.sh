@@ -134,7 +134,7 @@ touch "$PROGRESSDIR/z3_installed"
 
 ### VeriFast
 
-git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast "$BUILDDIR/verifast"
+git clone --depth 1 --branch export_path_conditions https://github.com/vignat/verifast "$BUILDDIR/verifast"
 pushd "$BUILDDIR/verifast/src"
   make verifast # should be just "make" but the verifast checks fail due to a non auto lemma
   echo 'PATH='"$BUILDDIR/verifast/bin"':$PATH' >> "$PATHSFILE"
@@ -155,7 +155,7 @@ pushd "$BUILDDIR/llvm"
   . "$PATHSFILE"
 popd
 
-git clone --depth 1 --branch fix_no_buffers https://github.com/SolalPirelli/klee-uclibc.git "$BUILDDIR/klee-uclibc"
+git clone --depth 1 --branch fix_no_buffers https://github.com/vignat/klee-uclibc.git "$BUILDDIR/klee-uclibc"
 pushd "$BUILDDIR/klee-uclibc"
   ./configure \
    --make-llvm-lib \
@@ -168,7 +168,7 @@ pushd "$BUILDDIR/klee-uclibc"
   make -j $(nproc)
 popd
 
-git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/SolalPirelli/klee.git "$BUILDDIR/klee"
+git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/vignat/klee.git "$BUILDDIR/klee"
 pushd "$BUILDDIR/klee"
   mkdir build
   pushd build
