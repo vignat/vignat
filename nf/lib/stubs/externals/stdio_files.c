@@ -1,3 +1,6 @@
+#include "lib/stubs/externals/externals_stub.h"
+#include "lib/stubs/hardware_stub.h"
+
 #include <dirent.h>
 #include <endian.h>
 #include <fcntl.h>
@@ -10,8 +13,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#include "lib/stubs/hardware_stub.h"
 
 #include <klee/klee.h>
 
@@ -56,7 +57,7 @@ struct stub_file {
 };
 // Files indexed by FD
 // TODO what if the code under verification branches on an FD with a hardcoded comparison?
-static struct stub_file FILES[1024];
+static struct stub_file FILES[STUB_FILES_COUNT];
 
 // Special case: the page map
 static char* FILE_CONTENT_PAGEMAP = (char*) -100;
@@ -484,9 +485,11 @@ stub_stdio_files_init(void)
 		char sys_uio_path[1024];
 		snprintf(sys_uio_path, sizeof(sys_uio_path), "/sys/class/uio/uio%d/device/config", n);
 		stub_add_file(strdup(sys_uio_path), "");
-		char dev_uio_path[1024];
-		snprintf(dev_uio_path, sizeof(dev_uio_path), "/dev/uio%d", n);
-		stub_add_file(strdup(dev_uio_path), ""); // HACK as long as it's not used, we can pretend it's a file (it's a device...)
+
+		// Interrupts
+		char interrupts_file_path[1024];
+		snprintf(interrupts_file_path, sizeof(interrupts_file_path), "/dev/uio%d", n);
+		DEVICES[n].interrupts_fd = stub_add_file(strdup(interrupts_file_path), "");
 	}
 
 	stub_add_folder_array("/sys/bus/pci/devices", devices_count, dev_folders);

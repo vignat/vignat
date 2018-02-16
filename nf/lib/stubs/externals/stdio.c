@@ -1,8 +1,12 @@
+#include "lib/stubs/externals/externals_stub.h"
+#include "lib/stubs/hardware_stub.h"
+
 // GNU_SOURCE for fopencookie (TODO define here, not on compile line)
 //#define _GNU_SOURCE
 #include <stdio.h>
 //#undef _GNU_SOURCE
 
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -147,4 +151,46 @@ fopencookie(void* cookie, const char* mode, cookie_io_functions_t io_funcs)
 	FILE* f = (FILE*) malloc(sizeof(FILE));;
 	klee_forbid_access(f, sizeof(FILE), "fopencookie");
 	return f;
+}
+
+// We implement this here since it's common to multiple kinds of I/O: files and pipes
+ssize_t
+write(int fd, const void* buf, size_t count)
+{
+	// http://man7.org/linux/man-pages/man2/write.2.html
+
+	// "According to POSIX.1, if count is greater than SSIZE_MAX, the result is implementation-defined"
+	klee_assert(count <= SSIZE_MAX);
+
+	// "On Linux, write() (and similar system calls) will transfer at most 0x7ffff000 (2,147,479,552) bytes,
+	//  returning the number of bytes actually transferred."
+	klee_assert(count <= 0x7ffff000);
+
+	// Either we write to the stub pipe, or to an interrupt file
+	if (fd == STUB_PIPE_FD_WRITE) {
+		stub_pipe_write(buf, count);
+	} else {
+		klee_assert(count == 4);
+
+		for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+			if (fd == DEVICES[n].interrupts_fd) {
+				if (*((uint32_t*) buf) == 0) {
+					DEVICES[n].interrupts_enabled = false;
+				} else if (*((uint32_t*) buf) == 1) {
+					DEVICES[n].interrupts_enabled = true;
+				} else {
+					klee_abort();
+				}
+
+				goto success;
+			}
+		}
+
+		klee_abort();
+	}
+
+	// "On success, the number of bytes written is returned (zero indicates nothing was written).
+	//  It is not an error if this number is smaller than the number of bytes requested."
+success:
+	return 0;
 }

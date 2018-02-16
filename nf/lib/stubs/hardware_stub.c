@@ -683,6 +683,18 @@ stub_registers_init(void)
 		     0b00010100000000110100000000000000);
 
 
+	// page 545
+	// Extended SDP Control — ESDP (0x00020; RW)
+	// NOTE: The ixgbe driver checks that SDP2 Data Value is 1 and assumes the link is down otherwise. TODO Why?
+
+	// 0-7: SDPn Data Value, where 'n' is bit number (0 - default)
+	// 8-15: SDPn Pin Directionality, where 'n' is bit number (0 - default)
+	// 16-23: SDPn Operating Mode, where 'n' is bit number (0 - default)
+	// 24-25: Reserved (0)
+	// 26-31: SDPn Native Mode Functionality, where 'n' is bit number PLUS TWO! (0 - default)
+	REG(0x00020, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000000100);
+
 	// page 549
 	// I2C Control — I2CCTL (0x00028; RW)
 
@@ -1106,7 +1118,7 @@ stub_registers_init(void)
 		     0x00000000);
 	for (int n = 1; n <= 127; n++) {
 		REG(0x0A200 + 8*n, 0x00000000,
-				   0x11111111);
+				   0xFFFFFFFF);
 	}
 
 	// page 587-588
@@ -1115,12 +1127,12 @@ stub_registers_init(void)
 
 	// 0-15: Receive Address High, upper 16 bits of MAC addr ("field is defined in big endian")
 	// 16-30: Reserved (0)
-	// 31: Address Valid (0 - valid)
-	REG(0x0A204, 0x00000123, // NOTE: see RAL
-		     0x00000000);
+	// 31: Address Valid (0/1 - in/valid)
+	REG(0x0A204, 0x80000123, // NOTE: see RAL
+		     0x80000000);
 	for (int n = 1; n <= 127; n++) {
 		REG(0x0A204 + 8*n, 0x00000000,
-				   0x11111111);
+				   0x8000FFFF);
 	}
 
 
@@ -1627,6 +1639,8 @@ stub_hardware_init(void)
 	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
 		struct stub_device stub_dev = {
 			.name = stub_pci_name(n),
+			.interrupts_fd = 0, // set by stdio_files stub
+			.interrupts_enabled = false,
 			.mem = NULL,
 			.mem_len = 1 << 20, // 2^20 bytes
 			.mem_shadow = NULL,

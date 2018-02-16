@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 
 
@@ -12,6 +13,9 @@ static const int DEVICES_COUNT = 0;
 
 struct stub_device {
 	char* name;
+
+	int interrupts_fd;
+	bool interrupts_enabled;
 
 	void* mem; // intercepted by stub
 	size_t mem_len;
