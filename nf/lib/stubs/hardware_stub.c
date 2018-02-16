@@ -426,10 +426,74 @@ klee_print_expr("addr", addr);
 		SET_BIT(new_value, n, 0);
 	}
 
-	// Checksum word - sum of all words from 0x00 to 0x3F (including words pointed to if any) must be 0xBABA
-	if (addr == 0x3F) {
-		new_value |= (0xBABA << 16);
+	// "EEPROM General Map" page 217
+	uint16_t eeprom_map[] = {
+		0, // 0x00
+		0, // 0x01,
+		0, // 0x02 - UNDOCUMENTED
+		0, // 0x03
+		0, // 0x04
+		0, // 0x05
+		0, // 0x06
+		0, // 0x07
+		0, // 0x08
+		0, // 0x09
+		0, // 0x0A
+		0, // 0x0B
+		0, // 0x0C
+		0, // 0x0D
+		0, // 0x0E
+		0, // 0x0F
+		0, 0, 0, 0, 0, // 0x10-0x14
+		0, 0, // 0x15-0x16
+		0, // 0x17
+		0, 0, // 0x18-0x19
+		0, // 0x20
+		0, 0, 0, 0, 0, // 0x21-25
+		0, // 0x26
+		0, // 0x27
+		0, // 0x28
+		0, 0, 0, 0, 0, 0, // 0x29-0x2E
+		0, // 0x2F
+		0, 0, 0, 0, 0, 0, 0, // 0x30-0x36
+		0, // 0x37
+		0, // 0x38
+		0, 0, 0, 0, 0, 0, // 0x39-0x3E
+		0, // 0x3F - CHECKSUM, LEAVE ZERO HERE
+		// begin of firmware module
+		0, // 0x0
+		0, // 0x1
+		0, // 0x2
+		0, // 0x3
+		0, // 0x4 - Pass Through Patch Configuration Pointer
+		0, // 0x5
+		0, // 0x6
+		0, // 0x7
+		0, // 0x8
+		0, // 0x9
+		0, // 0xA
+		// begin of Pass Through Patch Condiguration
+		0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0,
+	};
+	// Set the FW pointer to just after the basic block
+	eeprom_map[0x0F] = 0x3F + 1;
+	// Set the pass through patch conf pointer to just after the firmware module
+	eeprom_map[0x3F + 1 + 0x4] = 0x3F + 1 + 0xA + 1;
+	// and then for magic... this specific thing is a version, apparently? if it's not >5, ixgbe assumes the eeprom is invalid
+	eeprom_map[0x3F + 1 + 0xA + 1 + 0x7] = 0x6;
+
+	// Checksum word - sum of all words from 0x00 to 0x3F (including words pointed to if any, except the FW block) must be 0xBABA
+	uint16_t checksum = 0;
+	for (int n = 0; n <= 0x3F; n++) {
+		checksum += eeprom_map[n];
 	}
+	checksum = 0xBABA - checksum;
+	eeprom_map[0x3F] = checksum;
+
+	new_value |= (eeprom_map[addr] << 16);
 
 	// Mark read as done
 	// TODO some timeouts?
@@ -698,6 +762,14 @@ stub_registers_init(void)
 		     0b00000000000000000000000000000001);
 	REGISTERS[0x00800].write = stub_register_rw1c_write;
 
+	// page 573
+	// Extended Interrupt Mask Set/Read Register- EIMS (0x00880; RWS)
+
+	// 0-30: Interrupt Enable, each bit enables its corresponding interrupt in EICR (0 - not enabled)
+	// 31: Reserved (0)
+	REG(0x00880, 0b00000000000000000000000000000000,
+		     0b01111111111111111111111111111111);
+
 	// page 574
 	// Extended Interrupt Mask Clear Register- EIMC (0x00888; WO)
 	// TODO do we model interrupts?
@@ -707,6 +779,17 @@ stub_registers_init(void)
 	REG(0x00888, 0b00000000000000000000000000000000,
 		     0b01111111111111111111111111111111);
 	REGISTERS[0x00888].readable = false;
+
+	// page 575
+	// Extended Interrupt Mask Clear Registers — EIMC[n] (0x00AB0 + 4*(n-1), n=1...2; WO)
+
+	// 0-31: Writing a 1b to any bit clears the corresponding bit in the EIMS[n] register
+	//	 "Reading this register provides no meaningful data."
+	for (int n = 1; n <= 2; n++) {
+		REG(0x00AB0 + 4*(n-1), 0b00000000000000000000000000000000,
+				       0b11111111111111111111111111111111);
+		REGISTERS[0x00AB0 + 4*(n-1)].readable = false;
+	}
 
 
 	// page 621
@@ -775,6 +858,23 @@ stub_registers_init(void)
 	}
 
 
+	// page 702
+	// Receive Queue Statistic Mapping Registers — RQSMR[n] (0x02300 + 4*n, n=0...31; RW)
+
+	// 0-3: Q_MAP for queues 4*n (0 - default)
+	// 4-7: Reserved (0)
+	// 8-11: Q_MAP for queues 4*n+1 (0 - default)
+	// 12-15: Reserved (0)
+	// 16-19: Q_MAP for queues 4*n+2 (0 - default)
+	// 20-23: Reserved (0)
+	// 24-27: Q_MAP for queues 4*n+3 (0 - default)
+	// 28-31: Reserved (0)
+	for (int n = 0; n <= 31; n++) {
+		REG(0x02300 + 4*n, 0b00000000000000000000000000000000,
+				   0b00000000000000000000000000000000);
+	}
+
+
 	// page 600
 	// Receive Control Register — RXCTRL (0x03000; RW)
 
@@ -829,6 +929,29 @@ stub_registers_init(void)
 	REG(0x0425C, 0b00000000000000000000000000000000,
 		     0b01011111111111111111111111111111); // bit 29 is read-only since it cannot be 1
 	REGISTERS[0x0425C].write = stub_register_msca_write;
+
+
+	// page 666
+	// MAC Core Control 0 Register — HLREG0 (0x04240; RW)
+
+	// 0: TX CRC Enable (1 - enable)
+	// <the data sheet says bit 1 is reserved and set to 1, but then has another bit 1...>
+	// 1: RX CRC Strip (1 - enabled)
+	// 2: Jumbo Frames Enable (0 - disable)
+	// 3-9: Reserved, must be set to 0x1 (!!!)
+	// 10: TX Pad Frame Enable (1 - enabled)
+	// 11-14: Reserved, must be set to 0101b (!!!)
+	// 15: Loopback (0 - disabled)
+	// 16: MDC Speed (1 - default)
+	// 17: Continuous MDC (0 - off between packets, default)
+	// 18-19: Reserved (00)
+	// 20-23: Prepend Value (0 - default)
+	// 24-26: Reserved (0)
+	// 27: RX Length Error Reporting (1 - enabled, default)
+	// 28: RX Padding Strip Enable (0 - disabled, default; "this functionality should be used as debug mode only")
+	// 29-31: Reserved (0)
+	REG(0x04240, 0b00001000000000010010110000001011,
+		     0b00000000000000000000000000000000);
 
 
 	// page 669
@@ -1290,7 +1413,18 @@ stub_registers_init(void)
 		0x02428, // FCoE Packets Received Count — FCOEPRC
 		0x0242C, // FCOE DWord Received Count — FCOEDWRC
 		0x08784, // FCoE Packets Transmitted Count — FCOEPTC
-		0x08788  // FCoE DWord Transmitted Count — FCOEDWTC
+		0x08788, // FCoE DWord Transmitted Count — FCOEDWTC
+		0x0EE58, // Flow Director Filters Match Statistics — FDIRMATCH (page 657)
+		0x0EE5C, // Flow Director Filters Miss Match Statistics — FDIRMISS (page 657)
+		// starting on page 639
+		0x08F64, // LinkSec Rx Packet OK — LSECRXOK[0]
+		0x08F68, // LinkSec Rx Packet OK — LSECRXOK[1]
+		0x08F6C, // LinkSec Rx Invalid — LSECRXINV[0]
+		0x08F70, // LinkSec Rx Invalid — LSECRXINV[1]
+		0x08F74, // LinkSec Rx Not valid count — LSECRXNV[0]
+		0x08F78, // LinkSec Rx Not valid count — LSECRXNV[1]
+		0x08F7C, // LinkSec Rx Unused SA Count — LSECRXUNSA
+		0x08F80, // LinkSec Rx Not Using SA Count — LSECRXNUSA
 	};
 	for (int n = 0; n < sizeof(stat_regs)/sizeof(stat_regs[0]); n++) {
 		REG(stat_regs[n], 0b00000000000000000000000000000000,
@@ -1305,7 +1439,7 @@ stub_registers_init(void)
 		0x04068, // Packets Received [256–511 Bytes] Count — PRC511
 		0x0406C, // Packets Received [512–1023 Bytes] Count — PRC1023
 		0x04070, // Packets Received [1024 to Max Bytes] Count — PRC1522
-		0x02F40  // Rx DMA Statistic Counter Control — RXDSTATCTRL
+		0x02F40, // Rx DMA Statistic Counter Control — RXDSTATCTRL
 	};
 	for (int n = 0; n < sizeof(stat_regs_rw)/sizeof(stat_regs_rw[0]); n++) {
 		REG(stat_regs_rw[n], 0b00000000000000000000000000000000,
@@ -1320,7 +1454,22 @@ stub_registers_init(void)
 		0x0408C, // Good Octets Received Count High — GORCH
 		0x040B4, // Management Packets Received Count — MNGPRC
 		0x040B8, // Management Packets Dropped Count — MNGPDC
-		0x0CF90  // Management Packets Transmitted Count — MNGPTC
+		0x0CF90, // Management Packets Transmitted Count — MNGPTC
+		// and then, starting on page 634
+		0x08A3C, // Tx Untagged Packet Counter — LSECTXUT
+		0x08A40, // Encrypted Tx Packets — LSECTXPKTE
+		0x08A44, // Protected Tx Packets — LSECTXPKTP
+		0x08A48, // Encrypted Tx Octets — LSECTXOCTE
+		0x08A4C, // Protected Tx Octets — LSECTXOCTP
+		0x08F40, // LinkSec Untagged Rx Packet — LSECRXUT
+		0x08F44, // LinkSec Rx Octets Decrypted — LSECRXOCTE
+		0x08F48, // LinkSec Rx Octets Validated — LSECRXOCTP
+		0x08F4C, // LinkSec Rx Packet with Bad Tag — LSECRXBAD
+		0x08F50, // LinkSec Rx Packet No SCI — LSECRXNOSCI
+		0x08F54, // LinkSec Rx Packet Unknown SCI — LSECRXUNSCI
+		0x08F58, // LinkSec Rx Unchecked Packets — LSECRXUC
+		0x08F5C, // LinkSec Rx Delayed Packets — LSECRXDELAY
+		0x08F60, // LinkSec Rx Late Packets — LSECRXLATE
 	};
 	for (int n = 0; n < sizeof(stat_regs_ro)/sizeof(stat_regs_ro[0]); n++) {
 		REG(stat_regs_ro[n], 0b00000000000000000000000000000000,

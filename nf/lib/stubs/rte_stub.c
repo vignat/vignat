@@ -10,12 +10,8 @@ rte_cpu_get_flag_enabled(enum rte_cpu_flag_t feature)
 		return 1; //klee_int("rte_cpu_get_flag_enabled_return");
 	}
 
-	// Used in hash initialization
-	if (feature == RTE_CPUFLAG_EM64T) {
-		return 0;
-	}
-
-	klee_abort();
+	// Nope, not supported
+	return 0;
 }
 
 const char *

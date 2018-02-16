@@ -11,3 +11,16 @@ index bda8558..af90462 100644
  
  /* Interrupt Vector Allocation Registers */
  #define IXGBE_IVAR_REG_NUM		25
+diff --git a/drivers/net/ixgbe/ixgbe_ethdev.c b/drivers/net/ixgbe/ixgbe_ethdev.c
+index bead9c3..b75acf8 100644
+--- a/drivers/net/ixgbe/ixgbe_ethdev.c
++++ b/drivers/net/ixgbe/ixgbe_ethdev.c
+@@ -923,7 +923,7 @@ ixgbe_disable_intr(struct ixgbe_hw *hw)
+ 	if (hw->mac.type == ixgbe_mac_82598EB) {
+ 		IXGBE_WRITE_REG(hw, IXGBE_EIMC, ~0);
+ 	} else {
+-		IXGBE_WRITE_REG(hw, IXGBE_EIMC, 0xFFFF0000);
++		IXGBE_WRITE_REG(hw, IXGBE_EIMC, IXGBE_IRQ_CLEAR_MASK);
+ 		IXGBE_WRITE_REG(hw, IXGBE_EIMC_EX(0), ~0);
+ 		IXGBE_WRITE_REG(hw, IXGBE_EIMC_EX(1), ~0);
+ 	}
