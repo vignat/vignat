@@ -32,7 +32,7 @@ verify:
 	clang \
 		-D_GNU_SOURCE `# TODO find a way to remove this from here, not clean` \
 		-DKLEE_VERIFICATION `# for a few ifdefs` \
-		`#-DENABLE_HARDWARE_STUB enable hardware stubs instead of using driver stubs` \
+		-DENABLE_HARDWARE_STUB `# enable hardware stubs instead of using driver stubs` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
 		`# Include directories` \
 		-I . -I .. \
@@ -41,6 +41,7 @@ verify:
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
 		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
 		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
+		-I $(RTE_SDK)/drivers/net/ixgbe `# for ixgbe headers` \
 		`# Special included files` \
 		--include=lib/stubs/builtin_stub.h `# compiler builtin stubs` \
 		--include=rte_config.h `# required by many DPDK files` \
@@ -87,7 +88,7 @@ verify:
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
-	gdb -ex run --args klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
+	klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
 		--no-shconf `# don't mmap the config` \
 		-- \

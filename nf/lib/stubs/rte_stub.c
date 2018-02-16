@@ -1,4 +1,7 @@
 #include <rte_cpuflags.h>
+#include <rte_malloc.h> // for ixgbe_rxtx
+
+#include <ixgbe_rxtx_vec_common.h>
 
 #include <klee/klee.h>
 
@@ -24,6 +27,20 @@ uint64_t
 get_tsc_freq_arch(void)
 {
 	return -1; // Not supported
+}
+
+// The implementation of ixgbe_txq_vec_setup is in a file that uses a ton of SSE ops
+// but for some reason the ops it declares for ixgbe_txq_ops are just methods that
+// forward to non-SSE methods... so in essence we're just copy/pasting and inlining here
+static const struct ixgbe_txq_ops stub_txq_ops = {
+	.release_mbufs = _ixgbe_tx_queue_release_mbufs_vec,
+	.free_swring = _ixgbe_tx_free_swring_vec,
+	.reset = _ixgbe_reset_tx_queue_vec
+};
+int
+ixgbe_txq_vec_setup(struct ixgbe_tx_queue *txq)
+{
+	return ixgbe_txq_vec_setup_default(txq, &stub_txq_ops);
 }
 
 

@@ -22,6 +22,9 @@
 // TODO make it decent anyway, we shouldn't rely on that
 #define __sync_fetch_and_add(ptr, value) (*(ptr) += (value))
 
+// idem than add, but with sub
+#define __sync_fetch_and_sub(ptr, value) (*(ptr) -= (value))
+
 
 // Despite it being called test_and_set, GCC docs describe it as "not a traditional test-and-set operation, but rather an atomic exchange operation"
 static inline int32_t stub_test_and_set(volatile int32_t* ptr, int32_t value)

@@ -45,7 +45,6 @@ static uint64_t TIME;
 static void
 stub_delay_us(unsigned int us)
 {
-klee_print_expr("DELAY", us);
 	TIME += us * 1000 ; // TIME is in ns
 }
 
@@ -229,7 +228,6 @@ stub_register_i2cctl_write(struct stub_device* dev, uint32_t current_value, uint
 	}
 
 	if (dev->i2c_state == SFP_ADDRESSING) {
-klee_print_expr("sfp_addressing, counter=",dev->i2c_counter % 9);
 		if (dev->i2c_counter % 9 < 8) {
 			dev->sfp_address = dev->sfp_address << 1;
 			dev->sfp_address = dev->sfp_address | sda_new;
@@ -250,17 +248,14 @@ klee_print_expr("sfp_addressing, counter=",dev->i2c_counter % 9);
 		// Registers are found in table 4-1
 
 		int cursor = dev->i2c_counter % 9;
-klee_print_expr("sfp_reading, cursor = ", cursor);
 		dev->i2c_counter++;
 
 		if (cursor == 8) {
 			// "To specify a sequential read, the host responds with an acknowledge"
 			// "The sequence is terminated when the host responds with a NACK and a STOP"
 			if (sda_new == 0) { // remember, 0 is ACK because it's a pull-up
-klee_print_expr("GOT ACK", sda_new);
 				dev->sfp_address++;
 			} else {
-klee_print_expr("GOT NACK", sda_new);
 				dev->i2c_state = SFP_END;
 			}
 
@@ -416,8 +411,6 @@ stub_register_eerd_write(struct stub_device* dev, uint32_t current_value, uint32
 
 	bool read = GET_BIT(new_value, 0);
 	uint16_t addr = (new_value >> 2) & 0b11111111111111;
-klee_print_expr("EEPROM READ", read);
-klee_print_expr("addr", addr);
 
 	// Clear read bit
 	SET_BIT(new_value, 0, 0);
@@ -527,11 +520,7 @@ stub_register_msca_write(struct stub_device* dev, uint32_t current_value, uint32
 		if (opcode == 0b00) { // address operation
 			klee_assert(dev->current_mdi_address == -1);
 			dev->current_mdi_address = new_value & 0xFF;
-klee_print_expr("dev",*dev);
-klee_print_expr("ADDR PHY", dev->current_mdi_address);
 		} else if (opcode == 0b11) { // read operation
-klee_print_expr("dev", *dev);
-klee_print_expr("READ PHY", dev->current_mdi_address);
 			klee_assert(dev->current_mdi_address != -1);
 
 			int phy_addr = (new_value >> 21) & 0b11111;
@@ -544,21 +533,14 @@ klee_print_expr("READ PHY", dev->current_mdi_address);
 				result = 1; // just needs to be nonzero
 			}
 
-klee_print_expr("phy addr", phy_addr);
-klee_print_expr("addr", addr);
-klee_print_expr("result", result);
 			DEV_REG(dev, 0x04260) = result << 16; // register MSRWD holds the result in the upper 16 bits
 
 			dev->current_mdi_address = -1;
 		} else if (opcode == 0b01) { // write operation
-klee_print_expr("WRITE PHY", dev->current_mdi_address);
-klee_print_expr("dev", *dev);
 			klee_assert(dev->current_mdi_address != -1);
 
 			int phy_addr = (new_value >> 21) & 0b11111;
 			int data = new_value & 0xFF;
-klee_print_expr("phy addr", phy_addr);
-klee_print_expr("data", data);
 
 			// only support the reset register - we just pretend that it's been reset all the time
 			klee_assert(dev->current_mdi_address == 0);

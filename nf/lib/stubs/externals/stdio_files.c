@@ -446,10 +446,11 @@ stub_stdio_files_init(void)
 		// Driver symlink
 		int driver_fd = stub_add_link(stub_pci_file(dev, "driver"), "/drivers/igb_uio");
 
-		// 'uio' folder, itself containing an empty folder 'uio0'
-		// One single entry, called uio0
-		int uio0_fd = stub_add_folder(stub_pci_file(dev, "uio/uio0"), 0);
-		int uio_fd = stub_add_folder(stub_pci_file(dev, "uio"), 1, uio0_fd);
+		// 'uio' folder, itself containing an empty folder 'uioN' (where N is the device number)
+		char uio_name[1024];
+		snprintf(uio_name, sizeof(uio_name), "uio/uio%d", n);
+		int uio_entry_fd = stub_add_folder(stub_pci_file(dev, strdup(uio_name)), 0);
+		int uio_fd = stub_add_folder(stub_pci_file(dev, "uio"), 1, uio_entry_fd);
 
 		// Resources file
 		// Multiple lines; each line has the format <start addr> <end addr> <flags>
@@ -478,6 +479,14 @@ stub_stdio_files_init(void)
 					vendor_fd, device_fd, subvendor_fd, subdevice_fd,
 					class_fd, maxvfs_fd, numanode_fd, driver_fd,
 					uio_fd, resource_fd, resource0_fd);
+
+		// UIO stuff
+		char sys_uio_path[1024];
+		snprintf(sys_uio_path, sizeof(sys_uio_path), "/sys/class/uio/uio%d/device/config", n);
+		stub_add_file(strdup(sys_uio_path), "");
+		char dev_uio_path[1024];
+		snprintf(dev_uio_path, sizeof(dev_uio_path), "/dev/uio%d", n);
+		stub_add_file(strdup(dev_uio_path), ""); // HACK as long as it's not used, we can pretend it's a file (it's a device...)
 	}
 
 	stub_add_folder_array("/sys/bus/pci/devices", devices_count, dev_folders);
@@ -512,10 +521,6 @@ stub_stdio_files_init(void)
 
 	// /var stuff
 	stub_add_file("/var/run/.rte_hugepage_info", FILE_CONTENT_HPINFO);
-
-	// UIO stuff
-	stub_add_file("/sys/class/uio/uio0/device/config", "");
-	stub_add_file("/dev/uio0", ""); // HACK as long as it's not used, we can pretend it's a file (it's a device...)
 
 	// Other devices
 	stub_add_file("/dev/zero", ""); // HACK as long as it's not read, we can pretend it doesn't contain anything
