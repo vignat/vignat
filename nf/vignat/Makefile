@@ -32,7 +32,7 @@ verify:
 	clang \
 		-D_GNU_SOURCE `# TODO find a way to remove this from here, not clean` \
 		-DKLEE_VERIFICATION `# for a few ifdefs` \
-		-DENABLE_HARDWARE_STUB `# enable hardware stubs instead of using driver stubs` \
+		`#-DENABLE_HARDWARE_STUB enable hardware stubs instead of using driver stubs` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
 		`# Include directories` \
 		-I . -I .. \
