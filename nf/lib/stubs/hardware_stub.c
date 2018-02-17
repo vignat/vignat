@@ -53,7 +53,14 @@ static void
 stub_device_reset(struct stub_device* dev)
 {
 	for (int n = 0; n < sizeof(REGISTERS)/sizeof(REGISTERS[0]); n++) {
-		DEV_REG(dev, n) = REGISTERS[n].initial_value;
+		if (REGISTERS[n].present) {
+			DEV_REG(dev, n) = REGISTERS[n].initial_value;
+		}
+	}
+
+	// 1 bit diff between MAC addresses; see registers init and VigNAT makefile
+	if (dev == &DEVICES[1]) {
+		DEV_REG(dev, 0x0A200) |= 1;
 	}
 
 	dev->current_mdi_address = -1;
@@ -637,6 +644,7 @@ stub_registers_init(void)
 	// page 543
 	// Device Control Register — CTRL (0x00000 / 0x00004; RW)
 	// NOTE: "CTRL is also mapped to address 0x00004 to maintain compatibility with previous devices."
+	//       but ixgbe doesn't seem to use it so let's not do it
 
 	// 0-1: Reserved (0)
 	// 2: PCIe Master Disable (0 - not disabled)
@@ -647,7 +655,6 @@ stub_registers_init(void)
 	REG(0x00000, 0b00000000000000000000000000000000,
 		     0b00000100000000000000000000001100);
 	REGISTERS[0x00000].write = stub_register_ctrl_write;
-	// TODO should we do the 0x00004 mapping?
 
 
 	// page 544
@@ -828,7 +835,7 @@ stub_registers_init(void)
 	// 24-31: CPU ID (0 - not set)
 	for (int n = 0; n <= 127; n++) {
 		REG(0x0600C + 0x40*n, 0b00000000000000000010101000000000,
-				      0b11111111000000000000000000000000);
+				      0b11111111000000000010101000000000);
 	}
 
 
@@ -910,21 +917,6 @@ stub_registers_init(void)
 		     0b00000000000000001011000110100000);
 
 
-	// page 668
-	// MDI Single Command and Address — MSCA (0x0425C; RW)
-
-	// 0-15: MDI Address (0x0000 - default)
-	// 16-20: DeviceType/Register Address (0x0 - default)
-	// 21-25: PHY Address (0x0 - default)
-	// 26-27: OP Code (00 - default; all 4 combinations are valid)
-	// 28-29: ST Code (0 - New protocol, default; only 00 and 01 are valid)
-	// 30: MDI Command (0 - ready)
-	// 31: Reserved
-	REG(0x0425C, 0b00000000000000000000000000000000,
-		     0b01011111111111111111111111111111); // bit 29 is read-only since it cannot be 1
-	REGISTERS[0x0425C].write = stub_register_msca_write;
-
-
 	// page 666
 	// MAC Core Control 0 Register — HLREG0 (0x04240; RW)
 
@@ -946,6 +938,21 @@ stub_registers_init(void)
 	// 29-31: Reserved (0)
 	REG(0x04240, 0b00001000000000010010110000001011,
 		     0b00000000000000000000000000000000);
+
+
+	// page 668
+	// MDI Single Command and Address — MSCA (0x0425C; RW)
+
+	// 0-15: MDI Address (0x0000 - default)
+	// 16-20: DeviceType/Register Address (0x0 - default)
+	// 21-25: PHY Address (0x0 - default)
+	// 26-27: OP Code (00 - default; all 4 combinations are valid)
+	// 28-29: ST Code (0 - New protocol, default; only 00 and 01 are valid)
+	// 30: MDI Command (0 - ready)
+	// 31: Reserved
+	REG(0x0425C, 0b00000000000000000000000000000000,
+		     0b01011111111111111111111111111111); // bit 29 is read-only since it cannot be 1
+	REGISTERS[0x0425C].write = stub_register_msca_write;
 
 
 	// page 669
@@ -1533,16 +1540,7 @@ stub_device_init(struct stub_device* dev)
 	dev->mem_shadow = malloc(dev->mem_len);
 	memset(dev->mem_shadow, 0, dev->mem_len);
 
-	for (int n = 0; n < sizeof(REGISTERS)/sizeof(REGISTERS[0]); n++) {
-		if (REGISTERS[n].present) {
-			DEV_REG(dev, n) = REGISTERS[n].initial_value;
-		}
-	}
-
-	// 1 bit diff between MAC addresses; see registers init and VigNAT makefile
-	if (dev == &DEVICES[1]) {
-		DEV_REG(dev, 0x0A200) |= 1;
-	}
+	stub_device_reset(dev);
 }
 
 static struct stub_device*
@@ -1562,10 +1560,10 @@ stub_hardware_read(uint64_t addr, unsigned offset, unsigned size)
 {
 	struct stub_device* dev = stub_device_get(addr);
 
-	if (size == 1) {
+	if (size == 1) {klee_abort();
 		return DEV_MEM(dev, offset, uint8_t);
 	}
-	if (size == 2) {
+	if (size == 2) {klee_abort();
 		return DEV_MEM(dev, offset, uint16_t);
 	}
 	if (size == 4) {
@@ -1581,7 +1579,7 @@ stub_hardware_read(uint64_t addr, unsigned offset, unsigned size)
 
 		return current_value;
 	}
-	if (size == 8) {
+	if (size == 8) {klee_abort();
 		return DEV_MEM(dev, offset, uint64_t);
 	}
 
@@ -1593,9 +1591,9 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 {
 	struct stub_device* dev = stub_device_get(addr);
 
-	if (size == 1) {
+	if (size == 1) {klee_abort();
 		DEV_MEM(dev, offset, uint8_t) = (uint8_t) value;
-	} else if (size == 2) {
+	} else if (size == 2) {klee_abort();
 		DEV_MEM(dev, offset, uint16_t) = (uint16_t) value;
 	} else if (size == 4) {
 		struct stub_register reg = REGISTERS[offset];
@@ -1608,6 +1606,7 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 		if ((changed & ~reg.writable_mask) != 0) {
 			klee_print_expr("offset", offset);
 			klee_print_expr("old", current_value);
+			klee_print_expr("new", new_value);
 			klee_print_expr("changed", changed);
 			klee_abort();
 		}
@@ -1617,7 +1616,7 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 		}
 
 		DEV_REG(dev, offset) = new_value;
-	} else if (size == 8) {
+	} else if (size == 8) {klee_abort();
 		DEV_MEM(dev, offset, uint64_t) = (uint64_t) value;
 	} else {
 		klee_abort();
