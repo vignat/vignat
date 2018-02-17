@@ -66,7 +66,7 @@ verify:
 		../lib/nat_config.c \
 		../lib/flow.c ../lib/flow-log.c \
 		`# DPDK` \
-		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
+		`# Platform-independent EAL.` \
 		$(RTE_SDK)/lib/librte_eal/common/*.c \
 		`# Linux-specific EAL` \
 		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \

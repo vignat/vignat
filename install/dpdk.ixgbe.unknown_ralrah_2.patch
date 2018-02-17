@@ -2,6 +2,25 @@ diff --git a/drivers/net/ixgbe/base/ixgbe_common.c b/drivers/net/ixgbe/base/ixgb
 index 04f9d82..b0602c7 100644
 --- a/drivers/net/ixgbe/base/ixgbe_common.c
 +++ b/drivers/net/ixgbe/base/ixgbe_common.c
+@@ -2407,15 +2407,15 @@ s32 ixgbe_set_rar_generic(struct ixgbe_hw *hw, u32 index, u8 *addr, u32 vmdq,
+ 	 * so save everything except the lower 16 bits that hold part
+ 	 * of the address and the address valid bit.
+ 	 */
+-	rar_high = IXGBE_READ_REG(hw, IXGBE_RAH(index));
++	rar_high = IXGBE_READ_REG(hw, IXGBE_RAH_82599(index));
+ 	rar_high &= ~(0x0000FFFF | IXGBE_RAH_AV);
+ 	rar_high |= ((u32)addr[4] | ((u32)addr[5] << 8));
+ 
+ 	if (enable_addr != 0)
+ 		rar_high |= IXGBE_RAH_AV;
+ 
+-	IXGBE_WRITE_REG(hw, IXGBE_RAL(index), rar_low);
+-	IXGBE_WRITE_REG(hw, IXGBE_RAH(index), rar_high);
++	IXGBE_WRITE_REG(hw, IXGBE_RAL_82599(index), rar_low);
++	IXGBE_WRITE_REG(hw, IXGBE_RAH_82599(index), rar_high);
+ 
+ 	return IXGBE_SUCCESS;
+ }
 @@ -2512,8 +2510,8 @@ s32 ixgbe_init_rx_addrs_generic(struct ixgbe_hw *hw)
  	/* Zero out the other receive addresses. */
  	DEBUGOUT1("Clearing RAR[1-%d]\n", rar_entries - 1);
