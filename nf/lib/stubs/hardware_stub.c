@@ -58,10 +58,11 @@ stub_device_reset(struct stub_device* dev)
 		}
 	}
 
-	// 1 bit diff between MAC addresses; see registers init and VigNAT makefile
-	if (dev == &DEVICES[1]) {
-		DEV_REG(dev, 0x0A200) |= 1;
-	}
+// FIXME not needed?
+//	// 1 bit diff between MAC addresses; see registers init and VigNAT makefile
+//	if (dev == &DEVICES[1]) {
+//		DEV_REG(dev, 0x0A200) |= 1;
+//	}
 
 	dev->current_mdi_address = -1;
 }
@@ -1324,6 +1325,18 @@ stub_registers_init(void)
 		     0b00000000000000000000000000000000);
 
 
+	// page 603
+	// DMA Tx Control — DMATXCTL (0x04A80; RW)
+
+	// 0: Transmit Enable (0 - not enabled)
+	// 1-2: Reserved, reads as 10
+	// 3: Double VLAN Mode (0 - not enabled)
+	// 4-15: Reserved (0)
+	// 16-31: VLAN Ether-Type a.k.a. TPID (0x8100 - "For proper operation, software must not change the default setting of this field")
+	REG(0x04A80, 0b10000001000000000000000000000100,
+		     0b00000000000000000000000000000001);
+
+
 	// page 585
 	// Receive Checksum Control — RXCSUM (0x05000; RW)
 	// NOTE: "This register should only be initialized (written) when the receiver is not enabled (for example, only write this register when RXCTRL.RXEN = 0b)."
@@ -1367,6 +1380,19 @@ stub_registers_init(void)
 	REG(0x05080, 0b00000000000000000000000000000000,
 		     0b00000000000000000000011100000000);
 	REGISTERS[0x05080].write = stub_register_needsrxen0_write;
+
+
+	// page 583
+	// VLAN Control Register — VLNCTRL (0x05088; RW)
+
+	// 0-15: VLAN Ether Type (0x8100; "For proper operation, software must not change the default setting of this field")
+	// 16-27: Reserved (0)
+	// 28: Canonical Form Indicator Bit Value (0 - doesn't matter since not enabled)
+	// 29: Canonical Form Indicator Enable (0 - not enabled)
+	// 30: VLAN Filter Enable (0 - not enabled)
+	// 31: Reserved (0)
+	REG(0x05088, 0b00000000000000001000000100000000,
+		     0b00000000000000000000000000000000);
 
 
 	// page 583
@@ -1434,9 +1460,30 @@ stub_registers_init(void)
 		// 26: Transmit Software Flush (0 - not enabled; note: "This bit is self cleared by hardware")
 		// 27-31: Reserved (0)
 		REG(0x06028 + 0x40*n, 0b00000000000000000000000000000000,
-				      0b00000110000000000000000000000000);
+				      0b00000110000000000000000001111111);
 		REGISTERS[0x06028 + 0x40*n].write = stub_register_txdctl_write;
 	}
+
+
+	// page 626
+	// Security Rx Control — SECRXCTRL (0x08D00; RW)
+
+	// 0: RX Security Offload Disable (1 - disabled)
+	// 1: Disable Sec RX Path (0 - not disabled)
+	// 2-31: Reserved (0)
+	REG(0x08D00, 0b00000000000000000000000000000001,
+		     0b00000000000000000000000000000011);
+
+
+	// page 626
+	// Security Rx Status — SECRXSTAT (0x08D04; RO)
+
+	// 0: Rx security block ready for mode change (1 - ready)
+	// 1: Security offload is disabled by fuse or strapping pin (0 - not disabled)
+	// 2: Unrecoverable ECC error in an Rx SA table occurred (0 - no error)
+	// 3-31: Reserved (0)
+	REG(0x08D04, 0b00000000000000000000000000000001,
+		     0b00000000000000000000000000000000);
 
 
 	// page 609
@@ -1470,8 +1517,8 @@ stub_registers_init(void)
 	// NOTE: "The first Receive Address register [...] RAR0 should always be used to store the individual Ethernet MAC address of the adapter."
 
 	// 0-31: Receive Address Low, lower 32 bits of the MAC addr ("field is defined in big endian")
-	REG(0x0A200, 0x45678900, // NOTE: see VigNAT makefile
-		     0x00000000);
+	REG(0x0A200, 0x45678900, // FIXME not needed? NOTE: see VigNAT makefile
+		     0xFFFFFFFF);
 	for (int n = 1; n <= 127; n++) {
 		REG(0x0A200 + 8*n, 0x00000000,
 				   0xFFFFFFFF);
@@ -1484,8 +1531,8 @@ stub_registers_init(void)
 	// 0-15: Receive Address High, upper 16 bits of MAC addr ("field is defined in big endian")
 	// 16-30: Reserved (0)
 	// 31: Address Valid (0/1 - in/valid)
-	REG(0x0A204, 0x80000123, // NOTE: see RAL
-		     0x80000000);
+	REG(0x0A204, 0x80000123, // FIXME not needed? NOTE: see RAL
+		     0x8000FFFF);
 	for (int n = 1; n <= 127; n++) {
 		REG(0x0A204 + 8*n, 0x00000000,
 				   0x8000FFFF);

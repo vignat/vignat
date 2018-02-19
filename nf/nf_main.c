@@ -58,14 +58,9 @@ static const uint16_t TX_QUEUE_SIZE = 512;
 // Clone pool for flood()
 static struct rte_mempool* clone_pool;
 
-// Memory pool #buffers
-#ifdef KLEE_VERIFICATION
-// During verification, we need to minimize the amount of memory used
-static const unsigned MEMPOOL_BUFFER_COUNT = 1;
-#else
-// Normal execution (set to its value from l3fwd sample)
-static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
-#endif
+// Buffer count for mempools
+static const unsigned MEMPOOL_BUFFER_COUNT = 64;
+
 
 // --- Initialization ---
 static int

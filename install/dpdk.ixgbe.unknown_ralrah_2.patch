@@ -21,6 +21,21 @@ index 04f9d82..b0602c7 100644
  
  	return IXGBE_SUCCESS;
  }
+@@ -2446,11 +2446,11 @@ s32 ixgbe_clear_rar_generic(struct ixgbe_hw *hw, u32 index)
+ 	 * so save everything except the lower 16 bits that hold part
+ 	 * of the address and the address valid bit.
+ 	 */
+-	rar_high = IXGBE_READ_REG(hw, IXGBE_RAH(index));
++	rar_high = IXGBE_READ_REG(hw, IXGBE_RAH_82599(index));
+ 	rar_high &= ~(0x0000FFFF | IXGBE_RAH_AV);
+ 
+-	IXGBE_WRITE_REG(hw, IXGBE_RAL(index), 0);
+-	IXGBE_WRITE_REG(hw, IXGBE_RAH(index), rar_high);
++	IXGBE_WRITE_REG(hw, IXGBE_RAL_82599(index), 0);
++	IXGBE_WRITE_REG(hw, IXGBE_RAH_82599(index), rar_high);
+ 
+ 	/* clear VMDq pool/queue selection for this RAR */
+ 	hw->mac.ops.clear_vmdq(hw, index, IXGBE_CLEAR_VMDQ_ALL);
 @@ -2512,8 +2510,8 @@ s32 ixgbe_init_rx_addrs_generic(struct ixgbe_hw *hw)
  	/* Zero out the other receive addresses. */
  	DEBUGOUT1("Clearing RAR[1-%d]\n", rar_entries - 1);
