@@ -1,6 +1,11 @@
 # VigNAT
 This repository contains the VigNAT code together with the Vigor verification toolchain.
 
+**For the version of the code presented at SIGCOMM 2017, use this `master` branch.**
+
+**For the version of the code submitted to SIGCOMM 2018 KBNets, use the `kbnets18` branch.**
+
+
 ## Dependencies
 ### Unconditional dependencies
 * DPDK-16.04
