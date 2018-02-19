@@ -11,8 +11,8 @@
 #include <klee/klee.h>
 
 
-typedef uint32_t (*stub_register_read)(struct stub_device* dev, uint32_t current_value);
-typedef uint32_t (*stub_register_write)(struct stub_device* dev, uint32_t current_value, uint32_t new_value);
+typedef uint32_t (*stub_register_read)(struct stub_device* dev, uint32_t offset);
+typedef uint32_t (*stub_register_write)(struct stub_device* dev, uint32_t offset, uint32_t new_value);
 
 struct stub_register {
 	bool present; // to distinguish registers we model from others
@@ -69,13 +69,14 @@ stub_device_reset(struct stub_device* dev)
 
 // RW1C means a register can be read, and bits can be cleared by writing 1
 static uint32_t
-stub_register_rw1c_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_rw1c_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	for (int n = 0; n <= 31; n++) {
 		if (GET_BIT(new_value, n) == 1) {
 			SET_BIT(new_value, n, 0);
 		} else {
 			// Cannot flip a bit from 1 to 0
+			uint32_t current_value = DEV_REG(dev, offset);
 			klee_assert(current_value == 0);
 		}
 	}
@@ -85,14 +86,14 @@ stub_register_rw1c_write(struct stub_device* dev, uint32_t current_value, uint32
 
 // RC means a register is cleared on read
 static uint32_t
-stub_register_rc_read(struct stub_device* dev, uint32_t current_value)
+stub_register_rc_read(struct stub_device* dev, uint32_t offset)
 {
 	return 0;
 }
 
 
 static uint32_t
-stub_register_i2cctl_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_i2cctl_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// I2C citations here are from https://www.nxp.com/docs/en/user-guide/UM10204.pdf
 	// SFP citations here are from https://ta.snia.org/higherlogic/ws/public/download/268/SFF-8431.PDF
@@ -114,6 +115,8 @@ stub_register_i2cctl_write(struct stub_device* dev, uint32_t current_value, uint
 	const int SFP_ADDRESSING = 4;
 	const int SFP_WRITING = 5;
 	const int SFP_END = 6;
+
+	uint32_t current_value = DEV_REG(dev, offset);
 
 	uint8_t scl_old = (current_value >> 1) & 1;
 	uint8_t sda_old = (current_value >> 3) & 1;
@@ -385,7 +388,7 @@ stub_register_i2cctl_write(struct stub_device* dev, uint32_t current_value, uint
 
 
 static uint32_t
-stub_register_ctrl_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_ctrl_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// Bit 2 is cleared once no master requests are pending, which we don't emulate anyway
 	SET_BIT(new_value, 2, 0);
@@ -407,8 +410,10 @@ stub_register_ctrl_write(struct stub_device* dev, uint32_t current_value, uint32
 
 
 static uint32_t
-stub_register_eerd_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_eerd_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
+	uint32_t current_value = DEV_REG(dev, offset);
+
 	// Cannot set the done bit to 1, only clear it
 	klee_assert(!(GET_BIT(current_value, 1) == 0 && GET_BIT(new_value, 1) == 1));
 	// Same with the data
@@ -504,7 +509,7 @@ stub_register_eerd_write(struct stub_device* dev, uint32_t current_value, uint32
 
 
 static uint32_t
-stub_register_msca_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_msca_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// page 135
 	// MDIO Direct Access
@@ -566,7 +571,30 @@ stub_register_msca_write(struct stub_device* dev, uint32_t current_value, uint32
 
 
 static uint32_t
-stub_register_txdctl_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_rdrxctl_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
+{
+	// "Software should set [RSCFRSTSIZE, bits 17 to 21] to 0x0"
+	// (but the default is 0x0880, bits 7 and 11 set)
+	for (int n = 17; n <= 21; n++) {
+		klee_assert(GET_BIT(new_value, n) == 0);
+	}
+	SET_BIT(new_value, 7, 1);
+	SET_BIT(new_value, 11, 1);
+
+	// "Software should set [RSCACKC, bit 25] to 1"
+	klee_assert(GET_BIT(new_value, 25) == 1);
+	SET_BIT(new_value, 25, 0);
+
+	// "Software should set [FCOE_WRFIX, bit 26] to 1"
+	klee_assert(GET_BIT(new_value, 26) == 1);
+	SET_BIT(new_value, 26, 0);
+
+	return new_value;
+}
+
+
+static uint32_t
+stub_register_txdctl_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// Bit 26 is self-clearing
 	SET_BIT(new_value, 26, 0);
@@ -576,15 +604,63 @@ stub_register_txdctl_write(struct stub_device* dev, uint32_t current_value, uint
 
 
 static uint32_t
-stub_register_swsm_read(struct stub_device* dev, uint32_t current_value)
+stub_register_dbal_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
+	// for both RDBAL and TDBAL
+	// Bits 0-6 are ignored on write and read as 0
+	for (int n = 0; n <= 6; n++) {
+		SET_BIT(new_value, n, 0);
+	}
+
+	return new_value;
+}
+
+
+static uint32_t
+stub_register_tdh_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
+{
+	// Cannot write unless TXDCTL.ENABLE (bit 25) is false
+	int n = (offset - 0x06010) / 0x40;
+	uint32_t txdctl = DEV_REG(dev, 0x06028 + 0x40*n);
+	klee_assert(GET_BIT(txdctl, 25) == 0);
+
+	return new_value;
+}
+
+
+static uint32_t
+stub_register_needsrxen0_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
+{
+	// RXCTRL.RXEN (bit 0) must be set to 0 before writing to RXCSUM and FCTRL
+	klee_assert(GET_BIT(DEV_REG(dev, 0x03000), 0) == 0);
+
+	return new_value;
+}
+
+
+static uint32_t
+stub_register_mtqc_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
+{
+	// RTTDCS.ARBDIS (bit 6) must be set before writing to MTQC
+	klee_assert(GET_BIT(DEV_REG(dev, 0x04900), 6) == 1);
+
+	return new_value;
+}
+
+
+static uint32_t
+stub_register_swsm_read(struct stub_device* dev, uint32_t offset)
+{
+	uint32_t current_value = DEV_REG(dev, offset);
 	SET_BIT(current_value, 1, 1); // LSB is the semaphore bit - always set after a read
 	return current_value;
 }
 
 static uint32_t
-stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_swsm_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
+	uint32_t current_value = DEV_REG(dev, offset);
+
 	// Cannot set the semaphore bit to 1, only clear it
 	klee_assert(!(GET_BIT(current_value, 0) == 0 && GET_BIT(new_value, 0) == 1));
 
@@ -598,10 +674,12 @@ stub_register_swsm_write(struct stub_device* dev, uint32_t current_value, uint32
 
 
 static uint32_t
-stub_register_swfwsync_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_swfwsync_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// Cannot write to this register unless the software semaphore bit of SWSM is taken
 	klee_assert(GET_BIT(DEV_REG(dev, 0x10140), 1) == 1);
+
+	uint32_t current_value = DEV_REG(dev, offset);
 
 	// Cannot write 1 to a bit in this register if the firmware set the corresponding bit
 	for (int n = 0; n < 5; n++) {
@@ -613,7 +691,7 @@ stub_register_swfwsync_write(struct stub_device* dev, uint32_t current_value, ui
 
 
 static uint32_t
-stub_register_autoc_write(struct stub_device* dev, uint32_t current_value, uint32_t new_value)
+stub_register_autoc_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// Cannot write to this register unless the software semaphore bit of SWSM is taken
 	klee_assert(GET_BIT(DEV_REG(dev, 0x10140), 1) == 1);
@@ -817,8 +895,149 @@ stub_registers_init(void)
 		// 16-23: Reserved (0)
 		// 24-31: CPU ID (0 - not set)
 		REG(address, 0b00000000000000001010001000000000,
-			     0b11111111000000000000000000000000);
+			     0b11111111000000001010000000000000);
 	}
+
+
+	// page 598-599
+	// Split Receive Control Registers — SRRCTL[n] (0x01014 + 0x40*n, n=0...63 and 0x0D014 + 0x40*(n-64), n=64...127 / 0x02100 + 4*n, [n=0...15]; RW)
+	// NOTE: We do not model n <= 15 at 0x01014, since DPDK doesn't use them
+	// NOTE: "BSIZEHEADER must be bigger than zero if DESCTYPE is equal to 010b, 011b, 100b or 101b"
+
+	// 0-4: Receive Buffer Size for Packet Buffer (0x2 - default; "This field should not be set to 0x0. This field should be greater or equal to 0x2 in queues where RSC is enabled")
+	// 5-7: Reserved (0)
+	// 8-13: Receive Buffer Size for Header Buffer, in 64-byte resolution (0x4 - default; "Value can be from 64 bytes to 1024 bytes")
+	// 14-21: Reserved (0)
+	// 22-24: Receive Descriptor Minimum Threshold Size (0 - default)
+	// 25-27: Define the descriptor type in Rx (000 - Legacy, default)
+	// 28: Drop Enabled (0 - not enabled)
+	// 29-31: Reserved (000)
+	for (int n = 0; n <= 127; n++) {
+		int addr = n <= 15 ? (0x02100 + 4*n)
+			 : n <= 53 ? (0x01014 + 0x40*n)
+				   : (0x0D014 + 0x40*(n-64));
+		REG(addr, 0b00000000000000000000010000000010,
+			  0b00011111110000000011111100011111);
+	}
+
+
+	// page 604
+	// Transmit Descriptor Base Address Low — TDBAL[n] (0x06000+0x40*n, n=0...127; RW)
+
+	// 0-6: Ignored on writes, reads as 0
+	// 7-31: Transmit Descriptor Base Address Low
+	for (int n = 0; n <= 127; n++) {
+		REG(0x06000 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b11111111111111111111111111111111);
+		REGISTERS[0x06000 + 0x40*n].write = stub_register_dbal_write;
+	}
+
+
+	// page 605
+	// Transmit Descriptor Base Address High — TDBAH[n] (0x06004+0x40*n, n=0...127; RW)
+
+	// 0-31: Transmit Descriptor Base Address High
+	for (int n = 0; n <= 127; n++) {
+		REG(0x06004 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b11111111111111111111111111111111);
+	}
+
+	// page 605
+	// Transmit Descriptor Length — TDLEN[n] (0x06008+0x40*n, n=0...127; RW)
+
+	// 0-19: Descriptor Ring Length - "It must be 128byte-aligned (7 LS bit must be set to zero)."
+	// 20-31: Reserved (0)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x06008 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000011111111111110000000);
+	}
+
+	// page 605
+	// Transmit Descriptor Head — TDH[n] (0x06010+0x40*n, n=0...127; RO)
+	// "The only time that software should write to this register is after a reset (hardware reset or CTRL.RST)
+	//  and before enabling the transmit function (TXDCTL.ENABLE)."
+	// (in other words, it's RW, not RO...)
+
+	// 0-15: Transmit Descriptor Head
+	// 16-31: Reserved (0)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x06010 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000001111111111111111);
+		REGISTERS[0x06010 + 0x40*n].write = stub_register_tdh_write;
+	}
+
+	// page 606
+	// Transmit Descriptor Tail — TDT[n] (0x06018+0x40*n, n=0...127; RW)
+
+	// 0-15: Transmit Descriptor Tail
+	// 16-31: Reserved (0)
+	for (int n = 0; n <= 127; n++) {
+		REG(0x06018 + 0x40*n, 0b00000000000000000000000000000000,
+				      0b00000000000000001111111111111111);
+	}
+
+
+	// page 596
+	// Receive Descriptor Base Address Low — RDBAL[n] (0x01000 + 0x40*n, n=0...63 and 0x0D000 + 0x40*(n-64), n=64...127; RW)
+
+	// 0-6: Ignored on writes, reads as 0
+	// 7-31: Receive Descriptor Base Address Low
+	for (int n = 0; n <= 127; n++) {
+		int addr = n <= 63 ? (0x01000 + 0x40*n)
+				   : (0x0D000 + 0x40*(n-64));
+		REG(addr, 0b00000000000000000000000000000000,
+			  0b11111111111111111111111111111111);
+		REGISTERS[addr].write = stub_register_dbal_write;
+	}
+
+
+	// page 596
+	// Receive Descriptor Base Address High — RDBAH[n] (0x01004 + 0x40*n, n=0...63 and 0x0D004 + 0x40*(n-64), n=64...127; RW)
+
+	// 0-31: Receive Descriptor Base Address High
+	for (int n = 0; n <= 127; n++) {
+		int addr = n <= 63 ? (0x01004 + 0x40*n)
+				   : (0x0D004 + 0x40*(n-64));
+		REG(addr, 0b00000000000000000000000000000000,
+			  0b11111111111111111111111111111111);
+	}
+
+	// page 596
+	// Receive Descriptor Length — RDLEN[n] (0x01008 + 0x40*n, n=0...63 and 0x0D008 + 0x40*(n-64), n=64...127; RW)
+
+	// 0-19: Descriptor Ring Length - "It must be 128-byte aligned (7 LS bit must be set to zero)."
+	// 20-31: Reserved (0)
+	for (int n = 0; n <= 127; n++) {
+		int addr = n <= 63 ? (0x01008 + 0x40*n)
+				   : (0x0D008 + 0x40*(n-64));
+		REG(addr, 0b00000000000000000000000000000000,
+			  0b00000000000011111111111110000000);
+	}
+
+	// page 597
+	// Receive Descriptor Head — RDH[n] (0x01010 + 0x40*n, n=0...63 and 0x0D010 + 0x40*(n-64), n=64...127; RO)
+
+	// 0-15: Receive Descriptor Head
+	// 16-31: Reserved (0)
+	for (int n = 0; n <= 127; n++) {
+		int addr = n <= 63 ? (0x01010 + 0x40*n)
+				   : (0x0D010 + 0x40*(n-64));
+		REG(addr, 0b00000000000000000000000000000000,
+			  0b00000000000000000000000000000000);
+	}
+
+	// page 597
+	// Receive Descriptor Tail — RDT[n] (0x01018 + 0x40*n, n=0...63 and 0x0D018 + 0x40*(n-64), n=64...127; RW)
+
+	// 0-15: Receive Descriptor Tail
+	// 16-31: Reserved (0)
+	for (int n = 0; n <= 127; n++) {
+		int addr = n <= 63 ? (0x01018 + 0x40*n)
+				   : (0x0D018 + 0x40*(n-64));
+		REG(addr, 0b00000000000000000000000000000000,
+			  0b00000000000000001111111111111111);
+	}
+
 
 	// page 622
 	// Tx DCA Control Registers — DCA_TXCTRL[n] (0x0600C + 0x40*n, n=0...127; RW)
@@ -858,6 +1077,24 @@ stub_registers_init(void)
 			  0b00000110011111110100000000000000);
 	}
 
+
+	// page 599
+	// Receive DMA Control Register — RDRXCTL (0x02F00; RW)
+
+	// XXX SPEC BUG no bit 0 mentioned, we'll assume it's reserved and reads as 0...
+	// 1: Rx CRC Strip (0 - do not strip; "This bit must be set the same as HLREG0.RXCRCSTRP")
+	// 2: Reserved (0)
+	// 3: DMA Init Done (1 - done) TODO change this
+	// 4-16: Reserved, but reads as 0x0880 (0b1000 1000 0000)
+	// 17-21: Defines a minimum packet size (after VLAN stripping, if applicable) for a packet with a payload that can open a new RSC (in units of 16 byte.)
+	//        (0x8 - default; "RSCFRSTSIZE is reserved for internal use. Software should set this field to 0x0")
+	// 22-24: Reserved (000)
+	// 25: RSC Coalescing on ACK Change (0 - default; "RSCACKC is reserved for internal use. Software should set this bit to 1b")
+	// 26: FCoE Write Exchange Fix (0 - default; "FCOE_WRFIX is reserved for internal use. Software should set this bit to 1b")
+	// 27-31: Reserved (0)
+	REG(0x02F00, 0b00000000000100001000100000001000,
+		     0b00000110001111100000000000001110);
+	REGISTERS[0x02F00].write = stub_register_rdrxctl_write;
 
 	// page 702
 	// Receive Queue Statistic Mapping Registers — RQSMR[n] (0x02300 + 4*n, n=0...31; RW)
@@ -937,7 +1174,7 @@ stub_registers_init(void)
 	// 28: RX Padding Strip Enable (0 - disabled, default; "this functionality should be used as debug mode only")
 	// 29-31: Reserved (0)
 	REG(0x04240, 0b00001000000000010010110000001011,
-		     0b00000000000000000000000000000000);
+		     0b00000000000000000000000000000110);
 
 
 	// page 668
@@ -1047,6 +1284,26 @@ stub_registers_init(void)
 		     0b00000000000000000000000000000000);
 
 
+	// page 611
+	// DCB Transmit Descriptor Plane Control and Status — RTTDCS (0x04900; RW) DMA-Tx
+
+	// 0: TC Transmit Descriptor Plane Arbitration Control (0 - RR)
+	// 1: VM Transmit Descriptor Plane Arbitration Control (0 - RR)
+	// 2-3: Reserved (0)
+	// 4: TC Transmit descriptor plane recycle mode (0 - no recycle)
+	// 5: Reserved (0)
+	// 6: DCB Arbiters Disable (0 - "during nominal operation this bit should be set to 0")
+	// 7-16: Reserved (0)
+	// 17-19: Last Transmitted TC (0)
+	// 20-21: Reserved (0)
+	// 22: Bypass Data_Pipe Monitor (1 - bypass)
+	// 23: Bypass Packet Buffer Free Space Monitor (1 - bypass)
+	// 24-30: Reserved (0)
+	// 31: Link speed has changed (0 - not changed)
+	REG(0x04900, 0b00000000110000000000000000000000,
+		     0b00000000000000000000000001000000);
+
+
 	// page 618
 	// DCB Transmit Descriptor Plane Queue Select — RTTDQSEL (0x04904; RW)
 
@@ -1065,6 +1322,51 @@ stub_registers_init(void)
 	// 31: TX rate-scheduler enable (0 - not enabled)
 	REG(0x04984, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000000000);
+
+
+	// page 585
+	// Receive Checksum Control — RXCSUM (0x05000; RW)
+	// NOTE: "This register should only be initialized (written) when the receiver is not enabled (for example, only write this register when RXCTRL.RXEN = 0b)."
+
+	// 0-11: Reserved (0)
+	// 12: IP Payload Checksum Enable (0 - not enabled)
+	// 13: RSS/Fragment Checksum Status Selection (0 - fragment checksum; 1 is RSS)
+	// 14-31: Reserved (0)
+	REG(0x05000, 0b00000000000000000000000000000000,
+		     0b00000000000000000011000000000000);
+	REGISTERS[0x05000].write = stub_register_needsrxen0_write;
+
+	// page 586
+	// Receive Filter Control Register — RFCTL (0x05008; RW)
+
+	// 0-4: Reserved (0)
+	// XXX SPEC BUG: Reserved above is marked as 0-5, but there's a bit 5...
+	// 5: RSC Disable (0 - not disabled)
+	// 6: NFS Write disable (0 - not disabled)
+	// 7: NFS Read disable (0 - not disabled)
+	// 8-9: NFS version recognized by the hardware (00 - v2)
+	// 10: IPv6 Disable (0 - not disabled; "Internal use only – should not be set to 1b")
+	// 11-13: Reserved (0)
+	// 14: IP Fragment Split Disable (0 - not disabled; "Internal use only – should not be set to 1b")
+	// 15-31: Reserved (0)
+	REG(0x05008, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000011100000);
+
+
+	// page 582
+	// Filter Control Register — FCTRL (0x05080; RW)
+	// NOTE: "Before receive filters are updated/modified the RXCTRL.RXEN bit should be set to 0b"
+
+	// 0: Reserved (0)
+	// 1: Store Bad Packets (0 - don't)
+	// 2-7: Reserved (0)
+	// 8: Multicast Promiscuous Enable (0 - disable)
+	// 9: Unicast Promiscuous Enable (0 - disable)
+	// 10: Broadcast Accept Mode (0 - disable)
+	// 11-31: Reserved (0)
+	REG(0x05080, 0b00000000000000000000000000000000,
+		     0b00000000000000000000011100000000);
+	REGISTERS[0x05080].write = stub_register_needsrxen0_write;
 
 
 	// page 583
@@ -1087,6 +1389,38 @@ stub_registers_init(void)
 	}
 
 
+	// page 591
+	// RSS Random Key Register — RSSRK (0x0EB80 + 4*n, n=0...9 / 0x05C80 + 4*n, n=0...9; RW)
+	// NOTE: We only do the 0x05C80, DPDK doesn't use 0x0EB80
+
+	// 0-7: RSS Key Byte 4*n
+	// 8-15: RSS Key Byte 4*n+1
+	// 16-23: RSS Key Byte 4*n+2
+	// 24-31: RSS Key Byte 4*n+3
+	for (int n = 0; n <= 9; n++) {
+		REG(0x05C80 + 4*n, 0b00000000000000000000000000000000,
+				   0b11111111111111111111111111111111);
+	}
+
+
+	// page 591
+	// Redirection Table — RETA[n] (0x0EB00 + 4*n, n=0...31 / 0x05C00 + 4*n, n=0...31; RW)
+	// NOTE: we only do the 0x05C00, DPDK doesn't use 0x0EB00
+
+	// 0-3: RSS output index for hash value 4*n (0 - default)
+	// 4-7: Reserved (0)
+	// 8-11: RSS output index for hash value 4*n+1 (0 - default)
+	// 12-15: Reserved (0)
+	// 16-19: RSS output index for hash value 4*n+2 (0 - default)
+	// 20-23: Reserved (0)
+	// 24-27: RSS output index for hash value 4*n+3 (0 - default)
+	// 28-31: Reserved (0)
+	for (int n = 0; n <= 31; n++) {
+		REG(0x05C00 + 4*n, 0b00000000000000000000000000000000,
+				   0b00001111000011110000111100001111);
+	}
+
+
 	// page 606
 	// Transmit Descriptor Control — TXDCTL[n] (0x06028+0x40*n, n=0...127; RW)
 	for (int n = 0; n <= 127; n++) {
@@ -1097,12 +1431,27 @@ stub_registers_init(void)
 		// 16-22: Write-Back Threshold (0x0 - zero)
 		// 23-24: Reserved (0)
 		// 25: Transmit Queue Enable (0 - not enabled)
-		// 26 - Transmit Software Flush (0 - not enabled; note: "This bit is self cleared by hardware")
+		// 26: Transmit Software Flush (0 - not enabled; note: "This bit is self cleared by hardware")
 		// 27-31: Reserved (0)
 		REG(0x06028 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000110000000000000000000000000);
 		REGISTERS[0x06028 + 0x40*n].write = stub_register_txdctl_write;
 	}
+
+
+	// page 609
+	// Multiple Transmit Queues Command Register — MTQC (0x08120; RW)
+	// NOTE: "Programming MTQC must be done only during the init phase while software must also set RTTDCS.ARBDIS
+	//	  before configuring MTQC and then clear RTTDCS.ARBDIS afterwards"
+	//       -- page 337
+
+	// 0: DCB Enabled Mode (0)
+	// 1: Virtualization Enabled Mode (0)
+	// 2-3: Number of TCs or Number of Tx Queues per Pools (00)
+	// 4-31: Reserved (0)
+	REG(0x08120, 0b00000000000000000000000000000000,
+		     0b00000000000000000000000000001111);
+	REGISTERS[0x08120].write = stub_register_mtqc_write;
 
 
 	// page 588
@@ -1151,6 +1500,17 @@ stub_registers_init(void)
 		REG(0x0A600 + 4*n, 0b00000000000000000000000000000000,
 				   0b11111111111111111111111111111111);
 	}
+
+
+	// page 589
+	// Multiple Receive Queues Command Register- MRQC (0x0EC80 / 0x05818; RW)
+	// NOTE: We only implement 0x05818, which is the address DPDK uses
+
+	// 0-3: Multiple Receive Queues Enable (0000 - default)
+	// 4-15: Reserved (0)
+	// 16-31: RSS Field Enable (0x0 - default)
+	REG(0x05818, 0b00000000000000000000000000000000,
+		     0b11111111111111110000000000001111);
 
 
 	// pages 730-731
@@ -1574,7 +1934,7 @@ stub_hardware_read(uint64_t addr, unsigned offset, unsigned size)
 		klee_assert(reg.readable);
 
 		if (reg.read != NULL) {
-			DEV_REG(dev, offset) = reg.read(dev, current_value);
+			DEV_REG(dev, offset) = reg.read(dev, (uint32_t) offset);
 		}
 
 		return current_value;
@@ -1612,7 +1972,7 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 		}
 
 		if (reg.write != NULL) {
-			new_value = reg.write(dev, current_value, new_value);
+			new_value = reg.write(dev, (uint32_t) offset, new_value);
 		}
 
 		DEV_REG(dev, offset) = new_value;

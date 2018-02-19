@@ -1,0 +1,16 @@
+diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
+index 9bc8462..1778aad 100644
+--- a/drivers/net/ixgbe/ixgbe_rxtx.c
++++ b/drivers/net/ixgbe/ixgbe_rxtx.c
+@@ -4750,8 +4750,9 @@ ixgbe_dev_rx_init(struct rte_eth_dev *dev)
+ 	/* Enable receipt of broadcasted frames */
+ 	fctrl = IXGBE_READ_REG(hw, IXGBE_FCTRL);
+ 	fctrl |= IXGBE_FCTRL_BAM;
+-	fctrl |= IXGBE_FCTRL_DPF;
+-	fctrl |= IXGBE_FCTRL_PMCF;
++	// FIXME these are bits 1 and 0 of MFLCN (0x04294) for the 82599
++	//fctrl |= IXGBE_FCTRL_DPF;
++	//fctrl |= IXGBE_FCTRL_PMCF;
+ 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
+ 
+ 	/*

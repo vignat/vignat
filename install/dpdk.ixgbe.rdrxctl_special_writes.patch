@@ -1,0 +1,16 @@
+diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
+index 9bc8462..35a29b2 100644
+--- a/drivers/net/ixgbe/ixgbe_rxtx.c
++++ b/drivers/net/ixgbe/ixgbe_rxtx.c
+@@ -4886,7 +4886,11 @@ ixgbe_dev_rx_init(struct rte_eth_dev *dev)
+ 			rdrxctl |= IXGBE_RDRXCTL_CRCSTRIP;
+ 		else
+ 			rdrxctl &= ~IXGBE_RDRXCTL_CRCSTRIP;
++		/* Read as nonzero, must be written as zero. */
+ 		rdrxctl &= ~IXGBE_RDRXCTL_RSCFRSTSIZE;
++		/* Read as zero, must be written as nonzero. */
++		rdrxctl |= IXGBE_RDRXCTL_RSCACKC;
++		rdrxctl |= IXGBE_RDRXCTL_FCOE_WRFIX;
+ 		IXGBE_WRITE_REG(hw, IXGBE_RDRXCTL, rdrxctl);
+ 	}
+ 
