@@ -11,7 +11,7 @@ sudo apt-get install -yqq \
     make binutils gcc \
     bc cmake
 
-bash ~/scripts/install.sh dpdk-only
+. ~/scripts/init-machines/install-dpdk-16.07.sh
 
 . ~/scripts/init-machines/install-pktgen.sh
 
