@@ -1,13 +1,12 @@
 #!/bin/bash
 # Tested on Ubuntu 16.04, Debian Stretch, and the Linux Subsystem for Windows
-# TODO: use the $PROGRESSDIR files to skip the relevant parts of the script.
+# $1: "dpdk-only" to only install DPDK, or no argument to install everything
 
 # Setup
 
 VNDSDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 BUILDDIR=`pwd`
 PATHSFILE="$BUILDDIR/paths.sh"
-PROGRESSDIR="$BUILDDIR/install-progress"
 
 # Detect Docker or the Windows Subsystem for Linux
 OS='linux'
@@ -35,32 +34,18 @@ fi
 set -euxo pipefail
 
 echo '# The configuration paths for VNDS dependencies' > "$PATHSFILE"
-mkdir -p "$PROGRESSDIR"
 
-### General
+# Source the paths file at login
+echo ". $PATHSFILE" >> "$HOME/.profile"
 
+
+### DPDK initialization
 sudo apt-get update
 
-# cmake for KLEE
-# subversion for LLVM
-# parallel for the Vigor Validator
-# m4 for OCaml (not a dependency of opam but in practice it is)
 sudo apt-get install -y \
-                     bison flex zlib1g-dev libncurses5-dev libcap-dev cmake subversion `# for KLEE/LLVM` \
-                     parallel `# for the Vigor Validator` \
-                     opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
                      libpcap-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
-# for VeriFast
-# directly from VeriFast's readme
-sudo apt-get install -y --no-install-recommends \
-                     ca-certificates m4 \
-                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
-                     valac gtksourceview2.0-dev \
-                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
-
-# for DPDK
 # On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
 KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
 
@@ -73,10 +58,58 @@ elif [ "$OS" = 'linux' ]; then
   sudo apt-get install -y "linux-headers-$KERNEL_VER"
 fi
 
-touch "$PROGRESSDIR/system_packages_installed"
+
+### DPDK
+DPDK_RELEASE='17.11'
+
+pushd "$BUILDDIR"
+  if [ ! -f dpdk/.version ] || [ "$(cat dpdk/.version)" != "$DPDK_RELEASE" ]; then
+    wget -O dpdk.tar.xz "https://fast.dpdk.org/rel/dpdk-$DPDK_RELEASE.tar.xz"
+    tar xf dpdk.tar.xz
+    rm dpdk.tar.xz
+    mv "dpdk-$DPDK_RELEASE" dpdk
+
+    echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> "$PATHSFILE"
+    echo "export RTE_SDK=$BUILDDIR/dpdk" >> "$PATHSFILE"
+    . "$PATHSFILE"
+
+    pushd dpdk
+      # Apply the Vigor patches
+      for p in "$VNDSDIR/install/"dpdk.*.patch; do
+        patch -p1 < "$p"
+      done
+
+      make config T=x86_64-native-linuxapp-gcc
+      make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
+
+      echo "$DPDK_RELEASE" > .version
+    popd
+  fi
+popd
 
 
- # OCaml uses variables in its scripts without defining it first - we're in strict mode!
+if [ $# -ne 0 ] && [ "$1" = "dpdk-only" ]; then
+  echo "dpdk-only flag given, not installing other stuff"
+  exit 0
+fi
+
+
+### Non-DPDK initialization
+
+sudo apt-get install -y \
+                     bison flex zlib1g-dev libncurses5-dev libcap-dev cmake subversion `# for KLEE/LLVM` \
+                     parallel `# for the Vigor Validator` \
+                     opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
+
+# for VeriFast
+# directly from VeriFast's readme
+sudo apt-get install -y --no-install-recommends \
+                     ca-certificates m4 \
+                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
+                     valac gtksourceview2.0-dev \
+                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
+
+# OCaml uses variables in its scripts without defining it first - we're in strict mode!
 if [ -z ${PERL5LIB+x} ]; then
   export PERL5LIB=''
 fi
@@ -90,8 +123,6 @@ echo 'PATH='"$HOME/.opam/system/bin"':$PATH' >> "$PATHSFILE"
 echo ". $HOME/.opam/opam-init/init.sh" >> "$PATHSFILE"
 . "$PATHSFILE"
 
-touch "$PROGRESSDIR/opam_initialized"
-
 # For Z3 ml bindings
 # VeriFast requires Z3 in ocamlfind; install it now so that it puts itself in ocamlfind
 # Num is required for Big_int
@@ -104,7 +135,6 @@ opam install ocamlfind camlp4 -y
 ### Validator dependencies
 opam install ocamlfind core sexplib menhir -y
 
-touch "$PROGRESSDIR/opam_packages_installed"
 
 ### Z3 v4.5
 
@@ -130,7 +160,6 @@ pushd "$BUILDDIR/z3"
   popd
 popd
 
-touch "$PROGRESSDIR/z3_installed"
 
 ### VeriFast
 
@@ -141,7 +170,6 @@ pushd "$BUILDDIR/verifast/src"
   . "$PATHSFILE"
 popd
 
-touch "$PROGRESSDIR/verifast_built"
 
 ### KLEE
 
@@ -193,34 +221,3 @@ pushd "$BUILDDIR/klee"
     . "$PATHSFILE"
   popd
 popd
-
-touch "$PROGRESSDIR/klee_built"
-
-
-### DPDK
-
-pushd "$BUILDDIR"
-  wget -O dpdk.tar.xz https://fast.dpdk.org/rel/dpdk-17.11.tar.xz
-  tar xf dpdk.tar.xz
-  rm dpdk.tar.xz
-  mv dpdk-17.11 dpdk
-
-  echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> "$PATHSFILE"
-  echo "export RTE_SDK=$BUILDDIR/dpdk" >> "$PATHSFILE"
-  . "$PATHSFILE"
-
-  pushd dpdk
-    # Apply the Vigor patches
-    for p in "$VNDSDIR/install/"dpdk.*.patch; do
-      patch -p1 < "$p"
-    done
-
-    make config T=x86_64-native-linuxapp-gcc
-    make install -j T=x86_64-native-linuxapp-gcc DESTDIR=.
-  popd
-popd
-
-touch "$PROGRESSDIR/dpdk_built"
-
-# Source the paths file at login
-echo ". $PATHSFILE" >> "$HOME/.profile"
