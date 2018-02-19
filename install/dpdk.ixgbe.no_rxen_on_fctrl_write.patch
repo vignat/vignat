@@ -1,0 +1,93 @@
+diff --git a/drivers/net/ixgbe/ixgbe_ethdev.c b/drivers/net/ixgbe/ixgbe_ethdev.c
+index a2bc708..c841526 100644
+--- a/drivers/net/ixgbe/ixgbe_ethdev.c
++++ b/drivers/net/ixgbe/ixgbe_ethdev.c
+@@ -4078,10 +4078,20 @@ ixgbe_dev_promiscuous_enable(struct rte_eth_dev *dev)
+ {
+ 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+ 	uint32_t fctrl;
++	uint32_t rxctrl;
++
++	/* Before modifying FCTRL, RXCTRL.RXEN must be 0 */
++	rxctrl = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
++	rxctrl &= ~IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ 
+ 	fctrl = IXGBE_READ_REG(hw, IXGBE_FCTRL);
+ 	fctrl |= (IXGBE_FCTRL_UPE | IXGBE_FCTRL_MPE);
+ 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
++
++	/* Re-enable RXEN now */
++	rxctrl |= IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ }
+ 
+ static void
+@@ -4089,6 +4099,12 @@ ixgbe_dev_promiscuous_disable(struct rte_eth_dev *dev)
+ {
+ 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+ 	uint32_t fctrl;
++	uint32_t rxctrl;
++
++	/* Before modifying FCTRL, RXCTRL.RXEN must be 0 */
++	rxctrl = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
++	rxctrl &= ~IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ 
+ 	fctrl = IXGBE_READ_REG(hw, IXGBE_FCTRL);
+ 	fctrl &= (~IXGBE_FCTRL_UPE);
+@@ -4097,6 +4113,10 @@ ixgbe_dev_promiscuous_disable(struct rte_eth_dev *dev)
+ 	else
+ 		fctrl &= (~IXGBE_FCTRL_MPE);
+ 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
++
++	/* Re-enable RXEN now */
++	rxctrl |= IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ }
+ 
+ static void
+@@ -4104,9 +4124,19 @@ ixgbe_dev_allmulticast_enable(struct rte_eth_dev *dev)
+ {
+ 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+ 	uint32_t fctrl;
++	uint32_t rxctrl;
++
++	/* Before modifying FCTRL, RXCTRL.RXEN must be 0 */
++	rxctrl = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
++	rxctrl &= ~IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ 
+ 	fctrl = IXGBE_READ_REG(hw, IXGBE_FCTRL);
+ 	fctrl |= IXGBE_FCTRL_MPE;
++
++	/* Re-enable RXEN now */
++	rxctrl |= IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
+ }
+ 
+@@ -4115,13 +4145,23 @@ ixgbe_dev_allmulticast_disable(struct rte_eth_dev *dev)
+ {
+ 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+ 	uint32_t fctrl;
++	uint32_t rxctrl;
+ 
+ 	if (dev->data->promiscuous == 1)
+ 		return; /* must remain in all_multicast mode */
+ 
++	/* Before modifying FCTRL, RXCTRL.RXEN must be 0 */
++	rxctrl = IXGBE_READ_REG(hw, IXGBE_RXCTRL);
++	rxctrl &= ~IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
++
+ 	fctrl = IXGBE_READ_REG(hw, IXGBE_FCTRL);
+ 	fctrl &= (~IXGBE_FCTRL_MPE);
+ 	IXGBE_WRITE_REG(hw, IXGBE_FCTRL, fctrl);
++
++	/* Re-enable RXEN now */
++	rxctrl |= IXGBE_RXCTRL_RXEN;
++	IXGBE_WRITE_REG(hw, IXGBE_RXCTRL, rxctrl);
+ }
+ 
+ /**
