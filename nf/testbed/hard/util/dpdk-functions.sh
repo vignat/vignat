@@ -92,7 +92,7 @@ load_igb_uio_module()
 	  sudo /sbin/insmod $RTE_SDK/$RTE_TARGET/kmod/igb_uio.ko
 	  if [ $? -ne 0 ] ; then
 		    echo "## ERROR: Could not load kmod/igb_uio.ko."
-		    quit
+		    exit 0
 	  fi
 }
 
