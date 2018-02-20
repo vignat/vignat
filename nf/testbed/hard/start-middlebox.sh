@@ -91,5 +91,5 @@ else
         0<&- &>"$LOG_FILE") &
 
     # Wait for it to have started
-    sleep 20
+    sleep 60
 fi

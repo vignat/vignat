@@ -30,7 +30,7 @@ void nf_core_init()
 	}
 }
 
-int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
+int nf_core_process(uint16_t device, struct rte_mbuf* mbuf, time_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
@@ -53,7 +53,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 
 	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
 
-	uint8_t dst_device;
+	uint16_t dst_device;
 
 	if (device == config.wan_device) {
 		NF_DEBUG("Device %" PRIu8 " is external", device);

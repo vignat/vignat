@@ -59,41 +59,40 @@ static const uint16_t TX_QUEUE_SIZE = 512;
 static struct rte_mempool* clone_pool;
 
 // Buffer count for mempools
-static const unsigned MEMPOOL_BUFFER_COUNT = 64;
+static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
 
 
 // --- Initialization ---
 static int
-nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
+nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
 {
-  int retval;
-
   // Configure the device
-  // This is ugly code; DPDK samples use designated initializers,
-  // but those are not available in C++, and this code needs to compile
-  // both as C and C++.
+  int retval;
   struct rte_eth_conf device_conf;
+  // we need those in variables to address them for adjust_nb_rx_tx_desc
+  uint16_t nb_rx = 1;
+  uint16_t nb_tx = 1;
+
   memset(&device_conf, 0, sizeof(struct rte_eth_conf));
-  device_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
   device_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
-  device_conf.rxmode.split_hdr_size = 0;
-  device_conf.rxmode.header_split =   0;
-  device_conf.rxmode.hw_ip_checksum = 1;
-  device_conf.rxmode.hw_vlan_filter = 0;
-  device_conf.rxmode.jumbo_frame =    0;
-  device_conf.rxmode.hw_strip_crc =   0;
-  device_conf.txmode.mq_mode = ETH_MQ_TX_NONE;
-  device_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-  device_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 
   retval = rte_eth_dev_configure(
     device, // The device
-    1, // # of RX queues
-    1, // # of TX queues
+    nb_rx, // # of RX queues
+    nb_tx, // # of TX queues
     &device_conf // device config
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot configure device %" PRIu8 ", err=%d", device, retval);
+    rte_exit(EXIT_FAILURE, "Cannot configure device %" PRIu16 ", err=%d", device, retval);
+  }
+
+  retval = rte_eth_dev_adjust_nb_rx_tx_desc(
+    device, // device ID
+    &nb_rx, // # RX
+    &nb_tx  // # TX
+  );
+  if (retval != 0) {
+    rte_exit(EXIT_FAILURE, "Cannot adjust nb rx/tx desc for device %" PRIu16 ", err=%d", device, retval);
   }
 
   // Allocate and set up 1 RX queue per device
@@ -106,7 +105,7 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
     mbuf_pool // memory pool
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu8 ", err=%d", device, retval);
+    rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu16 ", err=%d", device, retval);
   }
 
   // Allocate and set up 1 TX queue per device
@@ -118,17 +117,32 @@ nf_init_device(uint8_t device, struct rte_mempool *mbuf_pool)
     NULL // config (NULL = default)
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu8 " err=%d", device, retval);
+    rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu16 " err=%d", device, retval);
   }
 
   // Start the device
   retval = rte_eth_dev_start(device);
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu8 ", err=%d", device, retval);
+    rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu16 ", err=%d", device, retval);
   }
 
   // Enable RX in promiscuous mode for the Ethernet device
   rte_eth_promiscuous_enable(device);
+  if (rte_eth_promiscuous_get(device) != 1) {
+    rte_exit(EXIT_FAILURE, "Cannot set promiscuous mode on device %" PRIu16 ", result=%d", device, retval);
+  }
+
+  // Get the link up
+  retval = rte_eth_dev_set_link_up(device);
+  if (retval != 0) {
+    rte_exit(EXIT_FAILURE, "Cannot set link up on device %" PRIu16 ", err=%d", device, retval);
+  }
+
+  struct rte_eth_link link;
+  rte_eth_link_get(device, &link);
+  if (link.link_status == 0) {
+    rte_exit(EXIT_FAILURE, "Link is down for device %" PRIu16, device);
+  }
 
   return 0;
 }
@@ -151,9 +165,11 @@ lcore_main(void)
 
   VIGOR_LOOP_BEGIN
     struct rte_mbuf* buf = NULL;
+NF_INFO("CHECKING.. %" PRIu16, VIGOR_DEVICE);
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
-
+NF_INFO("CHECKED.");
     if (actual_rx_len != 0) {
+NF_INFO("GOT A PACKET, YAY");
       uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
       if (dst_device == VIGOR_DEVICE) {
         rte_pktmbuf_free(buf);
@@ -239,7 +255,7 @@ main(int argc, char* argv[])
   }
 
   // Initialize all devices
-  for (uint8_t device = 0; device < nb_devices; device++) {
+  for (uint16_t device = 0; device < nb_devices; device++) {
     if (nf_init_device(device, mbuf_pool) == 0) {
       NF_INFO("Initialized device %" PRIu8 ".", device);
     } else {

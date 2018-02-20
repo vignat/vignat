@@ -64,6 +64,8 @@ DPDK_RELEASE='17.11'
 
 pushd "$BUILDDIR"
   if [ ! -f dpdk/.version ] || [ "$(cat dpdk/.version)" != "$DPDK_RELEASE" ]; then
+    rm -rf dpdk # in case it already exists
+
     wget -O dpdk.tar.xz "https://fast.dpdk.org/rel/dpdk-$DPDK_RELEASE.tar.xz"
     tar xf dpdk.tar.xz
     rm dpdk.tar.xz

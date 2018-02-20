@@ -6,7 +6,7 @@
 struct rte_mbuf;
 
 void nf_core_init(void);
-int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now);
+int nf_core_process(uint16_t device, struct rte_mbuf* mbuf, time_t now);
 
 enum nf_core_special_results {
   FLOOD_FRAME = -1
