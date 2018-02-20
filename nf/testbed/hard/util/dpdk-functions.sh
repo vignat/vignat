@@ -102,7 +102,7 @@ bind_nics_to_igb_uio()
 		    PCI_PATH=$1
                     echo "Binding PCI device: $PCI_PATH ..."
 		    if [ -f "$RTE_SDK/.version" ] && [ "$(cat $RTE_SDK/.version)" = "17.11" ]; then
-		      sudo ${RTE_SDK}/share/dpdk/usertools/dpdk-devbind.py -b $DPDK_NIC_DRIVER $PCI_PATH && echo "OK"
+		      sudo ${RTE_SDK}/usertools/dpdk-devbind.py -b $DPDK_NIC_DRIVER $PCI_PATH && echo "OK"
 		    else
 		      sudo ${RTE_SDK}/tools/dpdk-devbind.py -b $DPDK_NIC_DRIVER $PCI_PATH && echo "OK"
 		    fi
