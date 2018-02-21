@@ -165,11 +165,8 @@ lcore_main(void)
 
   VIGOR_LOOP_BEGIN
     struct rte_mbuf* buf = NULL;
-NF_INFO("CHECKING.. %" PRIu16, VIGOR_DEVICE);
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
-NF_INFO("CHECKED.");
     if (actual_rx_len != 0) {
-NF_INFO("GOT A PACKET, YAY");
       uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
       if (dst_device == VIGOR_DEVICE) {
         rte_pktmbuf_free(buf);
