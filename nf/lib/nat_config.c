@@ -38,7 +38,7 @@ void nat_config_init(struct nat_config* config,
 	};
 
 	// Set the devices' own MACs
-	for (uint8_t device = 0; device < nb_devices; device++) {
+	for (uint16_t device = 0; device < nb_devices; device++) {
 		rte_eth_macaddr_get(device, &(config->device_macs[device]));
 	}
 
