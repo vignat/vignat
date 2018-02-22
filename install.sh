@@ -99,6 +99,7 @@ fi
 ### Non-DPDK initialization
 
 sudo apt-get install -y \
+                     time `# to measure verification time` \
                      bison flex zlib1g-dev libncurses5-dev libcap-dev cmake subversion `# for KLEE/LLVM` \
                      parallel `# for the Vigor Validator` \
                      opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
