@@ -8,7 +8,7 @@ SRCS-y := nat_forward_nop.c ../nf_main.c ../lib/nat_config.c ../lib/nf_time.c ..
 
 # gcc flags
 CFLAGS += -O3
-CFLAGS += -I..
+CFLAGS += -I.. -I../..
 CFLAGS += -std=gnu99
 
 # disable warnings triggered by DPDK

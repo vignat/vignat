@@ -11,7 +11,7 @@
 
 #ifdef KLEE_VERIFICATION
 #  include "lib/stubs/containers/double-map-stub-control.h"
-#  include "lib/stubs/my-time-stub-control.h"
+#  include "lib/stubs/time_stub_control.h"
 #endif //KLEE_VERIFICATION
 
 struct DoubleMap *flow_map;

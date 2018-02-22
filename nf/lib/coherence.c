@@ -53,7 +53,7 @@ ensures dmap_dchain_coherent(m, ch) &*&
 /*@
 lemma void rejuvenate_preserves_coherent<t1,t2,vt>
              (dmap<t1,t2,vt> m, dchain ch,
-              int index, uint32_t time)
+              int index, time_t time)
 requires dmap_dchain_coherent(m, ch) &*&
          true == dchain_allocated_fp(ch, index);
 ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
@@ -187,7 +187,7 @@ ensures dmap_dchain_coherent(m, dchain_rejuvenate_fp(ch, index, time));
 /*@
 lemma void coherent_put_allocated_preserves_coherent<t1,t2,vt>
 (dmap<t1,t2,vt> m, dchain ch, t1 k1, t2 k2,
- vt value, int ind, uint32_t t,
+ vt value, int ind, time_t t,
  fixpoint (vt,t1) vk1,
  fixpoint (vt,t2) vk2)
 requires dmap_dchain_coherent(m, ch) &*&

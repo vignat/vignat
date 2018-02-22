@@ -18,11 +18,11 @@ void nf_print_config(void);
 
 #ifdef KLEE_VERIFICATION
 void nf_loop_iteration_begin(unsigned lcore_id,
-                             uint32_t time);
+                             time_t time);
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
-                                       uint32_t time);
+                                       time_t time);
 
 void nf_loop_iteration_end(unsigned lcore_id,
-                           uint32_t time);
+                           time_t time);
 #endif //KLEE_VERIFICATION

@@ -107,26 +107,27 @@ let stub_queue_struct = Ir.Str ( "stub_queue", ["port_id", Uint16] )
 let rte_mempool_struct = Ir.Str ( "rte_mempool", [] )
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                ["buf_addr", Ptr stub_mbuf_content_struct;
-                                (* "buf_physaddr", Uint64; FIXME: justify this ignoring *)
-                                "buf_len", Uint16;
+                                "buf_iova", Uint64;
                                 "data_off", Uint16;
                                 "refcnt", Uint16;
-                                "nb_segs", Uint8;
-                                "port", Uint8;
+                                "nb_segs", Uint16;
+                                "port", Uint16;
                                 "ol_flags", Uint64;
                                 "packet_type", Uint32;
                                 "pkt_len", Uint32;
                                 "data_len", Uint16;
                                 "vlan_tci", Uint16;
                                 "hash", Uint32;
-                                "seqn", Uint32;
                                 "vlan_tci_outer", Uint16;
+                                "buf_len", Uint16;
+                                "timestamp", Uint64;
                                 "udata64", Uint64;
                                 (*"pool", Ptr rte_mempool_struct;*)
                                 (*"next", Ptr Void;*)
                                 "tx_offload", Uint64;
                                 "priv_size", Uint16;
-                                "timesync", Uint16] )
+                                "timesync", Uint16; 
+                                "seqn", Uint32] )
 
 (* VeriFast's C parser is quite limited, so simplify stuff... this is very brittle since it does no lookbehind to avoid accidents *)
 let rec simplify_c_string str =
@@ -148,14 +149,14 @@ let copy_stub_mbuf_content var_name ptr =
 
 let fun_types =
   String.Map.of_alist_exn
-    ["current_time", {ret_type = Static Uint32;
+    ["current_time", {ret_type = Static Sint64;
                       arg_types = [];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [
                         (fun params ->
-                        "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
-     "start_time", {ret_type = Static Uint32;
+                        "time_t now = " ^ (params.ret_name) ^ ";\n")];};
+     "start_time", {ret_type = Static Sint64;
                     arg_types = [];
                     extra_ptr_types = [];
                     lemmas_before = [];
@@ -260,7 +261,7 @@ let fun_types =
                                 arg_types = stt [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Uint32;
-                                             Uint32;
+                                             Sint64;
                                              Sint32;
                                              Sint32];
                                 extra_ptr_types = [];
@@ -282,7 +283,7 @@ let fun_types =
                                 arg_types = stt [Ptr (Ptr dmap_struct);
                                              Ptr (Ptr dchain_struct);
                                              Ptr Uint32;
-                                             Ptr Uint32;
+                                             Ptr Sint64;
                                              Sint32;
                                              Sint32];
                                 extra_ptr_types = [];

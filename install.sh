@@ -86,7 +86,7 @@ fi
 
 opam init -y
 opam switch 4.06.0
-echo 'PATH=$PATH:'"$HOME/.opam/system/bin" >> "$PATHSFILE"
+echo 'PATH='"$HOME/.opam/system/bin"':$PATH' >> "$PATHSFILE"
 echo ". $HOME/.opam/opam-init/init.sh" >> "$PATHSFILE"
 . "$PATHSFILE"
 
@@ -123,6 +123,7 @@ pushd "$BUILDDIR/z3"
       sudo apt-get remove libz3-dev || true
       sudo rm -f /usr/lib/x86_64-linux-gnu/libz3.so || true
       sudo rm -f /usr/lib/x86_64-linux-gnu/libz3.so.4 || true
+      sudo rm -f /usr/lib/libz3.so || true
       # Install the new libz3.so
       sudo ln -s "$BUILDDIR/z3/build/libz3.so" "/usr/lib/libz3.so"
       sudo ldconfig
@@ -136,7 +137,7 @@ touch "$PROGRESSDIR/z3_installed"
 git clone --depth 1 --branch export_path_conditions https://github.com/SolalPirelli/verifast "$BUILDDIR/verifast"
 pushd "$BUILDDIR/verifast/src"
   make verifast # should be just "make" but the verifast checks fail due to a non auto lemma
-  echo 'PATH=$PATH:'"$BUILDDIR/verifast/bin" >> "$PATHSFILE"
+  echo 'PATH='"$BUILDDIR/verifast/bin"':$PATH' >> "$PATHSFILE"
   . "$PATHSFILE"
 popd
 
@@ -150,7 +151,7 @@ svn co https://llvm.org/svn/llvm-project/libcxx/tags/RELEASE_342/final "$BUILDDI
 pushd "$BUILDDIR/llvm"
   CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" ./configure --enable-optimized --disable-assertions --enable-targets=host --with-python='/usr/bin/python2'
   make -j $(nproc)
-  echo 'PATH=$PATH:'"$BUILDDIR/llvm/Release/bin" >> "$PATHSFILE"
+  echo 'PATH='"$BUILDDIR/llvm/Release/bin"':$PATH' >> "$PATHSFILE"
   . "$PATHSFILE"
 popd
 
@@ -187,7 +188,7 @@ pushd "$BUILDDIR/klee"
      -DENABLE_POSIX_RUNTIME=ON \
      ..
     make -j $(nproc)
-    echo 'PATH=$PATH:'"$BUILDDIR/klee/build/bin" >> "$PATHSFILE"
+    echo 'PATH='"$BUILDDIR/klee/build/bin"':$PATH' >> "$PATHSFILE"
     echo "export KLEE_INCLUDE=$BUILDDIR/klee/include" >> "$PATHSFILE"
     . "$PATHSFILE"
   popd
@@ -199,10 +200,10 @@ touch "$PROGRESSDIR/klee_built"
 ### DPDK
 
 pushd "$BUILDDIR"
-  wget -O dpdk.tar.xz http://static.dpdk.org/rel/dpdk-16.07.tar.xz
+  wget -O dpdk.tar.xz https://fast.dpdk.org/rel/dpdk-17.11.tar.xz
   tar xf dpdk.tar.xz
   rm dpdk.tar.xz
-  mv dpdk-16.07 dpdk
+  mv dpdk-17.11 dpdk
 
   echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> "$PATHSFILE"
   echo "export RTE_SDK=$BUILDDIR/dpdk" >> "$PATHSFILE"

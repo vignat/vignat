@@ -141,7 +141,7 @@ void nf_print_config() {
 #include "loop.h"
 
 void nf_loop_iteration_begin(unsigned lcore_id,
-                             uint32_t time) {
+                             time_t time) {
 	loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
                        lcore_id, time,
                        config.max_flows,
@@ -149,7 +149,7 @@ void nf_loop_iteration_begin(unsigned lcore_id,
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
-                                       uint32_t time) {
+                                       time_t time) {
   loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
                              lcore_id, time,
                              config.max_flows,
@@ -157,7 +157,7 @@ void nf_add_loop_iteration_assumptions(unsigned lcore_id,
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,
-                           uint32_t time) {
+                           time_t time) {
   loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
                      lcore_id, time,
                      config.max_flows,

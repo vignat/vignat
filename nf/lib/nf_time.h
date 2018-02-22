@@ -4,9 +4,9 @@
 
 // TODO use time_t from time.h - but this is used by VeriFast
 // so even #ifdef-ing the time.h inclusion out doesn't work
-#define time_t uint32_t
+#define time_t int64_t
 
-//@ predicate last_time(time_t t) = true;
+//@ predicate last_time(time_t t);
 
 /**
    A wrapper around the system time function. Returns the number of
@@ -15,6 +15,6 @@
 */
 time_t current_time(void);
 //@ requires last_time(?x);
-//@ ensures x <= result &*& last_time(result);
+//@ ensures result >= 0 &*& x <= result &*& last_time(result);
 
 #endif//NF_TIME_H_INCLUDED

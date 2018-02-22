@@ -34,7 +34,7 @@ int dchain_allocate(int index_range, struct DoubleChain** chain_out) {
 }
 
 int dchain_allocate_new_index(struct DoubleChain* chain, int *index_out,
-                              uint32_t time) {
+                              time_t time) {
     klee_trace_ret();
     //Deliberately trace this pointer as an integer to avoid
     // dereference.
@@ -52,7 +52,7 @@ int dchain_allocate_new_index(struct DoubleChain* chain, int *index_out,
 }
 
 int dchain_rejuvenate_index(struct DoubleChain* chain, int index,
-                            uint32_t time) {
+                            time_t time) {
     klee_trace_ret();
     //Deliberately trace this pointer as an integer to avoid
     // dereference.
@@ -67,7 +67,7 @@ int dchain_rejuvenate_index(struct DoubleChain* chain, int index,
 }
 
 int dchain_expire_one_index(struct DoubleChain* chain,
-                            int* index_out, uint32_t time) {
+                            int* index_out, time_t time) {
   klee_trace_ret();
   //Deliberately trace this pointer as an integer to avoid
   // dereference.

@@ -1,18 +1,3 @@
-diff --git a/lib/librte_eal/common/eal_common_dev.c b/lib/librte_eal/common/eal_common_dev.c
-index a8a4146..3ea83d9 100644
---- a/lib/librte_eal/common/eal_common_dev.c
-+++ b/lib/librte_eal/common/eal_common_dev.c
-@@ -120,7 +120,9 @@ rte_eal_dev_init(void)
- 		if (driver->type != PMD_PDEV)
- 			continue;
- 		/* PDEV drivers don't get passed any parameters */
--		driver->init(NULL, NULL);
-+		if (driver->init(NULL, NULL)) {
-+			return -1;
-+		}
- 	}
- 	return 0;
- }
 diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
 index c82e565..34ae73e 100644
 --- a/lib/librte_eal/linuxapp/eal/eal_memory.c
@@ -26,3 +11,54 @@ index c82e565..34ae73e 100644
  		if (addr == MAP_FAILED) {
  			RTE_LOG(ERR, EAL, "%s: mmap() failed: %s\n", __func__,
  					strerror(errno));
+diff --git a/lib/librte_eal/common/eal_common_options.c b/lib/librte_eal/common/eal_common_options.c
+index 05bc77d..32bdd2f 100644
+--- a/lib/librte_eal/common/eal_common_options.c
++++ b/lib/librte_eal/common/eal_common_options.c
+@@ -1210,6 +1210,11 @@ eal_adjust_config(struct internal_config *internal_cfg)
+ 	/* default master lcore is the first one */
+ 	if (!master_lcore_parsed) {
+ 		cfg->master_lcore = rte_get_next_lcore(-1, 0, 0);
++		if (cfg->master_lcore >= RTE_MAX_LCORE) {
++			RTE_LOG(ERR, EAL, "Could not find master lcore\n");
++			return -1;
++		}
++
+ 		lcore_config[cfg->master_lcore].core_role = ROLE_RTE;
+ 	}
+ 
+diff --git a/lib/librte_eal/linuxapp/eal/eal_memory.c b/lib/librte_eal/linuxapp/eal/eal_memory.c
+index 440f4d2..0c883d0 100644
+--- a/lib/librte_eal/linuxapp/eal/eal_memory.c
++++ b/lib/librte_eal/linuxapp/eal/eal_memory.c
+@@ -359,7 +359,7 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi,
+ 	int node_id = -1;
+ 	int essential_prev = 0;
+ 	int oldpolicy;
+-	struct bitmask *oldmask = numa_allocate_nodemask();
++	struct bitmask *oldmask = NULL;
+ 	bool have_numa = true;
+ 	unsigned long maxnode = 0;
+ 
+@@ -371,6 +371,9 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi,
+ 
+ 	if (orig && have_numa) {
+ 		RTE_LOG(DEBUG, EAL, "Trying to obtain current memory policy.\n");
++
++		oldmask = numa_allocate_nodemask(); // can't be called if numa_available is false
++
+ 		if (get_mempolicy(&oldpolicy, oldmask->maskp,
+ 				  oldmask->size + 1, 0, 0) < 0) {
+ 			RTE_LOG(ERR, EAL,
+@@ -548,7 +551,10 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi,
+ 			numa_set_localalloc();
+ 		}
+ 	}
+-	numa_free_cpumask(oldmask);
++
++	if (oldmask != NULL) {
++		numa_free_cpumask(oldmask);
++	}
+ #endif
+ 	return i;
+ }

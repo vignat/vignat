@@ -11,7 +11,7 @@ SRCS-y := nat_forward_nat.c nat_map_dpdk.c ../nf_main.c ../lib/nat_config.c ../l
 
 # g++ flags
 CFLAGS += -O3
-CFLAGS += -I..
+CFLAGS += -I.. -I../..
 CFLAGS += -std=gnu++11
 
 LDFLAGS += -lstdc++
