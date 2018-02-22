@@ -29,25 +29,42 @@ include $(RTE_SDK)/mk/rte.extapp.mk
 
 verify:
 	rm -f *.bc # in case previous build failed after generating bc files
-	clang -DKLEE_VERIFICATION \
-		-D_GNU_SOURCE `# eal_thread.c requires pthread_setname_np from GNU pthread.h` \
+	clang \
+		-D_GNU_SOURCE `# TODO find a way to remove this from here, not clean` \
+		-DKLEE_VERIFICATION `# for a few ifdefs` \
+		`#-DENABLE_HARDWARE_STUB enable hardware stubs instead of using driver stubs` \
 		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
-		-I . -I .. -I ../lib/stubs \
+		`# Include directories` \
+		-I . -I .. \
 		-I $(KLEE_INCLUDE) \
 		-I $(RTE_SDK)/$(RTE_TARGET)/include \
-		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
-		--include=sse_stubs.h --include=builtin_stubs.h \
-		--include=rte_config.h `# required by many DPDK files` \
 		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
-		../lib/stubs/device_stub.c \
-		../lib/stubs/external_stubs.c \
+		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
+		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
+		`# Special included files` \
+		--include=lib/stubs/builtin_stub.h `# compiler builtin stubs` \
+		--include=rte_config.h `# required by many DPDK files` \
+		`# General stubs` \
+		../lib/stubs/externals/*.c \
+		../lib/stubs/driver_stub.c \
+		../lib/stubs/hardware_stub.c \
 		../lib/stubs/rte_stub.c \
+		../lib/stubs/time_stub.c \
+		`# NF stubs` \
+		../lib/stubs/containers/double-chain-stub.c \
+		../lib/stubs/containers/double-map-stub.c \
+		../lib/stubs/containers/expirator-stub.c \
+		`# NAT-specific stubs` \
+		loop-stub.c \
+		`# NF base` \
 		../nf_main.c \
-		../lib/nf_util.c ../lib/nat_config.c \
-		../lib/stubs/my-time-stub.c \
-		flowtable.c flowmanager.c ../lib/flow.c ../lib/flow-log.c \
-		loop-stub.c ../lib/stubs/containers/double-chain-stub.c \
-		../lib/stubs/expirator-stub.c ../lib/stubs/containers/double-map-stub.c \
+		../lib/nf_util.c \
+		`# NAT-specific` \
+		nat_forward_vignat.c \
+		flowtable.c flowmanager.c \
+		../lib/nat_config.c \
+		../lib/flow.c ../lib/flow-log.c \
+		`# DPDK` \
 		`# Platform-independent EAL. cpuflags uses CPU intrinsics` \
 		$(RTE_SDK)/lib/librte_eal/common/*.c \
 		`# Linux-specific EAL` \
@@ -55,19 +72,23 @@ verify:
 		`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \
 		`#             power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html` \
 		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
-		`# Virtual devices support` \
-		$(RTE_SDK)/drivers/bus/vdev/*.c \
 		`# Stacks for mempool` \
 		$(RTE_SDK)/drivers/mempool/stack/*.c \
-		nat_forward_vignat.c  \
+		`# Virtual devices support` \
+		$(RTE_SDK)/drivers/bus/vdev/*.c \
+		`# PCI driver support` \
+		$(RTE_SDK)/drivers/bus/pci/*.c \
+		$(RTE_SDK)/drivers/bus/pci/linux/*.c \
+		`# ixgbe driver (except bypass, SSE and ARM NEON stuff)` \
+		$(RTE_SDK)/drivers/net/ixgbe/!(ixgbe_bypass|ixgbe_82599_bypass|ixgbe_rxtx_vec_sse|ixgbe_rxtx_vec_neon).c \
+		$(RTE_SDK)/drivers/net/ixgbe/base/*.c \
+		`# Compile flags` \
 		-c -g -emit-llvm -fsanitize=signed-integer-overflow
 	llvm-link -o veri.bc *.bc
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
 	klee -libc=uclibc -no-externals -dump-call-traces -max-memory=20000 -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error \
 		veri.bc \
-		--no-pci `# disable PCI enumeration since PCI is not available, we don't it use anyway` \
-		--no-huge -m 1 `# use 1 MB of malloc'ed memory instead of hugepages` \
 		--no-shconf `# don't mmap the config` \
 		-- \
 		`# TODO make those parameters symbolic` \

@@ -31,12 +31,12 @@ verify:
 	clang -DKLEE_VERIFICATION \
 		-I . -I .. -I $(KLEE_INCLUDE) -I $(RTE_SDK)/$(RTE_TARGET)/include \
 		../lib/stubs/rte_stubs.c bridge_config.c ../lib/nf_util.c \
-		../lib/stubs/my-time-stub.c \
+		../lib/stubs/time_stub.c \
 		../lib/stubs/containers/map-stub.c \
 		../lib/stubs/containers/vector-stub.c \
 		../lib/stubs/containers/double-chain-stub.c \
-		../lib/stubs/expirator-stub.c \
-                ../lib/stubs/bridge_stub.c
+		../lib/stubs/containers/expirator-stub.c \
+                ../lib/stubs/bridge/bridge_stub.c
 		$(RTE_SDK)/lib/librte_cmdline/cmdline_parse*addr.c \
     bridge_forward.c bridge_config.c bridge_data.c \
 		bridge_loop.c \
@@ -47,7 +47,7 @@ verify:
 		rte_stubs.bc bridge_forward.bc bridge_data.bc \
 		bridge_loop.bc \
 		nf_main.bc nf_util.bc bridge_config.bc \
-		my-time-stub.bc expirator-stub.bc \
+		time_stub.bc expirator-stub.bc \
 		map-stub.bc double-chain-stub.bc vector-stub.bc \
 		cmdline_parse*addr.bc
 	klee --libc=uclibc --posix-runtime --dump-call-traces --max-memory=12000 --dump-call-trace-prefixes \

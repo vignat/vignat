@@ -1,24 +1,22 @@
 // Inspired from the DPDK null driver
 
-#include <device_stub.h>
+#include "lib/stubs/driver_stub.h"
+#include "lib/stubs/containers/str-descr.h"
 
 #include <stdbool.h>
 
-#include <klee/klee.h>
-
-#include <containers/str-descr.h>
-
+#include <rte_bus_vdev.h>
 #include <rte_ethdev.h>
 #include <rte_ethdev_vdev.h>
 #include <rte_malloc.h>
 #include <rte_mbuf.h>
 
-#include <rte_bus_vdev.h>
+#include <klee/klee.h>
 
 
 // Constant stuff
-static const int STUB_DEVICE_COUNT = 2; // more devices = lots more paths in the NF
-static const char* stub_device_names[STUB_DEVICE_COUNT] = { "stub0", "stub1" }; // don't rely on snprintf
+static const int DEVICES_COUNT = 2; // more devices = lots more paths in the NF
+static const char* stub_driver_names[DEVICES_COUNT] = { "stub0", "stub1" }; // don't rely on snprintf
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
@@ -37,7 +35,7 @@ static bool device_tx_setup[RTE_MAX_ETHPORTS];
 
 
 // Globals
-static struct rte_vdev_driver stub_devices[STUB_DEVICE_COUNT];
+static struct rte_vdev_driver stub_drivers[DEVICES_COUNT];
 
 
 // Tracing
@@ -327,15 +325,15 @@ stub_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 static int
 stub_dev_configure(struct rte_eth_dev *dev)
 {
-	struct stub_device* stub_dev = dev->data->dev_private;
+	struct stub_driver* stub_drv = dev->data->dev_private;
 
-	klee_assert(device_created[stub_dev->port_id]);
-	klee_assert(!device_configured[stub_dev->port_id]);
+	klee_assert(device_created[stub_drv->port_id]);
+	klee_assert(!device_configured[stub_drv->port_id]);
 
 	int ret = klee_int("dev_configure_return");
 
 	if (ret == 0) {
-		device_configured[stub_dev->port_id] = true;
+		device_configured[stub_drv->port_id] = true;
 	}
 
 	return ret;
@@ -344,19 +342,19 @@ stub_dev_configure(struct rte_eth_dev *dev)
 static int
 stub_dev_start(struct rte_eth_dev *dev)
 {
-	struct stub_device* stub_dev = dev->data->dev_private;
+	struct stub_driver* stub_drv = dev->data->dev_private;
 
-	klee_assert(device_created[stub_dev->port_id]);
-	klee_assert(device_configured[stub_dev->port_id]);
-	klee_assert(device_rx_setup[stub_dev->port_id]);
-	klee_assert(device_tx_setup[stub_dev->port_id]);
-	klee_assert(!device_started[stub_dev->port_id]);
+	klee_assert(device_created[stub_drv->port_id]);
+	klee_assert(device_configured[stub_drv->port_id]);
+	klee_assert(device_rx_setup[stub_drv->port_id]);
+	klee_assert(device_tx_setup[stub_drv->port_id]);
+	klee_assert(!device_started[stub_drv->port_id]);
 
 	int ret = klee_int("dev_start_return");
 
 	if (ret == 0) {
 		dev->data->dev_link.link_status = ETH_LINK_UP;
-		device_started[stub_dev->port_id] = true;
+		device_started[stub_drv->port_id] = true;
 	}
 
 	return ret;
@@ -365,14 +363,14 @@ stub_dev_start(struct rte_eth_dev *dev)
 static void
 stub_dev_stop(struct rte_eth_dev *dev)
 {
-	struct stub_device* stub_dev = dev->data->dev_private;
+	struct stub_driver* stub_drv = dev->data->dev_private;
 
-	klee_assert(device_created[stub_dev->port_id]);
-	klee_assert(device_configured[stub_dev->port_id]);
-	klee_assert(device_started[stub_dev->port_id]);
+	klee_assert(device_created[stub_drv->port_id]);
+	klee_assert(device_configured[stub_drv->port_id]);
+	klee_assert(device_started[stub_drv->port_id]);
 
 	dev->data->dev_link.link_status = ETH_LINK_DOWN;
-	device_started[stub_dev->port_id] = false;
+	device_started[stub_drv->port_id] = false;
 }
 
 static int
@@ -382,24 +380,22 @@ stub_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 		const struct rte_eth_rxconf *rx_conf,
 		struct rte_mempool *mb_pool)
 {
-	struct stub_device* stub_dev = dev->data->dev_private;
+	struct stub_driver* stub_drv = dev->data->dev_private;
 
-	klee_assert(device_created[stub_dev->port_id]);
-	klee_assert(device_configured[stub_dev->port_id]);
-	klee_assert(!device_rx_setup[stub_dev->port_id]);
+	klee_assert(device_created[stub_drv->port_id]);
+	klee_assert(device_configured[stub_drv->port_id]);
+	klee_assert(!device_rx_setup[stub_drv->port_id]);
 
 	// Only 1 RX queue allowed
-	if (rx_queue_id != 0) {
-		return -EINVAL;
-	}
+	klee_assert(rx_queue_id == 0);
 
 	int ret = klee_int("dev_rx_queue_setup_return");
 
 	if (ret == 0) {
-		stub_dev->rx_queues[rx_queue_id].port_id = stub_dev->port_id;
-		stub_dev->rx_queues[rx_queue_id].mb_pool = mb_pool;
-		dev->data->rx_queues[rx_queue_id] = &stub_dev->rx_queues[rx_queue_id];
-		device_rx_setup[stub_dev->port_id] = true;
+		stub_drv->rx_queues[rx_queue_id].port_id = stub_drv->port_id;
+		stub_drv->rx_queues[rx_queue_id].mb_pool = mb_pool;
+		dev->data->rx_queues[rx_queue_id] = &stub_drv->rx_queues[rx_queue_id];
+		device_rx_setup[stub_drv->port_id] = true;
 	}
 
 	return ret;
@@ -411,61 +407,79 @@ stub_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 		unsigned int socket_id,
 		const struct rte_eth_txconf *tx_conf)
 {
-	struct stub_device* stub_dev = dev->data->dev_private;
+	struct stub_driver* stub_drv = dev->data->dev_private;
 
-	klee_assert(device_created[stub_dev->port_id]);
-	klee_assert(device_configured[stub_dev->port_id]);
-	klee_assert(!device_tx_setup[stub_dev->port_id]);
+	klee_assert(device_created[stub_drv->port_id]);
+	klee_assert(device_configured[stub_drv->port_id]);
+	klee_assert(!device_tx_setup[stub_drv->port_id]);
 
-	if (tx_queue_id != 0) {
-		return -EINVAL;
-	}
+	// Only 1 TX queue allowed
+	klee_assert(tx_queue_id == 0);
 
 	int ret = klee_int("dev_tx_queue_setup_return");
 
 	if (ret == 0) {
-		stub_dev->tx_queues[tx_queue_id].port_id = stub_dev->port_id;
-		stub_dev->tx_queues[tx_queue_id].mb_pool = NULL;
-		dev->data->tx_queues[tx_queue_id] = &stub_dev->tx_queues[tx_queue_id];
-		device_tx_setup[stub_dev->port_id] = true;
+		stub_drv->tx_queues[tx_queue_id].port_id = stub_drv->port_id;
+		stub_drv->tx_queues[tx_queue_id].mb_pool = NULL;
+		dev->data->tx_queues[tx_queue_id] = &stub_drv->tx_queues[tx_queue_id];
+		device_tx_setup[stub_drv->port_id] = true;
 	}
 
 	return ret;
 }
 
 static void
-stub_queue_release(void *q)
+stub_queue_release(void *queue)
 {
-	// Queues' creation and deletion is somewhat counter-intuitive.
-	//
-	// Drivers can say how many RX/TX queues they support per device;
-	// then, they have to initialize their devices' queues arrays to NULL,
-	// and the arrays are malloc'ed by DPDK when the app initializes the device,
-	// at which point DPDK also sets the "nb_rx/tx_queues" fields.
-	//
-	// However, queues aren't created until the app creates them;
-	// and if some part of the initialization fails, DPDK will request
-	// the deletion of all queues, even those who haven't been initialized yet.
-	//
-	// Thus, the queue "release" method can be given a null pointer.
-	if (q != NULL) {
-		klee_forbid_access(q, sizeof(struct stub_queue), "released_queue");
+	klee_assert(queue != NULL);
+
+	struct stub_queue* stub_queue = queue;
+
+	bool queue_found = false;
+
+	// First, find the queue we're releasing
+	for (int d = 0; d < DEVICES_COUNT; d++) {
+		struct rte_eth_dev* dev = rte_eth_dev_allocated(stub_drivers[d].driver.name);
+		struct stub_driver* stub_drv = dev->data->dev_private;
+
+		for (int q = 0; q < RTE_MAX_QUEUES_PER_PORT; q++) {
+			// Second, reset the associated state and progress
+			if (&stub_drv->rx_queues[q] == stub_queue) {
+				klee_assert(!queue_found);
+				klee_assert(device_rx_setup[stub_drv->port_id]);
+
+				dev->data->rx_queues[q] = NULL;
+				device_rx_setup[stub_drv->port_id] = false;
+				memset(stub_queue, 0, sizeof(struct stub_queue));
+				queue_found = true;
+			} else if (&stub_drv->tx_queues[q] == stub_queue) {
+				klee_assert(!queue_found);
+				klee_assert(device_tx_setup[stub_drv->port_id]);
+
+				dev->data->tx_queues[q] = NULL;
+				device_tx_setup[stub_drv->port_id] = false;
+				memset(stub_queue, 0, sizeof(struct stub_queue));
+				queue_found = true;
+			}
+		}
 	}
+
+	klee_assert(queue_found);
 }
 
 static void
 stub_dev_info(struct rte_eth_dev *dev,
 		struct rte_eth_dev_info *dev_info)
 {
-	struct stub_device* stub_dev = dev->data->dev_private;
+	struct stub_driver* stub_drv = dev->data->dev_private;
 
-	klee_assert(device_created[stub_dev->port_id]);
+	klee_assert(device_created[stub_drv->port_id]);
 
 	dev_info->driver_name = "stub";
 	dev_info->max_mac_addrs = 1;
 	dev_info->max_rx_pktlen = (uint32_t) -1;
-	dev_info->max_rx_queues = RTE_DIM(stub_dev->rx_queues);
-	dev_info->max_tx_queues = RTE_DIM(stub_dev->tx_queues);
+	dev_info->max_rx_queues = RTE_DIM(stub_drv->rx_queues);
+	dev_info->max_tx_queues = RTE_DIM(stub_drv->tx_queues);
 	dev_info->min_rx_bufsize = 0;
 	dev_info->pci_dev = NULL;
 	dev_info->reta_size = 0;
@@ -550,16 +564,16 @@ stub_driver_probe(struct rte_vdev_device* vdev)
 		vdev->device.numa_node = rte_socket_id();
 	}
 
-	struct rte_eth_dev* dev = rte_eth_vdev_allocate(vdev, sizeof(struct stub_device));
+	struct rte_eth_dev* dev = rte_eth_vdev_allocate(vdev, sizeof(struct stub_driver));
 
 	if (dev == NULL) {
 		return -ENOMEM;
 	}
 
-	struct stub_device* stub_dev = (struct stub_device*) dev->data->dev_private;
-	stub_dev->port_id = dev->data->port_id;
+	struct stub_driver* stub_drv = (struct stub_driver*) dev->data->dev_private;
+	stub_drv->port_id = dev->data->port_id;
 
-	klee_assert(!device_created[stub_dev->port_id]);
+	klee_assert(!device_created[stub_drv->port_id]);
 
 	dev->data->rx_queues = NULL;
 	dev->data->nb_rx_queues = 0;
@@ -573,7 +587,7 @@ stub_driver_probe(struct rte_vdev_device* vdev)
 	dev->rx_pkt_burst = stub_rx;
 	dev->tx_pkt_burst = stub_tx;
 
-	device_created[stub_dev->port_id] = true;
+	device_created[stub_drv->port_id] = true;
 
 	return 0;
 }
@@ -604,35 +618,37 @@ stub_driver_remove(struct rte_vdev_device* vdev)
 }
 
 
-
-void
-stub_device_init(void)
+// First part of init
+__attribute__((constructor))
+static void
+stub_driver_init(void)
 {
 	// Trace the packet free; need a regex to alias the duplicated functions
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
 	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
 
-	for (int n = 0; n < STUB_DEVICE_COUNT; n++) {
-		struct rte_vdev_driver stub_device = {
+	for (int n = 0; n < DEVICES_COUNT; n++) {
+		struct rte_vdev_driver rte_driver = {
 			.next = NULL,
 			.driver = {
 				.next = NULL,
-				.name = stub_device_names[n],
+				.name = stub_driver_names[n],
 				.alias = NULL,
 			},
 			.probe = stub_driver_probe,
 			.remove = stub_driver_remove,
 		};
-		stub_devices[n] = stub_device;
-		rte_vdev_register(&stub_devices[n]);
+		stub_drivers[n] = rte_driver;
+		rte_vdev_register(&stub_drivers[n]);
 	}
 }
 
+// Second part of init, after DPDK EAL init
 void
-stub_device_attach(void)
+stub_driver_attach(void)
 {
-	for (int n = 0; n < STUB_DEVICE_COUNT; n++) {
-		int ret = rte_vdev_init(stub_device_names[n], NULL);
+	for (int n = 0; n < DEVICES_COUNT; n++) {
+		int ret = rte_vdev_init(stub_driver_names[n], NULL);
 		// should be 0, or the symbol returned by probe
 		klee_assert(ret == 0 || klee_is_symbolic(ret));
 	}

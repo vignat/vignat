@@ -3,6 +3,13 @@
 #include <inttypes.h>
 
 
+// Pretend we support those
+#define __SSE3__
+#define __SSSE3__
+#define __SSE4_1__
+#define __SSE4_2__
+
+
 // Pretend that everything is known to be a compile-time constant, so DPDK uses less fancy tricks
 #define __builtin_constant_p(x) 1
 

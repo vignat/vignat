@@ -1,6 +1,6 @@
 #include <klee/klee.h>
 #include "loop.h"
-#include "lib/stubs/my-time-stub-control.h"
+#include "lib/stubs/time_stub_control.h"
 #include "lib/stubs/containers/double-chain-stub-control.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
 

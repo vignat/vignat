@@ -1,6 +1,6 @@
 #include <klee/klee.h>
 #include "lib/nf_time.h"
-#include "my-time-stub-control.h"
+#include "time_stub_control.h"
 
 time_t starting_time = 0;
 time_t last_time = 0;

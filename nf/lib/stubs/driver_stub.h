@@ -24,12 +24,11 @@ struct stub_queue {
 	struct rte_mempool* mb_pool;
 };
 
-struct stub_device {
+struct stub_driver {
 	uint16_t port_id;
 	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
 	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
 };
 
-void stub_device_init(void);
 
-void stub_device_attach(void);
+void stub_driver_attach(void);
