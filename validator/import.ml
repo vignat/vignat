@@ -129,6 +129,12 @@ let expand_shorted_sexp sexp =
   let defs = cross_expand_defs_fixp defs in
   if (map_expandable defs defs) then begin
     lprintf "failed expansion on sexp: \n%s\n" (Sexp.to_string sexp);
+    lprintf "defs: ";
+    Map.iteri (get_defs sexp) ~f:(fun ~key ~data ->
+        lprintf "%s ::: %s\n" key (Sexp.to_string data));
+    lprintf "expanded defs: ";
+    Map.iteri defs ~f:(fun ~key ~data ->
+        lprintf "%s ::: %s\n" key (Sexp.to_string data));
     failwith ("incomplete map expansion for " ^ (Sexp.to_string sexp));
   end;
   (fst (expand_exp (remove_defs sexp) defs))
