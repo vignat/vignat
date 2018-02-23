@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #define STUB_FILES_COUNT 1024
+#define STUB_HUGEPAGES_COUNT 2
 
 // note: we only support 1 pipe
 #define STUB_PIPE_FD_READ (STUB_FILES_COUNT + 1)

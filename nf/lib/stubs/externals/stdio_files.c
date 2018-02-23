@@ -65,6 +65,9 @@ static char* FILE_CONTENT_PAGEMAP = (char*) -100;
 // Special case: the hugepage info file, which is truncated
 static char* FILE_CONTENT_HPINFO = (char*) -200;
 
+// Special case: Hugepage files
+static char* FILE_CONTENT_HUGEPAGE = (char*) -300;
+
 
 int
 access(const char* pathname, int mode)
@@ -346,13 +349,12 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 
 	// addr must be NULL, unless we're mmapping hugepages
 	// TODO check the address somehow when it's a hugepage
-	const char* hugepages_prefix = "/dev/hugepages";
-	if (strncmp(FILES[fd].path, hugepages_prefix, strlen(hugepages_prefix))) {
-		klee_assert(addr == NULL);
-		klee_assert(length >= strlen(FILES[fd].content));
-	} else {
+	if (FILES[fd].content == FILE_CONTENT_HUGEPAGE) {
 		// if it's a hugepage, length is well-defined
 		klee_assert(length % (2048 * 1024) == 0);
+	} else {
+		klee_assert(addr == NULL);
+		klee_assert(length >= strlen(FILES[fd].content));
 	}
 
 	// Offsets not supported
@@ -496,8 +498,10 @@ stub_stdio_files_init(void)
 
 
 	// Hugepages properties
+	char huge_free_value[1024];
+	snprintf(huge_free_value, sizeof(huge_free_value), "%d\n", STUB_HUGEPAGES_COUNT);
 	int huge_res_fd = stub_add_file("/sys/kernel/mm/hugepages/hugepages-2048kB/resv_hugepages", "0\n"); // number of reserved hugepages
-	int huge_free_fd = stub_add_file("/sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages", "1\n"); // number of free hugepages
+	int huge_free_fd = stub_add_file("/sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages", strdup(huge_free_value)); // number of free hugepages
 	int huge_2048_fd = stub_add_folder("/sys/kernel/mm/hugepages/hugepages-2048kB", 2, huge_res_fd, huge_free_fd);
 	stub_add_folder("/sys/kernel/mm/hugepages", 1, huge_2048_fd);
 
@@ -518,9 +522,13 @@ stub_stdio_files_init(void)
 	// HACK this folder is opened as a file for locking and as a folder for enumerating...
 	stub_add_file("/dev/hugepages", "");
 
-	// HACK those two files exist but are not bound to their folder (defined above)...
-	stub_add_file("/dev/hugepages/rte", "");
-	stub_add_file("/dev/hugepages/rtemap_0", "");
+	// HACK those files exist but are not bound to their folder (defined above)...
+	stub_add_file("/dev/hugepages/rte", FILE_CONTENT_HUGEPAGE);
+	for (int n = 0; n < STUB_HUGEPAGES_COUNT; n++) {
+		char hugepage_file_name[1024];
+		snprintf(hugepage_file_name, sizeof(hugepage_file_name), "/dev/hugepages/rtemap_%d", n);
+		stub_add_file(strdup(hugepage_file_name), FILE_CONTENT_HUGEPAGE);
+	}
 
 	// /var stuff
 	stub_add_file("/var/run/.rte_hugepage_info", FILE_CONTENT_HPINFO);

@@ -59,7 +59,7 @@ static const uint16_t TX_QUEUE_SIZE = 512;
 static struct rte_mempool* clone_pool;
 
 // Buffer count for mempools
-static const unsigned MEMPOOL_BUFFER_COUNT = 8192;
+static const unsigned MEMPOOL_BUFFER_COUNT = 256;
 
 
 // --- Initialization ---
@@ -83,7 +83,7 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     &device_conf // device config
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot configure device %" PRIu16 ", err=%d", device, retval);
+    return retval;
   }
 
   retval = rte_eth_dev_adjust_nb_rx_tx_desc(
@@ -92,7 +92,7 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     &nb_tx  // # TX
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot adjust nb rx/tx desc for device %" PRIu16 ", err=%d", device, retval);
+    return retval;
   }
 
   // Allocate and set up 1 RX queue per device
@@ -105,7 +105,7 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     mbuf_pool // memory pool
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot allocate RX queue for device %" PRIu16 ", err=%d", device, retval);
+    return retval;
   }
 
   // Allocate and set up 1 TX queue per device
@@ -117,31 +117,31 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     NULL // config (NULL = default)
   );
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot allocate TX queue for device %" PRIu16 " err=%d", device, retval);
+    return retval;
   }
 
   // Start the device
   retval = rte_eth_dev_start(device);
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot start device on device %" PRIu16 ", err=%d", device, retval);
+    return retval;
   }
 
   // Enable RX in promiscuous mode for the Ethernet device
   rte_eth_promiscuous_enable(device);
   if (rte_eth_promiscuous_get(device) != 1) {
-    rte_exit(EXIT_FAILURE, "Cannot set promiscuous mode on device %" PRIu16 ", result=%d", device, retval);
+    return retval;
   }
 
   // Get the link up
   retval = rte_eth_dev_set_link_up(device);
   if (retval != 0) {
-    rte_exit(EXIT_FAILURE, "Cannot set link up on device %" PRIu16 ", err=%d", device, retval);
+    return retval;
   }
 
   struct rte_eth_link link;
   rte_eth_link_get(device, &link);
   if (link.link_status == 0) {
-    rte_exit(EXIT_FAILURE, "Link is down for device %" PRIu16, device);
+    return retval;
   }
 
   return 0;
@@ -253,10 +253,11 @@ main(int argc, char* argv[])
 
   // Initialize all devices
   for (uint16_t device = 0; device < nb_devices; device++) {
-    if (nf_init_device(device, mbuf_pool) == 0) {
+    ret = nf_init_device(device, mbuf_pool);
+    if (ret == 0) {
       NF_INFO("Initialized device %" PRIu8 ".", device);
     } else {
-      rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ".", device);
+      rte_exit(EXIT_FAILURE, "Cannot init device %" PRIu8 ", ret=%d", device, ret);
     }
   }
 
