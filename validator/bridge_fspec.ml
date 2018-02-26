@@ -559,9 +559,12 @@ let fun_types =
                               "if (!stat_vec_allocated)\
                                stat_vec_allocated = true;");];};
      "vector_borrow", {ret_type = Static Void;
-                       arg_types = stt [Ptr vector_struct;
-                                        Sint32;
-                                        Ptr (Ptr Void)];
+                       arg_types = [Static (Ptr vector_struct);
+                                    Static Sint32;
+                                    Dynamic ["StaticKey",
+                                             Ptr (Ptr static_key_struct);
+                                             "DynamicEntry",
+                                             Ptr (Ptr dynamic_entry_struct)]];
                        extra_ptr_types = ["borrowed_cell",
                                           Dynamic ["StaticKey",
                                                    static_key_struct;
@@ -580,9 +583,12 @@ let fun_types =
                             "if (!dyn_vec_borrowed)\
                              dyn_vec_borrowed = true;")];};
      "vector_return", {ret_type = Static Void;
-                       arg_types = stt [Ptr vector_struct;
-                                        Sint32;
-                                        Ptr Void];
+                       arg_types = [Static (Ptr vector_struct);
+                                    Static Sint32;
+                                    Dynamic ["StaticKey",
+                                             Ptr static_key_struct;
+                                             "DynamicEntry",
+                                             Ptr dynamic_entry_struct]];
                        extra_ptr_types = [];
                        lemmas_before = [];
                        lemmas_after = [];};]

@@ -715,9 +715,10 @@ let rec add_to_known_addresses
         (ttype_to_str base_value.t);
     assert((List.length breakdown) = 0)
   end;
-  lprintf "allocating *%Ld = %s at %s\n"
+  lprintf "allocating *%Ld = %s : %s at %s\n"
     addr
     (render_tterm base_value)
+    (ttype_to_str base_value.t)
     (moment_to_str callid);
   let prev = match Int64.Map.find !known_addresses addr with
     | Some value -> value
@@ -831,6 +832,7 @@ let get_basic_vars ftype_of tpref =
         end
         else get_arg_pointee_vars ptee ptee_type acc
     in
+    lprintf "getting_vars from %s\n" call.fun_name;
     if (List.length call.args <> get_num_args ftype_of call) then
       failwith ("Wrong number of arguments in the plugin for function " ^
                 call.fun_name);
@@ -1047,6 +1049,7 @@ let allocate_args ftype_of tpref arg_name_gen =
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call i in
+          lprintf "%s fun argument %d type is %s\n" call.fun_name i (ttype_to_str t);
           let ptee_type = get_pointee t in
           let ptee_ptr_val = Option.map ptee.before.full
               ~f:(fun expr -> get_sexp_value expr ptee_type)
@@ -1088,15 +1091,15 @@ let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
     let ptee_t = get_pointee arg_type in
+    let addr = (Int64.of_string (Sexp.to_string arg.value)) in
     let arg_var = find_first_symbol_by_address
-        (Int64.of_string (Sexp.to_string arg.value))
+        addr
         ptee_t
         (moment_before call.id)
     in
     match arg_var with
     | Some n -> n
-    | None -> {v=Addr {v=(Id ("arg??" ^ (Sexp.to_string arg.value)));
-                       t=ptee_t};
+    | None -> {v=(Utility (Ptr_placeholder addr));
                t=arg_type}
   in
   List.mapi call.args
@@ -1482,17 +1485,16 @@ let allocate_dummy addr t =
                         breakdown=String.Map.empty}];
   {v=Id name;t}
 
-let fixup_placeholder_ptrs_in_tterm moment tterm =
+let fixup_placeholder_ptrs_in_tterm moment tterm ~need_symbol =
   let replace_placeholder = function
     | {v=Utility (Ptr_placeholder addr); t=Ptr ptee_t} ->
       lprintf "fixing placeholder for %Ld\n" addr;
-      (* HORRIBLE HACK I think find_first_known_address is buggy somehow so... *)
-      let known_addr =
-        match moment with
-        | After x when x > 5 -> find_last_known_address addr ptee_t moment
-        | _ -> find_first_known_address addr ptee_t moment
+      let search_function =
+        if need_symbol then
+          find_first_symbol_by_address else
+          find_first_known_address
       in
-      begin match ptee_t, known_addr with
+      begin match ptee_t, search_function addr ptee_t moment with
         | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
                                   (render_tterm tterm))
         | _, Some x -> Some x
@@ -1502,13 +1504,14 @@ let fixup_placeholder_ptrs_in_tterm moment tterm =
     | {v=Utility _;t} ->
       failwith ("Ptr placeholder type is not a pointer:" ^
                 (render_tterm tterm) ^ " : " ^ (ttype_to_str t))
-    | _ -> None
+    | x -> lprintf "fxphdr called on %s\n" (render_tterm x); None
   in
+  lprintf "fixup_placeholder_ptrs_in_tterm called upon %s\n" (render_tterm tterm);
   call_recursively_on_tterm replace_placeholder tterm
 
 let fixup_placeholder_ptrs moment vars =
   List.map vars ~f:(fun {name;value} ->
-    {name;value=fixup_placeholder_ptrs_in_tterm moment value})
+    {name;value=fixup_placeholder_ptrs_in_tterm moment value ~need_symbol:false})
 
 let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
   lprintf "fixing pph in %s == %s\n" (render_tterm lhs) (render_tterm rhs);
@@ -1525,13 +1528,18 @@ let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
         {lhs=lhs;rhs=lhs}
     end
   | _ ->
-    {lhs=fixup_placeholder_ptrs_in_tterm moment lhs;
-     rhs=fixup_placeholder_ptrs_in_tterm moment rhs}
+    {lhs=fixup_placeholder_ptrs_in_tterm moment lhs ~need_symbol:true;
+     rhs=fixup_placeholder_ptrs_in_tterm moment rhs ~need_symbol:false}
 
 let fixup_placeholder_ptrs_in_context context =
+  lprintf "fixing placeholders in %s\n" (render_term context.application);
   {context with
    extra_pre_conditions = List.map context.extra_pre_conditions
-       ~f:(fixup_placeholder_ptrs_in_eq_cond (After context.call_id))}
+       ~f:(fixup_placeholder_ptrs_in_eq_cond (After context.call_id));
+   application = (fixup_placeholder_ptrs_in_tterm
+                    (After context.call_id)
+                    {v=context.application;t=Unknown}
+                    ~need_symbol:true).v}
 
 let fixup_placeholder_ptrs_in_hist_calls hist_calls =
   let in_one_call {context;result} =
@@ -1542,7 +1550,8 @@ let fixup_placeholder_ptrs_in_hist_calls hist_calls =
                   (After context.call_id));
         ret_val=fixup_placeholder_ptrs_in_tterm
             (After context.call_id)
-            result.ret_val}}
+            result.ret_val
+            ~need_symbol:false}}
   in
   List.map hist_calls ~f:in_one_call
 
@@ -1553,10 +1562,12 @@ let fixup_placeholder_ptrs_in_tip_call tip_call =
                (After tip_call.context.call_id));
      ret_val = fixup_placeholder_ptrs_in_tterm
          (After tip_call.context.call_id)
-         ret_val;
+         ret_val
+         ~need_symbol:false;
      post_statements = List.map post_statements
          ~f:(fixup_placeholder_ptrs_in_tterm
-               (After tip_call.context.call_id))}
+               (After tip_call.context.call_id)
+               ~need_symbol:false)}
   in
   {context = fixup_placeholder_ptrs_in_context tip_call.context;
    results = List.map tip_call.results
@@ -1564,24 +1575,27 @@ let fixup_placeholder_ptrs_in_tip_call tip_call =
 
 let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
   let type_match tag t str_val =
-    match t with
-    | Ptr (Str (struct_name, fields)) ->
-      begin match str_val.sname with
-        | Some sname ->
-          if String.equal sname struct_name then begin
-            assert (List.for_all str_val.break_down
-                      ~f:(fun {fname;value;addr=_} ->
-                          List.exists fields ~f:(fun (name,_) ->
-                              String.equal name fname)));
-            true
-          end else false
-      | None ->
-        List.for_all str_val.break_down
-          ~f:(fun {fname;value;addr=_} ->
-              List.exists fields ~f:(fun (name,_) -> String.equal name fname)
-              (* One level introspection should be enough *))
-      end
-    | _ -> false
+    (match str_val.sname with
+       Some sname when String.equal sname tag -> true | _ -> false)
+    ||
+    (match t with
+     | Ptr (Str (struct_name, fields)) ->
+       begin match str_val.sname with
+         | Some sname ->
+           if String.equal sname struct_name then begin
+             assert (List.for_all str_val.break_down
+                       ~f:(fun {fname;value;addr=_} ->
+                           List.exists fields ~f:(fun (name,_) ->
+                               String.equal name fname)));
+             true
+           end else false
+         | None ->
+           List.for_all str_val.break_down
+             ~f:(fun {fname;value;addr=_} ->
+                 List.exists fields ~f:(fun (name,_) -> String.equal name fname)
+                 (* One level introspection should be enough *))
+       end
+     | _ -> false)
   in
   let find_type_match ts str_val val_name call =
     match List.find ts ~f:(fun (tag,t) -> type_match tag t str_val) with
@@ -1603,7 +1617,7 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
     ~init:(Int.Map.empty:guessed_types Int.Map.t) ~f:(fun acc call ->
         let arg_decl_types = (basic_ftype_of call.fun_name).arg_types in
         let arg_type_guesses =
-          List.foldi (List.rev (List.zip_exn call.args arg_decl_types))
+          List.foldi (List.zip_exn call.args arg_decl_types)
             ~init:[]
             ~f:(fun (n:int) (acc:ttype list) ((arg:Trace_prefix.arg),
                                               (ts:type_set)) ->
@@ -1658,7 +1672,7 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
         in
         Int.Map.add acc ~key:call.id
           ~data:{ret_type=ret_type_guess;
-                 arg_types=arg_type_guesses;
+                 arg_types=List.rev arg_type_guesses;
                  extra_ptr_types=ex_ptr_type_guesses})
 
 let build_ir fun_types fin preamble boundary_fun finishing_fun
@@ -1676,6 +1690,10 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let pref = distribute_ids pref in
   let guessed_dyn_types = guess_dynamic_types ftype_of pref in
   let ftype_of = (ftype_of,guessed_dyn_types) in
+  (* Int.Map.iteri guessed_dyn_types ~f:(fun ~key ~data ->
+   *     lprintf "%d -> ret:%s \n" key (ttype_to_str data.ret_type);
+   *     List.iter data.arg_types ~f:(fun t ->
+   *         lprintf "arg type: %s\n" (ttype_to_str t))); *)
   let finishing_iteration =
     is_the_last_function_finishing pref eventproc_iteration_end
   in

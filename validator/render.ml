@@ -5,12 +5,24 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
   match out_val.v with
   | Addr ptee ->
-    render_eq_sttmt
-      ~is_assert
-      {v=Deref out_arg;t=get_pointee out_arg.t}
-      ptee
+    begin match out_arg.t with
+      | Ptr Void ->
+        render_eq_sttmt
+          ~is_assert
+          {v=Deref {v=Cast (out_val.t, out_arg);t=out_val.t};
+           t=get_pointee out_val.t}
+          ptee
+      | _ ->
+        render_eq_sttmt
+          ~is_assert
+          {v=Deref out_arg;t=get_pointee out_arg.t}
+          ptee
+    end
   | Struct (_, fields) ->
-    assert(out_val.t = out_arg.t);
+    if out_val.t <> out_arg.t then
+      failwith ("arg and val types inconsistent: arg:" ^
+                (ttype_to_str out_arg.t) ^ " <> val: " ^
+                (ttype_to_str out_val.t));
     (match out_arg with
      | {v=Deref {v=Id arg_name;t=_};t=_} -> "//@ " ^ head ^ "(" ^ arg_name ^ "!= 0 );\n" (* can be important to know the arg can be read *)
      | _ -> "") ^

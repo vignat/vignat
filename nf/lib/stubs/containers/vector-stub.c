@@ -82,7 +82,7 @@ void vector_borrow(struct Vector* vector, int index, void** val_out) {
   //Avoid dumpting the actual contents of vector.
   klee_trace_param_i32((uint32_t)vector, "vector");
   klee_trace_param_i32(index, "index");
-  klee_trace_param_ptr(val_out, sizeof(void*), "val_out");
+  klee_trace_param_tagged_ptr(val_out, sizeof(void*), "val_out", vector->cell_type);
   klee_trace_extra_ptr(vector->data, vector->elem_size,
                        "borrowed_cell", vector->cell_type);
   {
@@ -112,7 +112,8 @@ void vector_return(struct Vector* vector, int index, void* value) {
   //Avoid dumpting the actual contents of vector.
   klee_trace_param_i32((uint32_t)vector, "vector");
   klee_trace_param_i32(index, "index");
-  klee_trace_param_ptr(value, vector->elem_size, "value");
+  klee_trace_param_tagged_ptr(value, vector->elem_size, "value",
+                              vector->cell_type);
   {
     for (int i = 0; i < vector->field_count; ++i) {
       klee_trace_param_ptr_field(value,
