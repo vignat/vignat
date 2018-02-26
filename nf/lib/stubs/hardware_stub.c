@@ -994,6 +994,7 @@ stub_registers_init(void)
 
 	// page 596
 	// Receive Descriptor Base Address High — RDBAH[n] (0x01004 + 0x40*n, n=0...63 and 0x0D004 + 0x40*(n-64), n=64...127; RW)
+	// XXX SPEC BUG page 172 point 3 says "registers RDBAL, RDBAL" but one of those should be RDBAH
 
 	// 0-31: Receive Descriptor Base Address High
 	for (int n = 0; n <= 127; n++) {
@@ -1159,7 +1160,7 @@ stub_registers_init(void)
 	// MAC Core Control 0 Register — HLREG0 (0x04240; RW)
 
 	// 0: TX CRC Enable (1 - enable)
-	// <the data sheet says bit 1 is reserved and set to 1, but then has another bit 1...>
+	// XXX SPEC BUG the data sheet says bit 1 is reserved and set to 1, but then has another bit 1...
 	// 1: RX CRC Strip (1 - enabled)
 	// 2: Jumbo Frames Enable (0 - disable)
 	// 3-9: Reserved, must be set to 0x1 (!!!)

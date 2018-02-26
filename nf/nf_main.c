@@ -164,8 +164,10 @@ lcore_main(void)
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
   VIGOR_LOOP_BEGIN
+klee_print_expr("YES!",0);
     struct rte_mbuf* buf = NULL;
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
+klee_print_expr("rx!",0);
     if (actual_rx_len != 0) {
       uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
       if (dst_device == VIGOR_DEVICE) {
