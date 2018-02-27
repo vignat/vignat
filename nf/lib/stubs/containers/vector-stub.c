@@ -84,20 +84,22 @@ void vector_borrow(struct Vector* vector, int index, void** val_out) {
   klee_trace_param_i32(index, "index");
   klee_trace_param_tagged_ptr(val_out, sizeof(void*), "val_out", vector->cell_type);
   klee_trace_extra_ptr(vector->data, vector->elem_size,
-                       "borrowed_cell", vector->cell_type);
+                       "borrowed_cell", vector->cell_type, TD_BOTH);
   {
     for (int i = 0; i < vector->field_count; ++i) {
       klee_trace_extra_ptr_field(vector->data,
                                  vector->fields[i].offset,
                                  vector->fields[i].width,
-                                 vector->fields[i].name);
+                                 vector->fields[i].name,
+                                 TD_BOTH);
     }
     for (int i = 0; i < vector->nested_field_count; ++i) {
       klee_trace_extra_ptr_nested_field(vector->data,
                                         vector->nest_fields[i].base_offset,
                                         vector->nest_fields[i].offset,
                                         vector->nest_fields[i].width,
-                                        vector->nest_fields[i].name);
+                                        vector->nest_fields[i].name,
+                                        TD_BOTH);
     }
   }
   klee_assert(!vector->elem_claimed);
