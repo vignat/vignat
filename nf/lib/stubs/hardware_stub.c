@@ -630,6 +630,27 @@ stub_register_tdh_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 
 
 static uint32_t
+stub_register_rxctrl_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
+{
+	// When enabling RX, we write down the address of the receive descriptor for queue 0
+	dev->rdba =  DEV_REG(dev, 0x01000) // RDBAL
+		  | (DEV_REG(dev, 0x01004) << 32); // RDBAH
+
+	// Clear the head and tail of the descriptor
+	DEV_REG(dev, 0x01010) = 0; // RDH
+	DEV_REG(dev, 0x01018) = 0; // RDT
+
+	// If we have a message, increment the head
+	// TODO???
+	
+	
+	
+	
+	
+}
+
+
+static uint32_t
 stub_register_needsrxen0_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// RXCTRL.RXEN (bit 0) must be set to 0 before writing to RXCSUM and FCTRL
@@ -1122,6 +1143,7 @@ stub_registers_init(void)
 	// 1-31: Reserved
 	REG(0x03000, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000000001);
+	REGISTERS[0x03000].write = stub_register_rxctrl_write;
 
 
 	// page 661
