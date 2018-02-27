@@ -20,6 +20,9 @@ struct stub_mbuf_content {
 	struct tcp_hdr tcp;
 };
 
-void stub_core_free(struct rte_mbuf* mbuf, bool trace);
-uint16_t stub_core_rx(uint16_t device, struct rte_mempool* pool, struct rte_mbuf** mbufs);
-uint16_t stub_core_tx(uint16_t device, struct rte_mbuf** mbufs);
+void stub_core_trace_free(struct rte_mbuf* mbuf);
+void stub_core_trace_rx(struct rte_mbuf* mbuf);
+void stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
+
+bool stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf** mbufp);
+void stub_core_mbuf_free(struct rte_mbuf* mbuf);
