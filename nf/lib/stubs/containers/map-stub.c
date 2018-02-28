@@ -120,7 +120,7 @@ int map_get(struct Map* map, void* key, int* value_out) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type);
+  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type, TD_BOTH);
   klee_trace_param_ptr(value_out, sizeof(int), "value_out");
   TRACE_KEY_FIELDS(key, map);
   if (map->has_this_key) {
@@ -141,7 +141,7 @@ void map_put(struct Map* map, void* key, int value) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type);
+  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type, TD_BOTH);
   klee_trace_param_i32(value, "value");
   TRACE_KEY_FIELDS(key, map);
   if (map->ent_cond) {
@@ -161,7 +161,7 @@ void map_erase(struct Map* map, void* key, void** trash) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
   klee_trace_param_i32((uint32_t)map, "map");
-  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type);
+  klee_trace_param_tagged_ptr(key, map->key_size, "key", map->key_type, TD_BOTH);
   TRACE_KEY_FIELDS(key, map);
   klee_trace_param_ptr(trash, sizeof(void*), "trash");
   klee_assert(0); //no support for erasing staff for the moment
