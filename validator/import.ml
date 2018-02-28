@@ -179,6 +179,24 @@ let get_read_width_of_sexp exp =
           String.equal rd "Read") -> Some w
   | _ -> None
 
+let sexp_is_of_this_width sexp w =
+  match get_read_width_of_sexp sexp with
+  | Some ww -> String.equal ww w
+  | _ -> false
+
+let rec canonicalize_sexp sexp =
+  match expand_shorted_sexp sexp with
+  | Sexp.List [Sexp.Atom f1; Sexp.Atom w1; Sexp.Atom offset;
+               Sexp.List [Sexp.Atom f2; Sexp.Atom w2; arg];]
+    when (String.equal f1 "Extract") && (String.equal f2 "ZExt") &&
+         (String.equal offset "0") &&
+         sexp_is_of_this_width arg w1 ->
+    lprintf "canonicalized: %s\n" (Sexp.to_string arg);
+    (* TODO: make sure no sign-magic breaks here *)
+    canonicalize_sexp arg
+  | Sexp.List (Sexp.Atom f :: args) -> Sexp.List (Sexp.Atom f :: List.map args ~f:canonicalize_sexp)
+  | _ -> sexp
+
 let map_set_n_update_alist mp lst =
   List.fold lst ~init:mp ~f:(fun acc (key,data) ->
       String.Map.add acc ~key ~data)
@@ -313,7 +331,7 @@ let make_name_alist_from_var_decls (lst: typed_var list) =
 
 let get_vars_from_plain_val v type_guess known_vars =
   (*TODO: proper type induction here, e.g. Sadd w16 -> Sint16, ....*)
-  let decls = get_var_decls_of_sexp (expand_shorted_sexp v) type_guess known_vars in
+  let decls = get_var_decls_of_sexp (canonicalize_sexp v) type_guess known_vars in
   map_set_n_update_alist known_vars (make_name_alist_from_var_decls decls)
 
 let type_guess_of_ttype t = match t with
@@ -528,7 +546,7 @@ let find_first_known_address_or_dummy addr t at =
   | None -> {v=Utility (Ptr_placeholder addr); t=Ptr t}
 
 let rec get_sexp_value exp ?(at=Beginning) t =
-  let exp = expand_shorted_sexp exp in
+  let exp = canonicalize_sexp exp in
   let exp = eliminate_false_eq_0 exp t in
   match exp with
   | Sexp.Atom v ->
@@ -857,7 +875,7 @@ let get_basic_vars ftype_of tpref =
       map_set_n_update_alist vars
         (make_name_alist_from_var_decls
            (get_var_decls_of_sexp
-              (expand_shorted_sexp ctxt)
+              (canonicalize_sexp ctxt)
               {s=Noidea;w=Sure W1;precise=Boolean} vars)) in
     let call_ctxt_vars =
       List.fold call.call_context ~f:add_vars_from_ctxt ~init:ret_vars in
