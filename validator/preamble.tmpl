@@ -239,4 +239,6 @@ ensures 0 == (0&x);
                            fixpoint (t,int,bool) recp,
                            mapi<t> m) = mapp<t>(p, kp, hsh, recp, m); @*/
 
-/*@ predicate hide_vector<t>(struct Vector* p) = vectorp<t>(p, _, _); @*/
+/*@ predicate hide_vector<t>(struct Vector* vector,
+                             predicate (void*;t) entp,
+                             list<t> values) = vectorp<t>(vector, entp, values); @*/

@@ -573,12 +573,18 @@ let fun_types =
                        lemmas_before = [
                            tx_bl
                              "if (dyn_vec_borrowed) {\n\
-                              close hide_vector<dynenti>(_);\n\
+                              close hide_vector<dynenti>(_, _, _);\n\
                               } else {\n\
-                              close hide_vector<stat_keyi>(_);\n\
+                              close hide_vector<stat_keyi>(_, _, _);\n\
                               }";
                        ];
                        lemmas_after = [
+                           tx_l
+                             "if (dyn_vec_borrowed) {\n\
+                              open hide_vector<dynenti>(_, _, _);\n\
+                              } else {\n\
+                              open hide_vector<stat_keyi>(_, _, _);\n\
+                              }";
                          (fun _ ->
                             "if (!dyn_vec_borrowed)\
                              dyn_vec_borrowed = true;")];};
@@ -590,7 +596,24 @@ let fun_types =
                                              "DynamicEntry",
                                              Ptr dynamic_entry_struct]];
                        extra_ptr_types = [];
-                       lemmas_before = [];
+                       lemmas_before = [
+                         (fun {args;tmp_gen;arg_types;_} ->
+                            match List.nth_exn arg_types 2 with
+                            | Ptr (Str (name, _)) ->
+                              if String.equal name "StaticKey" then
+                                "\n/*@ { \n\
+                                 assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
+                                 update_id(" ^ (List.nth_exn args 1) ^
+                                ", vectr);\n\
+                                 } @*/"
+                              else
+                                "\n/*@ { \n\
+                                 assert vector_accp<dynenti>(_, _, ?vectr, _, _); \n\
+                                 update_id(" ^ (List.nth_exn args 1) ^
+                                ", vectr);\n\
+                                 } @*/"
+                            | _ -> failwith "Wrong type for the last argument of vector_return"
+                         )];
                        lemmas_after = [];};]
 
 let fixpoints =
