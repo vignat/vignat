@@ -195,7 +195,21 @@ let fun_types =
                                             (List.nth_exn args 4) ^ ", " ^
                                             (List.nth_exn args 5) ^ ", *" ^
                                             (List.nth_exn args 6) ^ ", " ^
-                                            (List.nth_exn args 7) ^ "); @*/");];};
+                                            (List.nth_exn args 7) ^ "); @*/");
+                                         (fun {tmp_gen;_} ->
+                                            "\n/*@ {\n\
+                                             assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
+                                            ", _));\n\
+                                             assert vectorp<dynenti>(_, _, ?" ^ (tmp_gen "dv") ^
+                                            ");\n\
+                                             assert map_vec_chain_coherent<ether_addri, dynenti>(" ^
+                                            (tmp_gen "dm") ^ ", " ^
+                                            (tmp_gen "dv") ^ ", ?" ^
+                                            (tmp_gen "dh") ^
+                                            ");\n\
+                                              mvc_coherent_same_len<ether_addri, dynenti>(" ^ (tmp_gen "dm") ^ ", " ^ (tmp_gen "dv") ^ ", " ^ (tmp_gen "dh") ^ ");\n\
+                                             } @*/"
+                                         )];};
      "dchain_allocate", {ret_type = Static Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
