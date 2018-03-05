@@ -54,6 +54,15 @@
   @*/
 
 /*@
+  lemma void mvc_coherent_dchain_non_out_of_space_map_nonfull<kt,vt>(list<pair<kt, int> > m,
+                                                                     list<vt> v, dchain ch);
+  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+           dchain_out_of_space_fp(ch) == false;
+  ensures map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+          map_size_fp(m) < dchain_index_range_fp(ch);
+  @*/
+
+/*@
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len);
 requires 0 <= len;
 ensures dmap_dchain_coherent<t1,t2,vt>

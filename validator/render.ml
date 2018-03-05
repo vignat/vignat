@@ -66,7 +66,8 @@ let render_assignment {lhs;rhs;} =
   | _ -> (render_tterm lhs) ^ " = " ^ (render_tterm rhs) ^ ";"
 
 let rec gen_plain_equalities {lhs;rhs} =
-  match rhs.t, rhs.v with
+  if term_eq lhs.v rhs.v then []
+  else match rhs.t, rhs.v with
   | Ptr ptee_t, Addr pointee ->
     gen_plain_equalities {lhs={v=Deref lhs;t=ptee_t};
                           rhs=pointee}
@@ -567,6 +568,7 @@ let render_tip_fun_call
     export_point free_vars hist_symbols
     ~render_assertions
     cmplxs =
+  (render_extra_pre_conditions context) ^ "\n" ^
   (render_fcall_with_prelemmas context) ^
   (render_postlemmas context) ^
   (* "// The legibility of these assignments is ensured by analysis.ml\n" ^ *)

@@ -674,8 +674,9 @@ let rec get_struct_val_value valu t =
     (* | Some name -> {v=Id name;t} *)
     (* | None -> <^^^ this was working a while ago, may be it should be
        left somewhere *)
-      lprintf "Destruct: %s; Need %d fields got %d fields.\n" strname
-        (List.length fields) (List.length valu.break_down);
+      lprintf "Destruct: %s; Need %d fields got %d fields (%s).\n" strname
+        (List.length fields) (List.length valu.break_down)
+        (match valu.sname with | Some x -> x | None -> "?");
       if List.length valu.break_down <>
          List.length fields then begin
         lprintf "%s expects %d fields but found only %d"
@@ -1289,6 +1290,7 @@ let take_extra_ptrs_into_pre_cond ptrs call ftype_of =
 let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
   let moment_before = moment_before call.id in
   List.filter_mapi args ~f:(fun i arg ->
+      lprintf "checking arg %s\n" arg.aname;
       match arg.ptr with
       | Nonptr -> None
       | Funptr _ -> None

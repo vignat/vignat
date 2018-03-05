@@ -65,6 +65,37 @@ let generate_2step_dereference tterm tmpgen =
   let (binding2,x) = innermost_dereference x tmpgen in
   ([binding1;binding2],x)
 
+let hide_the_other_mapp {arg_types;tmp_gen;args;arg_exps;_} =
+  match List.nth_exn arg_types 1 with
+  | Ptr (Str ("ether_addr", _)) ->
+    "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
+    ", _, _, _, ?" ^ (tmp_gen "stm") ^ ");\n\
+                                        //@ close hide_mapp<stat_keyi>(" ^
+    (tmp_gen "stm_ptr") ^
+    ", static_keyp, st_key_hash, _," ^
+    (tmp_gen "stm") ^ ");\n"
+  | Ptr (Str ("StaticKey", _)) ->
+    "//@ assert mapp<ether_addri>(?" ^ (tmp_gen "eam_ptr") ^
+    ", _, _, _, ?" ^ (tmp_gen "dym") ^ ");\n\
+                                        //@ close hide_mapp<ether_addri>(" ^
+    (tmp_gen "eam_ptr") ^
+    ", ether_addrp, eth_addr_hash, _, " ^
+    (tmp_gen "dym") ^
+    ");\n"
+  | _ -> "#error unexpected key type"
+
+let reveal_the_other_mapp : lemma = fun {arg_types;tmp_gen;args;_} ->
+  match List.nth_exn arg_types 1 with
+  | Ptr (Str ("ether_addr", _)) ->
+    "//@ open hide_mapp<stat_keyi>(" ^
+    (tmp_gen "stm_ptr") ^ ", static_keyp, st_key_hash, _," ^
+    (tmp_gen "stm") ^ ");\n"
+  | Ptr (Str ("StaticKey", _)) ->
+    "//@ open hide_mapp<ether_addri>(" ^
+    (tmp_gen "eam_ptr") ^ ", ether_addrp, eth_addr_hash, _," ^
+    (tmp_gen "dym") ^ ");"
+  | _ -> "#error unexpected key type"
+
 let map_struct = Ir.Str ("Map", [])
 let vector_struct = Ir.Str ( "Vector", [] )
 let dchain_struct = Ir.Str ( "DoubleChain", [] )
@@ -406,6 +437,7 @@ let fun_types =
                               Static (Ptr Sint32)];
                  extra_ptr_types = [];
                  lemmas_before = [
+                   hide_the_other_mapp;
                    (fun ({arg_types;tmp_gen;args;arg_exps;_} as params) ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
@@ -413,12 +445,6 @@ let fun_types =
                           generate_2step_dereference
                             (List.nth_exn arg_exps 1) tmp_gen
                         in
-                        "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
-                        ", _, _, _, ?" ^ (tmp_gen "stm") ^ ");\n\
-                         //@ close hide_mapp<stat_keyi>(" ^
-                        (tmp_gen "stm_ptr") ^
-                        ", static_keyp, st_key_hash, _," ^
-                        (tmp_gen "stm") ^ ");\n" ^
                         (String.concat ~sep:"\n" bindings) ^
                         "\n" ^
                         "//@ assert ether_addrp(" ^ (render_tterm expr) ^
@@ -427,28 +453,10 @@ let fun_types =
                          capture_a_map "ether_addri" "dm" params ^
                          capture_a_vector "dynenti" "dv" params);
                       | Ptr (Str ("StaticKey", _)) ->
-                        "//@ assert mapp<ether_addri>(?" ^ (tmp_gen "eam_ptr") ^
-                        ", _, _, _, ?" ^ (tmp_gen "dym") ^ ");\n\
-                         //@ close hide_mapp<ether_addri>(" ^
-                        (tmp_gen "eam_ptr") ^
-                        ", ether_addrp, eth_addr_hash, _, " ^
-                        (tmp_gen "dym") ^
-                        ");\n" ^
                         (capture_a_map "stat_keyi" "stm" params)
-                      | _ -> "#error unexpected key type");
-                 ];
+                      | _ -> "#error unexpected key type")];
                  lemmas_after = [
-                   (fun {arg_types;tmp_gen;args;_} ->
-                      match List.nth_exn arg_types 1 with
-                      | Ptr (Str ("ether_addr", _)) ->
-                        "//@ open hide_mapp<stat_keyi>(" ^
-                        (tmp_gen "stm_ptr") ^ ", static_keyp, st_key_hash, _," ^
-                        (tmp_gen "stm") ^ ");\n"
-                      | Ptr (Str ("StaticKey", _)) ->
-                        "//@ open hide_mapp<ether_addri>(" ^
-                        (tmp_gen "eam_ptr") ^ ", ether_addrp, eth_addr_hash, _," ^
-                        (tmp_gen "dym") ^ ");"
-                      | _ -> "#error unexpected key type");
+                   reveal_the_other_mapp;
                    (fun {args;ret_name;arg_types;tmp_gen;_} ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
@@ -474,12 +482,28 @@ let fun_types =
                          } @*/"
                       | _ -> "");];};
      "map_put", {ret_type = Static Void;
-                 arg_types = stt [Ptr map_struct;
-                                  Ptr Void;
-                                  Sint32];
+                 arg_types = [Static (Ptr map_struct);
+                              Dynamic ["ether_addr", Ptr ether_addr_struct;
+                                       "StaticKey", Ptr static_key_struct];
+                              Static Sint32];
                  extra_ptr_types = [];
-                 lemmas_before = [];
-                 lemmas_after = [];};
+                 lemmas_before = [
+                   (fun {tmp_gen;_} ->
+                      "\n/*@ {\n\
+                       assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
+                      ", _));\n\
+                       assert map_vec_chain_coherent<ether_addri, dynenti>(" ^
+                      (tmp_gen "dm") ^ ", ?" ^
+                      (tmp_gen "dv") ^ ", ?" ^
+                      (tmp_gen "dh") ^
+                      ");\n\
+                       mvc_coherent_dchain_non_out_of_space_map_nonfull<ether_addri, dynenti>(" ^
+                      (tmp_gen "dm") ^ ", " ^
+                      (tmp_gen "dv") ^ ", " ^
+                      (tmp_gen "dh") ^ ");\n} @*/");
+                   hide_the_other_mapp];
+                 lemmas_after = [
+                   reveal_the_other_mapp];};
      "received_packet", {ret_type = Static Void;
                          arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];
                          extra_ptr_types = estt ["user_buf_addr",

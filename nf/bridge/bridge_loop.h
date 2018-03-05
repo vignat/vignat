@@ -22,12 +22,12 @@
                                   uint32_t dev_count) =
     double_chainp(?dh, dyn_heap) &*&
     mapp<ether_addri>(dyn_map, ether_addrp, eth_addr_hash,
-                      ?earecp,
+                      nop_true,
                       mapc(capacity, ?dm, ?daddrs)) &*&
     vectorp<dynenti>(dyn_vec, dynamic_entryp, ?dv) &*&
     mapp<stat_keyi>(st_map, static_keyp,
                     st_key_hash,
-                    ?strecp,
+                    nop_true,
                     mapc(?stcap, ?sm, ?saddrs)) &*&
     vectorp<stat_keyi>(st_vec, static_keyp, ?sv) &*&
     0 < capacity &*&
