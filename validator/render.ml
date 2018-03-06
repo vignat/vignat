@@ -134,10 +134,15 @@ let rec gen_plain_equalities {lhs;rhs} =
                           " : lhs=" ^
                           (render_tterm lhs))
 
+let gen_plain_equalities_for_all equalities =
+  List.join (List.map equalities ~f:gen_plain_equalities)
+
 let render_extra_pre_conditions context =
   String.concat ~sep:"\n"
     (List.map
-       (List.join (List.map context.extra_pre_conditions ~f:gen_plain_equalities))
+       (* (gen_plain_equalities_for_all context.extra_pre_conditions)
+          ^-- this should be done by now as a byproduct of filtering *)
+       context.extra_pre_conditions
        ~f:(fun eq_cond ->
            (render_assignment eq_cond)))
 
@@ -655,7 +660,37 @@ let get_all_symbols calls =
 (*     [] *)
 (*   | _ -> failwith "Unsupported number of results (> 2)." *)
 
+let discard_redundant_preconditions ir =
+  let filter_redundant_preconditions prev_postconds preconds =
+    List.filter preconds ~f:(fun precond ->
+        not (List.exists prev_postconds
+               ~f:(fun postcond ->
+                   Ir.term_eq precond.lhs.v postcond.lhs.v &&
+                   Ir.term_eq precond.rhs.v postcond.rhs.v)))
+  in
+  let (last_postconds, hist_calls) =
+    List.fold_map ir.hist_calls ~init:[] ~f:(fun last_postconds hist_call ->
+        (gen_plain_equalities_for_all hist_call.result.args_post_conditions,
+         {context = {hist_call.context with
+                     extra_pre_conditions =
+                       filter_redundant_preconditions
+                         last_postconds
+                         (gen_plain_equalities_for_all
+                            hist_call.context.extra_pre_conditions)};
+          result = hist_call.result}))
+  in
+  let tip_call = {context = {ir.tip_call.context with
+                             extra_pre_conditions =
+                               filter_redundant_preconditions
+                                 last_postconds
+                                 (gen_plain_equalities_for_all
+                                    ir.tip_call.context.extra_pre_conditions)};
+                  results = ir.tip_call.results}
+  in
+  {ir with hist_calls; tip_call}
+
 let render_ir ir fout ~render_assertions =
+  let ir = discard_redundant_preconditions ir in
   let hist_symbols = get_all_symbols ir.hist_calls in
   (* let tip_input_assumptions = *)
   (*   get_some_input_assumptions ir.tip_call hist_symbols *)
