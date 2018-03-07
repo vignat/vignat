@@ -8,10 +8,10 @@ struct Vector;
 /*@
   predicate vectorp<t>(struct Vector* vector,
                        predicate (void*;t) entp,
-                       list<t> values);
+                       list<pair<t, bool> > values);
   predicate vector_accp<t>(struct Vector* vector,
                            predicate (void*;t) entp,
-                           list<t> values,
+                           list<pair<t, bool> > values,
                            int accessed_idx,
                            void* entry);
   @*/
@@ -35,19 +35,35 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
             (*vector_out |-> ?new_vo &*&
              result == 1 &*&
              vectorp<t>(new_vo, entp, ?contents) &*&
-             length(contents) == capacity); @*/
+             length(contents) == capacity &*&
+             true == forall(contents, snd)); @*/
 
-void vector_borrow/*@ <t> @*/(struct Vector* vector, int index, void** val_out);
+void vector_borrow_full/*@ <t> @*/(struct Vector* vector, int index, void** val_out);
 /*@ requires vectorp<t>(vector, ?entp, ?values) &*&
              0 <= index &*& index < length(values) &*&
+             nth(index, values) == pair(?val, true) &*&
              *val_out |-> _; @*/
 /*@ ensures *val_out |-> ?vo &*&
             vector_accp<t>(vector, entp, values, index, vo) &*&
-            entp(vo, nth(index, values)); @*/
+            entp(vo, val); @*/
 
-void vector_return/*@ <t> @*/(struct Vector* vector, int index, void* value);
+void vector_borrow_half/*@ <t> @*/(struct Vector* vector, int index, void** val_out);
+/*@ requires vectorp<t>(vector, ?entp, ?values) &*&
+             0 <= index &*& index < length(values) &*&
+             nth(index, values) == pair(?val, false) &*&
+             *val_out |-> _; @*/
+/*@ ensures *val_out |-> ?vo &*&
+            vector_accp<t>(vector, entp, values, index, vo) &*&
+            [0.5]entp(vo, val); @*/
+
+void vector_return_full/*@ <t> @*/(struct Vector* vector, int index, void* value);
 /*@ requires vector_accp<t>(vector, ?entp, ?values, index, value) &*&
              entp(value, ?v); @*/
-/*@ ensures vectorp<t>(vector, entp, update(index, v, values)); @*/
+/*@ ensures vectorp<t>(vector, entp, update(index, pair(v, true), values)); @*/
+
+void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value);
+/*@ requires vector_accp<t>(vector, ?entp, ?values, index, value) &*&
+             [0.5]entp(value, ?v); @*/
+/*@ ensures vectorp<t>(vector, entp, update(index, pair(v, false), values)); @*/
 
 #endif//_VECTOR_H_INCLUDED_

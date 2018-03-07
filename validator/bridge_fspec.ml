@@ -362,8 +362,36 @@ let fun_types =
                                                           st_key_hash,\
                                                           _,\
                                                           stm);\n");
+                                   (fun {tmp_gen;args;_} ->
+                                      "//@ assert double_chainp(?" ^
+                                      (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 0) ^ ");\n" ^
+                                      "//@ expire_olds_keeps_high_bounded(" ^
+                                      (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 5) ^ ");\n");
                                  ];
-                                 lemmas_after = [];};
+                                 lemmas_after = [
+                                   (fun {tmp_gen;_} ->
+                                      "//@ open hide_mapp<stat_keyi>(" ^
+                                      (tmp_gen "stmp") ^ ", static_keyp,\
+                                                          st_key_hash,\
+                                                          _,\
+                                                          stm);\n");
+                                   (fun {tmp_gen;_} ->
+                                      "\n/*@ {\n\
+                                       assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
+                                      ", _));\n\
+                                       assert vectorp<dynenti>(_, _, ?" ^ (tmp_gen "dv") ^
+                                      ");\n\
+                                       assert map_vec_chain_coherent<ether_addri, dynenti>(" ^
+                                      (tmp_gen "dm") ^ ", " ^
+                                      (tmp_gen "dv") ^ ", ?" ^
+                                      (tmp_gen "dh") ^
+                                      ");\n\
+                                       mvc_coherent_same_len<ether_addri, dynenti>(" ^
+                                      (tmp_gen "dm") ^ ", " ^
+                                      (tmp_gen "dv") ^ ", " ^
+                                      (tmp_gen "dh") ^ ");\n} @*/"
+                                         );
+                                 ];};
      "map_allocate", {ret_type = Static Sint32;
                       arg_types = stt [Fptr "map_keys_equality";
                                        Fptr "map_key_hash";
@@ -463,6 +491,12 @@ let fun_types =
                         "/*@ if (" ^ ret_name ^
                         " != 0) {\n\
                          mvc_coherent_map_get_bounded(" ^
+                        (tmp_gen "dm") ^ ", " ^
+                        (tmp_gen "dv") ^ ", " ^
+                        (tmp_gen "dh") ^ ", " ^
+                        (tmp_gen "dk") ^
+                        ");\n\
+                         mvc_coherent_map_get_vec_half(" ^
                         (tmp_gen "dm") ^ ", " ^
                         (tmp_gen "dv") ^ ", " ^
                         (tmp_gen "dh") ^ ", " ^
@@ -596,63 +630,120 @@ let fun_types =
                            (fun _ ->
                               "if (!stat_vec_allocated)\
                                stat_vec_allocated = true;");];};
-     "vector_borrow", {ret_type = Static Void;
-                       arg_types = [Static (Ptr vector_struct);
-                                    Static Sint32;
-                                    Dynamic ["StaticKey",
-                                             Ptr (Ptr static_key_struct);
-                                             "DynamicEntry",
-                                             Ptr (Ptr dynamic_entry_struct)]];
-                       extra_ptr_types = ["borrowed_cell",
-                                          Dynamic ["StaticKey",
-                                                   static_key_struct;
-                                                   "DynamicEntry",
-                                                   dynamic_entry_struct]];
-                       lemmas_before = [
-                           tx_bl
-                             "if (dyn_vec_borrowed) {\n\
-                              close hide_vector<dynenti>(_, _, _);\n\
-                              } else {\n\
-                              close hide_vector<stat_keyi>(_, _, _);\n\
-                              }";
-                       ];
-                       lemmas_after = [
-                           tx_l
-                             "if (dyn_vec_borrowed) {\n\
-                              open hide_vector<dynenti>(_, _, _);\n\
-                              } else {\n\
-                              open hide_vector<stat_keyi>(_, _, _);\n\
-                              }";
-                         (fun _ ->
-                            "if (!dyn_vec_borrowed)\
-                             dyn_vec_borrowed = true;")];};
-     "vector_return", {ret_type = Static Void;
-                       arg_types = [Static (Ptr vector_struct);
-                                    Static Sint32;
-                                    Dynamic ["StaticKey",
-                                             Ptr static_key_struct;
-                                             "DynamicEntry",
-                                             Ptr dynamic_entry_struct]];
-                       extra_ptr_types = [];
-                       lemmas_before = [
-                         (fun {args;tmp_gen;arg_types;_} ->
-                            match List.nth_exn arg_types 2 with
-                            | Ptr (Str (name, _)) ->
-                              if String.equal name "StaticKey" then
-                                "\n/*@ { \n\
-                                 assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
-                                 update_id(" ^ (List.nth_exn args 1) ^
-                                ", vectr);\n\
-                                 } @*/"
-                              else
-                                "\n/*@ { \n\
-                                 assert vector_accp<dynenti>(_, _, ?vectr, _, _); \n\
-                                 update_id(" ^ (List.nth_exn args 1) ^
-                                ", vectr);\n\
-                                 } @*/"
-                            | _ -> failwith "Wrong type for the last argument of vector_return"
-                         )];
-                       lemmas_after = [];};]
+     "vector_borrow_full", {ret_type = Static Void;
+                            arg_types = [Static (Ptr vector_struct);
+                                         Static Sint32;
+                                         Dynamic ["StaticKey",
+                                                  Ptr (Ptr static_key_struct);
+                                                  "DynamicEntry",
+                                                  Ptr (Ptr dynamic_entry_struct)]];
+                            extra_ptr_types = ["borrowed_cell",
+                                               Dynamic ["StaticKey",
+                                                        static_key_struct;
+                                                        "DynamicEntry",
+                                                        dynamic_entry_struct]];
+                            lemmas_before = [
+                              tx_bl
+                                "if (dyn_vec_borrowed) {\n\
+                                 close hide_vector<dynenti>(_, _, _);\n\
+                                 } else {\n\
+                                 close hide_vector<stat_keyi>(_, _, _);\n\
+                                 }";
+                            ];
+                            lemmas_after = [
+                              tx_l
+                                "if (dyn_vec_borrowed) {\n\
+                                 open hide_vector<dynenti>(_, _, _);\n\
+                                 } else {\n\
+                                 open hide_vector<stat_keyi>(_, _, _);\n\
+                                 }";
+                              (fun _ ->
+                                 "if (!dyn_vec_borrowed)\
+                                  dyn_vec_borrowed = true;")];};
+     "vector_borrow_half", {ret_type = Static Void;
+                            arg_types = [Static (Ptr vector_struct);
+                                         Static Sint32;
+                                         Dynamic ["StaticKey",
+                                                  Ptr (Ptr static_key_struct);
+                                                  "DynamicEntry",
+                                                  Ptr (Ptr dynamic_entry_struct)]];
+                            extra_ptr_types = ["borrowed_cell",
+                                               Dynamic ["StaticKey",
+                                                        static_key_struct;
+                                                        "DynamicEntry",
+                                                        dynamic_entry_struct]];
+                            lemmas_before = [
+                              tx_bl
+                                "if (dyn_vec_borrowed) {\n\
+                                 close hide_vector<dynenti>(_, _, _);\n\
+                                 } else {\n\
+                                 close hide_vector<stat_keyi>(_, _, _);\n\
+                                 }";
+                            ];
+                            lemmas_after = [
+                              tx_l
+                                "if (dyn_vec_borrowed) {\n\
+                                 open hide_vector<dynenti>(_, _, _);\n\
+                                 } else {\n\
+                                 open hide_vector<stat_keyi>(_, _, _);\n\
+                                 }";
+                              (fun _ ->
+                                 "if (!dyn_vec_borrowed)\
+                                  dyn_vec_borrowed = true;")];};
+     "vector_return_full", {ret_type = Static Void;
+                            arg_types = [Static (Ptr vector_struct);
+                                         Static Sint32;
+                                         Dynamic ["StaticKey",
+                                                  Ptr static_key_struct;
+                                                  "DynamicEntry",
+                                                  Ptr dynamic_entry_struct]];
+                            extra_ptr_types = [];
+                            lemmas_before = [
+                              (fun {args;tmp_gen;arg_types;_} ->
+                                 match List.nth_exn arg_types 2 with
+                                 | Ptr (Str (name, _)) ->
+                                   if String.equal name "StaticKey" then
+                                     "\n/*@ { \n\
+                                      assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
+                                      update_id(" ^ (List.nth_exn args 1) ^
+                                     ", vectr);\n\
+                                      } @*/"
+                                   else
+                                     "\n/*@ { \n\
+                                      assert vector_accp<dynenti>(_, _, ?vectr, _, _); \n\
+                                      update_id(" ^ (List.nth_exn args 1) ^
+                                     ", vectr);\n\
+                                      } @*/"
+                                 | _ -> failwith "Wrong type for the last argument of vector_return"
+                              )];
+                            lemmas_after = [];};
+       "vector_return_half", {ret_type = Static Void;
+                              arg_types = [Static (Ptr vector_struct);
+                                           Static Sint32;
+                                           Dynamic ["StaticKey",
+                                                    Ptr static_key_struct;
+                                                    "DynamicEntry",
+                                                    Ptr dynamic_entry_struct]];
+                              extra_ptr_types = [];
+                              lemmas_before = [
+                                (fun {args;tmp_gen;arg_types;_} ->
+                                   match List.nth_exn arg_types 2 with
+                                   | Ptr (Str (name, _)) ->
+                                     if String.equal name "StaticKey" then
+                                       "\n/*@ { \n\
+                                        assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
+                                        update_id(" ^ (List.nth_exn args 1) ^
+                                       ", vectr);\n\
+                                        } @*/"
+                                     else
+                                       "\n/*@ { \n\
+                                        assert vector_accp<dynenti>(_, _, ?vectr, _, _); \n\
+                                        update_id(" ^ (List.nth_exn args 1) ^
+                                       ", vectr);\n\
+                                        } @*/"
+                                   | _ -> failwith "Wrong type for the last argument of vector_return"
+                                )];
+                              lemmas_after = [];};]
 
 let fixpoints =
   String.Map.of_alist_exn []

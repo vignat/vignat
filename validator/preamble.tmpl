@@ -241,4 +241,4 @@ ensures 0 == (0&x);
 
 /*@ predicate hide_vector<t>(struct Vector* vector,
                              predicate (void*;t) entp,
-                             list<t> values) = vectorp<t>(vector, entp, values); @*/
+                             list<pair<t, bool> > values) = vectorp<t>(vector, entp, values); @*/

@@ -128,12 +128,12 @@ int expire_items_single_map/*@ <vt,kt> @*/(struct DoubleChain* chain,
   int index = -1;
   while (dchain_expire_one_index(chain, &index, time)) {
     void* entry;
-    vector_borrow(vector, index, &entry);
+    vector_borrow_half(vector, index, &entry);
     void* key;
     eek(entry, &key);
     map_erase(map, key, &entry);
     epk(entry, &key);
-    vector_return(vector, index, entry);
+    vector_return_full(vector, index, entry);
     ++count;
   }
   return count;
