@@ -777,7 +777,13 @@ let fun_types =
                                       } @*/"
                                  | Ptr (Str (name, _))
                                    when String.equal name "DynamicValue"->
-                                   ""
+                                   "\n/*@ {\n\
+                                    assert vector_accp<uint8_t>(_, _, ?" ^ (tmp_gen "vec") ^
+                                   ", _, _);\n\
+                                    forall_update<pair<uint8_t, bool> >(" ^ (tmp_gen "vec") ^
+                                   ", snd, " ^ (List.nth_exn args 1) ^
+                                   ", pair(" ^ (List.nth_exn args 2) ^ "->device, true));
+                                   } @*/\n"
                                  | x -> "Error: unexpected argument type: " ^ (ttype_to_str x))
                               ];
                             lemmas_after = [];};
