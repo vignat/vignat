@@ -734,6 +734,7 @@ stub_register_rxctrl_write(struct stub_device* dev, uint32_t offset, uint32_t ne
 	if (mbuf_content == NULL) {
 		klee_abort(); // TODO ahem...
 	}
+
 	if (is_ipv4) {
 #if __BYTE_ORDER == __BIG_ENDIAN
 		mbuf_content->ether.ether_type = 0x0800;
@@ -780,6 +781,10 @@ stub_register_rxctrl_write(struct stub_device* dev, uint32_t offset, uint32_t ne
 	// 48-63: VLAN Tag (0, no VLAN)
 	uint64_t wb1 = 0b0000000000000000000000000000000000000000000000000000000000000011;
 
+	// get packet length
+	uint16_t packet_length = sizeof(struct stub_mbuf_content);
+	wb1 |= (uint64_t) packet_length << 32;
+
 	bool is_ip_multi_or_broadcast = is_ip && (
 		// Multicast addr?
 #if __BYTE_ORDER == __BIG_ENDIAN
@@ -788,7 +793,7 @@ stub_register_rxctrl_write(struct stub_device* dev, uint32_t offset, uint32_t ne
 		((mbuf_content->ipv4.dst_addr & 0xFF) >= 0xE0 && (mbuf_content->ipv4.dst_addr & 0xFF) < 0xF0)
 #endif
 		||
-		// Or just a broardcast, which can be pretty much anything
+		// Or just a broadcast, which can be pretty much anything
 		(klee_int("is_ip_broadcast") != 0)
 	);
 
@@ -796,15 +801,13 @@ stub_register_rxctrl_write(struct stub_device* dev, uint32_t offset, uint32_t ne
 		SET_BIT(wb1, 7, 1);
 	}
 
-	// Get device index
-	int device = 0;
-	while (dev != &DEVICES[device]) { device++; }
+	// Put the mbuf in the right place
+	memcpy((char*) mbuf_addr, mbuf_content, packet_length);
 
-	
-	
-	
-	
-	
+
+//	// Get device index
+//	int device = 0;
+//	while (dev != &DEVICES[device]) { device++; }
 
 	return new_value;
 }

@@ -75,8 +75,8 @@ struct nested_nested_field_descr stub_mbuf_content_n2[] = {
   {offsetof(struct stub_mbuf_content, ether), offsetof(struct ether_hdr, s_addr), 4, sizeof(uint8_t), "e"},
   {offsetof(struct stub_mbuf_content, ether), offsetof(struct ether_hdr, s_addr), 5, sizeof(uint8_t), "f"},
 };
-#define KLEE_TRACE_MBUF(m_ptr, name, dir)                                                                                              \
-  klee_trace_param_ptr_directed(m_ptr, sizeof(*m_ptr), name, dir);                                                                     \
+#define KLEE_TRACE_MBUF(m_ptr, mname, dir)                                                                                             \
+  klee_trace_param_ptr_directed(m_ptr, sizeof(*m_ptr), mname, dir);                                                                    \
   klee_trace_param_ptr_field_directed(m_ptr, offsetof(struct rte_mbuf, buf_addr), sizeof(struct stub_mbuf_content*), "buf_addr", dir); \
   for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) {                                                               \
     klee_trace_param_ptr_field_directed(m_ptr,                                                                                         \
@@ -131,12 +131,12 @@ void
 stub_core_trace_rx(struct rte_mbuf* mbuf)
 {
 	klee_trace_param_ptr_directed(mbuf, sizeof(struct rte_mbuf*), "mbuf", TD_BOTH);
-	KLEE_TRACE_MBUF_EPTR(bufs[0], "incoming_package", TD_OUT);
-	KLEE_TRACE_MBUF_CONTENT(bufs[0]->buf_addr, TD_OUT);
+	KLEE_TRACE_MBUF_EPTR(mbuf, "incoming_package", TD_OUT);
+	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_OUT);
 }
 
 void
-stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t)
+stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device)
 {
 	KLEE_TRACE_MBUF(mbuf, "mbuf", TD_IN);
 	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
@@ -145,7 +145,7 @@ stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t)
 
 
 bool
-stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf* mbufp)
+stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf** mbufp)
 {
 	uint16_t priv_size = rte_pktmbuf_priv_size(pool);
 	uint16_t mbuf_size = sizeof(struct rte_mbuf) + priv_size;
@@ -164,7 +164,7 @@ stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf
 
 	// Make the packet symbolic
 	klee_make_symbolic(buf_symbol, pool->elt_size, "buf_value");
-	memcpy(*mbufp, buf_symbol, pool->elt_size);
+	memcpy(mbufp, buf_symbol, pool->elt_size);
 	free(buf_symbol);
 
 	// Explicitly make the content symbolic - validator depends on an user_buf symbol for the proof
@@ -188,8 +188,8 @@ stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf
 	// Keep concrete values for what a driver guarantees
 	// (assignments are in the same order as the rte_mbuf declaration)
 
-	(*mbufp)->buf_addr = (char*) bufs[i] + mbuf_size;
-	(*mbufp)->buf_iova = rte_mempool_virt2iova(bufs[i]) + mbuf_size;
+	(*mbufp)->buf_addr = (char*) (*mbufp) + mbuf_size;
+	(*mbufp)->buf_iova = rte_mempool_virt2iova(*mbufp) + mbuf_size;
 	// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
 	// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
 	(*mbufp)->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");

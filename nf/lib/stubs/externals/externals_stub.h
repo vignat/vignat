@@ -2,6 +2,8 @@
 
 #include <unistd.h>
 
+#define PAGE_SIZE 4096
+
 #define STUB_FILES_COUNT 1024
 #define STUB_HUGEPAGES_COUNT 2
 

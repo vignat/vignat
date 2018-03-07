@@ -27,8 +27,12 @@ enum stub_file_kind {
 };
 
 struct stub_mmap {
+	// 'mem' is 'actual_mem' rounded up to the page size
+	// See 'mmap' for an explanation.
 	void* mem;
 	size_t mem_len;
+	void* actual_mem;
+	size_t actual_mem_len;
 };
 
 struct stub_file {
@@ -208,7 +212,8 @@ lseek(int fd, off_t offset, int whence)
 
 	if (FILES[fd].content == FILE_CONTENT_PAGEMAP) {
 		klee_assert(whence == SEEK_SET);
-		// We pretend the seek was successful - pagemap always returns the same value in our stub
+
+		FILES[fd].pos = (int) offset;
 
 		// Upon successful completion, lseek() returns the resulting offset
 		// location as measured in bytes from the beginning of the file. On
@@ -228,17 +233,27 @@ read(int fd, void *buf, size_t count)
 
 	if (FILES[fd].content == FILE_CONTENT_PAGEMAP) {
 		klee_assert(count == 8);
-		// Read fake pagemap data
-		memset(buf, 0, count);
 
-		// According to https://www.kernel.org/doc/Documentation/vm/pagemap.txt,
-		// all we need is a non-null PFN (bits 0-54)
+		// Read fake pagemap data
+		// See mmap() for an explanation of the computation
+		// The file's position is the virtual PFN times the size of a PFN (64 bits),
+		// and we want the PFN to be equal to the VPFN since we want VAs and PAs to match
+		int vpfn = FILES[fd].pos / sizeof(uint64_t);
+		klee_assert(vpfn < (((uint64_t) 1) << 55)); // PFNs are stored on 55 bits
+klee_print_expr("fd",fd);klee_print_expr("FILES[fd].pos", FILES[fd].pos);
+klee_print_expr("vpfn", vpfn);
+klee_print_expr("1<<63",  (((uint64_t) 1) << 63));
+klee_print_expr("result", vpfn | (((uint64_t) 1) << 63));
 		// TODO I think DPDK forgets to check whether the page is marked as swapped,
 		//      which changes the meaning of bits 0-54...
+
+		memset(buf, 0, count);
 #if __BYTE_ORDER == __BIG_ENDIAN
-		*((char*) buf + 7) = 1;
+		klee_abort(); // TODO too lazy to do it right now
 #else
-		*((char*) buf) = 1;
+		// Bits 0-54 are the PFN, bit 63 is "page present", rest can be 0
+		// See https://www.kernel.org/doc/Documentation/vm/pagemap.txt
+		*((uint64_t*) buf) = vpfn | (((uint64_t) 1) << 63);
 #endif
 
 		return count;
@@ -334,6 +349,10 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
 	// http://man7.org/linux/man-pages/man2/mmap.2.html
 
+	// Offsets not supported
+	// NOTE: if they were, they'd need to be a multiple of PAGE_SIZE
+	klee_assert(offset == 0);
+
 	klee_assert(FILES[fd].kind == KIND_FILE);
 
 	// First off, are we trying to mmap device memory?
@@ -357,22 +376,33 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 		klee_assert(length >= strlen(FILES[fd].content));
 	}
 
-	// Offsets not supported
-	klee_assert(offset == 0);
-
 	// don't mmap too many times
 	klee_assert(FILES[fd].mmaps_len < sizeof(FILES[0].mmaps)/sizeof(FILES[0].mmaps[0]));
 
-	void* mem = malloc(length);
-	memset(mem, 0, length);
+	// We need to align the returned value to the page size.
+	// This is because we want "physical" addresses a.k.a. PAs (that we report) to be the same as virtual addresses a.k.a. VAs;
+	// since PA = (PFN * PS) + (VA % PS)
+	//       where PFN is the Page Frame Number, PS is the Page Size
+	//   PA = VA implies PFN = (VA - (VA % PS))/PS, and since PFN must be an integer, (VA % PS) must be 0,
+	//   which is only the case if the address is aligned.
+	// Thus, we allocate an additional page so that we can always align the return value to a page,
+	// since at most the offset we'll have to add to the "real" VA is the page size itself.
+	size_t actual_length = length + PAGE_SIZE;
+	void* actual_mem = malloc(actual_length);
+	memset(actual_mem, 0, actual_length);
 	if ((prot & PROT_WRITE) != PROT_WRITE) {
 		// Read-only memory, we enforce even stronger semantics by disallowing reads with forbid_access
-		klee_forbid_access(mem, length, "mmapped read-only memory");
+		klee_forbid_access(actual_mem, actual_length, "mmapped read-only memory");
 	}
+	// note that this will result in an offset of PAGE_SIZE even if it could be 0 - we don't care
+	size_t real_offset = PAGE_SIZE - (((intptr_t) actual_mem) % PAGE_SIZE);
+	void* mem = (actual_mem + real_offset);
 
 	int m = FILES[fd].mmaps_len;
 	FILES[fd].mmaps[m].mem = mem;
 	FILES[fd].mmaps[m].mem_len = length;
+	FILES[fd].mmaps[m].actual_mem = actual_mem;
+	FILES[fd].mmaps[m].actual_mem_len = actual_length;
 	FILES[fd].mmaps_len++;
 
 	return mem;
@@ -399,7 +429,8 @@ munmap(void* addr, size_t length)
 			if (FILES[n].mmaps[m].mem == addr) {
 				klee_assert(FILES[n].mmaps[m].mem_len == length);
 
-				free(FILES[n].mmaps[m].mem);
+				// Free the actual_mem here, since mem is just a pointer within it
+				free(FILES[n].mmaps[m].actual_mem);
 				memset(&(FILES[n].mmaps[m]), 0, sizeof(struct stub_mmap));
 
 				FILES[n].mmaps_len--;

@@ -1,3 +1,5 @@
+#include "lib/stubs/externals/externals_stub.h"
+
 #include <signal.h>
 #include <unistd.h>
 
@@ -36,8 +38,7 @@ syscall(long number, ...)
 int
 getpagesize(void)
 {
-	//return klee_int("page_size"); // TODO - but it propagates a symbol in annoying places
-	return 4096;
+	return PAGE_SIZE;
 }
 
 int

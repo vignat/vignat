@@ -42,7 +42,19 @@ ixgbe_txq_vec_setup(struct ixgbe_tx_queue *txq)
 {
 	return ixgbe_txq_vec_setup_default(txq, &stub_txq_ops);
 }
-
+// By default rxq_vec_setup has a dummy implementation,
+// this is a copy/paste from the SSE file mentioned above
+int
+ixgbe_rxq_vec_setup(struct ixgbe_rx_queue *rxq)
+{
+	return ixgbe_rxq_vec_setup_default(rxq);
+}
+// Same as rxq_vec_setup
+int
+ixgbe_rx_vec_dev_conf_condition_check(struct rte_eth_dev *dev)
+{
+	return ixgbe_rx_vec_dev_conf_condition_check_default(dev);
+}
 
 uint64_t
 stub_rdtsc(void)

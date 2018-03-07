@@ -47,6 +47,7 @@ verify:
 		--include=rte_config.h `# required by many DPDK files` \
 		`# General stubs` \
 		../lib/stubs/externals/*.c \
+		../lib/stubs/core_stub.c \
 		../lib/stubs/driver_stub.c \
 		../lib/stubs/hardware_stub.c \
 		../lib/stubs/rte_stub.c \
