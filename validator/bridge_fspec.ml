@@ -654,18 +654,18 @@ let fun_types =
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "StaticKey"->
                                    "/*@ {\n\
-                                    close hide_vector<ether_addri>(_, _, _);\n\
-                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    if (!dyn_ks_borrowed) close hide_vector<ether_addri>(_, _, _);\n\
+                                    if (!dyn_vs_borrowed) close hide_vector<uint8_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "ether_addr"->
                                    "/*@ {\n\
-                                    close hide_vector<stat_keyi>(_, _, _);\n\
-                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    if (!stat_vec_borrowed) close hide_vector<stat_keyi>(_, _, _);\n\
+                                    if (!dyn_vs_borrowed) close hide_vector<uint8_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "DynamicValue"->
                                    "/*@ {\n\
-                                    close hide_vector<ether_addri>(_, _, _);\n\
-                                    close hide_vector<stat_keyi>(_, _, _);\n\
+                                    if (!dyn_ks_borrowed) close hide_vector<ether_addri>(_, _, _);\n\
+                                    if (!stat_vec_borrowed) close hide_vector<stat_keyi>(_, _, _);\n\
                                     assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "vec") ^
                                    ");\n\
                                     forall_mem(nth(" ^ (List.nth_exn args 1) ^ ", " ^
@@ -678,22 +678,23 @@ let fun_types =
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "StaticKey"->
                                    "/*@ {\n\
-                                    open hide_vector<ether_addri>(_, _, _);\n\
-                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    if (!dyn_ks_borrowed) open hide_vector<ether_addri>(_, _, _);\n\
+                                    if (!dyn_vs_borrowed) open hide_vector<uint8_t>(_, _, _);\n} @*/\n\
+                                    stat_vec_borrowed = true;"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "ether_addr"->
                                    "/*@ {\n\
-                                    open hide_vector<stat_keyi>(_, _, _);\n\
-                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    if (!stat_vec_borrowed) open hide_vector<stat_keyi>(_, _, _);\n\
+                                    if (!dyn_vs_borrowed) open hide_vector<uint8_t>(_, _, _);\n} @*/\n\
+                                    dyn_ks_borrowed = true;"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "DynamicValue"->
                                    "/*@ {\n\
-                                    open hide_vector<ether_addri>(_, _, _);\n\
-                                    open hide_vector<stat_keyi>(_, _, _);\n} @*/"
+                                    if (!dyn_ks_borrowed) open hide_vector<ether_addri>(_, _, _);\n\
+                                    if (!stat_vec_borrowed) open hide_vector<stat_keyi>(_, _, _);\n} @*/\n\
+                                    dyn_vs_borrowed = true;"
                                  | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
-                              (fun _ ->
-                                 "if (!dyn_vec_borrowed)\
-                                  dyn_vec_borrowed = true;")];};
+                              ];};
      "vector_borrow_half", {ret_type = Static Void;
                             arg_types = [Static (Ptr vector_struct);
                                          Static Sint32;
@@ -745,9 +746,7 @@ let fun_types =
                                     open hide_vector<ether_addri>(_, _, _);\n\
                                     open hide_vector<stat_keyi>(_, _, _);\n} @*/"
                                  | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
-                              (fun _ ->
-                                 "if (!dyn_vec_borrowed)\
-                                  dyn_vec_borrowed = true;")];};
+                              ];};
      "vector_return_full", {ret_type = Static Void;
                             arg_types = [Static (Ptr vector_struct);
                                          Static Sint32;
@@ -848,7 +847,9 @@ struct
                  ^
                  "bool dyn_keys_allocated = false;\n"
                  ^
-                 "bool dyn_vec_borrowed = false;\n"
+                 "bool dyn_ks_borrowed = false;\n\
+                  bool dyn_vs_borrowed = false;\n\
+                  bool stat_vec_borrowed = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
   let boundary_fun = "bridge_loop_invariant_produce"
