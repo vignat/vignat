@@ -52,6 +52,16 @@
   @*/
 
 /*@
+  lemma void mvc_coherent_alloc_is_halfowned<kt,vt>(list<pair<kt, int> > m,
+                                                    list<pair<vt, bool> > v, dchain ch,
+                                                    int index);
+  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+           0 <= index &*& index < length(v);
+  ensures map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+          snd(nth(index, v)) != dchain_allocated_fp(ch, index);
+  @*/
+
+/*@
   lemma void mvc_coherent_same_len<kt,vt>(list<pair<kt, int> > m,
                                           list<pair<vt, bool> > v, dchain ch);
   requires map_vec_chain_coherent<kt,vt>(m, v, ch);
