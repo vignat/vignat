@@ -11,77 +11,77 @@
   @*/
 
 /*@
-  predicate map_vec_chain_coherent<kt,vt>(list<pair<kt, int> > m,
-                                          list<pair<vt, bool> > v, dchain ch);
+  predicate map_vec_chain_coherent<kt>(list<pair<kt, int> > m,
+                                       list<pair<kt, bool> > v, dchain ch);
   @*/
 
 /*@
-  lemma void mvc_coherent_map_get_bounded<kt,vt>(list<pair<kt, int> > m,
-                                                 list<pair<vt, bool> > v, dchain ch,
-                                                 kt k);
-  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  lemma void mvc_coherent_map_get_bounded<kt>(list<pair<kt, int> > m,
+                                              list<pair<kt, bool> > v, dchain ch,
+                                              kt k);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
            true == map_has_fp(m, k);
   ensures 0 <= map_get_fp(m, k) &*& map_get_fp(m, k) < length(v) &*&
           dchain_index_range_fp(ch) == length(v) &*&
-          map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+          map_vec_chain_coherent<kt>(m, v, ch) &*&
           true == dchain_allocated_fp(ch, map_get_fp(m, k));
   @*/
 
 /*@
-  lemma void mvc_coherent_map_get_vec_half<kt,vt>(list<pair<kt, int> > m,
-                                                  list<pair<vt, bool> > v, dchain ch,
-                                                  kt k);
-  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  lemma void mvc_coherent_map_get_vec_half<kt>(list<pair<kt, int> > m,
+                                               list<pair<kt, bool> > v, dchain ch,
+                                               kt k);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
            true == map_has_fp(m, k);
   ensures 0 <= map_get_fp(m, k) &*& map_get_fp(m, k) < length(v) &*&
           dchain_index_range_fp(ch) == length(v) &*&
-          map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+          map_vec_chain_coherent<kt>(m, v, ch) &*&
           true == dchain_allocated_fp(ch, map_get_fp(m, k)) &*&
           false == snd(nth(map_get_fp(m, k), v));
   @*/
 
 /*@
-  lemma void mvc_rejuvenate_preserves_coherent<kt,vt>(list<pair<kt, int> > m,
-                                                      list<pair<vt, bool> > v, dchain ch,
-                                                      int index, time_t time);
-  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  lemma void mvc_rejuvenate_preserves_coherent<kt>(list<pair<kt, int> > m,
+                                                  list<pair<kt, bool> > v, dchain ch,
+                                                  int index, time_t time);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
            true == dchain_allocated_fp(ch, index);
-  ensures map_vec_chain_coherent<kt,vt>(m, v, dchain_rejuvenate_fp(ch,
-                                                                    index,
-                                                                    time));
+  ensures map_vec_chain_coherent<kt>(m, v, dchain_rejuvenate_fp(ch,
+                                                                index,
+                                                                time));
   @*/
 
 /*@
-  lemma void mvc_coherent_alloc_is_halfowned<kt,vt>(list<pair<kt, int> > m,
-                                                    list<pair<vt, bool> > v, dchain ch,
-                                                    int index);
-  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  lemma void mvc_coherent_alloc_is_halfowned<kt>(list<pair<kt, int> > m,
+                                                 list<pair<kt, bool> > v, dchain ch,
+                                                 int index);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
            0 <= index &*& index < length(v);
-  ensures map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           snd(nth(index, v)) != dchain_allocated_fp(ch, index);
   @*/
 
 /*@
-  lemma void mvc_coherent_same_len<kt,vt>(list<pair<kt, int> > m,
-                                          list<pair<vt, bool> > v, dchain ch);
-  requires map_vec_chain_coherent<kt,vt>(m, v, ch);
-  ensures map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  lemma void mvc_coherent_same_len<kt>(list<pair<kt, int> > m,
+                                       list<pair<kt, bool> > v, dchain ch);
+  requires map_vec_chain_coherent<kt>(m, v, ch);
+  ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           length(v) == dchain_index_range_fp(ch);
   @*/
 
 /*@
-  lemma void empty_map_vec_dchain_coherent<kt,vt>(list<pair<vt, bool> > vec);
+  lemma void empty_map_vec_dchain_coherent<kt>(list<pair<kt, bool> > vec);
   requires vec != nil;
-  ensures map_vec_chain_coherent<kt,vt>(nil, vec,
-                                        empty_dchain_fp(length(vec), 0));
+  ensures map_vec_chain_coherent<kt>(nil, vec,
+                                     empty_dchain_fp(length(vec), 0));
   @*/
 
 /*@
-  lemma void mvc_coherent_dchain_non_out_of_space_map_nonfull<kt,vt>(list<pair<kt, int> > m,
-                                                                     list<pair<vt, bool> > v, dchain ch);
-  requires map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  lemma void mvc_coherent_dchain_non_out_of_space_map_nonfull<kt>(list<pair<kt, int> > m,
+                                                                  list<pair<kt, bool> > v, dchain ch);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
            dchain_out_of_space_fp(ch) == false;
-  ensures map_vec_chain_coherent<kt,vt>(m, v, ch) &*&
+  ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           map_size_fp(m) < dchain_index_range_fp(ch);
   @*/
 

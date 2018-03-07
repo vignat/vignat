@@ -14,7 +14,8 @@
 
   predicate bridge_loop_invariant(struct DoubleChain* dyn_heap,
                                   struct Map* dyn_map,
-                                  struct Vector* dyn_vec,
+                                  struct Vector* dyn_keys,
+                                  struct Vector* dyn_vals,
                                   struct Map* st_map,
                                   struct Vector* st_vec,
                                   uint32_t capacity,
@@ -24,15 +25,18 @@
     mapp<ether_addri>(dyn_map, ether_addrp, eth_addr_hash,
                       nop_true,
                       mapc(capacity, ?dm, ?daddrs)) &*&
-    vectorp<dynenti>(dyn_vec, dynamic_entryp, ?dv) &*&
+    vectorp<ether_addri>(dyn_keys, ether_addrp, ?dks) &*&
+    vectorp<uint8_t>(dyn_vals, dyn_valp, ?dvs) &*&
     mapp<stat_keyi>(st_map, static_keyp,
                     st_key_hash,
                     nop_true,
                     mapc(?stcap, ?sm, ?saddrs)) &*&
     vectorp<stat_keyi>(st_vec, static_keyp, ?sv) &*&
     0 < capacity &*&
-    length(dv) == capacity &*&
-    map_vec_chain_coherent<ether_addri, dynenti>(dm, dv, dh) &*&
+    length(dks) == capacity &*&
+    length(dvs) == capacity &*&
+    true == forall(dvs, snd) &*&
+    map_vec_chain_coherent<ether_addri>(dm, dks, dh) &*&
     dchain_high_fp(dh) <= time &*&
     last_time(time) &*&
     true == forall(sm, (st_entry_bound)(dev_count));
@@ -40,7 +44,8 @@
 
 void bridge_loop_invariant_consume(struct DoubleChain** dyn_heap,
                                    struct Map** dyn_map,
-                                   struct Vector** dyn_vec,
+                                   struct Vector** dyn_keys,
+                                   struct Vector** dyn_vals,
                                    struct Map** st_map,
                                    struct Vector** st_vec,
                                    uint32_t capacity,
@@ -48,22 +53,25 @@ void bridge_loop_invariant_consume(struct DoubleChain** dyn_heap,
                                    uint32_t dev_count);
 /*@ requires *dyn_heap |-> ?dh &*&
              *dyn_map |-> ?dm &*&
-             *dyn_vec |-> ?dv &*&
+             *dyn_keys |-> ?dks &*&
+             *dyn_vals |-> ?dvs &*&
              *st_map |-> ?sm &*&
              *st_vec |-> ?sv &*&
-             bridge_loop_invariant(dh, dm, dv, sm, sv,
+             bridge_loop_invariant(dh, dm, dks, dvs, sm, sv,
                                    capacity, time,
                                    dev_count); @*/
 /*@ ensures *dyn_heap |-> dh &*&
             *dyn_map |-> dm &*&
-            *dyn_vec |-> dv &*&
+            *dyn_keys |-> dks &*&
+            *dyn_vals |-> dvs &*&
             *st_map |-> sm &*&
             *st_vec |-> sv; @*/
 
 
 void bridge_loop_invariant_produce(struct DoubleChain** dyn_heap,
                                    struct Map** dyn_map,
-                                   struct Vector** dyn_vec,
+                                   struct Vector** dyn_keys,
+                                   struct Vector** dyn_vals,
                                    struct Map** st_map,
                                    struct Vector** st_vec,
                                    uint32_t capacity,
@@ -71,23 +79,26 @@ void bridge_loop_invariant_produce(struct DoubleChain** dyn_heap,
                                    uint32_t dev_count);
 /*@ requires *dyn_heap |-> ?dh &*&
              *dyn_map |-> ?dm &*&
-             *dyn_vec |-> ?dv &*&
+             *dyn_keys |-> ?dks &*&
+             *dyn_vals |-> ?dvs &*&
              *st_map |-> ?sm &*&
              *st_vec |-> ?sv &*&
              *time |-> _; @*/
 /*@ ensures *dyn_heap |-> dh &*&
             *dyn_map |-> dm &*&
-            *dyn_vec |-> dv &*&
+            *dyn_keys |-> dks &*&
+            *dyn_vals |-> dvs &*&
             *st_map |-> sm &*&
             *st_vec |-> sv &*&
             *time |-> ?t &*&
-            bridge_loop_invariant(dh, dm, dv, sm, sv,
+            bridge_loop_invariant(dh, dm, dks, dvs, sm, sv,
                                   capacity, t,
                                   dev_count); @*/
 
 void bridge_loop_iteration_begin(struct DoubleChain** dyn_heap,
                                  struct Map** dyn_map,
-                                 struct Vector** dyn_vec,
+                                 struct Vector** dyn_keys,
+                                 struct Vector** dyn_vals,
                                  struct Map** st_map,
                                  struct Vector** st_vec,
                                  uint32_t capacity,
@@ -98,7 +109,8 @@ void bridge_loop_iteration_begin(struct DoubleChain** dyn_heap,
 
 void bridge_loop_iteration_end(struct DoubleChain** dyn_heap,
                                struct Map** dyn_map,
-                               struct Vector** dyn_vec,
+                               struct Vector** dyn_keys,
+                               struct Vector** dyn_vals,
                                struct Map** st_map,
                                struct Vector** st_vec,
                                uint32_t capacity,
@@ -109,7 +121,8 @@ void bridge_loop_iteration_end(struct DoubleChain** dyn_heap,
 
 void bridge_loop_iteration_assumptions(struct DoubleChain** dyn_heap,
                                        struct Map** dyn_map,
-                                       struct Vector** dyn_vec,
+                                       struct Vector** dyn_keys,
+                                       struct Vector** dyn_vals,
                                        struct Map** st_map,
                                        struct Vector** st_vec,
                                        uint32_t capacity,

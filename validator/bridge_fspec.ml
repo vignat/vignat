@@ -107,8 +107,7 @@ let ether_addr_struct = Ir.Str ( "ether_addr", ["a", Uint8;
                                                 "f", Uint8;])
 let static_key_struct = Ir.Str ( "StaticKey", ["addr", ether_addr_struct;
                                                "device", Uint8] )
-let dynamic_entry_struct = Ir.Str ( "DynamicEntry", ["addr", ether_addr_struct;
-                                                     "device", Uint8] )
+let dynamic_value_struct = Ir.Str ( "DynamicValue", ["device", Uint8] )
 let ether_hdr_struct = Ir.Str ("ether_hdr", ["d_addr", ether_addr_struct;
                                              "s_addr", ether_addr_struct;
                                              "ether_type", Uint16;])
@@ -186,6 +185,7 @@ let fun_types =
                                            [Ptr (Ptr dchain_struct);
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
+                                            Ptr (Ptr vector_struct);
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
                                             Uint32;
@@ -199,15 +199,17 @@ let fun_types =
                                             (List.nth_exn args 1) ^ ", *" ^
                                             (List.nth_exn args 2) ^ ", *" ^
                                             (List.nth_exn args 3) ^ ", *" ^
-                                            (List.nth_exn args 4) ^ ", " ^
+                                            (List.nth_exn args 4) ^ ", *" ^
                                             (List.nth_exn args 5) ^ ", " ^
                                             (List.nth_exn args 6) ^ ", " ^
-                                            (List.nth_exn args 7) ^ "); @*/");];
+                                            (List.nth_exn args 7) ^ ", " ^
+                                            (List.nth_exn args 8) ^ "); @*/");];
                                        lemmas_after = [];};
      "bridge_loop_invariant_produce", {ret_type = Static Void;
                                        arg_types = stt
                                            [Ptr (Ptr dchain_struct);
                                             Ptr (Ptr map_struct);
+                                            Ptr (Ptr vector_struct);
                                             Ptr (Ptr vector_struct);
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
@@ -223,22 +225,23 @@ let fun_types =
                                             (List.nth_exn args 1) ^ ", *" ^
                                             (List.nth_exn args 2) ^ ", *" ^
                                             (List.nth_exn args 3) ^ ", *" ^
-                                            (List.nth_exn args 4) ^ ", " ^
-                                            (List.nth_exn args 5) ^ ", *" ^
-                                            (List.nth_exn args 6) ^ ", " ^
-                                            (List.nth_exn args 7) ^ "); @*/");
+                                            (List.nth_exn args 4) ^ ", *" ^
+                                            (List.nth_exn args 5) ^ ", " ^
+                                            (List.nth_exn args 6) ^ ", *" ^
+                                            (List.nth_exn args 7) ^ ", " ^
+                                            (List.nth_exn args 8) ^ "); @*/");
                                          (fun {tmp_gen;_} ->
                                             "\n/*@ {\n\
                                              assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
                                             ", _));\n\
-                                             assert vectorp<dynenti>(_, _, ?" ^ (tmp_gen "dv") ^
+                                             assert vectorp<ether_addri>(_, _, ?" ^ (tmp_gen "dv") ^
                                             ");\n\
-                                             assert map_vec_chain_coherent<ether_addri, dynenti>(" ^
+                                             assert map_vec_chain_coherent<ether_addri>(" ^
                                             (tmp_gen "dm") ^ ", " ^
                                             (tmp_gen "dv") ^ ", ?" ^
                                             (tmp_gen "dh") ^
                                             ");\n\
-                                              mvc_coherent_same_len<ether_addri, dynenti>(" ^ (tmp_gen "dm") ^ ", " ^ (tmp_gen "dv") ^ ", " ^ (tmp_gen "dh") ^ ");\n\
+                                              mvc_coherent_same_len<ether_addri>(" ^ (tmp_gen "dm") ^ ", " ^ (tmp_gen "dv") ^ ", " ^ (tmp_gen "dh") ^ ");\n\
                                              } @*/"
                                          )];};
      "dchain_allocate", {ret_type = Static Sint32;
@@ -248,9 +251,9 @@ let fun_types =
                          lemmas_after = [
                            on_rez_nonzero
                              "{\n\
-                              assert vectorp<dynenti>(_, _, ?allocated_vector);\n\
+                              assert vectorp<ether_addri>(_, _, ?allocated_vector);\n\
                               empty_map_vec_dchain_coherent\
-                              <ether_addri,dynenti>(allocated_vector);\n\
+                              <ether_addri>(allocated_vector);\n\
                               }";
                            tx_l "index_range_of_empty(65536, 0);";];};
      "dchain_allocate_new_index", {ret_type = Static Sint32;
@@ -284,12 +287,12 @@ let fun_types =
                                        (fun {args;tmp_gen;_} ->
                                           "{\n\
                                            assert map_vec_chain_coherent<\
-                                           ether_addri,dynenti>(?" ^
+                                           ether_addri>(?" ^
                                           (tmp_gen "cur_map") ^ ", ?" ^
                                           (tmp_gen "cur_vec") ^ ", " ^
                                           (tmp_gen "cur_ch") ^
                                           ");\n\
-                                           mvc_coherent_alloc_is_halfowned<ether_addri, dynenti>(" ^
+                                           mvc_coherent_alloc_is_halfowned<ether_addri>(" ^
                                           (tmp_gen "cur_map") ^ ", " ^
                                           (tmp_gen "cur_vec") ^ ", " ^
                                           (tmp_gen "cur_ch") ^ ", *" ^
@@ -304,7 +307,7 @@ let fun_types =
                                    (fun {args;tmp_gen;_} ->
                                       "/*@ {\n\
                                         assert map_vec_chain_coherent<\
-                                       ether_addri,dynenti>(?" ^
+                                       ether_addri>(?" ^
                                       (tmp_gen "cur_map") ^ ", ?" ^
                                       (tmp_gen "cur_vec") ^ ", " ^
                                       (tmp_gen "cur_ch") ^
@@ -323,8 +326,8 @@ let fun_types =
                                    (fun params ->
                                       "/*@ if (" ^ params.ret_name ^
                                       " != 0) { \n" ^
-                                      "assert map_vec_chain_coherent<ether_addri,\
-                                       dynenti>(?cur_map,?cur_vec,?cur_ch);\n" ^
+                                      "assert map_vec_chain_coherent<ether_addri>\
+                                       (?cur_map,?cur_vec,?cur_ch);\n" ^
                                       "mvc_rejuvenate_preserves_coherent(cur_map,\
                                        cur_vec, cur_ch, " ^
                                       (List.nth_exn params.args 1) ^ ", "
@@ -340,34 +343,9 @@ let fun_types =
                                  arg_types = stt [Ptr dchain_struct;
                                                   Ptr vector_struct;
                                                   Ptr map_struct;
-                                                  Fptr "entry_extract_key";
-                                                  Fptr "entry_pack_key";
                                                   Uint32];
                                  extra_ptr_types = [];
                                  lemmas_before = [
-                                   tx_bl
-                                     "produce_function_pointer_chunk \
-                                      entry_extract_key<ether_addri,\
-                                      dynenti>(dyn_entry_get_addr)\
-                                      (ether_addrp,dynamic_entryp,\
-                                      dynamic_entry_barep,\
-                                      dynentry_right_offsets,\
-                                      dynentry_get_addr_fp)(a, b) \
-                                      {\
-                                      call();\
-                                      }";
-                                   tx_bl
-                                     "produce_function_pointer_chunk \
-                                      entry_pack_key<ether_addri,\
-                                      dynenti>(dyn_entry_retrieve_addr)\
-                                      (ether_addrp,dynamic_entryp,\
-                                      dynamic_entry_barep,\
-                                      dynentry_right_offsets,\
-                                      dynentry_get_addr_fp)(a, b) \
-                                      {\
-                                      call();\
-                                      }\n\
-                                     ";
                                    (fun {tmp_gen;_} ->
                                       "//@ assert mapp<stat_keyi>(?" ^
                                       (tmp_gen "stmp") ^ ", _, _, _, ?stm);\n" ^
@@ -380,7 +358,7 @@ let fun_types =
                                       "//@ assert double_chainp(?" ^
                                       (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 0) ^ ");\n" ^
                                       "//@ expire_olds_keeps_high_bounded(" ^
-                                      (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 5) ^ ");\n");
+                                      (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 3) ^ ");\n");
                                  ];
                                  lemmas_after = [
                                    (fun {tmp_gen;_} ->
@@ -393,14 +371,14 @@ let fun_types =
                                       "\n/*@ {\n\
                                        assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
                                       ", _));\n\
-                                       assert vectorp<dynenti>(_, _, ?" ^ (tmp_gen "dv") ^
+                                       assert vectorp<ether_addri>(_, _, ?" ^ (tmp_gen "dv") ^
                                       ");\n\
-                                       assert map_vec_chain_coherent<ether_addri, dynenti>(" ^
+                                       assert map_vec_chain_coherent<ether_addri>(" ^
                                       (tmp_gen "dm") ^ ", " ^
                                       (tmp_gen "dv") ^ ", ?" ^
                                       (tmp_gen "dh") ^
                                       ");\n\
-                                       mvc_coherent_same_len<ether_addri, dynenti>(" ^
+                                       mvc_coherent_same_len<ether_addri>(" ^
                                       (tmp_gen "dm") ^ ", " ^
                                       (tmp_gen "dv") ^ ", " ^
                                       (tmp_gen "dh") ^ ");\n} @*/"
@@ -493,7 +471,7 @@ let fun_types =
                         ", ?" ^ (tmp_gen "dk") ^ ");\n" ^
                         (capture_a_chain "dh" params ^
                          capture_a_map "ether_addri" "dm" params ^
-                         capture_a_vector "dynenti" "dv" params);
+                         capture_a_vector "ether_addri" "dv" params);
                       | Ptr (Str ("StaticKey", _)) ->
                         (capture_a_map "stat_keyi" "stm" params)
                       | _ -> "#error unexpected key type")];
@@ -540,12 +518,12 @@ let fun_types =
                       "\n/*@ {\n\
                        assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
                       ", _));\n\
-                       assert map_vec_chain_coherent<ether_addri, dynenti>(" ^
+                       assert map_vec_chain_coherent<ether_addri>(" ^
                       (tmp_gen "dm") ^ ", ?" ^
                       (tmp_gen "dv") ^ ", ?" ^
                       (tmp_gen "dh") ^
                       ");\n\
-                       mvc_coherent_dchain_non_out_of_space_map_nonfull<ether_addri, dynenti>(" ^
+                       mvc_coherent_dchain_non_out_of_space_map_nonfull<ether_addri>(" ^
                       (tmp_gen "dm") ^ ", " ^
                       (tmp_gen "dv") ^ ", " ^
                       (tmp_gen "dh") ^ ");\n} @*/");
@@ -625,12 +603,21 @@ let fun_types =
                          lemmas_before = [
                            tx_bl
                              "if (stat_vec_allocated) {\n\
+                              if (dyn_keys_allocated) {\n\
                               produce_function_pointer_chunk \
-                              vector_init_elem<dynenti>(init_nothing)\
-                              (dynamic_entryp, sizeof(struct DynamicEntry))(a) \
+                              vector_init_elem<uint8_t>(init_nothing_dv)\
+                              (dyn_valp, sizeof(struct DynamicValue))(a) \
+                              {\
+                              call();\
+                              }\n\
+                              } else {\n\
+                              produce_function_pointer_chunk \
+                              vector_init_elem<ether_addri>(init_nothing_ea)\
+                              (ether_addrp, sizeof(struct ether_addr))(a) \
                               {\
                               call();\
                               }\n
+                              }\n\
                               } else {\n\
                               produce_function_pointer_chunk \
                               vector_init_elem<stat_keyi>(init_nothing_st)\
@@ -643,34 +630,67 @@ let fun_types =
                          lemmas_after = [
                            (fun _ ->
                               "if (!stat_vec_allocated)\
-                               stat_vec_allocated = true;");];};
+                               stat_vec_allocated = true;\n\
+                               else if (!dyn_keys_allocated)\ dyn_keys_allocated = true;");];};
      "vector_borrow_full", {ret_type = Static Void;
                             arg_types = [Static (Ptr vector_struct);
                                          Static Sint32;
                                          Dynamic ["StaticKey",
                                                   Ptr (Ptr static_key_struct);
-                                                  "DynamicEntry",
-                                                  Ptr (Ptr dynamic_entry_struct)]];
+                                                  "ether_addr",
+                                                  Ptr (Ptr ether_addr_struct);
+                                                  "DynamicValue",
+                                                  Ptr (Ptr dynamic_value_struct)]];
                             extra_ptr_types = ["borrowed_cell",
                                                Dynamic ["StaticKey",
                                                         static_key_struct;
-                                                        "DynamicEntry",
-                                                        dynamic_entry_struct]];
+                                                        "ether_addr",
+                                                        ether_addr_struct;
+                                                        "DynamicValue",
+                                                        dynamic_value_struct]];
                             lemmas_before = [
-                              tx_bl
-                                "if (dyn_vec_borrowed) {\n\
-                                 close hide_vector<dynenti>(_, _, _);\n\
-                                 } else {\n\
-                                 close hide_vector<stat_keyi>(_, _, _);\n\
-                                 }";
+                              (fun {arg_types;tmp_gen;args;_} ->
+                                 match List.nth_exn arg_types 2 with
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "StaticKey"->
+                                   "/*@ {\n\
+                                    close hide_vector<ether_addri>(_, _, _);\n\
+                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "ether_addr"->
+                                   "/*@ {\n\
+                                    close hide_vector<stat_keyi>(_, _, _);\n\
+                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "DynamicValue"->
+                                   "/*@ {\n\
+                                    close hide_vector<ether_addri>(_, _, _);\n\
+                                    close hide_vector<stat_keyi>(_, _, _);\n\
+                                    assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "vec") ^
+                                   ");\n\
+                                    forall_mem(nth(" ^ (List.nth_exn args 1) ^ ", " ^
+                                   (tmp_gen "vec") ^ "), " ^ (tmp_gen "vec") ^ ", snd);\n} @*/"
+                                 | x -> "Error: unexpected argument type: " ^ (ttype_to_str x))
                             ];
                             lemmas_after = [
-                              tx_l
-                                "if (dyn_vec_borrowed) {\n\
-                                 open hide_vector<dynenti>(_, _, _);\n\
-                                 } else {\n\
-                                 open hide_vector<stat_keyi>(_, _, _);\n\
-                                 }";
+                              (fun {arg_types;_} ->
+                                 match List.nth_exn arg_types 2 with
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "StaticKey"->
+                                   "/*@ {\n\
+                                    open hide_vector<ether_addri>(_, _, _);\n\
+                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "ether_addr"->
+                                   "/*@ {\n\
+                                    open hide_vector<stat_keyi>(_, _, _);\n\
+                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "DynamicValue"->
+                                   "/*@ {\n\
+                                    open hide_vector<ether_addri>(_, _, _);\n\
+                                    open hide_vector<stat_keyi>(_, _, _);\n} @*/"
+                                 | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
                               (fun _ ->
                                  "if (!dyn_vec_borrowed)\
                                   dyn_vec_borrowed = true;")];};
@@ -679,28 +699,52 @@ let fun_types =
                                          Static Sint32;
                                          Dynamic ["StaticKey",
                                                   Ptr (Ptr static_key_struct);
-                                                  "DynamicEntry",
-                                                  Ptr (Ptr dynamic_entry_struct)]];
+                                                  "ether_addr",
+                                                  Ptr (Ptr ether_addr_struct)]];
                             extra_ptr_types = ["borrowed_cell",
                                                Dynamic ["StaticKey",
                                                         static_key_struct;
-                                                        "DynamicEntry",
-                                                        dynamic_entry_struct]];
+                                                        "ether_addr",
+                                                        ether_addr_struct]];
                             lemmas_before = [
-                              tx_bl
-                                "if (dyn_vec_borrowed) {\n\
-                                 close hide_vector<dynenti>(_, _, _);\n\
-                                 } else {\n\
-                                 close hide_vector<stat_keyi>(_, _, _);\n\
-                                 }";
+                              (fun {arg_types;_} ->
+                                 match List.nth_exn arg_types 2 with
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "StaticKey"->
+                                   "/*@ {\n\
+                                    close hide_vector<ether_addri>(_, _, _);\n\
+                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "ether_addr"->
+                                   "/*@ {\n\
+                                    close hide_vector<stat_keyi>(_, _, _);\n\
+                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "DynamicValue"->
+                                   "/*@ {\n\
+                                    close hide_vector<ether_addri>(_, _, _);\n\
+                                    close hide_vector<stat_keyi>(_, _, _);\n} @*/"
+                                 | x -> "Error: unexpected argument type: " ^ (ttype_to_str x))
                             ];
                             lemmas_after = [
-                              tx_l
-                                "if (dyn_vec_borrowed) {\n\
-                                 open hide_vector<dynenti>(_, _, _);\n\
-                                 } else {\n\
-                                 open hide_vector<stat_keyi>(_, _, _);\n\
-                                 }";
+                              (fun {arg_types;_} ->
+                                 match List.nth_exn arg_types 2 with
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "StaticKey"->
+                                   "/*@ {\n\
+                                    open hide_vector<ether_addri>(_, _, _);\n\
+                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "ether_addr"->
+                                   "/*@ {\n\
+                                    open hide_vector<stat_keyi>(_, _, _);\n\
+                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                 | Ptr (Ptr (Str (name, _)))
+                                   when String.equal name "DynamicValue"->
+                                   "/*@ {\n\
+                                    open hide_vector<ether_addri>(_, _, _);\n\
+                                    open hide_vector<stat_keyi>(_, _, _);\n} @*/"
+                                 | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
                               (fun _ ->
                                  "if (!dyn_vec_borrowed)\
                                   dyn_vec_borrowed = true;")];};
@@ -709,35 +753,41 @@ let fun_types =
                                          Static Sint32;
                                          Dynamic ["StaticKey",
                                                   Ptr static_key_struct;
-                                                  "DynamicEntry",
-                                                  Ptr dynamic_entry_struct]];
+                                                  "ether_addr",
+                                                  Ptr ether_addr_struct;
+                                                  "DynamicValue",
+                                                  Ptr dynamic_value_struct]];
                             extra_ptr_types = [];
                             lemmas_before = [
-                              (fun {args;tmp_gen;arg_types;_} ->
+                              (fun {arg_types;tmp_gen;args;_} ->
                                  match List.nth_exn arg_types 2 with
-                                 | Ptr (Str (name, _)) ->
-                                   if String.equal name "StaticKey" then
-                                     "\n/*@ { \n\
-                                      assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
-                                      update_id(" ^ (List.nth_exn args 1) ^
-                                     ", vectr);\n\
+                                 | Ptr (Str (name, _))
+                                   when String.equal name "StaticKey"->
+                                   "\n/*@ { \n\
+                                    assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
+                                    update_id(" ^ (List.nth_exn args 1) ^
+                                   ", vectr);\n\
+                                    } @*/"
+                                 | Ptr (Str (name, _))
+                                   when String.equal name "ether_addr"->
+                                   "\n/*@ { \n\
+                                    assert vector_accp<ether_addri>(_, _, ?vectr, _, _); \n\
+                                    update_id(" ^ (List.nth_exn args 1) ^
+                                   ", vectr);\n\
                                       } @*/"
-                                   else
-                                     "\n/*@ { \n\
-                                      assert vector_accp<dynenti>(_, _, ?vectr, _, _); \n\
-                                      update_id(" ^ (List.nth_exn args 1) ^
-                                     ", vectr);\n\
-                                      } @*/"
-                                 | _ -> failwith "Wrong type for the last argument of vector_return"
-                              )];
+                                 | Ptr (Str (name, _))
+                                   when String.equal name "DynamicValue"->
+                                   ""
+                                 | x -> "Error: unexpected argument type: " ^ (ttype_to_str x))
+                              ];
                             lemmas_after = [];};
        "vector_return_half", {ret_type = Static Void;
                               arg_types = [Static (Ptr vector_struct);
                                            Static Sint32;
                                            Dynamic ["StaticKey",
                                                     Ptr static_key_struct;
-                                                    "DynamicEntry",
-                                                    Ptr dynamic_entry_struct]];
+                                                    "ether_addr",
+                                                    Ptr ether_addr_struct]];
                               extra_ptr_types = [];
                               lemmas_before = [
                                 (fun {args;tmp_gen;arg_types;_} ->
@@ -751,7 +801,7 @@ let fun_types =
                                         } @*/"
                                      else
                                        "\n/*@ { \n\
-                                        assert vector_accp<dynenti>(_, _, ?vectr, _, _); \n\
+                                        assert vector_accp<ether_addri>(_, _, ?vectr, _, _); \n\
                                         update_id(" ^ (List.nth_exn args 1) ^
                                        ", vectr);\n\
                                         } @*/"
@@ -781,13 +831,16 @@ struct
                  ^
                  "/*@ //TODO: this hack should be \
                   converted to a system \n\
-                  assume(sizeof(struct DynamicEntry) == 7);\n@*/\n\
+                  assume(sizeof(struct ether_addr) == 6);\n@*/\n\
+                  /*@ assume(sizeof(struct DynamicValue) == 1);\n@*/\n\
                   /*@\
                   assume(sizeof(struct StaticKey) == 7);\n@*/\n"
                  ^
                  "/*@ assume(ether_addr_eq != static_key_eq); @*/\n"
                  ^
                  "bool stat_vec_allocated = false;\n"
+                 ^
+                 "bool dyn_keys_allocated = false;\n"
                  ^
                  "bool dyn_vec_borrowed = false;\n"
   let fun_types = fun_types

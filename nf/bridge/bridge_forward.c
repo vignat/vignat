@@ -43,10 +43,8 @@ struct DynamicFilterTable dynamic_ft;
 int bridge_expire_entries(uint32_t time) {
   if (time < config.expiration_time) return 0;
   uint32_t min_time = time - config.expiration_time;
-  return expire_items_single_map(dynamic_ft.heap, dynamic_ft.entries,
+  return expire_items_single_map(dynamic_ft.heap, dynamic_ft.keys,
                                  dynamic_ft.map,
-                                 dyn_entry_get_addr,
-                                 dyn_entry_retrieve_addr,
                                  min_time);
 }
 
@@ -64,17 +62,17 @@ int bridge_get_device(struct ether_addr* dst,
   }
 #ifdef KLEE_VERIFICATION
   map_reset(dynamic_ft.map);
-  vector_reset(dynamic_ft.entries);
+  vector_reset(dynamic_ft.values);
 #endif//KLEE_VERIFICATION
 
   int index = -1;
   hash = ether_addr_hash(dst);
   present = map_get(dynamic_ft.map, dst, &index);
   if (present) {
-    struct DynamicEntry* entry = 0;
-    vector_borrow_half(dynamic_ft.entries, index, (void**)&entry);
-    device = entry->device;
-    vector_return_half(dynamic_ft.entries, index, entry);
+    struct DynamicValue* value = 0;
+    vector_borrow_full(dynamic_ft.values, index, (void**)&value);
+    device = value->device;
+    vector_return_full(dynamic_ft.values, index, value);
     return device;
   }
   return -1;
@@ -96,12 +94,16 @@ void bridge_put_update_entry(struct ether_addr* src,
       NF_INFO("No more space in the dynamic table");
       return;
     }
-    struct DynamicEntry* entry = 0;
-    vector_borrow_full(dynamic_ft.entries, index, (void**)&entry);
-    memcpy(&entry->addr, src, sizeof(struct ether_addr));
-    entry->device = src_device;
-    map_put(dynamic_ft.map, &entry->addr, index);
-    vector_return_half(dynamic_ft.entries, index, entry);
+    struct ether_addr* key = 0;
+    struct DynamicValue* value = 0;
+    vector_borrow_full(dynamic_ft.keys, index, (void**)&key);
+    vector_borrow_full(dynamic_ft.values, index, (void**)&value);
+    memcpy(key, src, sizeof(struct ether_addr));
+    value->device = src_device;
+    map_put(dynamic_ft.map, &key, index);
+    //the other half of the key is in the map
+    vector_return_half(dynamic_ft.keys, index, key);
+    vector_return_full(dynamic_ft.values, index, value);
   }
 }
 
@@ -142,18 +144,17 @@ struct str_field_descr dynamic_map_key_fields[] = {
   {5, sizeof(uint8_t), "f"}
 };
 
-struct str_field_descr dynamic_vector_entry_fields[] = {
-  {offsetof(struct DynamicEntry, addr), sizeof(struct ether_addr), "addr"},
-  {offsetof(struct DynamicEntry, device), sizeof(uint8_t), "device"},
+struct str_field_descr dynamic_vector_key_fields[] = {
+  {0, sizeof(uint8_t), "a"},
+  {1, sizeof(uint8_t), "b"},
+  {2, sizeof(uint8_t), "c"},
+  {3, sizeof(uint8_t), "d"},
+  {4, sizeof(uint8_t), "e"},
+  {5, sizeof(uint8_t), "f"},
 };
 
-struct nested_field_descr dynamic_vector_entry_nested_fields[] = {
-  {offsetof(struct DynamicEntry, addr), 0, sizeof(uint8_t), "a"},
-  {offsetof(struct DynamicEntry, addr), 1, sizeof(uint8_t), "b"},
-  {offsetof(struct DynamicEntry, addr), 2, sizeof(uint8_t), "c"},
-  {offsetof(struct DynamicEntry, addr), 3, sizeof(uint8_t), "d"},
-  {offsetof(struct DynamicEntry, addr), 4, sizeof(uint8_t), "e"},
-  {offsetof(struct DynamicEntry, addr), 5, sizeof(uint8_t), "f"},
+struct str_field_descr dynamic_vector_value_fields[] = {
+  {0, sizeof(uint8_t), "device"},
 };
 
 int stat_map_condition(void* key, int index) {
@@ -307,10 +308,14 @@ void nf_core_init(void) {
   int happy = map_allocate(ether_addr_eq, ether_addr_hash,
                            capacity, &dynamic_ft.map);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic map");
-  happy = vector_allocate(sizeof(struct DynamicEntry), capacity,
-                          init_nothing,
-                          &dynamic_ft.entries);
-  if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic array");
+  happy = vector_allocate(sizeof(struct ether_addr), capacity,
+                          init_nothing_ea,
+                          &dynamic_ft.keys);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic key array");
+  happy = vector_allocate(sizeof(struct DynamicValue), capacity,
+                          init_nothing_dv,
+                          &dynamic_ft.values);
+  if (!happy) rte_exit(EXIT_FAILURE, "error allocating dynamic value array");
   happy = dchain_allocate(capacity, &dynamic_ft.heap);
   if (!happy) rte_exit(EXIT_FAILURE, "error allocating heap");
 
@@ -318,14 +323,18 @@ void nf_core_init(void) {
   map_set_layout(dynamic_ft.map, dynamic_map_key_fields,
                  sizeof(dynamic_map_key_fields)/sizeof(dynamic_map_key_fields[0]),
                  NULL, 0, "ether_addr");
-  vector_set_layout(dynamic_ft.entries,
-                    dynamic_vector_entry_fields,
-                    sizeof(dynamic_vector_entry_fields)/
-                    sizeof(dynamic_vector_entry_fields[0]),
-                    dynamic_vector_entry_nested_fields,
-                    sizeof(dynamic_vector_entry_nested_fields)/
-                    sizeof(dynamic_vector_entry_nested_fields[0]),
-                    "DynamicEntry");
+  vector_set_layout(dynamic_ft.keys,
+                    dynamic_vector_key_fields,
+                    sizeof(dynamic_vector_key_fields)/
+                    sizeof(dynamic_vector_key_fields[0]),
+                    NULL, 0,
+                    "ether_addr");
+  vector_set_layout(dynamic_ft.values,
+                    dynamic_vector_value_fields,
+                    sizeof(dynamic_vector_value_fields)/
+                    sizeof(dynamic_vector_value_fields[0]),
+                    NULL, 0,
+                    "DynamicValue");
 #endif//KLEE_VERIFICATION
 }
 
@@ -370,7 +379,8 @@ void nf_loop_iteration_begin(unsigned lcore_id,
                              uint32_t time) {
   bridge_loop_iteration_begin(&dynamic_ft.heap,
                               &dynamic_ft.map,
-                              &dynamic_ft.entries,
+                              &dynamic_ft.keys,
+                              &dynamic_ft.values,
                               &static_ft.map,
                               &static_ft.keys,
                               config.dyn_capacity,
@@ -382,7 +392,8 @@ void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        uint32_t time) {
   bridge_loop_iteration_assumptions(&dynamic_ft.heap,
                                     &dynamic_ft.map,
-                                    &dynamic_ft.entries,
+                                    &dynamic_ft.keys,
+                                    &dynamic_ft.values,
                                     &static_ft.map,
                                     &static_ft.keys,
                                     config.dyn_capacity,
@@ -393,7 +404,8 @@ void nf_loop_iteration_end(unsigned lcore_id,
                            uint32_t time) {
   bridge_loop_iteration_end(&dynamic_ft.heap,
                             &dynamic_ft.map,
-                            &dynamic_ft.entries,
+                            &dynamic_ft.keys,
+                            &dynamic_ft.values,
                             &static_ft.map,
                             &static_ft.keys,
                             config.dyn_capacity,

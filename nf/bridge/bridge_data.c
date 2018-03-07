@@ -27,19 +27,14 @@ int static_key_hash(void* key) {
   return (ether_addr_hash(&k->addr) << 2) ^ k->device;
 }
 
-void init_nothing(void* entry) {
+void init_nothing_ea(void* entry) {
+  /* do nothing */
+}
+
+void init_nothing_dv(void* entry) {
   /* do nothing */
 }
 
 void init_nothing_st(void* entry) {
-  /* do nothing */
-}
-
-void dyn_entry_get_addr(void* entry,
-                        void** addr_out) {
-  *((struct ether_addr**)addr_out) = &((struct DynamicEntry*)entry)->addr;
-}
-
-void dyn_entry_retrieve_addr(void* entry, void* addr) {
   /* do nothing */
 }
