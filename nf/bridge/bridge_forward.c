@@ -100,7 +100,7 @@ void bridge_put_update_entry(struct ether_addr* src,
     vector_borrow_full(dynamic_ft.values, index, (void**)&value);
     memcpy(key, src, sizeof(struct ether_addr));
     value->device = src_device;
-    map_put(dynamic_ft.map, &key, index);
+    map_put(dynamic_ft.map, key, index);
     //the other half of the key is in the map
     vector_return_half(dynamic_ft.keys, index, key);
     vector_return_full(dynamic_ft.values, index, value);
