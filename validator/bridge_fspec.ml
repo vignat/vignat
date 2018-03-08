@@ -263,6 +263,9 @@ let fun_types =
                                      capture_chain "cur_ch" 0;
                                    ];
                                    lemmas_after = [
+                                     (fun {args;_} ->
+                                        "uint32_t time_for_allocated_index = " ^ (List.nth_exn args 2) ^
+                                        ";\n");
                                      on_rez_nz
                                        (fun params ->
                                           "{\n allocate_preserves_index_range(" ^
@@ -515,9 +518,10 @@ let fun_types =
                  extra_ptr_types = [];
                  lemmas_before = [
                    (fun {tmp_gen;_} ->
+                       "\n//@ assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
+                       ", _));\n");
+                   (fun {tmp_gen;_} ->
                       "\n/*@ {\n\
-                       assert mapp<ether_addri>(_, _, _, _, mapc(_, ?" ^ (tmp_gen "dm") ^
-                      ", _));\n\
                        assert map_vec_chain_coherent<ether_addri>(" ^
                       (tmp_gen "dm") ^ ", ?" ^
                       (tmp_gen "dv") ^ ", ?" ^
@@ -529,6 +533,26 @@ let fun_types =
                       (tmp_gen "dh") ^ ");\n} @*/");
                    hide_the_other_mapp];
                  lemmas_after = [
+                   (fun {tmp_gen;args;_} ->
+                      "\n/*@ {\n\
+                       assert map_vec_chain_coherent<ether_addri>(" ^ (tmp_gen "dm") ^
+                      ", ?" ^ (tmp_gen "dv") ^
+                      ", ?" ^ (tmp_gen "dh") ^
+                      ");\n\
+                       ether_addri " ^ (tmp_gen "ea") ^ " = eaddrc(" ^ (List.nth_exn args 1) ^
+                      "->a, " ^ (List.nth_exn args 1) ^
+                      "->b, " ^ (List.nth_exn args 1) ^
+                      "->c, " ^ (List.nth_exn args 1) ^
+                      "->d, " ^ (List.nth_exn args 1) ^
+                      "->e, " ^ (List.nth_exn args 1) ^
+                      "->f);\n\
+                       mvc_coherent_put<ether_addri>(" ^ (tmp_gen "dm") ^
+                      ", " ^ (tmp_gen "dv") ^
+                      ", " ^ (tmp_gen "dh") ^
+                      ", " ^ (List.nth_exn args 2) ^
+                      ", time_for_allocated_index, " ^ (tmp_gen "ea") ^ ");\n\
+                       } @*/"
+                   );
                    reveal_the_other_mapp];};
      "received_packet", {ret_type = Static Void;
                          arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];

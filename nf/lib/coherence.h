@@ -86,6 +86,17 @@
   @*/
 
 /*@
+  lemma void mvc_coherent_put<kt>(list<pair<kt, int> > m,
+                                  list<pair<kt, bool> > v, dchain ch,
+                                  int index, uint32_t time,
+                                  kt key);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
+           false == dchain_allocated_fp(ch, index);
+  ensures map_vec_chain_coherent<kt>(map_put_fp(m, key, index),
+                                     update(index, pair(key, false), v),
+                                     dchain_allocate_fp(ch, index, time));
+  @*/
+/*@
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len);
 requires 0 <= len;
 ensures dmap_dchain_coherent<t1,t2,vt>
