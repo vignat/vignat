@@ -862,19 +862,19 @@ let fun_types =
                                      "/*@ {\n\
                                       if (dyn_ks_borrowed) open hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
                                       if (dyn_vs_borrowed) open hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/\n\
-                                      stat_vec_borrowed = true;"
+                                      stat_vec_borrowed = false;"
                                    | Ptr (Str (name, _))
                                      when String.equal name "ether_addr" ->
                                      "/*@ {\n\
                                       if (stat_vec_borrowed) open hide_vector_acc<stat_keyi>(_, _, _, _, _);\n\
                                       if (dyn_vs_borrowed) open hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/\n\
-                                      dyn_ks_borrowed = true;"
+                                      dyn_ks_borrowed = false;"
                                    | Ptr (Str (name, _))
                                      when String.equal name "DynamicValue" ->
                                      "/*@ {\n\
                                       if (dyn_ks_borrowed) open hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
                                       if (stat_vec_borrowed) open hide_vector_acc<stat_keyi>(_, _, _, _, _);\n} @*/\n\
-                                      dyn_vs_borrowed = true;"
+                                      dyn_vs_borrowed = false;"
                                    | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
                               ];};]
 
