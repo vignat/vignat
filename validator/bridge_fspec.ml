@@ -834,9 +834,49 @@ let fun_types =
                                         update_id(" ^ (List.nth_exn args 1) ^
                                        ", vectr);\n\
                                         } @*/"
-                                   | _ -> failwith "Wrong type for the last argument of vector_return"
-                                )];
-                              lemmas_after = [];};]
+                                   | _ -> failwith "Wrong type for the last argument of vector_return");
+                                (fun {arg_types;_} ->
+                                   match List.nth_exn arg_types 2 with
+                                   | Ptr (Str (name, _))
+                                     when String.equal name "StaticKey" ->
+                                     "/*@ {\n\
+                                      if (dyn_ks_borrowed) close hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
+                                      if (dyn_vs_borrowed) close hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/"
+                                   | Ptr (Str (name, _))
+                                     when String.equal name "ether_addr" ->
+                                     "/*@ {\n\
+                                      if (stat_vec_borrowed) close hide_vector_acc<stat_keyi>(_, _, _, _, _);\n\
+                                      if (dyn_vs_borrowed) close hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/"
+                                   | Ptr (Str (name, _))
+                                     when String.equal name "DynamicValue" ->
+                                     "/*@ {\n\
+                                      if (dyn_ks_borrowed) close hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
+                                      if (stat_vec_borrowed) close hide_vector_acc<stat_keyi>(_, _, _, _, _);\n} @*/"
+                                   | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
+                              ];
+                              lemmas_after = [
+                                (fun {arg_types;_} ->
+                                   match List.nth_exn arg_types 2 with
+                                   | Ptr (Str (name, _))
+                                     when String.equal name "StaticKey" ->
+                                     "/*@ {\n\
+                                      if (dyn_ks_borrowed) open hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
+                                      if (dyn_vs_borrowed) open hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/\n\
+                                      stat_vec_borrowed = true;"
+                                   | Ptr (Str (name, _))
+                                     when String.equal name "ether_addr" ->
+                                     "/*@ {\n\
+                                      if (stat_vec_borrowed) open hide_vector_acc<stat_keyi>(_, _, _, _, _);\n\
+                                      if (dyn_vs_borrowed) open hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/\n\
+                                      dyn_ks_borrowed = true;"
+                                   | Ptr (Str (name, _))
+                                     when String.equal name "DynamicValue" ->
+                                     "/*@ {\n\
+                                      if (dyn_ks_borrowed) open hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
+                                      if (stat_vec_borrowed) open hide_vector_acc<stat_keyi>(_, _, _, _, _);\n} @*/\n\
+                                      dyn_vs_borrowed = true;"
+                                   | x -> "Error: unexpected argument type: " ^ (ttype_to_str x));
+                              ];};]
 
 let fixpoints =
   String.Map.of_alist_exn []

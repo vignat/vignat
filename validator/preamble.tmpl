@@ -242,3 +242,9 @@ ensures 0 == (0&x);
 /*@ predicate hide_vector<t>(struct Vector* vector,
                              predicate (void*;t) entp,
                              list<pair<t, bool> > values) = vectorp<t>(vector, entp, values); @*/
+
+/*@ predicate hide_vector_acc<t>(struct Vector* vector,
+                                 predicate (void*;t) entp,
+                                 list<pair<t, bool> > values,
+                                 int accessed_idx,
+                                 void* entry) = vector_accp<t>(vector, entp, values, accessed_idx, entry); @*/
