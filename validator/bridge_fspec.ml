@@ -362,6 +362,27 @@ let fun_types =
                                       (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 0) ^ ");\n" ^
                                       "//@ expire_olds_keeps_high_bounded(" ^
                                       (tmp_gen "cur_ch") ^ ", " ^ (List.nth_exn args 3) ^ ");\n");
+                                   (fun {args;tmp_gen;_} ->
+                                      "/*@ {\n\
+                                       expire_preserves_index_range(" ^
+                                      (tmp_gen "cur_ch") ^ ", " ^
+                                      (List.nth_exn args 3) ^
+                                      ");\n\
+                                       length_nonnegative(\
+                                       dchain_get_expired_indexes_fp(" ^
+                                      (tmp_gen "cur_ch") ^ ", " ^
+                                      (List.nth_exn args 3) ^
+                                      "));\n\
+                                       if (length(dchain_get_expired_indexes_fp(" ^
+                                      (tmp_gen "cur_ch") ^ ", " ^
+                                      (List.nth_exn args 3) ^
+                                      ")) > 0 ) {\n\
+                                       expire_old_dchain_nonfull\
+                                       (" ^ (List.nth_exn args 0) ^ ", " ^
+                                      (tmp_gen "cur_ch") ^ ", " ^
+                                      (List.nth_exn args 3) ^
+                                      ");\n\
+                                       }} @*/");
                                  ];
                                  lemmas_after = [
                                    (fun {tmp_gen;_} ->
