@@ -62,7 +62,6 @@ int bridge_get_device(struct ether_addr* dst,
   }
 #ifdef KLEE_VERIFICATION
   map_reset(dynamic_ft.map);
-  vector_reset(dynamic_ft.values);
 #endif//KLEE_VERIFICATION
 
   int index = -1;
