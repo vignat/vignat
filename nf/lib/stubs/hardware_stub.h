@@ -34,3 +34,6 @@ struct stub_device {
 };
 
 struct stub_device DEVICES[DEVICES_COUNT];
+
+
+void stub_hardware_receive_packet(void);

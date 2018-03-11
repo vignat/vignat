@@ -69,6 +69,177 @@ stub_device_reset(struct stub_device* dev)
 	dev->current_mdi_address = -1;
 }
 
+static void
+stub_device_start(struct stub_device* dev)
+{
+	// Get the address of the receive descriptor for queue 0
+	uint64_t rdba =  ((uint64_t) DEV_REG(dev, 0x01000)) // RDBAL
+		      | (((uint64_t) DEV_REG(dev, 0x01004)) << 32); // RDBAH
+klee_print_expr("RDBA", rdba);
+
+	// Clear the head of the descriptor
+	DEV_REG(dev, 0x01010) = 0; // RDH
+	// Make sure we have enough space
+	uint32_t rdt = DEV_REG(dev, 0x01018);
+	klee_assert(rdt >= 1);
+
+	if (klee_int("received") == 0) {
+		// no packet
+	}
+
+	// Descriptor is 128 bits, see page 313, table 7-15 "Descriptor Read Format"
+	// (which the NIC reads to know where to put a packet)
+	// and page 314, table 7-16 "Descriptor Write-Back Format"
+	// (note that "write" in this context is from the NIC's point of view;
+	//  it writes those descriptors into memory)
+	uint64_t* descr = (uint64_t*) rdba;
+
+	// Read phase
+	// Address is the first 64 bits, header the next 64
+	// normally headers shouldn't be split
+	uint64_t mbuf_addr = descr[0];
+	uint64_t head_addr = descr[1];
+klee_print_expr("mbuf addr", mbuf_addr);
+klee_print_expr("head addr", head_addr);
+	klee_assert(head_addr == 0);
+
+	// Write phase
+
+	// First Line
+	// 0-3: RSS Type (0 - no RSS)
+	// 4-16: Packet Type
+	//  4/5 and 6/7 are IPv4 and IPv6 respectively (mutually exclusive?)
+	//  8/9/10 are TCP/UDP/SCTP respectively (mutually exclusive?)
+	//  11 is NFS
+	//  12/13 is IPSec
+	//  14 is LinkSec (non-IP)
+	//  15 must be 0 to indicate a non-L2 packet
+	//  16 is reserved
+	// 17-20: RSC Count (0 - no RSC)
+	// 21-30: Header Length (0 - header not decoded)
+	// 31: Split Header (1 - not split)
+	// 32-63: RSS Hash or FCOE_PARAM or Flow Director Filters ID or Fragment Checksum (0 - not supported)
+	uint64_t wb0 = 0b0000000000000000000000000000000010000000000000000000000000000000;
+klee_print_expr("and now for some path explosion...",0);
+#if 0
+	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
+	bool is_ipv6 = !is_ipv4 && klee_int("received_is_ipv6") != 0;
+	bool is_ip = is_ipv4 || is_ipv6;
+	bool is_ip_broadcast = is_ip && klee_int("received_is_ip_broadcast") != 0;
+
+	bool has_ip_ext = is_ip && klee_int("received_has_ip_ext") != 0;
+
+	bool is_linksec = !is_ip && klee_int("received_is_linksec") != 0;
+
+	bool is_udp = is_ip && klee_int("received_is_udp") != 0;
+	bool is_tcp = is_ip && !is_udp && klee_int("received_is_tcp") != 0;
+	bool is_sctp = is_ip && !is_udp && !is_tcp && klee_int("received_is_sctp") != 0;
+
+	bool not_ipsec = is_udp || is_tcp || is_sctp;
+	bool is_nfs = not_ipsec && klee_int("received_is_nfs") != 0;
+
+	bool is_ipsec_esp = !not_ipsec && klee_int("received_is_ipsec_esp") != 0;
+	bool is_ipsec_ah = !not_ipsec ¬&& !is_ipsec_esp &&klee_int("received_is_ipsec_ah") != 0;
+#else
+	bool is_ipv4 = true, is_ip = true, is_tcp = true;
+	bool is_ipv6 = false, is_ip_broadcast = false, has_ip_ext = false, is_linksec = false, is_udp = false, is_sctp = false,
+	     not_ipsec = true, is_nfs = false, is_ipsec_esp = false, is_ipsec_ah = false;
+#endif
+
+#define BIT(index, cond) SET_BIT(wb0, index, (cond) ? 1 : 0);
+	BIT(4, is_ipv4);
+	BIT(5, is_ipv4 && has_ip_ext);
+	BIT(6, is_ipv6);
+	BIT(7, is_ipv6 && has_ip_ext);
+	BIT(8, is_tcp);
+	BIT(9, is_udp);
+	BIT(10, is_sctp);
+	BIT(11, is_nfs);
+	BIT(12, is_ipsec_esp);
+	BIT(13, is_ipsec_ah);
+	BIT(14, is_linksec);
+#undef BIT
+
+	struct stub_mbuf_content* mbuf_content = malloc(sizeof(struct stub_mbuf_content));
+	if (mbuf_content == NULL) {
+		klee_abort(); // TODO ahem...
+	}
+
+	if (is_ipv4) {
+#if __BYTE_ORDER == __BIG_ENDIAN
+		mbuf_content->ether.ether_type = 0x0800;
+#else
+		mbuf_content->ether.ether_type = 0x0080;
+#endif
+
+		if (is_tcp) {
+			mbuf_content->ipv4.next_proto_id = 6;
+		} else if (is_udp) {
+			mbuf_content->ipv4.next_proto_id = 17;
+		} else if (is_sctp) {
+			mbuf_content->ipv4.next_proto_id = 132;
+		}
+	} else if (is_ipv6) {
+#if __BYTE_ORDER == __BIG_ENDIAN
+		mbuf_content->ether.ether_type = 0x86DD;
+#else
+		mbuf_content->ether.ether_type = 0xDD68;
+#endif
+	}
+
+	// Second Line
+	// 0-19: Extended Status / NEXTP
+	//  0: Descriptor Done (1 - done)
+	//  1: End Of Packet (1 - yes, no more fragments)
+	//  2: Flow Match (0 - no filter set, no match)
+	//  3: VLAN Packet (0 - no VLANs configured, no match)
+	//  4: UDP Checksum Offload (0 - not provided)
+	//  5: L4 Integrity (0 - not provided)
+	//  6: IPv4 Checksum (0 - not provided)
+	//  7: Non-Unicast (depends on IP)
+	//  8: Reserved (0)
+	//  9: Outer-VLAN on double VLAN packet (0 - not enabled)
+	//  10: UDP Checksum Valid (0 - not supported)
+	//  11: Low Latency Interrupt (0 - no interrupts)
+	//  12-15: Reserved (0)
+	//  16: Time Stamp (0 - not a time sync packet)
+	//  17: Security Processing (0 - not configured)
+	//  18: Loopback Indication (0 - not a loopback)
+	//  19: Reserved (0)
+	// 20-31: Extended Error (0 - no error)
+	// 32-47: Packet Length (depends on packet)
+	// 48-63: VLAN Tag (0, no VLAN)
+	uint64_t wb1 = 0b0000000000000000000000000000000000000000000000000000000000000011;
+
+	// get packet length
+	uint16_t packet_length = sizeof(struct stub_mbuf_content);
+	wb1 |= (uint64_t) packet_length << 32;
+
+	if (is_ip && (
+			// Multicast addr?
+#if __BYTE_ORDER == __BIG_ENDIAN
+			(mbuf_content->ipv4.dst_addr >= 0xE0000000 && mbuf_content->ipv4.dst_addr < 0xF0000000)
+#else
+			((mbuf_content->ipv4.dst_addr & 0xFF) >= 0xE0 && (mbuf_content->ipv4.dst_addr & 0xFF) < 0xF0)
+#endif
+			// Or just a broadcast, which can be pretty much anything
+			|| is_ip_broadcast)) {
+		SET_BIT(wb1, 7, 1);
+	}
+
+	// Write the packet into the proper place
+	memcpy((char*) mbuf_addr, mbuf_content, packet_length);
+
+	// "The 82599 writes back the receive descriptor immediately following the packet write into system memory."
+	descr[0] = wb0;
+	descr[1] = wb1;
+
+	// Get device index
+	int device_index = 0;
+	while (dev != &DEVICES[device_index]) { device_index++; }
+klee_print_expr("put the mbuf for device", device_index);
+}
+
 
 // RW1C means a register can be read, and bits can be cleared by writing 1
 static uint32_t
@@ -632,188 +803,6 @@ stub_register_tdh_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 
 
 static uint32_t
-stub_register_rxctrl_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
-{
-	if (GET_BIT(new_value, 0) == 0) {
-		// RX not enabled
-		return new_value;
-	}
-
-	// Get the address of the receive descriptor for queue 0
-	uint64_t rdba =  ((uint64_t) DEV_REG(dev, 0x01000)) // RDBAL
-		      | (((uint64_t) DEV_REG(dev, 0x01004)) << 32); // RDBAH
-
-	// Clear the head and tail of the descriptor
-	DEV_REG(dev, 0x01010) = 0; // RDH
-	DEV_REG(dev, 0x01018) = 0; // RDT
-
-	if (klee_int("received") == 0) {
-		// no packet
-	}
-
-	// Descriptor is 128 bits, see page 313, table 7-15 "Descriptor Read Format"
-	// (which the NIC reads to know where to put a packet)
-	// and page 314, table 7-16 "Descriptor Write-Back Format"
-	// (note that "write" in this context is from the NIC's point of view;
-	//  it writes those descriptors into memory)
-	uint64_t* descr = (uint64_t*) rdba;
-
-	// Read phase
-	// Address is the first 64 bits, header the next 64
-	// normally headers shouldn't be split
-	uint64_t mbuf_addr = descr[0];
-	uint64_t head_addr = descr[1];
-	klee_assert(head_addr == 0);
-
-	// Write phase
-
-	// First Line
-	// 0-3: RSS Type (0 - no RSS)
-	// 4-16: Packet Type
-	//  4/5 and 6/7 are IPv4 and IPv6 respectively (mutually exclusive?)
-	//  8/9/10 are TCP/UDP/SCTP respectively (mutually exclusive?)
-	//  11 is NFS
-	//  12/13 is IPSec
-	//  14 is LinkSec (non-IP)
-	//  15 must be 0 to indicate a non-L2 packet
-	//  16 is reserved
-	// 17-20: RSC Count (0 - no RSC)
-	// 21-30: Header Length (0 - header not decoded)
-	// 31: Split Header (1 - not split)
-	// 32-63: RSS Hash or FCOE_PARAM or Flow Director Filters ID or Fragment Checksum (0 - not supported)
-	uint64_t wb0 = 0b0000000000000000000000000000000010000000000000000000000000000000;
-	bool is_ip = true;
-	bool is_ipv4 = false;
-	bool is_ipv6 = false;
-	bool is_udp = false;
-	bool is_tcp = false;
-	bool is_sctp = false;
-	if (klee_int("received_is_ipv4") != 0) {
-		is_ipv4 = true;
-		SET_BIT(wb0, 4, 1);
-		if (klee_int("received_has_ipv4_extensions") != 0) {
-			SET_BIT(wb0, 5, 1);
-		}
-	} else if (klee_int("received_is_ipv6") != 0) {
-		is_ipv6 = true;
-		SET_BIT(wb0, 6, 1);
-		if (klee_int("received_has_ipv6_extensions") != 0) {
-			SET_BIT(wb0, 7, 1);
-		}
-	} else {
-		if (klee_int("received_is_linksec") != 0) {
-			SET_BIT(wb0, 14, 1);
-		}
-		is_ip = false;
-	}
-	if (is_ip) {
-		bool can_be_nfs = true;
-		if (klee_int("received_is_tcp") != 0) {
-			is_tcp = true;
-			SET_BIT(wb0, 8, 1);
-		} else if (klee_int("received_is_udp") != 0) {
-			is_udp = true;
-			SET_BIT(wb0, 9, 1);
-		} else if (klee_int("received_is_sctp") != 0) {
-			is_sctp = true;
-			SET_BIT(wb0, 10, 1);
-		} else if (klee_int("received_is_ipsec_esp") != 0) {
-			SET_BIT(wb0, 12, 1);
-			can_be_nfs = false;
-		} else if (klee_int("received_is_ipsec_ah") != 0) {
-			SET_BIT(wb0, 13, 1);
-			can_be_nfs = false;
-		}
-
-		if (can_be_nfs && klee_int("received_is_nfs") != 0) {
-			SET_BIT(wb0, 11, 1);
-		}
-	}
-
-	struct stub_mbuf_content* mbuf_content = malloc(sizeof(struct stub_mbuf_content));
-	if (mbuf_content == NULL) {
-		klee_abort(); // TODO ahem...
-	}
-
-	if (is_ipv4) {
-#if __BYTE_ORDER == __BIG_ENDIAN
-		mbuf_content->ether.ether_type = 0x0800;
-#else
-		mbuf_content->ether.ether_type = 0x0080;
-#endif
-
-		if (is_tcp) {
-			mbuf_content->ipv4.next_proto_id = 6;
-		} else if (is_udp) {
-			mbuf_content->ipv4.next_proto_id = 17;
-		} else if (is_sctp) {
-			mbuf_content->ipv4.next_proto_id = 132;
-		}
-	} else if (is_ipv6) {
-#if __BYTE_ORDER == __BIG_ENDIAN
-		mbuf_content->ether.ether_type = 0x86DD;
-#else
-		mbuf_content->ether.ether_type = 0xDD68;
-#endif
-	}
-
-	// Second Line
-	// 0-19: Extended Status / NEXTP
-	//  0: Descriptor Done (1 - done)
-	//  1: End Of Packet (1 - yes, no more fragments)
-	//  2: Flow Match (0 - no filter set, no match)
-	//  3: VLAN Packet (0 - no VLANs configured, no match)
-	//  4: UDP Checksum Offload (0 - not provided)
-	//  5: L4 Integrity (0 - not provided)
-	//  6: IPv4 Checksum (0 - not provided)
-	//  7: Non-Unicast (depends on IP)
-	//  8: Reserved (0)
-	//  9: Outer-VLAN on double VLAN packet (0 - not enabled)
-	//  10: UDP Checksum Valid (0 - not supported)
-	//  11: Low Latency Interrupt (0 - no interrupts)
-	//  12-15: Reserved (0)
-	//  16: Time Stamp (0 - not a time sync packet)
-	//  17: Security Processing (0 - not configured)
-	//  18: Loopback Indication (0 - not a loopback)
-	//  19: Reserved (0)
-	// 20-31: Extended Error (0 - no error)
-	// 32-47: Packet Length (depends on packet)
-	// 48-63: VLAN Tag (0, no VLAN)
-	uint64_t wb1 = 0b0000000000000000000000000000000000000000000000000000000000000011;
-
-	// get packet length
-	uint16_t packet_length = sizeof(struct stub_mbuf_content);
-	wb1 |= (uint64_t) packet_length << 32;
-
-	bool is_ip_multi_or_broadcast = is_ip && (
-		// Multicast addr?
-#if __BYTE_ORDER == __BIG_ENDIAN
-		(mbuf_content->ipv4.dst_addr >= 0xE0000000 && mbuf_content->ipv4.dst_addr < 0xF0000000)
-#else
-		((mbuf_content->ipv4.dst_addr & 0xFF) >= 0xE0 && (mbuf_content->ipv4.dst_addr & 0xFF) < 0xF0)
-#endif
-		||
-		// Or just a broadcast, which can be pretty much anything
-		(klee_int("is_ip_broadcast") != 0)
-	);
-
-	if (is_ip_multi_or_broadcast) {
-		SET_BIT(wb1, 7, 1);
-	}
-
-	// Put the mbuf in the right place
-	memcpy((char*) mbuf_addr, mbuf_content, packet_length);
-
-
-//	// Get device index
-//	int device = 0;
-//	while (dev != &DEVICES[device]) { device++; }
-
-	return new_value;
-}
-
-
-static uint32_t
 stub_register_needsrxen0_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// RXCTRL.RXEN (bit 0) must be set to 0 before writing to RXCSUM and FCTRL
@@ -1094,15 +1083,15 @@ stub_registers_init(void)
 	// 8-13: Receive Buffer Size for Header Buffer, in 64-byte resolution (0x4 - default; "Value can be from 64 bytes to 1024 bytes")
 	// 14-21: Reserved (0)
 	// 22-24: Receive Descriptor Minimum Threshold Size (0 - default)
-	// 25-27: Define the descriptor type in Rx (000 - Legacy, default)
+	// 25-27: Define the descriptor type in Rx (001 - Advanced)
 	// 28: Drop Enabled (0 - not enabled)
 	// 29-31: Reserved (000)
 	for (int n = 0; n <= 127; n++) {
 		int addr = n <= 15 ? (0x02100 + 4*n)
 			 : n <= 53 ? (0x01014 + 0x40*n)
 				   : (0x0D014 + 0x40*(n-64));
-		REG(addr, 0b00000000000000000000010000000010,
-			  0b00011111110000000011111100011111);
+		REG(addr, 0b00000010000000000000010000000010,
+			  0b00000001110000000011111100011111);
 	}
 
 
@@ -1306,7 +1295,6 @@ stub_registers_init(void)
 	// 1-31: Reserved
 	REG(0x03000, 0b00000000000000000000000000000000,
 		     0b00000000000000000000000000000001);
-	REGISTERS[0x03000].write = stub_register_rxctrl_write;
 
 
 	// page 661
@@ -2255,6 +2243,17 @@ stub_hardware_init(void)
 	// DPDK "delay" method override
 	rte_delay_us_callback_register(stub_delay_us);
 }
+
+
+void
+stub_hardware_receive_packet(void)
+{
+	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+		stub_device_start(&(DEVICES[n]));
+	}
+}
+
+
 
 // Helper methods - not part of the stubs
 

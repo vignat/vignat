@@ -27,6 +27,12 @@ enum stub_file_kind {
 };
 
 struct stub_mmap {
+	// >1 -> in use
+	int refcount;
+
+	// False for read-only mmaps (we disallow access altogether)
+	bool accessible;
+
 	// 'mem' is 'actual_mem' rounded up to the page size
 	// See 'mmap' for an explanation.
 	void* mem;
@@ -143,8 +149,8 @@ fcntl(int fd, int cmd, ...)
 {
 	klee_assert(cmd == F_SETFD);
 
-        va_list args;
-        va_start(args, cmd);
+	va_list args;
+	va_start(args, cmd);
 
 	int arg = va_arg(args, int);
 	klee_assert(arg == FD_CLOEXEC);
@@ -240,10 +246,7 @@ read(int fd, void *buf, size_t count)
 		// and we want the PFN to be equal to the VPFN since we want VAs and PAs to match
 		int vpfn = FILES[fd].pos / sizeof(uint64_t);
 		klee_assert(vpfn < (((uint64_t) 1) << 55)); // PFNs are stored on 55 bits
-klee_print_expr("fd",fd);klee_print_expr("FILES[fd].pos", FILES[fd].pos);
-klee_print_expr("vpfn", vpfn);
-klee_print_expr("1<<63",  (((uint64_t) 1) << 63));
-klee_print_expr("result", vpfn | (((uint64_t) 1) << 63));
+
 		// TODO I think DPDK forgets to check whether the page is marked as swapped,
 		//      which changes the meaning of bits 0-54...
 
@@ -376,6 +379,20 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 		klee_assert(length >= strlen(FILES[fd].content));
 	}
 
+	// Keep the same address if we're mmapping the same length again
+	// DPDK depends on this for hugepages mapping...
+	for (int m = 0; m < FILES[fd].mmaps_len; m++) {
+		if (FILES[fd].mmaps[m].mem_len == length) {
+			if (FILES[fd].mmaps[m].refcount == 0 && FILES[fd].mmaps[m].accessible) {
+				// freed mmap, need to re-allow access
+				klee_allow_access(FILES[fd].mmaps[m].actual_mem, FILES[fd].mmaps[m].actual_mem_len);
+			}
+
+			FILES[fd].mmaps[m].refcount++;
+			return FILES[fd].mmaps[m].mem;
+		}
+	}
+
 	// don't mmap too many times
 	klee_assert(FILES[fd].mmaps_len < sizeof(FILES[0].mmaps)/sizeof(FILES[0].mmaps[0]));
 
@@ -390,20 +407,26 @@ mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 	size_t actual_length = length + PAGE_SIZE;
 	void* actual_mem = malloc(actual_length);
 	memset(actual_mem, 0, actual_length);
-	if ((prot & PROT_WRITE) != PROT_WRITE) {
-		// Read-only memory, we enforce even stronger semantics by disallowing reads with forbid_access
-		klee_forbid_access(actual_mem, actual_length, "mmapped read-only memory");
-	}
+
 	// note that this will result in an offset of PAGE_SIZE even if it could be 0 - we don't care
 	size_t real_offset = PAGE_SIZE - (((intptr_t) actual_mem) % PAGE_SIZE);
 	void* mem = (actual_mem + real_offset);
 
 	int m = FILES[fd].mmaps_len;
+	FILES[fd].mmaps[m].refcount = 1;
 	FILES[fd].mmaps[m].mem = mem;
 	FILES[fd].mmaps[m].mem_len = length;
 	FILES[fd].mmaps[m].actual_mem = actual_mem;
 	FILES[fd].mmaps[m].actual_mem_len = actual_length;
 	FILES[fd].mmaps_len++;
+
+	if ((prot & PROT_WRITE) != PROT_WRITE) {
+		// Read-only memory, we enforce even stronger semantics by disallowing reads with forbid_access
+		klee_forbid_access(actual_mem, actual_length, "mmapped read-only memory");
+		FILES[fd].mmaps[m].accessible = false;
+	} else {
+		FILES[fd].mmaps[m].accessible = true;
+	}
 
 	return mem;
 }
@@ -429,11 +452,12 @@ munmap(void* addr, size_t length)
 			if (FILES[n].mmaps[m].mem == addr) {
 				klee_assert(FILES[n].mmaps[m].mem_len == length);
 
-				// Free the actual_mem here, since mem is just a pointer within it
-				free(FILES[n].mmaps[m].actual_mem);
-				memset(&(FILES[n].mmaps[m]), 0, sizeof(struct stub_mmap));
-
-				FILES[n].mmaps_len--;
+				// We never free the mappings or decrease mmaps_len, since we keep old mappings alive
+				// But we do ensure freed mmaps are not accessed
+				FILES[n].mmaps[m].refcount--;
+				if (FILES[n].mmaps[m].refcount == 0 && FILES[n].mmaps[m].accessible) {
+					klee_forbid_access(FILES[n].mmaps[m].actual_mem, FILES[n].mmaps[m].actual_mem_len, "freed mmap");
+				}
 
 				return 0;
 			}
@@ -610,18 +634,13 @@ static int file_counter;
 int
 stub_add_file(char* path, char* content)
 {
-	struct stub_file file = {
-		.path = path,
-		.content = content,
-		.children = NULL,
-		.children_len = 0,
-		.pos = POS_UNOPENED,
-		.kind = KIND_FILE,
-		.locked = false,
-		.mmaps = NULL,
-		.mmaps_len = 0
-	};
+	struct stub_file file;
+	memset(&file, 0, sizeof(struct stub_file));
 
+	file.path = path;
+	file.content = content;
+	file.pos = POS_UNOPENED;
+	file.kind = KIND_FILE;
 
 	int fd = file_counter;
 	file_counter++;
@@ -642,24 +661,21 @@ stub_add_link(char* path, char* content)
 int
 stub_add_folder_array(char* path, int children_len, int* children)
 {
-        struct stub_file file = {
-		.path = path,
-		.content = NULL,
-		.children = children,
-		.children_len = children_len,
-		.pos = POS_UNOPENED,
-		.kind = KIND_DIRECTORY,
-		.locked = false,
-		.mmaps = NULL,
-		.mmaps_len = 0
-	};
+	struct stub_file file;
+	memset(&file, 0, sizeof(struct stub_file));
 
-        int fd = file_counter;
-        file_counter++;
+	file.path = path;
+	file.children = children;
+	file.children_len = children_len;
+	file.pos = POS_UNOPENED;
+	file.kind = KIND_DIRECTORY;
+
+	int fd = file_counter;
+	file_counter++;
 
 	FILES[fd] = file;
 
-        return fd;
+	return fd;
 }
 
 int
