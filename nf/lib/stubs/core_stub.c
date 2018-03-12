@@ -1,6 +1,11 @@
 #include "lib/stubs/core_stub.h"
 #include "lib/stubs/containers/str-descr.h"
 
+#include <stdlib.h>
+#include <string.h>
+
+#include <rte_memory.h>
+
 #include <klee/klee.h>
 
 
@@ -187,12 +192,11 @@ stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf
 
 	// Keep concrete values for what a driver guarantees
 	// (assignments are in the same order as the rte_mbuf declaration)
-
 	(*mbufp)->buf_addr = (char*) (*mbufp) + mbuf_size;
-	(*mbufp)->buf_iova = rte_mempool_virt2iova(*mbufp) + mbuf_size;
+	(*mbufp)->buf_iova = (rte_iova_t) (*mbufp)->buf_addr; // we assume VA = PA
 	// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
 	// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
-	(*mbufp)->data_off = 0; // klee_range(0, stub_q->mb_pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
+	(*mbufp)->data_off = 0; // klee_range(0, pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
 	(*mbufp)->refcnt = 1;
 	(*mbufp)->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
 	(*mbufp)->port = device;

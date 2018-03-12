@@ -40,19 +40,19 @@
 #include <linux/limits.h>
 #include <sys/types.h>
 
+#include <stdlib.h>
+#include <string.h>
+
 #include <rte_common.h>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
-#include <rte_launch.h>
-#include <rte_lcore.h>
 #include <rte_mbuf.h>
-#include "rte_errno.h"
+#include <rte_errno.h>
 
 #include "lib/nf_forward.h"
 #include "lib/nf_log.h"
 #include "lib/nf_time.h"
 #include "lib/nf_util.h"
-#include <string.h>
 
 
 // Number of RX/TX queues
@@ -75,7 +75,7 @@ static const unsigned MEMPOOL_BUFFER_COUNT = 256;
 // --- Initialization ---
 static int
 nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
-{klee_print_expr("init device",device);
+{
   // Configure the device
   int retval;
   struct rte_eth_conf device_conf;
@@ -84,69 +84,66 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
   device_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
 
   retval = rte_eth_dev_configure(
-    device, // The device
-    RX_QUEUES_COUNT, // # of RX queues
-    TX_QUEUES_COUNT, // # of TX queues
-    &device_conf // device config
+    device,
+    RX_QUEUES_COUNT,
+    TX_QUEUES_COUNT,
+    &device_conf
   );
   if (retval != 0) {
     return retval;
   }
-klee_print_expr("configured dev",device);
+
   // Allocate and set up RX queues
-  for (int rxq = 0; rxq < RX_QUEUES_COUNT; rxq++) {klee_print_expr("setting up a rx...", rxq);
+  for (int rxq = 0; rxq < RX_QUEUES_COUNT; rxq++) {
     retval = rte_eth_rx_queue_setup(
-      device, // device ID
-      rxq, // queue ID
-      RX_QUEUE_SIZE, // size
-      rte_eth_dev_socket_id(device), // socket
+      device,
+      rxq,
+      RX_QUEUE_SIZE,
+      rte_eth_dev_socket_id(device),
       NULL, // config (NULL = default)
-      mbuf_pool // memory pool
+      mbuf_pool
     );
-    if (retval != 0) {klee_print_expr("rx retval", retval);klee_abort();
+    if (retval != 0) {
       return retval;
     }
   }
-klee_print_expr("rx queues setup", device);
+
   // Allocate and set up TX queues
   for (int txq = 0; txq < TX_QUEUES_COUNT; txq++) {
     retval = rte_eth_tx_queue_setup(
-      device, // device ID
-      txq, // queue ID
-      TX_QUEUE_SIZE, // size
-      rte_eth_dev_socket_id(device), // socket
+      device,
+      txq,
+      TX_QUEUE_SIZE,
+      rte_eth_dev_socket_id(device),
       NULL // config (NULL = default)
     );
     if (retval != 0) {
       return retval;
     }
   }
-klee_print_expr("tx queues setup", device);
+
   // Start the device
   retval = rte_eth_dev_start(device);
   if (retval != 0) {
     return retval;
   }
-klee_print_expr("start", device);
-  // Enable RX in promiscuous mode for the Ethernet device
+
+  // Enable RX in promiscuous mode, just in case
   rte_eth_promiscuous_enable(device);
   if (rte_eth_promiscuous_get(device) != 1) {
     return retval;
   }
-klee_print_expr("promiscuous", device);
+
   // Get the link up
   retval = rte_eth_dev_set_link_up(device);
   if (retval != 0) {
     return retval;
   }
-klee_print_expr("up!", device);
+
+  // Sanity-check that it is up
   struct rte_eth_link link;
   rte_eth_link_get(device, &link);
-  if (link.link_status == 0) {
-    return retval;
-  }
-klee_print_expr("YAAAAAAY!", device);
-  return 0;
+  return link.link_status; // 0 == success
 }
 
 // --- Per-core work ---
@@ -166,10 +163,8 @@ lcore_main(void)
   NF_INFO("Core %u forwarding packets.", rte_lcore_id());
 
   VIGOR_LOOP_BEGIN
-klee_print_expr("begin...",0);
     struct rte_mbuf* buf = NULL;
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
-klee_print_expr("rx!",actual_rx_len);
     if (actual_rx_len != 0) {
       uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
       if (dst_device == VIGOR_DEVICE) {

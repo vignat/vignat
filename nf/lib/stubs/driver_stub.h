@@ -2,9 +2,13 @@
 
 #include <inttypes.h>
 
-#include "rte_config.h"
-#include "rte_mempool.h"
+#include <rte_config.h>
 
+
+static const int STUB_DRIVER_DEVICES_COUNT = 2;
+
+
+struct rte_mempool;
 
 struct stub_queue {
 	uint16_t port_id;
@@ -18,4 +22,8 @@ struct stub_driver {
 };
 
 
+#ifdef VIGOR_STUB_DRIVER
 void stub_driver_attach(void);
+#else
+inline void stub_driver_attach(void) { }
+#endif

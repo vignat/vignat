@@ -1,14 +1,11 @@
 #pragma once
 
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 
 
-#ifdef ENABLE_HARDWARE_STUB
-static const int DEVICES_COUNT = 2;
-#else
-static const int DEVICES_COUNT = 0;
-#endif
+static const int STUB_HARDWARE_DEVICES_COUNT = 2;
 
 
 struct stub_device {
@@ -36,9 +33,14 @@ struct stub_device {
 	uint64_t old_mbuf_addr;
 };
 
-struct stub_device DEVICES[DEVICES_COUNT];
+struct stub_device DEVICES[STUB_HARDWARE_DEVICES_COUNT];
 
 
+#ifdef VIGOR_STUB_HARDWARE
 void stub_hardware_receive_packet(void);
 // HACK this should not be needed :( but it is cause of the current impl. of havocing
 void stub_hardware_reset_receive(void);
+#else
+inline void stub_hardware_receive_packet(void) { }
+inline void stub_hardware_reset_receive(void) { }
+#endif

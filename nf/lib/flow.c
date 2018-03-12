@@ -2,6 +2,9 @@
 #include <string.h>
 #include <limits.h>
 
+// for RTE_MAX_ETHPORTS
+#include <rte_config.h>
+
 #include "include_ignored_by_verifast.h"
 
 #include "flow.h"

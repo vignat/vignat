@@ -1,8 +1,10 @@
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <netinet/in.h>
 
-#include <rte_byteorder.h>
+#include <rte_common.h>
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_mbuf.h>

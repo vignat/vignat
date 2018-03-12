@@ -1,7 +1,7 @@
 #ifndef LOOP_H_INCLUDED
 #define LOOP_H_INCLUDED
 
-#include "rte_config.h" // for RTE_MAX_ETHPORTS
+#include <rte_config.h> // for RTE_MAX_ETHPORTS
 
 #include "lib/containers/double-chain.h"
 #include "lib/containers/double-map.h"

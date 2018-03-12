@@ -1,4 +1,5 @@
 #include <rte_cpuflags.h>
+#include <rte_log.h>
 #include <rte_malloc.h> // for ixgbe_rxtx
 
 #include <ixgbe_rxtx_vec_common.h>
@@ -94,4 +95,7 @@ stub_rte_init(void)
 
 	// Don't let symbex die...
 	klee_alias_function("abort", "stub_abort");
+
+	// Use stderr for logs
+	rte_openlog_stream(stderr);
 }

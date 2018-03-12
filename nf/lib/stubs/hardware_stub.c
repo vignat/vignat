@@ -2130,7 +2130,7 @@ stub_device_init(struct stub_device* dev)
 static struct stub_device*
 stub_device_get(uint64_t addr)
 {
-	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
 		if (addr == (uint64_t) DEVICES[n].mem) {
 			return &DEVICES[n];
 		}
@@ -2221,7 +2221,7 @@ stub_hardware_init(void)
 	stub_registers_init();
 
 	// Device initialization
-	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
 		struct stub_device stub_dev = {
 			.name = stub_pci_name(n),
 			.interrupts_fd = 0, // set by stdio_files stub
@@ -2251,7 +2251,7 @@ stub_hardware_init(void)
 void
 stub_hardware_receive_packet(void)
 {
-	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
 		stub_device_start(&(DEVICES[n]));
 	}
 }
@@ -2259,7 +2259,7 @@ stub_hardware_receive_packet(void)
 void
 stub_hardware_reset_receive(void)
 {
-	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
 		struct stub_device* dev = &(DEVICES[n]);
 
 		// Reset descriptor ring

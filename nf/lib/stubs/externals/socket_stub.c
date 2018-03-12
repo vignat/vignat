@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
-#include <rte_log.h>
-
 #include <klee/klee.h>
 
 
@@ -25,6 +23,4 @@ static void
 stub_socket_init(void)
 {
 	klee_alias_function("socket", "stub_socket");
-
-	rte_openlog_stream(stderr);
 }

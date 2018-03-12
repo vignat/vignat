@@ -1,6 +1,21 @@
-# allow the use of extglob in paths
-SHELL=/bin/bash -O extglob -c
+# Pick your verification-time stub!
+# DPDK, DRIVER, or HARDWARE
+STUB_KIND = DPDK
 
+# Pick your compile-time flags! (i.e. not for verification)
+CFLAGS += -O3
+#CFLAGS += -O0 -g -rdynamic -DENABLE_LOG -Wfatal-errors
+
+
+
+### Abandon all hope, ye who enter here! ###
+
+
+
+# allow the use of extglob in paths
+SHELL = /bin/bash -O extglob -c
+
+# DPDK stuff
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
@@ -16,41 +31,33 @@ SRCS-y := nat_forward_vignat.c ../nf_main.c ../lib/nat_config.c \
           ../lib/containers/vector.c ../lib/containers/map.c
 
 # gcc flags
-CFLAGS += -O3
-#CFLAGS += -O0 -g -rdynamic -DENABLE_LOG -Wfatal-errors
-CFLAGS += -I../..
-CFLAGS += -std=gnu99
+CFLAGS += -std=gnu99 -I../..
 
 # disable warnings triggered by DPDK
 CFLAGS += -Wno-implicit-function-declaration
 CFLAGS += -Wno-nested-externs
 
+# DPDK stuff
 include $(RTE_SDK)/mk/rte.extapp.mk
 
+
+# Verification via KLEE
 verify:
-	rm -f *.bc # in case previous build failed after generating bc files
-	clang \
+	# Cleanup in case previous build failed after generating bc files
+	rm -f *.bc
+
+	# Always pass the compile flags, and some files; only use DPDK files if we're not stubbing it
+	COMPILE_FLAGS='-c -g -emit-llvm -fsanitize=signed-integer-overflow'; \
+	COMPILE_FILES="\
 		-D_GNU_SOURCE `# TODO find a way to remove this from here, not clean` \
 		-DKLEE_VERIFICATION `# for a few ifdefs` \
-		-DENABLE_HARDWARE_STUB `# enable hardware stubs instead of using driver stubs` \
-		-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
+		-DVIGOR_STUB_$(STUB_KIND) \
 		`# Include directories` \
 		-I . -I .. \
 		-I $(KLEE_INCLUDE) \
-		-I $(RTE_SDK)/$(RTE_TARGET)/include \
-		-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
-		-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
-		-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
-		-I $(RTE_SDK)/drivers/net/ixgbe `# for ixgbe headers` \
-		`# Special included files` \
-		--include=lib/stubs/builtin_stub.h `# compiler builtin stubs` \
-		--include=rte_config.h `# required by many DPDK files` \
 		`# General stubs` \
 		../lib/stubs/externals/*.c \
 		../lib/stubs/core_stub.c \
-		../lib/stubs/driver_stub.c \
-		../lib/stubs/hardware_stub.c \
-		../lib/stubs/rte_stub.c \
 		../lib/stubs/time_stub.c \
 		`# NF stubs` \
 		../lib/stubs/containers/double-chain-stub.c \
@@ -65,28 +72,52 @@ verify:
 		nat_forward_vignat.c \
 		flowtable.c flowmanager.c \
 		../lib/nat_config.c \
-		../lib/flow.c ../lib/flow-log.c \
-		`# DPDK` \
-		`# Platform-independent EAL.` \
-		$(RTE_SDK)/lib/librte_eal/common/*.c \
-		`# Linux-specific EAL` \
-		$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
-		`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \
-		`#             power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html` \
-		$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
-		`# Stacks for mempool` \
-		$(RTE_SDK)/drivers/mempool/stack/*.c \
-		`# Virtual devices support` \
-		$(RTE_SDK)/drivers/bus/vdev/*.c \
-		`# PCI driver support` \
-		$(RTE_SDK)/drivers/bus/pci/*.c \
-		$(RTE_SDK)/drivers/bus/pci/linux/*.c \
-		`# ixgbe driver (except bypass, SSE and ARM NEON stuff)` \
-		$(RTE_SDK)/drivers/net/ixgbe/!(ixgbe_bypass|ixgbe_82599_bypass|ixgbe_rxtx_vec_sse|ixgbe_rxtx_vec_neon).c \
-		$(RTE_SDK)/drivers/net/ixgbe/base/*.c \
-		`# Compile flags` \
-		-c -g -emit-llvm -fsanitize=signed-integer-overflow
+		../lib/flow.c ../lib/flow-log.c"; \
+	if [ '$(STUB_KIND)' = 'DPDK' ]; then \
+		DPDK_FILES="\
+			`# Stub DPDK headers` \
+			-I ../lib/stubs/dpdk"; \
+	else \
+		DPDK_FILES="\
+			-DRTE_COMPILE_TIME_CPUFLAGS=424242 `# sentinel value; cpuflags uses it, usually passed from the dpdk build system` \
+			`# Special included files` \
+			--include=lib/stubs/builtin_stub.h `# compiler builtin stubs` \
+			--include=rte_config.h `# required by many DPDK files` \
+			`# Stubs` \
+			../lib/stubs/driver_stub.c \
+			../lib/stubs/hardware_stub.c \
+			`# DPDK headers` \
+			-I $(RTE_SDK)/$(RTE_TARGET)/include \
+			-I $(RTE_SDK)/lib/librte_eal/common `# eal_thread.c requires eal_private.h in there` \
+			-I $(RTE_SDK)/drivers/bus/vdev `# for stub driver` \
+			-I $(RTE_SDK)/drivers/bus/pci `# linux pci requires private.h in there` \
+			-I $(RTE_SDK)/drivers/net/ixgbe `# for ixgbe headers` \
+			`# DPDK low-level stubs for specific functions` \
+			../lib/stubs/dpdk_low_level_stub.c \
+			`# Platform-independent EAL.` \
+			$(RTE_SDK)/lib/librte_eal/common/*.c \
+			`# Linux-specific EAL` \
+			$(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c \
+			`# Other libs. acl and distributor uses CPU intrinsics (there is a generic version of distributor, but we don't need it)` \
+			`#             power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html` \
+			$(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c \
+			`# Stacks for mempool` \
+			$(RTE_SDK)/drivers/mempool/stack/*.c \
+			`# Virtual devices support` \
+			$(RTE_SDK)/drivers/bus/vdev/*.c \
+			`# PCI driver support` \
+			$(RTE_SDK)/drivers/bus/pci/*.c \
+			$(RTE_SDK)/drivers/bus/pci/linux/*.c \
+			`# ixgbe driver (except bypass, SSE and ARM NEON stuff)` \
+			$(RTE_SDK)/drivers/net/ixgbe/!(ixgbe_bypass|ixgbe_82599_bypass|ixgbe_rxtx_vec_sse|ixgbe_rxtx_vec_neon).c \
+			$(RTE_SDK)/drivers/net/ixgbe/base/*.c"; \
+	fi; \
+	echo $$DPDK_FILES; \
+	clang $$COMPILE_FILES $$DPDK_FILES $$COMPILE_FLAGS
+
+	# Link
 	llvm-link -o veri.bc *.bc
+
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
 	/usr/bin/time -v `# print time/mem stats` \

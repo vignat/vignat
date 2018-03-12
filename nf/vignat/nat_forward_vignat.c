@@ -3,6 +3,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <stdlib.h>
+
+#include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_ether.h>
 #include <rte_ip.h>

@@ -13,8 +13,6 @@
 
 
 // Constant stuff
-static const int DEVICES_COUNT = 2; // more devices = lots more paths in the NF
-static const char* stub_driver_names[DEVICES_COUNT] = { "stub0", "stub1" }; // don't rely on snprintf
 static struct ether_addr stub_addr = { .addr_bytes = {0} };
 static struct rte_eth_link stub_link = {
 	.link_speed = ETH_SPEED_NUM_10G,
@@ -33,7 +31,7 @@ static bool device_tx_setup[RTE_MAX_ETHPORTS];
 
 
 // Globals
-static struct rte_vdev_driver stub_drivers[DEVICES_COUNT];
+static struct rte_vdev_driver stub_drivers[STUB_DRIVER_DEVICES_COUNT];
 
 void
 stub_free(struct rte_mbuf* mbuf) {
@@ -206,8 +204,8 @@ stub_queue_release(void *queue)
 	bool queue_found = false;
 
 	// First, find the queue we're releasing
-	for (int d = 0; d < DEVICES_COUNT; d++) {
-		struct rte_eth_dev* dev = rte_eth_dev_allocated(stub_drivers[d].driver.name);
+	for (int n = 0; n < STUB_DRIVER_DEVICES_COUNT; n++) {
+		struct rte_eth_dev* dev = rte_eth_dev_allocated(stub_drivers[n].driver.name);
 		struct stub_driver* stub_drv = dev->data->dev_private;
 
 		for (int q = 0; q < RTE_MAX_QUEUES_PER_PORT; q++) {
@@ -386,22 +384,34 @@ stub_driver_remove(struct rte_vdev_device* vdev)
 }
 
 
+
+// Helper method (not part of stubs)
+static char*
+stub_driver_name(int index)
+{
+	char buffer[1024];
+	snprintf(buffer, sizeof(buffer), "stub%d", index);
+	return strdup(buffer);
+}
+
+
+
 // First part of init
 __attribute__((constructor))
 static void
 stub_driver_init(void)
 {
-#ifndef ENABLE_HARDWARE_STUB
+#ifdef VIGOR_STUB_DRIVER
 	// Trace the packet free; need a regex to alias the duplicated functions
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
 	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
 
-	for (int n = 0; n < DEVICES_COUNT; n++) {
+	for (int n = 0; n < STUB_DRIVER_DEVICES_COUNT; n++) {
 		struct rte_vdev_driver rte_driver = {
 			.next = NULL,
 			.driver = {
 				.next = NULL,
-				.name = stub_driver_names[n],
+				.name = stub_driver_name(n),
 				.alias = NULL,
 			},
 			.probe = stub_driver_probe,
@@ -417,8 +427,8 @@ stub_driver_init(void)
 void
 stub_driver_attach(void)
 {
-	for (int n = 0; n < DEVICES_COUNT; n++) {
-		int ret = rte_vdev_init(stub_driver_names[n], NULL);
+	for (int n = 0; n < STUB_DRIVER_DEVICES_COUNT; n++) {
+		int ret = rte_vdev_init(stub_driver_name(n), NULL);
 		// should be 0, or the symbol returned by probe
 		klee_assert(ret == 0 || klee_is_symbolic(ret));
 	}
