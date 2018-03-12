@@ -76,13 +76,13 @@ static const unsigned MEMPOOL_BUFFER_COUNT = 256;
 static int
 nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
 {
-  // Configure the device
   int retval;
+
+  // device_conf passed to rte_eth_dev_configure cannot be NULL
   struct rte_eth_conf device_conf;
-
   memset(&device_conf, 0, sizeof(struct rte_eth_conf));
-  device_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
 
+  // Configure the device
   retval = rte_eth_dev_configure(
     device,
     RX_QUEUES_COUNT,
