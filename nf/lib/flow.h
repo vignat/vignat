@@ -3,6 +3,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// HACK HACK HACK HACK super dirty hack from when there was only 1 instance of the model
+//                     used in flow consistency checks
+uint16_t GLOBAL_starting_port;
+
 /**
   The "internal" key - the part of the flow ID, related to the internal network.
   Used in a hash map to identify flows for packets coming from the internal
@@ -63,9 +67,6 @@ void log_flow(const struct flow *f);
 
 #include <klee/klee.h>
 #include "lib/stubs/containers/double-map-stub-control.h"
-
-//TODO: this is dirty.
-extern uint16_t starting_port;
 
 /*
   Metainformation about the structures above. Used for detailed traces in Klee
