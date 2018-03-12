@@ -141,5 +141,5 @@ int expire_flows(struct FlowManager* manager, time_t time) {
   uint64_t last_time_u = time_u - manager->expiration_time; // OK because time >= expiration_time >= 0
   assert(sizeof(uint64_t) <= sizeof(time_t));
   time_t last_time = (time_t) last_time_u; // OK since the assert above passed
-  return expire_items(managet->chain, manager->flow_table, last_time);
+  return expire_items(manager->chain, manager->flow_table, last_time);
 }
