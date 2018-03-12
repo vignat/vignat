@@ -6,6 +6,7 @@
 struct rte_mbuf;
 
 // rte_ether
+struct ether_addr;
 struct ether_hdr;
 
 // rte_ip

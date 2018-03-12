@@ -1,6 +1,9 @@
 #pragma once
 
 #include <inttypes.h>
+#include <stdbool.h>
+
+#include <rte_config.h>
 
 
 inline uint16_t
@@ -8,6 +11,21 @@ rte_eth_dev_count(void)
 {
 	return 2;
 }
+
+
+static bool PROMISCUOUS_DEVICES[RTE_MAX_ETHPORTS];
+static inline void
+rte_eth_promiscuous_enable(uint16_t port_id)
+{
+	PROMISCUOUS_DEVICES[port_id] = true;
+}
+
+static inline int
+rte_eth_promiscuous_get(uint16_t port_id)
+{
+	return PROMISCUOUS_DEVICES[port_id] ? 1 : 0;
+}
+
 
 struct rte_eth_link {
 	uint32_t link_speed;
