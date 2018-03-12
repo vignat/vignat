@@ -1,6 +1,7 @@
 #ifdef KLEE_VERIFICATION
 #include "lib/stubs/time_stub_control.h"
 #include "lib/stubs/driver_stub.h"
+#include "lib/stubs/hardware_stub.h"
 #include <klee/klee.h>
 #endif
 
@@ -22,6 +23,7 @@
     unsigned VIGOR_DEVICE = klee_range(0, _vigor_devices_count, "VIGOR_DEVICE"); \
     for(unsigned _d = 0; _d < _vigor_devices_count; _d++) if (VIGOR_DEVICE == _d) { VIGOR_DEVICE = _d; break; }
 #define VIGOR_LOOP_END \
+    stub_hardware_reset_receive(); \
     nf_loop_iteration_end(_vigor_lcore_id, VIGOR_NOW); \
   }
 #else

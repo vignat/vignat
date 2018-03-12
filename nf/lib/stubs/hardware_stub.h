@@ -31,9 +31,14 @@ struct stub_device {
 	uint64_t i2c_stop_time; // time of last stop
 
 	uint8_t sfp_address; // see i2cctl sfp implementation
+
+	// required for the reset hack...
+	uint64_t old_mbuf_addr;
 };
 
 struct stub_device DEVICES[DEVICES_COUNT];
 
 
 void stub_hardware_receive_packet(void);
+// HACK this should not be needed :( but it is cause of the current impl. of havocing
+void stub_hardware_reset_receive(void);

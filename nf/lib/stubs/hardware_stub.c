@@ -81,6 +81,7 @@ klee_print_expr("RDBA", rdba);
 	DEV_REG(dev, 0x01010) = 0; // RDH
 	// Make sure we have enough space
 	uint32_t rdt = DEV_REG(dev, 0x01018);
+klee_print_expr("rdt", rdt);
 	klee_assert(rdt >= 1);
 
 	if (klee_int("received") == 0) {
@@ -102,6 +103,8 @@ klee_print_expr("RDBA", rdba);
 klee_print_expr("mbuf addr", mbuf_addr);
 klee_print_expr("head addr", head_addr);
 	klee_assert(head_addr == 0);
+
+	dev->old_mbuf_addr = mbuf_addr;
 
 	// Write phase
 
@@ -2253,6 +2256,24 @@ stub_hardware_receive_packet(void)
 	}
 }
 
+void
+stub_hardware_reset_receive(void)
+{
+	for (int n = 0; n < sizeof(DEVICES)/sizeof(DEVICES[0]); n++) {
+		struct stub_device* dev = &(DEVICES[n]);
+
+		// Reset descriptor ring
+		DEV_REG(dev, 0x01010) = 0;
+		DEV_REG(dev, 0x01018) = 95;
+
+		// Reset descriptor
+		uint64_t rdba =  ((uint64_t) DEV_REG(dev, 0x01000)) // RDBAL
+			      | (((uint64_t) DEV_REG(dev, 0x01004)) << 32); // RDBAH
+		uint64_t* descr = (uint64_t*) rdba;
+		descr[0] = dev->old_mbuf_addr;
+		descr[1] = 0;
+	}
+}
 
 
 // Helper methods - not part of the stubs
