@@ -1,0 +1,25 @@
+assert mapp<ether_addri>(_, ether_addrp, eth_addr_hash, nop_true, ?final_dyn_map);
+assert mapp<stat_keyi>(_, static_keyp, st_key_hash, nop_true, ?stat_map);
+assert vectorp<ether_addri>(_, ether_addrp, ?final_dyn_key_vec);
+assert vectorp<stat_keyi>(_, static_keyp, ?final_stat_key_vec);
+assert vectorp<uint8_t>(_, dyn_valp, ?final_dyn_val_vec);
+assert double_chainp(?final_chain,_);
+
+ml_table initial_table = bridge_abstract_function(initial_dyn_map,
+                                                  initial_dyn_val_vec,
+                                                  stat_map);
+ml_table final_table = bridge_abstract_function(final_dyn_map,
+                                                final_dyn_val_vec,
+                                                stat_map);
+
+bit_and_zero(0x00000010);
+if (10 < now) {// consider only normal moments, remote from the start of the epoch
+
+  if (a_packet_received) {
+    ml_table exprnd_table = bridge_abstract_function(exprnd_dyn_map,
+                                                     exprnd_dyn_val_vec,
+                                                     stat_map);
+
+    assert true;
+  }
+}

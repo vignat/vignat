@@ -236,14 +236,23 @@ let fun_types =
                                             ", _));\n\
                                              assert vectorp<ether_addri>(_, _, ?" ^ (tmp_gen "dv") ^
                                             ");\n\
+                                             assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "dv_init") ^
+                                            ");\n\
                                              assert map_vec_chain_coherent<ether_addri>(" ^
                                             (tmp_gen "dm") ^ ", " ^
                                             (tmp_gen "dv") ^ ", ?" ^
                                             (tmp_gen "dh") ^
                                             ");\n\
-                                              mvc_coherent_same_len<ether_addri>(" ^ (tmp_gen "dm") ^ ", " ^ (tmp_gen "dv") ^ ", " ^ (tmp_gen "dh") ^ ");\n\
-                                             } @*/"
-                                         )];};
+                                             mvc_coherent_same_len<ether_addri>(" ^ (tmp_gen "dm") ^
+                                            ", " ^ (tmp_gen "dv") ^
+                                            ", " ^ (tmp_gen "dh") ^
+                                            ");\n\
+                                             assert mapp<ether_addri>(_, _, _, _, ?" ^ (tmp_gen "dm_full") ^
+                                            ");\n\
+                                            initial_dyn_map = " ^ (tmp_gen "dm_full") ^
+                                            ";\ninitial_dyn_val_vec = " ^ (tmp_gen "dv_init") ^
+                                            ";\n} @*/");
+                                       ];};
      "dchain_allocate", {ret_type = Static Sint32;
                          arg_types = stt [Sint32; Ptr (Ptr dchain_struct)];
                          extra_ptr_types = [];
@@ -918,6 +927,10 @@ struct
                   uint8_t flooded_except_port;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
+                 ^ "//@ mapi<ether_addri> initial_dyn_map;\n"
+                 ^ "//@ list<pair<uint8_t, bool> > initial_dyn_val_vec;\n"
+                 ^ "//@ mapi<ether_addri> exprnd_dyn_map;\n"
+                 ^ "//@ list<pair<uint8_t, bool> > exprnd_dyn_val_vec;\n"
                  ^
                  "/*@ //TODO: this hack should be \
                   converted to a system \n\
@@ -942,7 +955,7 @@ struct
   let eventproc_iteration_begin = "bridge_loop_invariant_produce"
   let eventproc_iteration_end = "bridge_loop_invariant_consume"
   let user_check_for_complete_iteration =
-    "" (*In_channel.read_all "forwarding_property.tmpl"*)
+    In_channel.read_all "bridge_forwarding_property.tmpl"
 end
 
 (* Register the module *)
