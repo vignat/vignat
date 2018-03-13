@@ -95,13 +95,19 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
   }
 
   // Allocate and set up RX queues
+  // with rx_free_thresh = 1 so that internal descriptors are replenished always,
+  // i.e. 1 mbuf is taken (for RX) from the pool and 1 is put back (when freeing),
+  //      at each iteration, which avoids havocing problems
+  struct rte_eth_rxconf rx_conf;
+  memset(&rx_conf, 0, sizeof(struct rte_eth_rxconf));
+  rx_conf.rx_free_thresh = 1;
   for (int rxq = 0; rxq < RX_QUEUES_COUNT; rxq++) {
     retval = rte_eth_rx_queue_setup(
       device,
       rxq,
       RX_QUEUE_SIZE,
       rte_eth_dev_socket_id(device),
-      NULL, // config (NULL = default)
+      &rx_conf,
       mbuf_pool
     );
     if (retval != 0) {
@@ -215,8 +221,8 @@ main(int argc, char* argv[])
   argc -= ret;
   argv += ret;
 
-  // Attach stub driver if needed (note that hardware stub is autodetected, no need to attach)
-#if defined(KLEE_VERIFICATION) && !defined(ENABLE_HARDWARE_STUB)
+#ifdef KLEE_VERIFICATION
+  // Attach stub driver (note that hardware stub is autodetected, no need to attach)
   stub_driver_attach();
 #endif
 

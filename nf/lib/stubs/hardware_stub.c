@@ -2272,6 +2272,8 @@ stub_hardware_reset_receive(void)
 		uint64_t* descr = (uint64_t*) rdba;
 		descr[0] = dev->old_mbuf_addr;
 		descr[1] = 0;
+
+		memset((char*) descr[0], 0, sizeof(struct stub_mbuf_content));
 	}
 }
 

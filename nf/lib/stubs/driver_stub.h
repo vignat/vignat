@@ -25,5 +25,5 @@ struct stub_driver {
 #ifdef VIGOR_STUB_DRIVER
 void stub_driver_attach(void);
 #else
-inline void stub_driver_attach(void) { }
+static inline void stub_driver_attach(void) { }
 #endif

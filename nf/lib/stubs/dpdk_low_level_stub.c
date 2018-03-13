@@ -65,6 +65,12 @@ stub_rdtsc(void)
 	return value;
 }
 
+void
+stub_prefetch(const volatile void* p)
+{
+	// Nothing
+}
+
 const char *
 stub_strerror(int errnum)
 {
@@ -88,6 +94,9 @@ stub_rte_init(void)
 	// rte_rdtsc uses assembly; we remain sound by modeling it as an unconstrained symbol
 	// note that rte_rdtsc is static inline, so we alias it with a regex to catch all instantiations
 	klee_alias_function_regex("rte_rdtsc[0-9]*", "stub_rdtsc");
+
+	// rte_prefetch* functions use assembly, obviously
+	klee_alias_function_regex("rte_prefetch.*", "stub_prefetch");
 
 	// Don't bother trying to translate error codes
 	// note: this is just to avoid an snprintf, we could support it I guess...

@@ -487,9 +487,8 @@ stub_stdio_files_init(void)
 	memset(FILES, 0, sizeof(FILES));
 
 	// PCI-related files
-	int devices_count = sizeof(DEVICES)/sizeof(DEVICES[0]);
-	int* dev_folders = (int*) malloc(devices_count * sizeof(int));
-	for (int n = 0; n < devices_count; n++) {
+	int* dev_folders = (int*) malloc(STUB_HARDWARE_DEVICES_COUNT * sizeof(int));
+	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
 		char* dev = DEVICES[n].name;
 
 		// Basic files
@@ -549,7 +548,7 @@ stub_stdio_files_init(void)
 		DEVICES[n].interrupts_fd = stub_add_file(strdup(interrupts_file_path), "");
 	}
 
-	stub_add_folder_array("/sys/bus/pci/devices", devices_count, dev_folders);
+	stub_add_folder_array("/sys/bus/pci/devices", STUB_HARDWARE_DEVICES_COUNT, dev_folders);
 
 
 	// Hugepages properties
