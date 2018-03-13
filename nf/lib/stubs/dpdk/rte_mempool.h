@@ -1,7 +1,11 @@
 #pragma once
 
+
+#define RTE_MEMZONE_NAMESIZE 32
+
+
 struct rte_mempool {
-	char name[32];
+	char name[RTE_MEMZONE_NAMESIZE];
 	union {
 		void *pool_data;
 		uint64_t pool_id;

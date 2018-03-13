@@ -550,7 +550,6 @@ stub_stdio_files_init(void)
 
 	stub_add_folder_array("/sys/bus/pci/devices", STUB_HARDWARE_DEVICES_COUNT, dev_folders);
 
-
 	// Hugepages properties
 	char huge_free_value[1024];
 	snprintf(huge_free_value, sizeof(huge_free_value), "%d\n", STUB_HUGEPAGES_COUNT);

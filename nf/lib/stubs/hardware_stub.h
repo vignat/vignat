@@ -5,7 +5,12 @@
 #include <stddef.h>
 
 
+// ifdef this so the stdio stubs don't create files that we don't need
+#ifdef VIGOR_STUB_HARDWARE
 static const int STUB_HARDWARE_DEVICES_COUNT = 2;
+#else
+static const int STUB_HARDWARE_DEVICES_COUNT = 0;
+#endif
 
 
 struct stub_device {
@@ -41,6 +46,6 @@ void stub_hardware_receive_packet(void);
 // HACK this should not be needed :( but it is cause of the current impl. of havocing
 void stub_hardware_reset_receive(void);
 #else
-inline void stub_hardware_receive_packet(void) { }
-inline void stub_hardware_reset_receive(void) { }
+static inline void stub_hardware_receive_packet(void) { }
+static inline void stub_hardware_reset_receive(void) { }
 #endif

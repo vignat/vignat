@@ -1,6 +1,6 @@
 # Pick your verification-time stub!
 # DPDK, DRIVER, or HARDWARE
-STUB_KIND = HARDWARE
+STUB_KIND = DPDK
 
 # Pick your compile-time flags! (i.e. not for verification)
 CFLAGS += -O3
@@ -70,6 +70,8 @@ VERIF_FLAGS := -c -g -emit-llvm -fsanitize=signed-integer-overflow
 
 # Basic includes: VigNAT, NF files, and KLEE
 VERIF_INCLUDES := -I . -I .. -I $(KLEE_INCLUDE)
+# ...and the DPDK cmdline library
+VERIF_INCLUDES += -I $(RTE_SDK)/lib/librte_cmdline
 
 # Defines. TODO remove _GNU_SOURCE from here, #define it in files
 VERIF_DEFS := -D_GNU_SOURCE -DKLEE_VERIFICATION -DVIGOR_STUB_$(STUB_KIND)
@@ -85,6 +87,10 @@ VERIF_FILES += loop-stub.c
 VERIF_FILES += ../lib/stubs/containers/double-chain-stub.c ../lib/stubs/containers/double-map-stub.c ../lib/stubs/containers/expirator-stub.c
 # Environment stubs
 VERIF_FILES += ../lib/stubs/externals/*.c ../lib/stubs/core_stub.c ../lib/stubs/time_stub.c
+# DPDK cmdline parsing library, always included, we don't want/need to stub it
+VERIF_FILES += $(RTE_SDK)/lib/librte_cmdline/*.c
+# ...and the string function it uses
+VERIF_FILES += $(RTE_SDK)/lib/librte_eal/common/eal_common_string_fns.c
 
 # Defines for DPDK
 # CPUFLAGS is set to a sentinel value; usually it's passed from the DPDK build system
@@ -152,12 +158,12 @@ verify:
 
 	# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
         # can't use -optimize because does inlining and removes functions that we need to trace or use for aliases
+	# TODO make the NAT parameters symbolic?
 	/usr/bin/time -v `# print time/mem stats` \
 	klee -libc=uclibc -no-externals -dump-call-traces -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error -max-memory=750000 --max-solver-time=3 --debug-report-symbdex \
 		veri.bc \
 		--no-shconf `# don't mmap the config` \
 		-- \
-		`# TODO make those parameters symbolic` \
 		--lan-dev 0 \
 		--wan 1 \
 		--expire 10 \

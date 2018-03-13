@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <rte_mbuf.h>
 #include <rte_memory.h>
 
 #include <klee/klee.h>
@@ -169,7 +170,7 @@ stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf
 
 	// Make the packet symbolic
 	klee_make_symbolic(buf_symbol, pool->elt_size, "buf_value");
-	memcpy(mbufp, buf_symbol, pool->elt_size);
+	memcpy(*mbufp, buf_symbol, pool->elt_size);
 	free(buf_symbol);
 
 	// Explicitly make the content symbolic - validator depends on an user_buf symbol for the proof

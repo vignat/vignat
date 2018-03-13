@@ -94,6 +94,20 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     return retval;
   }
 
+  // Allocate and set up TX queues
+  for (int txq = 0; txq < TX_QUEUES_COUNT; txq++) {
+    retval = rte_eth_tx_queue_setup(
+      device,
+      txq,
+      TX_QUEUE_SIZE,
+      rte_eth_dev_socket_id(device),
+      NULL // config (NULL = default)
+    );
+    if (retval != 0) {
+      return retval;
+    }
+  }
+
   // Allocate and set up RX queues
   // with rx_free_thresh = 1 so that internal descriptors are replenished always,
   // i.e. 1 mbuf is taken (for RX) from the pool and 1 is put back (when freeing),
@@ -115,20 +129,6 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     }
   }
 
-  // Allocate and set up TX queues
-  for (int txq = 0; txq < TX_QUEUES_COUNT; txq++) {
-    retval = rte_eth_tx_queue_setup(
-      device,
-      txq,
-      TX_QUEUE_SIZE,
-      rte_eth_dev_socket_id(device),
-      NULL // config (NULL = default)
-    );
-    if (retval != 0) {
-      return retval;
-    }
-  }
-
   // Start the device
   retval = rte_eth_dev_start(device);
   if (retval != 0) {
@@ -141,16 +141,7 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
     return retval;
   }
 
-  // Get the link up
-  retval = rte_eth_dev_set_link_up(device);
-  if (retval != 0) {
-    return retval;
-  }
-
-  // Sanity-check that it is up
-  struct rte_eth_link link;
-  rte_eth_link_get(device, &link);
-  return link.link_status; // 0 == success
+  return 0;
 }
 
 // --- Per-core work ---

@@ -36,7 +36,7 @@ void nat_config_init(struct nat_config* config,
 		{"max-flows",		required_argument,	NULL, 'f'},
 		{"starting-port",	required_argument,	NULL, 's'},
 		{"wan",			required_argument,	NULL, 'w'},
-		{NULL, 			0,			NULL, 0  }
+		{NULL, 			0,			NULL,  0 }
 	};
 
 	// Set the devices' own MACs
@@ -102,6 +102,10 @@ void nat_config_init(struct nat_config* config,
 				if (config->wan_device >= nb_devices) {
 					PARSE_ERROR("WAN device does not exist.\n");
 				}
+				break;
+
+			default:
+				PARSE_ERROR("Unknown option.\n");
 				break;
 		}
 	}

@@ -17,3 +17,16 @@ struct ipv4_hdr {
 	uint32_t src_addr;
 	uint32_t dst_addr;
 };
+
+
+static inline uint16_t
+rte_ipv4_udptcp_cksum(const struct ipv4_hdr* ipv4_hdr, const void* l4_hdr)
+{
+	return 0; // TODO?
+}
+
+static inline uint16_t
+rte_ipv4_cksum(const struct ipv4_hdr* ipv4_hdr)
+{
+	return 0; // TODO?
+}
