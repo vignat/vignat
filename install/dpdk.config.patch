@@ -30,25 +30,6 @@ index 7830535..f908cbb 100644
  CONFIG_RTE_LIBRTE_IEEE1588=n
  CONFIG_RTE_ETHDEV_QUEUE_STAT_CNTRS=16
  CONFIG_RTE_ETHDEV_RXTX_CALLBACKS=y
-@@ -306,7 +307,7 @@ CONFIG_RTE_PMD_RING_MAX_TX_RINGS=16
- #
- # Compile software PMD backed by PCAP files
- #
--CONFIG_RTE_LIBRTE_PMD_PCAP=n
-+CONFIG_RTE_LIBRTE_PMD_PCAP=y
- 
- #
- # Compile link bonding PMD library
-@@ -418,7 +419,8 @@ CONFIG_RTE_LIBRTE_MEMPOOL_DEBUG=n
- #
- CONFIG_RTE_LIBRTE_MBUF=y
- CONFIG_RTE_LIBRTE_MBUF_DEBUG=n
--CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="ring_mp_mc"
-+# Use stacks instead of rings for mbuf pools, so that an [allocate+free] operation is idempotent
-+CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="stack"
- CONFIG_RTE_MBUF_REFCNT_ATOMIC=y
- CONFIG_RTE_PKTMBUF_HEADROOM=128
- 
 diff --git a/config/common_linuxapp b/config/common_linuxapp
 index 74c7d64..172208f 100644
 --- a/config/common_linuxapp

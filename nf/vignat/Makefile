@@ -111,13 +111,13 @@ VERIF_DPDK_INCLUDES += --include=lib/stubs/builtin_stub.h --include=rte_config.h
 # Files for DPDK
 # Low-level stubs for specific functions
 VERIF_DPDK_FILES := ../lib/stubs/dpdk_low_level_stub.c
+# Replacement for the mempool containr
+VERIF_DPDK_FILES += ../lib/stubs/dpdk_mempool_singleton.c
 # Platform-independent and Linux-specific EAL
 VERIF_DPDK_FILES += $(RTE_SDK)/lib/librte_eal/common/*.c $(RTE_SDK)/lib/librte_eal/linuxapp/eal/*.c
 # Other libraries, except acl and distributor which use CPU intrinsics (there is a generic version of distributor, but we don't need it),
 # and power has been broken for a while: http://dpdk.org/ml/archives/dev/2016-February/033152.html
 VERIF_DPDK_FILES += $(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)/*.c
-# Stacks for mempool
-VERIF_DPDK_FILES += $(RTE_SDK)/drivers/mempool/stack/*.c
 # Virtual devices support (for stub drivers)
 VERIF_DPDK_FILES += $(RTE_SDK)/drivers/bus/vdev/*.c
 # PCI driver support (for ixgbe driver)
