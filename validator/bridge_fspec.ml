@@ -251,6 +251,7 @@ let fun_types =
                                             ");\n\
                                             initial_dyn_map = " ^ (tmp_gen "dm_full") ^
                                             ";\ninitial_dyn_val_vec = " ^ (tmp_gen "dv_init") ^
+                                            ";\ninitial_chain = " ^ (tmp_gen "dh") ^
                                             ";\n} @*/");
                                        ];};
      "dchain_allocate", {ret_type = Static Sint32;
@@ -928,9 +929,14 @@ struct
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
                  ^ "//@ mapi<ether_addri> initial_dyn_map;\n"
+                 ^ "//@ dchain initial_chain;\n"
                  ^ "//@ list<pair<uint8_t, bool> > initial_dyn_val_vec;\n"
                  ^ "//@ mapi<ether_addri> exprnd_dyn_map;\n"
                  ^ "//@ list<pair<uint8_t, bool> > exprnd_dyn_val_vec;\n"
+                 ^ "//@ dchain exprnd_chain;\n"
+                 ^ "//@ mapi<ether_addri> refreshed_dyn_map;\n"
+                 ^ "//@ list<pair<uint8_t, bool> > refreshed_dyn_val_vec;\n"
+                 ^ "//@ dchain refreshed_chain;\n"
                  ^
                  "/*@ //TODO: this hack should be \
                   converted to a system \n\

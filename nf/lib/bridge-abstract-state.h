@@ -5,17 +5,75 @@
 #include "bridge/bridge_data.h"
 
 /*@
-  inductive dyn_entry = dyn_entry(ether_addri, int);
+  inductive dyn_entry = dyn_entry(ether_addri, uint8_t, uint32_t);
   inductive stat_entry = stat_entry(stat_keyi, int);
 
   inductive ml_table = ml_table(list<dyn_entry>, list<stat_entry>, int);
 
-  fixpoint list<dyn_entry> gen_dyn_entries(list<pair<ether_addri, uint8_t> > table) {
+  fixpoint list<dyn_entry> get_dyn_table(ml_table table) {
+    switch(table) {
+      case ml_table(dyn_table, stat_table, capacity):
+        return dyn_table;
+    }
+  }
+
+  fixpoint list<stat_entry> get_stat_table(ml_table table) {
+    switch(table) {
+      case ml_table(dyn_table, stat_table, capacity):
+        return stat_table;
+    }
+  }
+
+  fixpoint bool stat_table_has_key(list<stat_entry> table, stat_keyi key) {
+    switch(table) {
+      case nil: return false;
+      case cons(h,t):
+        return switch(h) { case stat_entry(k,v):
+          return (k == key) ? true : stat_table_has_key(t, key);
+        };
+    }
+  }
+
+  fixpoint int stat_table_get(list<stat_entry> table, stat_keyi key) {
+    switch(table) {
+      case nil: return 0;
+      case cons(h,t):
+        return switch(h) { case stat_entry(k,v):
+          return (k == key) ? v : stat_table_get(t, key);
+        };
+    }
+  }
+
+  fixpoint bool dyn_table_has_key(list<dyn_entry> table, ether_addri key) {
+    switch(table) {
+      case nil: return false;
+      case cons(h,t):
+        return switch(h) { case dyn_entry(k,v,timestamp):
+           return (k == key) ? true : dyn_table_has_key(t, key);
+        };
+    }
+  }
+
+  fixpoint uint8_t dyn_table_get(list<dyn_entry> table, ether_addri key) {
+    switch(table) {
+      case nil: return 0;
+      case cons(h,t):
+        return switch(h) { case dyn_entry(k,v,timestamp):
+           return (k == key) ? v : dyn_table_get(t, key);
+        };
+    }
+  }
+
+  fixpoint list<dyn_entry> gen_dyn_entries(list<pair<ether_addri, int> > table,
+                                           list<pair<uint8_t, bool> > values,
+                                           dchain indices) {
     switch(table) {
       case nil: return nil;
       case cons(h, t): return switch(h) { case pair(addr, index):
-        return cons(dyn_entry(addr, index),
-                    gen_dyn_entries(t));
+        return cons(dyn_entry(addr,
+                              fst(nth(index, values)),
+                              dchain_get_time_fp(indices, index)),
+                    gen_dyn_entries(t, values, indices));
       };
     }
   }
@@ -23,8 +81,8 @@
   fixpoint list<stat_entry> gen_stat_entries(list<pair<stat_keyi, uint8_t> > table) {
     switch(table) {
       case nil: return nil;
-      case cons(h, t): return switch(h) { case pair(key, index):
-        return cons(stat_entry(key, index),
+      case cons(h, t): return switch(h) { case pair(key, port):
+        return cons(stat_entry(key, port),
                     gen_stat_entries(t));
       };
     }
@@ -32,10 +90,11 @@
 
   fixpoint ml_table bridge_abstract_function(mapi<ether_addri> dyn_map,
                                              list<pair<uint8_t, bool> > vals,
+                                             dchain indices,
                                              mapi<stat_keyi> stat_map) {
     switch(dyn_map) { case mapc(dyn_capacity, dm, daddrs):
       return switch(stat_map) { case mapc(stat_capacity, sm, saddrs):
-        return ml_table(gen_dyn_entries(dm), gen_stat_entries(sm), dyn_capacity);
+        return ml_table(gen_dyn_entries(dm, vals, indices), gen_stat_entries(sm), dyn_capacity);
       };
     }
   }

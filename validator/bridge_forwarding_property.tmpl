@@ -5,11 +5,17 @@ assert vectorp<stat_keyi>(_, static_keyp, ?final_stat_key_vec);
 assert vectorp<uint8_t>(_, dyn_valp, ?final_dyn_val_vec);
 assert double_chainp(?final_chain,_);
 
+//TODO: check that the packet is intact
+#define PACKETS_EQUAL(pkta, pktb) true
+#define ETHERNET_ADDR(addr) eaddrc(addr.a, addr.b, addr.c, addr.d, addr.e, addr.f)
+
 ml_table initial_table = bridge_abstract_function(initial_dyn_map,
                                                   initial_dyn_val_vec,
+                                                  initial_chain,
                                                   stat_map);
 ml_table final_table = bridge_abstract_function(final_dyn_map,
                                                 final_dyn_val_vec,
+                                                final_chain,
                                                 stat_map);
 
 bit_and_zero(0x00000010);
@@ -18,8 +24,35 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
   if (a_packet_received) {
     ml_table exprnd_table = bridge_abstract_function(exprnd_dyn_map,
                                                      exprnd_dyn_val_vec,
+                                                     exprnd_chain,
                                                      stat_map);
+    ml_table refreshed_table = bridge_abstract_function(refreshed_dyn_map,
+                                                        refreshed_dyn_val_vec,
+                                                        refreshed_chain,
+                                                        stat_map);
 
-    assert true;
+    ether_addri dst_addr = ETHERNET_ADDR(the_received_packet.ether.d_addr);
+    ether_addri src_addr = ETHERNET_ADDR(the_received_packet.ether.s_addr);
+    stat_keyi static_key = stkc(received_on_port, dst_addr);
+
+    if (stat_table_has_key(get_stat_table(refreshed_table), static_key)) {
+      int output_port = stat_table_get(get_stat_table(refreshed_table), static_key);
+      if (output_port == -1) {
+        //assert false == a_packet_sent;
+      } else {
+        //assert true == a_packet_sent;
+        //assert sent_on_port == output_port;
+        //assert PACKETS_EQUAL(the_received_packet, sent_packet);
+      }
+    } else {
+      if (dyn_table_has_key(get_dyn_table(refreshed_table), dst_addr)) {
+        //assert true == a_packet_sent;
+        //assert sent_on_port == dyn_table_get(get_dyn_table(refreshed_table), dst_addr);
+        //assert PACKETS_EQUAL(the_received_packet, sent_packet);
+      } else {
+        //assert true == a_packet_flooded;
+        //assert PACKETS_EQUAL(the_received_packet, sent_packet);
+      }
+    }
   }
 }
