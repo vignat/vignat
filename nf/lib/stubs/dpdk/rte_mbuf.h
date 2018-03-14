@@ -133,6 +133,7 @@ rte_mbuf_raw_alloc(struct rte_mempool* mp)
 	return malloc(mp->elt_size);
 }
 
+// free is called by user code, raw_free by stubs
 static inline void
 rte_pktmbuf_free(struct rte_mbuf* m)
 {
@@ -142,6 +143,11 @@ rte_pktmbuf_free(struct rte_mbuf* m)
 	stub_core_mbuf_free(m);
 }
 
+static inline void
+rte_mbuf_raw_free(struct rte_mbuf* m)
+{
+	free(m);
+}
 
 static inline uint16_t
 rte_pktmbuf_data_room_size(struct rte_mempool *mp)

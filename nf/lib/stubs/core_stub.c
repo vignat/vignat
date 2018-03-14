@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <rte_byteorder.h>
 #include <rte_mbuf.h>
+#include <rte_mbuf_ptype.h>
 #include <rte_memory.h>
 
 #include <klee/klee.h>
@@ -218,6 +220,14 @@ stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf
 	// timesync is symbolic
 	// seqn is symbolic
 
+	// Force the IPv4 content to have sane values for symbex...
+	struct stub_mbuf_content* buf_content = rte_pktmbuf_mtod(*mbufp, struct stub_mbuf_content*);
+	if(RTE_ETH_IS_IPV4_HDR((*mbufp)->packet_type)) {
+		// TODO can we make version_ihl symbolic?
+		buf_content->ipv4.version_ihl = (4 << 4) | 5; // IPv4, 5x4 bytes - concrete to avoid symbolic indexing
+		buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+	}
+
 	rte_mbuf_sanity_check(*mbufp, 1 /* is head mbuf */);
 
 	return true;
@@ -231,5 +241,5 @@ stub_core_mbuf_free(struct rte_mbuf* mbuf)
 	free(mbuf->next);
 	mbuf->next = NULL;
 
-	rte_pktmbuf_free(mbuf);
+	rte_mbuf_raw_free(mbuf);
 }

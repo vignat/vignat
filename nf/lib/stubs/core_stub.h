@@ -11,11 +11,12 @@
 
 // TODO more complete stub content?
 // do change the total_len in rx if this is changed!
+// Need to pack this struct so that accesses via rte_pktmbuf_mtod_offset work properly
 struct stub_mbuf_content {
 	struct ether_hdr ether;
 	struct ipv4_hdr ipv4;
 	struct tcp_hdr tcp;
-};
+} __attribute__((packed));
 
 // TODO add tracing for packet details
 

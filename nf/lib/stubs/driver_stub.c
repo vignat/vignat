@@ -396,12 +396,12 @@ stub_driver_name(int index)
 
 
 
+#ifdef VIGOR_STUB_DRIVER
 // First part of init
 __attribute__((constructor))
 static void
 stub_driver_init(void)
 {
-#ifdef VIGOR_STUB_DRIVER
 	// Trace the packet free; need a regex to alias the duplicated functions
 	// since rte_pktmbuf_free is inline (so there's e.g. rte_pktmbuf_free930)
 	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
@@ -420,8 +420,8 @@ stub_driver_init(void)
 		stub_drivers[n] = rte_driver;
 		rte_vdev_register(&stub_drivers[n]);
 	}
-#endif
 }
+#endif
 
 // Second part of init, after DPDK EAL init
 void
