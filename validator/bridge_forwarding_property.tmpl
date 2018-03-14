@@ -26,8 +26,8 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                                                      exprnd_dyn_val_vec,
                                                      exprnd_chain,
                                                      stat_map);
-    ml_table refreshed_table = bridge_abstract_function(refreshed_dyn_map,
-                                                        refreshed_dyn_val_vec,
+    ml_table refreshed_table = bridge_abstract_function(exprnd_dyn_map,
+                                                        exprnd_dyn_val_vec,
                                                         refreshed_chain,
                                                         stat_map);
 
@@ -35,23 +35,37 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
     ether_addri src_addr = ETHERNET_ADDR(the_received_packet.ether.s_addr);
     stat_keyi static_key = stkc(received_on_port, dst_addr);
 
+    switch(stat_map) { case mapc(capacity, st_map, addrs):
+      stat_map_has(st_map, static_key);
+    }
+    switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
+      dyn_map_has(dyn_map, exprnd_dyn_val_vec, refreshed_chain, dst_addr);
+    }
     if (stat_table_has_key(get_stat_table(refreshed_table), static_key)) {
+      switch(stat_map) { case mapc(capacity, st_map, addrs):
+        stat_map_has_get(st_map, static_key);
+      }
       int output_port = stat_table_get(get_stat_table(refreshed_table), static_key);
-      if (output_port == -1) {
-        //assert false == a_packet_sent;
+      if (output_port == -2 ||
+          output_port == received_on_port) {
+        assert false == a_packet_sent;
       } else {
-        //assert true == a_packet_sent;
-        //assert sent_on_port == output_port;
-        //assert PACKETS_EQUAL(the_received_packet, sent_packet);
+        assert true == a_packet_sent;
+        assert sent_on_port == output_port;
+        assert PACKETS_EQUAL(the_received_packet, sent_packet);
       }
     } else {
       if (dyn_table_has_key(get_dyn_table(refreshed_table), dst_addr)) {
-        //assert true == a_packet_sent;
-        //assert sent_on_port == dyn_table_get(get_dyn_table(refreshed_table), dst_addr);
-        //assert PACKETS_EQUAL(the_received_packet, sent_packet);
+        switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
+          dyn_map_has_get(dyn_map, exprnd_dyn_val_vec, refreshed_chain, dst_addr);
+        }
+        assert true == a_packet_sent;
+        assert sent_on_port == dyn_table_get(get_dyn_table(refreshed_table), dst_addr);
+        assert PACKETS_EQUAL(the_received_packet, sent_packet);
       } else {
-        //assert true == a_packet_flooded;
-        //assert PACKETS_EQUAL(the_received_packet, sent_packet);
+        assert true == a_packet_flooded;
+        assert flooded_except_port == received_on_port;
+        assert PACKETS_EQUAL(the_received_packet, sent_packet);
       }
     }
   }

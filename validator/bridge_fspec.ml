@@ -341,6 +341,7 @@ let fun_types =
                                       " != 0) { \n" ^
                                       "assert map_vec_chain_coherent<ether_addri>\
                                        (?cur_map,?cur_vec,?cur_ch);\n" ^
+                                      "refreshed_chain = cur_ch;\n" ^
                                       "mvc_rejuvenate_preserves_coherent(cur_map,\
                                        cur_vec, cur_ch, " ^
                                       (List.nth_exn params.args 1) ^ ", "
@@ -412,7 +413,14 @@ let fun_types =
                                       (tmp_gen "dv") ^ ", ?" ^
                                       (tmp_gen "dh") ^
                                       ");\n\
-                                       mvc_coherent_same_len<ether_addri>(" ^
+                                       assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "dv_init") ^
+                                      ");\n\
+                                       assert mapp<ether_addri>(_, _, _, _, ?" ^ (tmp_gen "dm_full") ^
+                                      ");\n\
+                                       exprnd_dyn_map = " ^ (tmp_gen "dm_full") ^
+                                      ";\nexprnd_dyn_val_vec = " ^ (tmp_gen "dv_init") ^
+                                      ";\nexprnd_chain = " ^ (tmp_gen "dh") ^
+                                      ";\nmvc_coherent_same_len<ether_addri>(" ^
                                       (tmp_gen "dm") ^ ", " ^
                                       (tmp_gen "dv") ^ ", " ^
                                       (tmp_gen "dh") ^ ");\n} @*/"
@@ -641,6 +649,7 @@ let fun_types =
                  "flooded_except_port = " ^
                  (List.nth_exn params.args 1) ^
                  ";\n" ^
+                 "a_packet_flooded = true;\n" ^
                  "sent_packet_type = (" ^
                  sent_pkt ^ ")->packet_type;")];
                lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];};
@@ -926,6 +935,7 @@ struct
                   struct user_buf sent_packet;\n\
                   uint8_t sent_on_port;\n\
                   uint8_t flooded_except_port;\n\
+                  bool a_packet_flooded = false;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"
                  ^ "//@ mapi<ether_addri> initial_dyn_map;\n"
@@ -934,8 +944,6 @@ struct
                  ^ "//@ mapi<ether_addri> exprnd_dyn_map;\n"
                  ^ "//@ list<pair<uint8_t, bool> > exprnd_dyn_val_vec;\n"
                  ^ "//@ dchain exprnd_chain;\n"
-                 ^ "//@ mapi<ether_addri> refreshed_dyn_map;\n"
-                 ^ "//@ list<pair<uint8_t, bool> > refreshed_dyn_val_vec;\n"
                  ^ "//@ dchain refreshed_chain;\n"
                  ^
                  "/*@ //TODO: this hack should be \

@@ -98,4 +98,28 @@
       };
     }
   }
+
+  lemma void stat_map_has(list<pair<stat_keyi, uint8_t> > map, stat_keyi key);
+  requires true;
+  ensures map_has_fp(map, key)== stat_table_has_key(gen_stat_entries(map), key);
+
+  lemma void dyn_map_has(list<pair<ether_addri, int> > map,
+                         list<pair<uint8_t, bool> > values,
+                         dchain indices,
+                         ether_addri key);
+  requires true;
+  ensures map_has_fp(map, key) == dyn_table_has_key(gen_dyn_entries(map, values, indices), key);
+
+  lemma void stat_map_has_get(list<pair<stat_keyi, uint8_t> > map, stat_keyi key);
+  requires true == map_has_fp(map, key);
+  ensures true == stat_table_has_key(gen_stat_entries(map), key) &*&
+          map_get_fp(map, key) == stat_table_get(gen_stat_entries(map), key);
+
+  lemma void dyn_map_has_get(list<pair<ether_addri, int> > map,
+                             list<pair<uint8_t, bool> > values,
+                             dchain indices,
+                             ether_addri key);
+  requires true == dyn_table_has_key(gen_dyn_entries(map, values, indices), key);
+  ensures true == map_has_fp(map, key) &*&
+          map_get_fp(map, key) == dyn_table_get(gen_dyn_entries(map, values, indices), key);
   @*/
