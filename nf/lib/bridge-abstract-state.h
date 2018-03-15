@@ -121,5 +121,5 @@
                              ether_addri key);
   requires true == dyn_table_has_key(gen_dyn_entries(map, values, indices), key);
   ensures true == map_has_fp(map, key) &*&
-          map_get_fp(map, key) == dyn_table_get(gen_dyn_entries(map, values, indices), key);
+          fst(nth(map_get_fp(map, key), values)) == dyn_table_get(gen_dyn_entries(map, values, indices), key);
   @*/
