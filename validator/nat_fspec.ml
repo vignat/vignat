@@ -102,8 +102,6 @@ let stub_mbuf_content_struct = Ir.Str ( "stub_mbuf_content",
                                          "ipv4", ipv4_hdr_struct;
                                          "tcp", tcp_hdr_struct;])
 
-let stub_queue_struct = Ir.Str ( "stub_queue", ["port_id", Uint16] )
-
 let rte_mempool_struct = Ir.Str ( "rte_mempool", [] )
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
                                ["buf_addr", Ptr stub_mbuf_content_struct;
@@ -138,6 +136,7 @@ let rec simplify_c_string str =
   let str0 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str0 in (* ( *a ).b  ==>  a->b *)
   if str = str0 then str else simplify_c_string str0 (* find a fixpoint *)
 
+(* TODO try removing this? *)
 let copy_stub_mbuf_content var_name ptr =
   ("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
    " = (" ^ ptr ^ ")->buf_addr;\n") ^
@@ -707,43 +706,43 @@ let fun_types =
                                       "int the_index_rejuvenated = " ^
                                       (List.nth_exn params.args 1) ^ ";\n");
                                  ];};
-     "stub_rx", {ret_type = Static Ir.Uint16;
-                 arg_types = stt [Ptr stub_queue_struct; Ptr (Ptr rte_mbuf_struct); Ir.Uint16;];
+     "stub_core_trace_rx", {
+                 ret_type = Static Void;
+                 arg_types = stt [Ptr rte_mbuf_struct;];
                  extra_ptr_types = estt ["user_buf_addr",
-                                         stub_mbuf_content_struct;
-                                         "incoming_package",
-                                         rte_mbuf_struct];
+                                         stub_mbuf_content_struct];
                  lemmas_before = [];
-                 lemmas_after = [(fun params -> "if (" ^ params.ret_name ^ " == 1) { a_packet_received = true;\n" ^
+                 lemmas_after = [(fun params -> "a_packet_received = true;\n" ^
                                        simplify_c_string (
                                          "received_on_port = " ^
-                                         (List.nth_exn params.args 0) ^ "->port_id;\n" ^
-                                         "received_packet_type = (" ^
-                                         "*" ^ (List.nth_exn params.args 1) ^ ")->packet_type;\n" ^
+                                         (List.nth_exn params.args 0) ^ "->port;\n" ^
+                                         "received_packet_type = " ^
+                                         (List.nth_exn params.args 0) ^ "->packet_type;\n") ^
                                          (copy_stub_mbuf_content "the_received_packet"
-                                          ("*" ^ (List.nth_exn params.args 1)))) ^ "}");
+                                          (List.nth_exn params.args 0)));
                                  ];};
-     "stub_tx", {ret_type = Static Ir.Uint16;
-                 arg_types = stt [Ptr stub_queue_struct; Ptr rte_mbuf_struct; Ir.Uint16;];
+     "stub_core_trace_tx", {
+                 ret_type = Static Void;
+                 arg_types = stt [Ptr rte_mbuf_struct;];
                  extra_ptr_types = estt ["user_buf_addr",
                                          stub_mbuf_content_struct];
                  lemmas_before = [
                      (fun params ->
                           let sent_pkt =
-                            (List.nth_exn params.args 1)
+                            (List.nth_exn params.args 0)
                           in
+                            (copy_stub_mbuf_content "sent_packet"
+                             (sent_pkt)) ^ "\n" ^
                             simplify_c_string (
-                              (copy_stub_mbuf_content "sent_packet"
-                               (sent_pkt)) ^ "\n" ^
                               "sent_on_port = " ^
-                              (List.nth_exn params.args 0) ^ "->port_id;\n" ^
+                              sent_pkt ^ "->port;\n" ^
                               "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
-                 (* TODO use a_packet_sent somehow *)
-                 lemmas_after = [(fun params -> "a_packet_send_attempted = true;\n" ^ 
-                                                "if (" ^ params.ret_name ^ " == 1 ) { a_packet_sent = true; }\n");];
+                 (* TODO do something with a_packet_sent *)
+                 lemmas_after = [(fun params -> "a_packet_sent = true;\n");];
                  };
-     "stub_free", {ret_type = Static Void;
+     "stub_core_trace_free", {
+                   ret_type = Static Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
                    extra_ptr_types = estt ["user_buf_addr",
                                            stub_mbuf_content_struct];
@@ -827,7 +826,6 @@ struct
                   struct stub_mbuf_content sent_packet;\n\
                   uint16_t sent_on_port;\n\
                   uint32_t sent_packet_type;\n\
-                  bool a_packet_send_attempted = false;\n\
                   bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints

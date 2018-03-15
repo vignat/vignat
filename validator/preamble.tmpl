@@ -195,16 +195,19 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 // TODO a lot of assumptions about only sending 1 packet here :(
 
-// Most of the ensures is a convoluted way to say "*bufs is null iff result == 0, otherwise it points to a valid mbuf"
-uint16_t stub_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs);
-//@ requires nb_bufs == 1 &*& *bufs |-> _;
-//@ ensures result <= nb_bufs &*& *bufs |-> ?mb &*& (result == 0 ? true : mbufp(mb, _)) &*& (result == nb_bufs ? mb != 0 : mb == 0);
+void stub_core_trace_rx(struct rte_mbuf* mbuf);
+//@ requires true;
+//@ ensures mbufp(mbuf, _);
 
-uint16_t stub_tx(void* q, struct rte_mbuf* bufs, uint16_t nb_bufs);
-//@ requires nb_bufs == 1 &*&  mbufp(bufs, _);
-//@ ensures result <= nb_bufs &*& (result == 0 ? mbufp(bufs, _) : true);
+void stub_core_trace_tx_attempt(struct rte_mbuf* mbuf, uint16_t device);
+//@ requires mbufp(mbuf, ?mb);
+//@ ensures mbufp(mbuf, mb);
 
-void stub_free(struct rte_mbuf* mbuf);
+void stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
+//@ requires mbufp(mbuf, _);
+//@ ensures true;
+
+void stub_core_trace_free(struct rte_mbuf* mbuf);
 //@ requires mbufp(mbuf,_);
 //@ ensures true;
 

@@ -22,9 +22,9 @@ struct stub_mbuf_content {
 
 // mbuf tracing
 struct rte_mbuf;
-void stub_core_trace_free(struct rte_mbuf* mbuf);
 void stub_core_trace_rx(struct rte_mbuf* mbuf);
 void stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
+void stub_core_trace_free(struct rte_mbuf* mbuf);
 
 
 // mbuf create/free

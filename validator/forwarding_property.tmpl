@@ -26,20 +26,17 @@ flowtable final_ft = abstract_function(final_map, final_chain);
 bit_and_zero(0x00000010);
 if (10 < now) {// consider only normal moments, remote from the start of the epoch
 
-  if (a_packet_received &&
-      ((received_packet_type & 0x00000010) ||
-       (received_packet_type == 0 &&
-        the_received_packet.ether.ether_type == 0x08))) {
+  // 0x10 -> IPv4
+  if (a_packet_received && (received_packet_type & 0x00000010)) {
 
     flowtable after_expiration_ft =
       abstract_function(map_after_expiration, chain_after_expiration);
 
     assert after_expiration_ft == flowtable_expire_flows(initial_ft, now - 10);
 
-    // IPv4 packet
+    // 6/17 -> TCP/UDP
     if (the_received_packet.ipv4.next_proto_id == 6 ||
         the_received_packet.ipv4.next_proto_id == 17) {
-      // TCP/UDP packet
       if (received_on_port == 1) {
         // packet from the external network
         ext_k external_flow_id = ekc(the_received_packet.tcp.dst_port,
@@ -51,7 +48,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
         if (flowtable_contains_ext_flow_id(after_expiration_ft,
                                            external_flow_id)) {
           // flow is present in the table
-          assert true == a_packet_send_attempted;
+          assert true == a_packet_sent;
           flw flow = flowtable_get_by_ext_flow_id(after_expiration_ft,
                                                   external_flow_id);
           assert final_ft ==
@@ -73,7 +70,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
           }
         } else {
           // no flow in the table
-          assert false == a_packet_send_attempted;
+          assert false == a_packet_sent;
           assert final_ft == after_expiration_ft;
         }
       } else {
@@ -87,7 +84,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
         if (flowtable_contains_int_flow_id(after_expiration_ft,
                                            internal_flow_id)) {
           // flow present in the table
-          assert true == a_packet_send_attempted;
+          assert true == a_packet_sent;
           flw flow = flowtable_get_by_int_flow_id(after_expiration_ft,
                                                   internal_flow_id);
           assert final_ft ==
@@ -111,11 +108,11 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
           // No flow in the table
           if (flowtable_out_of_space(after_expiration_ft)) {
             // Flowtable overflow
-            assert false == a_packet_send_attempted;
+            assert false == a_packet_sent;
             assert final_ft == after_expiration_ft;
           } else {
             // The flow must have been inserted
-            assert true == a_packet_send_attempted;
+            assert true == a_packet_sent;
             assert final_ft == flowtable_add_flow(after_expiration_ft,
                                                   the_inserted_flow,
                                                   now);
@@ -139,10 +136,10 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
       }
     } else {
       // Non TCP or UDP packet
-      assert false == a_packet_send_attempted;
+      assert false == a_packet_sent;
     }
   } else {
     // Non IPv4 packet
-    assert false == a_packet_send_attempted;
+    assert false == a_packet_sent;
   }
 }
