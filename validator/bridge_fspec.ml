@@ -413,12 +413,12 @@ let fun_types =
                                       (tmp_gen "dv") ^ ", ?" ^
                                       (tmp_gen "dh") ^
                                       ");\n\
-                                       assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "dv_init") ^
+                                       assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "dv_exprnd") ^
                                       ");\n\
                                        assert mapp<ether_addri>(_, _, _, _, ?" ^ (tmp_gen "dm_full") ^
                                       ");\n\
                                        exprnd_dyn_map = " ^ (tmp_gen "dm_full") ^
-                                      ";\nexprnd_dyn_val_vec = " ^ (tmp_gen "dv_init") ^
+                                      ";\nexprnd_dyn_val_vec = " ^ (tmp_gen "dv_exprnd") ^
                                       ";\nexprnd_chain = " ^ (tmp_gen "dh") ^
                                       ";\nmvc_coherent_same_len<ether_addri>(" ^
                                       (tmp_gen "dm") ^ ", " ^

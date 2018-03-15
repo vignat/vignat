@@ -26,10 +26,10 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                                                      exprnd_dyn_val_vec,
                                                      exprnd_chain,
                                                      stat_map);
-    ml_table refreshed_table = bridge_abstract_function(exprnd_dyn_map,
-                                                        exprnd_dyn_val_vec,
-                                                        refreshed_chain,
-                                                        stat_map);
+    // ml_table refreshed_table = bridge_abstract_function(exprnd_dyn_map,
+    //                                                     exprnd_dyn_val_vec,
+    //                                                     refreshed_chain,
+    //                                                     stat_map);
 
     ether_addri dst_addr = ETHERNET_ADDR(the_received_packet.ether.d_addr);
     ether_addri src_addr = ETHERNET_ADDR(the_received_packet.ether.s_addr);
@@ -38,14 +38,14 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
     switch(stat_map) { case mapc(capacity, st_map, addrs):
       stat_map_has(st_map, static_key);
     }
-    switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
-      dyn_map_has(dyn_map, exprnd_dyn_val_vec, refreshed_chain, dst_addr);
+    switch(final_dyn_map) { case mapc(capacity, dyn_map, addrs):
+      dyn_map_has(dyn_map, final_dyn_val_vec, final_chain, dst_addr);
     }
-    if (stat_table_has_key(get_stat_table(refreshed_table), static_key)) {
+    if (stat_table_has_key(get_stat_table(final_table), static_key)) {
       switch(stat_map) { case mapc(capacity, st_map, addrs):
         stat_map_has_get(st_map, static_key);
       }
-      int output_port = stat_table_get(get_stat_table(refreshed_table), static_key);
+      int output_port = stat_table_get(get_stat_table(final_table), static_key);
       if (output_port == -2 ||
           output_port == received_on_port) {
         assert false == a_packet_sent;
@@ -57,10 +57,10 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
         assert PACKETS_EQUAL(the_received_packet, sent_packet);
       }
     } else {
-      if (dyn_table_has_key(get_dyn_table(refreshed_table), dst_addr)) {
-        int output_port = dyn_table_get(get_dyn_table(refreshed_table), dst_addr);
-        switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
-          dyn_map_has_get(dyn_map, exprnd_dyn_val_vec, refreshed_chain, dst_addr);
+      if (dyn_table_has_key(get_dyn_table(final_table), dst_addr)) {
+        int output_port = dyn_table_get(get_dyn_table(final_table), dst_addr);
+        switch(final_dyn_map) { case mapc(capacity, dyn_map, addrs):
+          dyn_map_has_get(dyn_map, final_dyn_val_vec, final_chain, dst_addr);
         }
         if (output_port == received_on_port) {
           assert false == a_packet_sent;
