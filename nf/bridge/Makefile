@@ -68,4 +68,5 @@ verifast:
 		../lib/expirator.c \
 		../lib/containers/vector.c \
 		../lib/containers/map.c \
-		bridge_data.c
+		bridge_data.c \
+    abstract-state.c

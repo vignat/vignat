@@ -110,17 +110,21 @@ int expire_items_single_map/*@ <vt,kt> @*/(struct DoubleChain* chain,
                                            struct Map* map,
                                            time_t time)
 /*@ requires mapp<kt>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
-             vectorp<vt>(vector, ?entp, ?v) &*&
+             vectorp<kt>(vector, ?entp, ?v) &*&
              double_chainp(?ch, chain) &*&
-             map_vec_chain_coherent<kt,vt>(m, v, ch); @*/
+             map_vec_chain_coherent<kt>(m, v, ch); @*/
 /*@ ensures mapp<kt>(map, kp, hsh, recp, mapc(cap, ?nm, ?naddrs)) &*&
-            vectorp<vt>(vector, entp, ?nv) &*&
+            vectorp<kt>(vector, entp, ?nv) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
-            map_vec_chain_coherent<kt,vt>(nm, nv, nch) &*&
+            nm == map_erase_all_fp(m, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
+            naddrs == map_erase_all_fp(addrs, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
+            nv == vector_erase_all_fp(v, dchain_get_expired_indexes_fp(ch, time)) &*&
+            map_vec_chain_coherent<kt>(nm, nv, nch) &*&
             length(nv) == length(v) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 {
+  //@ assume(false); //TODO
   int count = 0;
   int index = -1;
   while (dchain_expire_one_index(chain, &index, time)) {
