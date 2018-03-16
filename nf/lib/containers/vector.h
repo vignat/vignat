@@ -14,6 +14,24 @@ struct Vector;
                            list<pair<t, bool> > values,
                            int accessed_idx,
                            void* entry);
+
+  fixpoint list<pair<t, bool> > vector_erase_all_fp<t>(list<pair<t, bool> > vector,
+                                                       list<int> indices) {
+    switch(indices) {
+      case nil: return vector;
+      case cons(h,t):
+        return vector_erase_all_fp(update(h, pair(fst(nth(h, vector)), false), vector), t);
+    }
+  }
+
+  fixpoint list<t> vector_get_values_fp<t>(list<pair<t, bool> > vector,
+                                           list<int> indices) {
+    switch(indices) {
+      case nil: return nil;
+      case cons(h,t):
+        return cons(fst(nth(h, vector)), vector_get_values_fp(vector, t));
+    }
+  }
   @*/
 
 typedef void vector_init_elem/*@ <t> (predicate (void*;t) entp,

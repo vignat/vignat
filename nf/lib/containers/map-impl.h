@@ -60,6 +60,14 @@ typedef bool map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, vo
     }
   }
 
+  fixpoint list<pair<kt,vt> > map_erase_all_fp<kt,vt>(list<pair<kt,vt> > m, list<kt> keys) {
+    switch(keys) {
+      case nil: return m;
+      case cons(h,t):
+        return map_erase_fp(map_erase_all_fp(m, t), h);
+    }
+  }
+
   fixpoint int map_size_fp<kt,vt>(list<pair<kt,vt> > m) {
     return length(m);
   }

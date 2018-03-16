@@ -251,6 +251,7 @@ let fun_types =
                                             ");\n\
                                             initial_dyn_map = " ^ (tmp_gen "dm_full") ^
                                             ";\ninitial_dyn_val_vec = " ^ (tmp_gen "dv_init") ^
+                                            ";\ninitial_dyn_key_vec = " ^ (tmp_gen "dv") ^
                                             ";\ninitial_chain = " ^ (tmp_gen "dh") ^
                                             ";\n} @*/");
                                        ];};
@@ -274,7 +275,7 @@ let fun_types =
                                    ];
                                    lemmas_after = [
                                      (fun {args;_} ->
-                                        "uint32_t time_for_allocated_index = " ^ (List.nth_exn args 2) ^
+                                        "time_for_allocated_index = " ^ (List.nth_exn args 2) ^
                                         ";\n");
                                      on_rez_nz
                                        (fun params ->
@@ -294,7 +295,7 @@ let fun_types =
                                           (List.nth_exn params.args 2);
                                         "");
                                      (fun params ->
-                                        "int the_index_allocated = *" ^
+                                        "the_index_allocated = *" ^
                                         (List.nth_exn params.args 1) ^ ";\n");
                                      on_rez_nz
                                        (fun {args;tmp_gen;_} ->
@@ -341,7 +342,6 @@ let fun_types =
                                       " != 0) { \n" ^
                                       "assert map_vec_chain_coherent<ether_addri>\
                                        (?cur_map,?cur_vec,?cur_ch);\n" ^
-                                      "refreshed_chain = cur_ch;\n" ^
                                       "mvc_rejuvenate_preserves_coherent(cur_map,\
                                        cur_vec, cur_ch, " ^
                                       (List.nth_exn params.args 1) ^ ", "
@@ -845,7 +845,9 @@ let fun_types =
                                    ", _, _);\n\
                                     forall_update<pair<uint8_t, bool> >(" ^ (tmp_gen "vec") ^
                                    ", snd, " ^ (List.nth_exn args 1) ^
-                                   ", pair(" ^ (List.nth_exn args 2) ^ "->device, true));
+                                   ", pair(" ^ (List.nth_exn args 2) ^ "->device, true));\n\
+                                    update_id(" ^ (List.nth_exn args 1) ^
+                                   ", " ^ (tmp_gen "vec") ^ ");\n\
                                    } @*/\n"
                                  | x -> "Error: unexpected argument type: " ^ (ttype_to_str x))
                               ];
@@ -931,6 +933,8 @@ struct
                   uint8_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
                   struct user_buf the_received_packet;\n\
+                  int the_index_allocated = -1;\n\
+                  uint32_t time_for_allocated_index = 0;\n\
                   bool a_packet_received = false;\n\
                   struct user_buf sent_packet;\n\
                   uint8_t sent_on_port;\n\
@@ -941,10 +945,10 @@ struct
                  ^ "//@ mapi<ether_addri> initial_dyn_map;\n"
                  ^ "//@ dchain initial_chain;\n"
                  ^ "//@ list<pair<uint8_t, bool> > initial_dyn_val_vec;\n"
+                 ^ "//@ list<pair<ether_addri, bool> > initial_dyn_key_vec;\n"
                  ^ "//@ mapi<ether_addri> exprnd_dyn_map;\n"
                  ^ "//@ list<pair<uint8_t, bool> > exprnd_dyn_val_vec;\n"
                  ^ "//@ dchain exprnd_chain;\n"
-                 ^ "//@ dchain refreshed_chain;\n"
                  ^
                  "/*@ //TODO: this hack should be \
                   converted to a system \n\

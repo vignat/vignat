@@ -74,6 +74,9 @@ int expire_items_single_map/*@ <vt,kt> @*/(struct DoubleChain* chain,
             vectorp<kt>(vector, entp, ?nv) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
+            nm == map_erase_all_fp(m, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
+            naddrs == map_erase_all_fp(addrs, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
+            nv == vector_erase_all_fp(v, dchain_get_expired_indexes_fp(ch, time)) &*&
             map_vec_chain_coherent<kt>(nm, nv, nch) &*&
             length(nv) == length(v) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/

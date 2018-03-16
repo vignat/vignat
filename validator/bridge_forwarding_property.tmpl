@@ -1,5 +1,5 @@
 assert mapp<ether_addri>(_, ether_addrp, eth_addr_hash, nop_true, ?final_dyn_map);
-assert mapp<stat_keyi>(_, static_keyp, st_key_hash, nop_true, ?stat_map);
+assert mapp<stat_keyi>(_, static_keyp, st_key_hash, nop_true, ?stat_map);//TODO: do not assume that stat_map does not change
 assert vectorp<ether_addri>(_, ether_addrp, ?final_dyn_key_vec);
 assert vectorp<stat_keyi>(_, static_keyp, ?final_stat_key_vec);
 assert vectorp<uint8_t>(_, dyn_valp, ?final_dyn_val_vec);
@@ -26,10 +26,6 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                                                      exprnd_dyn_val_vec,
                                                      exprnd_chain,
                                                      stat_map);
-    // ml_table refreshed_table = bridge_abstract_function(exprnd_dyn_map,
-    //                                                     exprnd_dyn_val_vec,
-    //                                                     refreshed_chain,
-    //                                                     stat_map);
 
     ether_addri dst_addr = ETHERNET_ADDR(the_received_packet.ether.d_addr);
     ether_addri src_addr = ETHERNET_ADDR(the_received_packet.ether.s_addr);
@@ -41,6 +37,53 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
     switch(final_dyn_map) { case mapc(capacity, dyn_map, addrs):
       dyn_map_has(dyn_map, final_dyn_val_vec, final_chain, dst_addr);
     }
+    switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
+      dyn_map_has(dyn_map, exprnd_dyn_val_vec, exprnd_chain, src_addr);
+    }
+
+    switch(initial_dyn_map) { case mapc(capacity, dyn_map, addrs):
+      bridge_expire_abstract(dyn_map, initial_dyn_val_vec, initial_dyn_key_vec, initial_chain, now - 10);
+    }
+    assert get_stat_table(final_table) == get_stat_table(initial_table);
+    assert true == set_eq(get_dyn_table(exprnd_table),
+                          expire_addresses(get_dyn_table(initial_table), now - 10));
+
+
+   if (dyn_table_has_key(get_dyn_table(exprnd_table), src_addr)) {
+     //TODO rejuvenated
+   } else {
+      chain_out_of_space_ml_out_of_space(exprnd_dyn_map, exprnd_dyn_val_vec, exprnd_chain, stat_map);
+      if (dyn_table_out_of_space(exprnd_table)) {
+        assert true == set_eq(get_dyn_table(final_table),
+                              expire_addresses(get_dyn_table(initial_table), now - 10));
+      } else {
+        switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
+          bridge_add_entry(dyn_map, exprnd_dyn_val_vec, exprnd_chain,
+                          src_addr, the_index_allocated, received_on_port, time_for_allocated_index);
+          assert true == set_eq(gen_dyn_entries(map_put_fp(dyn_map, src_addr, the_index_allocated),
+                                                update(the_index_allocated, pair(received_on_port, true), exprnd_dyn_val_vec),
+                                                dchain_allocate_fp(exprnd_chain,
+                                                                  the_index_allocated,
+                                                                  time_for_allocated_index)),
+                                add_dyn_entry(get_dyn_table(exprnd_table),
+                                              src_addr, received_on_port, time_for_allocated_index));
+          assert true == set_eq(get_dyn_table(final_table),
+                                add_dyn_entry(get_dyn_table(exprnd_table),
+                                              src_addr, received_on_port, time_for_allocated_index));
+        }
+
+        bridge_add_entry_set_eq(get_dyn_table(exprnd_table),
+                                expire_addresses(get_dyn_table(initial_table), now - 10),
+                                src_addr, received_on_port, time_for_allocated_index);
+
+        set_eq_trans(get_dyn_table(final_table), add_dyn_entry(get_dyn_table(exprnd_table), src_addr, received_on_port, now),
+                    add_dyn_entry(expire_addresses(get_dyn_table(initial_table), now - 10), src_addr, received_on_port, now));
+        assert true == set_eq(get_dyn_table(final_table),
+                              add_dyn_entry(expire_addresses(get_dyn_table(initial_table), now - 10),
+                                            src_addr, received_on_port, now));
+      }
+    }
+
     if (stat_table_has_key(get_stat_table(final_table), static_key)) {
       switch(stat_map) { case mapc(capacity, st_map, addrs):
         stat_map_has_get(st_map, static_key);
