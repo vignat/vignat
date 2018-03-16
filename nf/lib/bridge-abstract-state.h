@@ -113,6 +113,20 @@
     return cons(dyn_entry(addr, port, time), table);
   }
 
+  fixpoint list<dyn_entry> rejuvenate_dyn_entry(list<dyn_entry> table,
+                                                ether_addri addr_to_rej,
+                                                uint32_t new_time) {
+    switch(table) {
+      case nil: return nil;
+      case cons(h,t):
+        return switch(h) { case dyn_entry(addr, port, time):
+          return (addr == addr_to_rej) ?
+                   cons(dyn_entry(addr, port, new_time), t) :
+                   cons(h, rejuvenate_dyn_entry(t, addr_to_rej, new_time));
+        };
+    }
+  }
+
   fixpoint list<dyn_entry> expire_addresses(list<dyn_entry> table, uint32_t now) {
     switch(table) {
       case nil: return nil;
@@ -152,6 +166,26 @@
                                  dchain_allocate_fp(indices, index, time)),
                  add_dyn_entry(gen_dyn_entries(dyn_map, vals, indices),
                                addr, port, time)) == true;
+
+  lemma void bridge_rejuv_entry(list<pair<ether_addri, uint32_t> > dyn_map,
+                                list<pair<uint8_t, bool> > vals,
+                                dchain indices,
+                                ether_addri addr,
+                                uint32_t time);
+  requires true;
+  ensures set_eq(gen_dyn_entries(dyn_map,
+                                 vals,
+                                 dchain_rejuvenate_fp(indices, map_get_fp(dyn_map, addr), time)),
+                 rejuvenate_dyn_entry(gen_dyn_entries(dyn_map, vals, indices),
+                                      addr, time)) == true;
+
+  lemma void bridge_rejuv_entry_set_eq(list<dyn_entry> dyn_table1,
+                                       list<dyn_entry> dyn_table2,
+                                       ether_addri addr,
+                                       uint32_t time);
+  requires true == set_eq(dyn_table1, dyn_table2);
+  ensures true == set_eq(rejuvenate_dyn_entry(dyn_table1, addr, time),
+                         rejuvenate_dyn_entry(dyn_table2, addr, time));
 
   lemma void bridge_add_entry_set_eq(list<dyn_entry> dyn_table1,
                                      list<dyn_entry> dyn_table2,

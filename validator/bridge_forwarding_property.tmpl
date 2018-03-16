@@ -49,8 +49,33 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
                           expire_addresses(get_dyn_table(initial_table), now - 10));
 
 
+   // State postcondition
    if (dyn_table_has_key(get_dyn_table(exprnd_table), src_addr)) {
-     //TODO rejuvenated
+      switch(exprnd_dyn_map) { case mapc(capacity, dyn_map, addrs):
+        bridge_rejuv_entry(dyn_map, exprnd_dyn_val_vec, exprnd_chain,
+                           src_addr, now);
+        assert true == set_eq(gen_dyn_entries(dyn_map,
+                                              exprnd_dyn_val_vec,
+                                              dchain_rejuvenate_fp(exprnd_chain,
+                                                                  the_index_rejuvenated,
+                                                                  now)),
+                              rejuvenate_dyn_entry(get_dyn_table(exprnd_table),
+                                                   src_addr, now));
+        assert true == set_eq(get_dyn_table(final_table),
+                              rejuvenate_dyn_entry(get_dyn_table(exprnd_table),
+                                                   src_addr, now));
+      }
+      bridge_rejuv_entry_set_eq(get_dyn_table(exprnd_table),
+                                expire_addresses(get_dyn_table(initial_table), now - 10),
+                                src_addr, now);
+
+      set_eq_trans(get_dyn_table(final_table), rejuvenate_dyn_entry(get_dyn_table(exprnd_table), src_addr, now),
+                   rejuvenate_dyn_entry(expire_addresses(get_dyn_table(initial_table), now - 10),
+                                        src_addr, now));
+
+      assert true == set_eq(get_dyn_table(final_table),
+                            rejuvenate_dyn_entry(expire_addresses(get_dyn_table(initial_table), now - 10),
+                                                 src_addr, now));
    } else {
       chain_out_of_space_ml_out_of_space(exprnd_dyn_map, exprnd_dyn_val_vec, exprnd_chain, stat_map);
       if (dyn_table_out_of_space(exprnd_table)) {
@@ -84,6 +109,7 @@ if (10 < now) {// consider only normal moments, remote from the start of the epo
       }
     }
 
+    // Output packet postcondition
     if (stat_table_has_key(get_stat_table(final_table), static_key)) {
       switch(stat_map) { case mapc(capacity, st_map, addrs):
         stat_map_has_get(st_map, static_key);
