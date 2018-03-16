@@ -141,11 +141,3 @@ ensures dchain_out_of_space_fp(indices) ==
 }
 
 @*/
-/*@
-lemma void set_eq_trans<t>(list<t> s1, list<t> s2, list<t> s3)
-requires true == set_eq(s1, s2) &*& true == set_eq(s2, s3);
-ensures true == set_eq(s1, s3);
-{
-  assume(false);//TODO
-}
-@*/

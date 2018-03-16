@@ -227,8 +227,4 @@
   requires true;
   ensures dchain_out_of_space_fp(indices) ==
           dyn_table_out_of_space(bridge_abstract_function(dyn_map, vals, indices, stat_map));
-
-  lemma void set_eq_trans<t>(list<t> s1, list<t> s2, list<t> s3);
-  requires true == set_eq(s1, s2) &*& true == set_eq(s2, s3);
-  ensures true == set_eq(s1, s3);
 @*/
