@@ -708,18 +708,20 @@ let fun_types =
                                  ];};
      "stub_core_trace_rx", {
                  ret_type = Static Void;
-                 arg_types = stt [Ptr rte_mbuf_struct;];
-                 extra_ptr_types = estt ["user_buf_addr",
+                 arg_types = stt [Ptr (Ptr rte_mbuf_struct);];
+                 extra_ptr_types = estt ["incoming_package",
+                                         rte_mbuf_struct;
+                                         "user_buf_addr",
                                          stub_mbuf_content_struct];
                  lemmas_before = [];
                  lemmas_after = [(fun params -> "a_packet_received = true;\n" ^
                                        simplify_c_string (
                                          "received_on_port = " ^
-                                         (List.nth_exn params.args 0) ^ "->port;\n" ^
+                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->port;\n" ^
                                          "received_packet_type = " ^
-                                         (List.nth_exn params.args 0) ^ "->packet_type;\n") ^
+                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->packet_type;\n") ^
                                          (copy_stub_mbuf_content "the_received_packet"
-                                          (List.nth_exn params.args 0)));
+                                          ("*" ^ (List.nth_exn params.args 0))));
                                  ];};
      "stub_core_trace_tx", {
                  ret_type = Static Void;

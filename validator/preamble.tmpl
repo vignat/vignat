@@ -195,9 +195,9 @@ int flow_consistency(void* key_a, void* key_b, int index, void* value)
 
 // TODO a lot of assumptions about only sending 1 packet here :(
 
-void stub_core_trace_rx(struct rte_mbuf* mbuf);
+void stub_core_trace_rx(struct rte_mbuf** mbuf);
 //@ requires true;
-//@ ensures mbufp(mbuf, _);
+//@ ensures *mbuf |-> ?mb &*& mbufp(mb, _);
 
 void stub_core_trace_tx_attempt(struct rte_mbuf* mbuf, uint16_t device);
 //@ requires mbufp(mbuf, ?mb);

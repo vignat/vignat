@@ -129,10 +129,11 @@ struct nested_nested_field_descr stub_mbuf_content_n2[] = {
 
 
 void
-stub_core_trace_rx(struct rte_mbuf* mbuf)
+stub_core_trace_rx(struct rte_mbuf** mbuf)
 {
-	KLEE_TRACE_MBUF(mbuf, "mbuf", TD_OUT);
-	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_OUT);
+	klee_trace_param_ptr(*mbuf, sizeof(struct rte_mbuf*), "mbuf");
+	KLEE_TRACE_MBUF_EPTR(*mbuf, "incoming_package", TD_OUT);
+	KLEE_TRACE_MBUF_CONTENT((*mbuf)->buf_addr, TD_OUT);
 }
 
 void
