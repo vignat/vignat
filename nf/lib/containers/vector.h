@@ -1,6 +1,9 @@
 #ifndef _VECTOR_H_INCLUDED_
 #define _VECTOR_H_INCLUDED_
 
+//@ #include "stdex.gh"
+//@ #include "listexex.gh"
+
 #define VECTOR_CAPACITY_UPPER_LIMIT 140000
 
 struct Vector;
@@ -9,6 +12,12 @@ struct Vector;
   predicate vectorp<t>(struct Vector* vector,
                        predicate (void*;t) entp,
                        list<pair<t, bool> > values);
+
+  fixpoint list<pair<t, bool> > vector_erase_fp<t>(list<pair<t, bool> > vector,
+                                                   int index) {
+    return update(index, pair(fst(nth(index, vector)), true), vector);
+  }
+
   predicate vector_accp<t>(struct Vector* vector,
                            predicate (void*;t) entp,
                            list<pair<t, bool> > values,
@@ -20,18 +29,49 @@ struct Vector;
     switch(indices) {
       case nil: return vector;
       case cons(h,t):
-        return vector_erase_all_fp(update(h, pair(fst(nth(h, vector)), false), vector), t);
+        return vector_erase_all_fp(vector_erase_fp(vector, h), t);
     }
   }
 
   fixpoint list<t> vector_get_values_fp<t>(list<pair<t, bool> > vector,
                                            list<int> indices) {
-    switch(indices) {
-      case nil: return nil;
-      case cons(h,t):
-        return cons(fst(nth(h, vector)), vector_get_values_fp(vector, t));
-    }
+    return map((sup)(fst, (nth2)(vector)), indices);
   }
+  @*/
+
+/*@
+  lemma void vector_erase_all_same_len<t>(list<pair<t, bool> > vector,
+                                          list<int> indices);
+  requires true;
+  ensures length(vector) == length(vector_erase_all_fp(vector, indices));
+  @*/
+
+/*@
+  lemma void vector_get_values_append<t>(list<pair<t, bool> > vector,
+                                         list<int> indices,
+                                         int index, t v);
+  requires 0 <= index &*& index < length(vector) &*&
+           nth(index, vector) == pair(v, _);
+  ensures append(vector_get_values_fp(vector, indices), cons(v, nil)) ==
+          vector_get_values_fp(vector, append(indices, cons(index, nil)));
+  @*/
+
+/*@
+  lemma void vector_erase_all_keeps_val<t>(list<pair<t, bool> > vector,
+                                           list<int> indices,
+                                           int index);
+  requires 0 <= index &*& index < length(vector);
+  ensures nth(index, vector_erase_all_fp(vector, indices)) ==
+          nth(index, vector);
+  @*/
+
+/*@
+   lemma void vector_erase_one_more<t>(list<pair<t, bool> > vector,
+                                       list<int> indices,
+                                       int index);
+   requires true;
+   ensures vector_erase_fp(vector_erase_all_fp(vector, indices), index) ==
+           vector_erase_all_fp(vector, append(indices, cons(index, nil)));
   @*/
 
 typedef void vector_init_elem/*@ <t> (predicate (void*;t) entp,

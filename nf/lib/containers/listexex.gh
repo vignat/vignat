@@ -1039,4 +1039,6 @@ ensures true == mem(el, filter(f, l));
   }
 }//took 1m
 
+fixpoint t nth2<t>(list<t> lst, int index) { return nth(index, lst); }
+
 #endif//LISTEXEX_GH

@@ -4,6 +4,8 @@
 #include "containers/map.h"
 #include "containers/double-map.h"
 #include "containers/double-chain.h"
+// FIXME: remove, once generalized. see below.
+#include "../bridge/bridge_data.h"
 
 
 /*@
@@ -15,6 +17,37 @@
                                        list<pair<kt, bool> > v, dchain ch);
   @*/
 
+// FIXME: VeriFast currently does not support generic predicate constructors,
+// so kkeeperp is specialized to its immediate use case. Need to revisit this
+// and dependent places, once the support is implemented.
+/*@
+  predicate_ctor kkeeperp(list<pair<ether_addri, void*> > addrs,
+                          predicate (void*;ether_addri) entp)(
+                          void* ptr;
+                          ether_addri key) =
+    true == map_has_fp(addrs, key) &*&
+    ptr == map_get_fp(addrs, key) &*&
+    entp(ptr, key);
+  @*/
+
+/*@
+  lemma void mvc_coherent_bounds<kt>(list<pair<kt, int> > m,
+                                     list<pair<kt, bool> > v, dchain ch);
+  requires map_vec_chain_coherent<kt>(m, v, ch);
+  ensures dchain_index_range_fp(ch) == length(v) &*&
+          map_vec_chain_coherent<kt>(m, v, ch);
+  @*/
+/*@
+  lemma void mvc_coherent_index_busy<kt>(list<pair<kt, int> > m,
+                                         list<pair<kt, bool> > v, dchain ch,
+                                         uint32_t index);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
+           true == dchain_allocated_fp(ch, index);
+  ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
+          nth(index, v) == pair(?key, false) &*&
+          true == map_has_fp(m, key) &*&
+          map_get_fp(m, key) == index;
+  @*/
 /*@
   lemma void mvc_coherent_map_get_bounded<kt>(list<pair<kt, int> > m,
                                               list<pair<kt, bool> > v, dchain ch,
@@ -96,6 +129,32 @@
                                      update(index, pair(key, false), v),
                                      dchain_allocate_fp(ch, index, time));
   @*/
+
+/*@
+  lemma void mvc_coherent_expire_one<kt>(list<pair<kt, int> > m,
+                                         list<pair<kt, bool> > v, dchain ch,
+                                         int index,
+                                         kt key);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
+           nth(index, v) == pair(key, false);
+  ensures map_vec_chain_coherent<kt>(map_erase_fp(m, key),
+                                     vector_erase_fp(v, index),
+                                     dchain_remove_index_fp(ch, index));
+  @*/
+
+/*@
+  lemma void kkeeperp_erase_one(struct Vector* vector,
+                                list<pair<ether_addri, bool> > contents,
+                                list<pair<ether_addri, void*> > addrs,
+                                predicate (void*;ether_addri) kp,
+                                int index);
+  requires 0 <= index &*& index <= length(contents) &*&
+           vectorp<ether_addri>(vector, kkeeperp(addrs, kp),
+                                vector_erase_fp(contents, index));
+  ensures vectorp<ether_addri>(vector, kkeeperp(map_erase_fp(addrs, fst(nth(index, contents))), kp),
+                               vector_erase_fp(contents, index));
+  @*/
+
 /*@
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len);
 requires 0 <= len;
