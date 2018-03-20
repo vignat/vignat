@@ -6,9 +6,6 @@ NF_FILES := nat_forward_vignat.c ../lib/nat_config.c \
             ../lib/flow.c ../lib/flow-log.c \
             flowmanager.c flowtable.c
 
-# Runtime files (none)
-# NF_RUNTIME_FILES := ???
-
 # Verification files
 NF_VERIF_FILES := loop-stub.c
 

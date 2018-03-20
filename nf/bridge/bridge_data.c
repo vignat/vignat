@@ -10,9 +10,9 @@ bool ether_addr_eq(void* k1, void* k2)
 {
   struct ether_addr* a = (struct ether_addr*)k1;
   struct ether_addr* b = (struct ether_addr*)k2;
-  return 0 == memcmp(a->addr_bytes,
-                     b->addr_bytes,
-                     6);
+  return 0 == memcmp(a,
+                     b,
+                     sizeof(struct ether_addr));
 }
 
 bool static_key_eq(void* k1, void* k2)
@@ -34,8 +34,8 @@ int ether_addr_hash(void* k)
             result == eth_addr_hash(ea); @*/
 {
   struct ether_addr* addr = (struct ether_addr*)k;
-  return (int)((*(uint32_t*)addr->addr_bytes) ^
-               (*(uint32_t*)(addr->addr_bytes + 2)));
+  return (int)((*(uint32_t*)addr) ^
+               (*(uint32_t*)((char*)addr + 2)));
 }
 
 int static_key_hash(void* key)

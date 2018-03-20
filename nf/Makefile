@@ -2,7 +2,6 @@
 # Variables that should be defined by inheriting Makefiles:
 # - APP := <binary name>
 # - NF_FILES := <NF files for both runtime and verif-time>
-# - NF_RUNTIME_FILES := <runtime-only NF files>
 # - NF_VERIF_FILES := <verif-time only NF files>
 # - NF_VERIF_ARGS := <arguments to pass to the NF at verif-time>
 
@@ -28,7 +27,7 @@ SRCS-y := $(SELF_DIR)/nf_main.c \
           $(SELF_DIR)/lib/containers/double-map.c \
           $(SELF_DIR)/lib/containers/vector.c
 # NF specific source
-SRCS-y += $(NF_FILES) $(NF_RUNTIME_FILES)
+SRCS-y += $(NF_FILES)
 
 # gcc flags
 CFLAGS += -std=gnu99

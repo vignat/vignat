@@ -219,7 +219,7 @@ stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf
 	// vlan_tci_outer is symbolic
 	(*mbufp)->buf_len = (uint16_t) buf_len;
 	// timestamp is symbolic
-	(*mbufp)->userdata = NULL;
+	(*mbufp)->udata64 = 0;
 	(*mbufp)->pool = pool;
 	(*mbufp)->next = buf_next;
 	// tx_offload is symbolic

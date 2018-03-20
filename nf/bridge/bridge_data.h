@@ -5,6 +5,8 @@
 
 #include "rte_ether.h"
 
+#include "lib/stubs/core_stub.h"
+
 struct Map;
 struct Vector;
 struct DoubleChain;
@@ -31,19 +33,7 @@ struct StaticFilterTable {
 };
 
 /*@
-  inductive ether_addri = eaddrc(int, int, int, int, int, int);
   inductive stat_keyi = stkc(int, ether_addri);
-
-  predicate ether_addrp(struct ether_addr* ptr; ether_addri addr) =
-    struct_ether_addr_padding(ptr) &*&
-    ptr->a |-> ?a &*&
-    ptr->b |-> ?b &*&
-    ptr->c |-> ?c &*&
-    ptr->d |-> ?d &*&
-    ptr->e |-> ?e &*&
-    ptr->f |-> ?f &*&
-    addr == eaddrc(a, b, c, d, e, f);
-
   predicate static_keyp(struct StaticKey* ptr; stat_keyi k) =
     struct_StaticKey_padding(ptr) &*&
     ptr->device |-> ?device &*&
