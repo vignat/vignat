@@ -359,6 +359,18 @@ void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value
     }
   }
 
+  lemma void vector_erase_all_same_length<t>(list<pair<t, bool> > vector,
+                                             list<int> indices)
+  requires true;
+  ensures length(vector_erase_all_fp(vector, indices)) == length(vector);
+  {
+    switch(indices) {
+      case nil: return;
+      case cons(h,t):
+        vector_erase_all_same_length(vector, t);
+    }
+  }
+
   lemma void vector_erase_all_keeps_val<t>(list<pair<t, bool> > vector,
                                            list<int> indices,
                                            int index)
@@ -369,20 +381,45 @@ void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value
     switch(indices) {
       case nil: return;
       case cons(h,t):
-        vector_erase_keeps_val(vector, h, index);
-        vector_erase_all_keeps_val(vector_erase_fp(vector, h), t, index);
+        vector_erase_all_keeps_val(vector, t, index);
+        vector_erase_all_same_length(vector, t);
+        vector_erase_keeps_val(vector_erase_all_fp(vector, t), h, index);
     }
   }
   @*/
 
 /*@
-   lemma void vector_erase_one_more<t>(list<pair<t, bool> > vector,
-                                       list<int> indices,
-                                       int index)
-   requires true;
-   ensures vector_erase_fp(vector_erase_all_fp(vector, indices), index) ==
-           vector_erase_all_fp(vector, append(indices, cons(index, nil)));
+  lemma void vector_erase_swap<t>(list<pair<t, bool> > vector, int i1, int i2)
+  requires true;
+  ensures vector_erase_fp(vector_erase_fp(vector, i1), i2) ==
+          vector_erase_fp(vector_erase_fp(vector, i2), i1);
   {
-    assume(false);//TODO
+    switch(vector) {
+      case nil: return;
+      case cons(h,t):
+        if (i1 == 0) return;
+        if (i2 == 0) return;
+        vector_erase_swap(t, i1 - 1, i2 - 1);
+    }
+  }
+
+  lemma void vector_erase_one_more<t>(list<pair<t, bool> > vector,
+                                      list<int> indices,
+                                      int index)
+  requires true;
+  ensures vector_erase_fp(vector_erase_all_fp(vector, indices), index) ==
+          vector_erase_all_fp(vector, append(indices, cons(index, nil)));
+  {
+    switch(indices) {
+      case nil: return;
+      case cons(h,t):
+        vector_erase_one_more(vector, t, index);
+        vector_erase_swap(vector_erase_all_fp(vector, t), index, h);
+        assert vector_erase_fp(vector_erase_all_fp(vector, t), index) == vector_erase_all_fp(vector, append(t, cons(index, nil)));
+        assert vector_erase_fp(vector_erase_fp(vector_erase_all_fp(vector, t), index), h) ==
+               vector_erase_fp(vector_erase_all_fp(vector, append(t, cons(index, nil))), h);
+        assert vector_erase_fp(vector_erase_fp(vector_erase_all_fp(vector, t), index), h) ==
+               vector_erase_all_fp(vector, append(indices, cons(index, nil)));
+    }
   }
   @*/

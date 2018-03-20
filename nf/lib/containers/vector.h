@@ -29,7 +29,7 @@ struct Vector;
     switch(indices) {
       case nil: return vector;
       case cons(h,t):
-        return vector_erase_all_fp(vector_erase_fp(vector, h), t);
+        return vector_erase_fp(vector_erase_all_fp(vector, t), h);
     }
   }
 
