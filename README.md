@@ -31,14 +31,14 @@ Run `install.sh`, which will install the Vigor toolchain and create a file named
 $ cd nf/vignat
 $ make
 
-# Run it (this will print a help message
+# Run it (this will print a help message)
 $ ./build/nat
 
 # Verify the data structures (can be done at any time)
 $ make verifast
 
 # Symbolically execute VigNAT to generate traces
-$ make verify
+$ make verify-dpdk
 
 # Verify the traces
 $ cd ../../validator
