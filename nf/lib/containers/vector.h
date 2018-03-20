@@ -61,8 +61,8 @@ struct Vector;
                                            list<int> indices,
                                            int index);
   requires 0 <= index &*& index < length(vector);
-  ensures nth(index, vector_erase_all_fp(vector, indices)) ==
-          nth(index, vector);
+  ensures fst(nth(index, vector_erase_all_fp(vector, indices))) ==
+          fst(nth(index, vector));
   @*/
 
 /*@

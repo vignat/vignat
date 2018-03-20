@@ -341,14 +341,37 @@ void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value
   @*/
 
 /*@
+  lemma void vector_erase_keeps_val<t>(list<pair<t, bool> > vector,
+                                       int erase_index, int val_index)
+  requires 0 <= val_index &*& val_index < length(vector);
+  ensures fst(nth(val_index, vector)) ==
+          fst(nth(val_index, vector_erase_fp(vector, erase_index)));
+  {
+    switch(vector) {
+      case nil: return;
+      case cons(h,t):
+        if (val_index == 0) {
+          if (erase_index == 0) return;
+          else return;
+        }
+        if (erase_index == 0) return;
+        vector_erase_keeps_val(t, erase_index - 1, val_index - 1);
+    }
+  }
+
   lemma void vector_erase_all_keeps_val<t>(list<pair<t, bool> > vector,
                                            list<int> indices,
                                            int index)
   requires 0 <= index &*& index < length(vector);
-  ensures nth(index, vector_erase_all_fp(vector, indices)) ==
-          nth(index, vector);
+  ensures fst(nth(index, vector_erase_all_fp(vector, indices))) ==
+          fst(nth(index, vector));
   {
-    assume(false);//TODO
+    switch(indices) {
+      case nil: return;
+      case cons(h,t):
+        vector_erase_keeps_val(vector, h, index);
+        vector_erase_all_keeps_val(vector_erase_fp(vector, h), t, index);
+    }
   }
   @*/
 
