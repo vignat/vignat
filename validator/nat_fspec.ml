@@ -735,8 +735,7 @@ let fun_types =
                             (copy_stub_mbuf_content "sent_packet"
                              (sent_pkt)) ^ "\n" ^
                             simplify_c_string (
-                              "sent_on_port = " ^
-                              sent_pkt ^ "->port;\n" ^
+                              "sent_on_port = " ^ (List.nth_exn params.args 1) ^ ";\n" ^
                               "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
                  lemmas_after = [(fun params -> "a_packet_sent = true;\n");];
