@@ -136,40 +136,53 @@ let tcp_hdr_struct = Ir.Str ("tcp_hdr", ["src_port", Uint16;
 (* FIXME: for bridge only ether_hdr is needed, the other two are here,
    just because rte_stubs.c dumps them for the other NF (NAT), and validator
    ensures we read everything dumped.*)
-let user_buf_struct = Ir.Str ("user_buf", ["ether", ether_hdr_struct;
-                                           "ipv4", ipv4_hdr_struct;
-                                           "tcp", tcp_hdr_struct;])
+let stub_mbuf_content_struct = Ir.Str ( "stub_mbuf_content",
+                                        ["ether", ether_hdr_struct;
+                                         "ipv4", ipv4_hdr_struct;
+                                         "tcp", tcp_hdr_struct;])
+
+let rte_mempool_struct = Ir.Str ( "rte_mempool", [] )
 let rte_mbuf_struct = Ir.Str ( "rte_mbuf",
-                               ["buf_addr", Ptr user_buf_struct;
-                                "buf_physaddr", Uint64;
-                                "buf_len", Uint16;
+                               ["buf_addr", Ptr stub_mbuf_content_struct;
+                                "buf_iova", Uint64;
                                 "data_off", Uint16;
                                 "refcnt", Uint16;
-                                "nb_segs", Uint8;
-                                "port", Uint8;
+                                "nb_segs", Uint16;
+                                "port", Uint16;
                                 "ol_flags", Uint64;
                                 "packet_type", Uint32;
                                 "pkt_len", Uint32;
                                 "data_len", Uint16;
                                 "vlan_tci", Uint16;
                                 "hash", Uint32;
-                                "seqn", Uint32;
                                 "vlan_tci_outer", Uint16;
+                                "buf_len", Uint16;
+                                "timestamp", Uint64;
                                 "udata64", Uint64;
-                                "pool", Ptr Void;
-                                "next", Ptr Void;
+                                (*"pool", Ptr rte_mempool_struct;*)
+                                (*"next", Ptr Void;*)
                                 "tx_offload", Uint64;
                                 "priv_size", Uint16;
-                                "timesync", Uint16] )
+                                "timesync", Uint16;
+                                "seqn", Uint32] )
 
-let copy_user_buf var_name ptr =
-  ("struct user_buf* tmp_ub_ptr" ^ var_name ^
+let copy_stub_mbuf_content var_name ptr =
+  ("struct stub_mbuf_content* tmp_ub_ptr" ^ var_name ^
    " = (" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
      Ir.value={v=Deref {v=Ir.Id ("tmp_ub_ptr" ^ var_name);
-                        t=Ptr user_buf_struct};
-               t=user_buf_struct}}
+                        t=Ptr stub_mbuf_content_struct};
+               t=stub_mbuf_content_struct}}
+
+(* VeriFast's C parser is quite limited, so simplify stuff... this is very brittle since it does no lookbehind to avoid accidents *)
+let rec simplify_c_string str =
+  let str0 = Str.global_replace (Str.regexp "\\*&") "" str in (* *&a  ==>  a *)
+  let str0 = Str.global_replace (Str.regexp "\\*(&\\([^)]+\\))") "\\1" str0 in (* * (&a)  ==>  a *)
+  let str0 = Str.global_replace (Str.regexp "&(\\([^)]+\\))->\\([^)]+\\)") "\\1.\\2" str0 in (* &a->b  ==>  a.b *)
+  let str0 = Str.global_replace (Str.regexp "(&(\\([^)]+\\)))->\\([^)]+\\)") "\\1.\\2" str0 in (* (&a)->b  ==>  a.b *)
+  let str0 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str0 in (* ( *a ).b  ==>  a->b *)
+  if str = str0 then str else simplify_c_string str0 (* find a fixpoint *)
 
 let fun_types =
   String.Map.of_alist_exn
@@ -593,58 +606,58 @@ let fun_types =
                        } @*/"
                    );
                    reveal_the_other_mapp];};
-     "received_packet", {ret_type = Static Void;
-                         arg_types = stt [Ir.Uint8; Ptr (Ptr rte_mbuf_struct);];
-                         extra_ptr_types = estt ["user_buf_addr",
-                                                 user_buf_struct;
-                                                 "incoming_package",
-                                                 rte_mbuf_struct];
-                         lemmas_before = [];
-                         lemmas_after = [(fun _ -> "a_packet_received = true;\n");
-                                         (fun params ->
-                                            let recv_pkt =
-                                              "*" ^ (List.nth_exn params.args 1)
-                                            in
-                                            "received_on_port = " ^
-                                            (List.nth_exn params.args 0) ^ ";\n" ^
-                                            "received_packet_type = (" ^
-                                            recv_pkt ^ ")->packet_type;\n" ^
-                                            (copy_user_buf "the_received_packet"
-                                               recv_pkt) ^ "\n");
-                                           ];};
-     "rte_pktmbuf_free", {ret_type = Static Void;
-                          arg_types = stt [Ptr rte_mbuf_struct;];
-                          extra_ptr_types = estt ["user_buf_addr",
-                                                  user_buf_struct];
-                          lemmas_before = [];
-                          lemmas_after = [];};
-     "send_single_packet", {ret_type = Static Ir.Sint32;
-                            arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8];
-                            extra_ptr_types = estt ["user_buf_addr",
-                                                    user_buf_struct];
-                            lemmas_before = [
-                              (fun params ->
-                                 let sent_pkt =
-                                   (List.nth_exn params.args 0)
-                                 in
-                                 (copy_user_buf "sent_packet"
-                                    sent_pkt) ^ "\n" ^
-                                 "sent_on_port = " ^
-                                 (List.nth_exn params.args 1) ^
-                                 ";\n" ^
-                                 "sent_packet_type = (" ^
-                                 sent_pkt ^ ")->packet_type;")];
-                            lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];};
+     "stub_core_trace_rx", {
+                 ret_type = Static Void;
+                 arg_types = stt [Ptr (Ptr rte_mbuf_struct);];
+                 extra_ptr_types = estt ["incoming_package",
+                                         rte_mbuf_struct;
+                                         "user_buf_addr",
+                                         stub_mbuf_content_struct];
+                 lemmas_before = [];
+                 lemmas_after = [(fun params -> "a_packet_received = true;\n" ^
+                                       simplify_c_string (
+                                         "received_on_port = " ^
+                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->port;\n" ^
+                                         "received_packet_type = " ^
+                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->packet_type;\n") ^
+                                         (copy_stub_mbuf_content "the_received_packet"
+                                          ("*" ^ (List.nth_exn params.args 0))));
+                                 ];};
+     "stub_core_trace_tx", {
+                 ret_type = Static Uint8;
+                 arg_types = stt [Ptr rte_mbuf_struct; Uint16];
+                 extra_ptr_types = estt ["user_buf_addr",
+                                         stub_mbuf_content_struct];
+                 lemmas_before = [
+                     (fun params ->
+                          let sent_pkt =
+                            (List.nth_exn params.args 0)
+                          in
+                            (copy_stub_mbuf_content "sent_packet"
+                             (sent_pkt)) ^ "\n" ^
+                            simplify_c_string (
+                              "sent_on_port = " ^ (List.nth_exn params.args 1) ^ ";\n" ^
+                              "sent_packet_type = (" ^
+                              sent_pkt ^ ")->packet_type;"));];
+                 lemmas_after = [(fun params -> "a_packet_sent = true;\n");];
+                 };
+     "stub_core_trace_free", {
+                   ret_type = Static Void;
+                   arg_types = stt [Ptr rte_mbuf_struct;];
+                   extra_ptr_types = estt ["user_buf_addr",
+                                           stub_mbuf_content_struct];
+                   lemmas_before = [];
+                   lemmas_after = [];};
      "flood", {ret_type = Static Ir.Sint32;
-               arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint8; Ir.Uint8];
+               arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint16; Ir.Uint16];
                extra_ptr_types = estt ["user_buf_addr",
-                                       user_buf_struct];
+                                       stub_mbuf_content_struct];
                lemmas_before = [
                (fun params ->
                  let sent_pkt =
                    (List.nth_exn params.args 0)
                  in
-                 (copy_user_buf "sent_packet"
+                 (copy_stub_mbuf_content "sent_packet"
                     sent_pkt) ^ "\n" ^
                  "flooded_except_port = " ^
                  (List.nth_exn params.args 1) ^
@@ -932,13 +945,13 @@ struct
                   /*@ ensures true; @*/\n{\n\
                   uint8_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
-                  struct user_buf the_received_packet;\n\
+                  struct stub_mbuf_content the_received_packet;\n\
                   int the_index_allocated = -1;\n\
                   uint32_t time_for_allocated_index = 0;\n\
                   bool a_packet_received = false;\n\
-                  struct user_buf sent_packet;\n\
-                  uint8_t sent_on_port;\n\
-                  uint8_t flooded_except_port;\n\
+                  struct stub_mbuf_content sent_packet;\n\
+                  uint16_t sent_on_port;\n\
+                  uint16_t flooded_except_port;\n\
                   bool a_packet_flooded = false;\n\
                   uint32_t sent_packet_type;\n\
                   bool a_packet_sent = false;\n"

@@ -1,4 +1,8 @@
-#pragma once
+// used with VeriFast, no pragma
+#ifndef RTE_IP_H
+#define RTE_IP_H
+
+#include <stdint.h>
 
 
 #define IPV4_HDR_IHL_MASK 0x0F
@@ -19,14 +23,16 @@ struct ipv4_hdr {
 };
 
 
-static inline uint16_t
+static uint16_t
 rte_ipv4_udptcp_cksum(const struct ipv4_hdr* ipv4_hdr, const void* l4_hdr)
 {
 	return 0; // TODO?
 }
 
-static inline uint16_t
+static uint16_t
 rte_ipv4_cksum(const struct ipv4_hdr* ipv4_hdr)
 {
 	return 0; // TODO?
 }
+
+#endif

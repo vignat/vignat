@@ -1,15 +1,18 @@
-#pragma once
+// used with VeriFast, can't use #pragma
+#ifndef RTE_MEMPOOL_H
+#define RTE_MEMPOOL_H
 
+#include <stdint.h>
 
 #define RTE_MEMZONE_NAMESIZE 32
 
 
 struct rte_mempool {
 	char name[RTE_MEMZONE_NAMESIZE];
-	union {
-		void *pool_data;
+//	union {
+//		void *pool_data;
 		uint64_t pool_id;
-	};
+//	};
 	void *pool_config;
 //	const struct rte_memzone *mz;
 	unsigned int flags;
@@ -27,3 +30,5 @@ struct rte_mempool {
 	uint32_t nb_mem_chunks;
 //	struct rte_mempool_memhdr_list mem_list;
 };
+
+#endif

@@ -1,6 +1,5 @@
 #include <klee/klee.h>
 #include "bridge_loop.h"
-#include "lib/stubs/rte-stubs-control.h"
 #include "lib/stubs/containers/double-chain-stub-control.h"
 #include "lib/stubs/containers/map-stub-control.h"
 #include "lib/stubs/containers/vector-stub-control.h"
@@ -17,7 +16,6 @@ void bridge_loop_iteration_assumptions(struct DoubleChain** dyn_heap,
                                        struct Vector** st_vec,
                                        uint32_t capacity,
                                        uint32_t time) {
-  rte_reset();
   dchain_reset(*dyn_heap, capacity);
   map_reset(*dyn_map);
   vector_reset(*dyn_keys);

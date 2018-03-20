@@ -1,4 +1,9 @@
-#pragma once
+// used with VeriFast, no pragma
+#ifndef RTE_TCP_H
+#define RTE_TCP_H
+
+#include <stdint.h>
+
 
 struct tcp_hdr {
 	uint16_t src_port;
@@ -11,3 +16,5 @@ struct tcp_hdr {
 	uint16_t cksum;
 	uint16_t tcp_urp;
 };
+
+#endif

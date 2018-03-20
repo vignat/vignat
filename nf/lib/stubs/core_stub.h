@@ -1,22 +1,26 @@
-#pragma once
+// used with VeriFast, cannot use #pragma
+#ifndef CORE_STUB_H
+#define CORE_STUB_H
 
-#include <inttypes.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_tcp.h>
 
-// TODO include this file in the validator instead of copy/pasting it into its preamble
-
 // TODO more complete stub content?
 // do change the total_len in rx if this is changed!
-// Need to pack this struct so that accesses via rte_pktmbuf_mtod_offset work properly
 struct stub_mbuf_content {
 	struct ether_hdr ether;
 	struct ipv4_hdr ipv4;
 	struct tcp_hdr tcp;
-} __attribute__((packed));
+}
+// We need to pack the structure so offsets are correct, but only if we're not within VeriFast, cause VeriFast doesn't know about it
+#ifdef KLEE_VERIFICATION
+ __attribute__((packed))
+#else
+;
 
 // TODO add tracing for packet details
 
@@ -36,3 +40,5 @@ void stub_core_trace_free(struct rte_mbuf* mbuf);
 struct rte_mempool;
 bool stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf** mbufp);
 void stub_core_mbuf_free(struct rte_mbuf* mbuf);
+
+#endif

@@ -1,6 +1,5 @@
 #include "containers/double-map.h"
 #include "containers/double-chain.h"
-#include "flow.h"
 #include "coherence.h"
 #include "bridge/bridge_data.h"
 

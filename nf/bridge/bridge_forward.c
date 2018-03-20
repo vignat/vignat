@@ -1,28 +1,23 @@
-#include <inttypes.h>
-#include <string.h>
-
 #ifdef KLEE_VERIFICATION
 #  include <klee/klee.h>
-#  include "lib/stubs/rte_stubs.h"
-#  include <cmdline_parse_etheraddr.h>
-
 #  include "lib/stubs/containers/map-stub-control.h"
 #  include "lib/stubs/containers/double-chain-stub-control.h"
 #  include "lib/stubs/containers/vector-stub-control.h"
-#  include "lib/stubs/rte-stubs-control.h"
-
 #  include "bridge_loop.h"
-#else//KLEE_VERIFICATION
-#  include <assert.h>
-#  include <errno.h>
-#  include <stdio.h>
+#endif //KLEE_VERIFICATION
+
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <inttypes.h>
+#include <string.h>
 // DPDK uses these but doesn't include them. :|
-#  include <linux/limits.h>
-#  include <sys/types.h>
-#  include <unistd.h>
-#  include <rte_ethdev.h>
-#  include <rte_mbuf.h>
-#endif//KLEE_VERIFICATION
+#include <linux/limits.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <rte_common.h>
+#include <rte_ethdev.h>
+#include <rte_mbuf.h>
 
 #include "lib/nf_forward.h"
 #include "lib/nf_util.h"
@@ -40,16 +35,16 @@ struct bridge_config config;
 struct StaticFilterTable static_ft;
 struct DynamicFilterTable dynamic_ft;
 
-int bridge_expire_entries(uint32_t time) {
+int bridge_expire_entries(time_t time) {
   if (time < config.expiration_time) return 0;
-  uint32_t min_time = time - config.expiration_time;
+  time_t min_time = time - config.expiration_time;
   return expire_items_single_map(dynamic_ft.heap, dynamic_ft.keys,
                                  dynamic_ft.map,
                                  min_time);
 }
 
 int bridge_get_device(struct ether_addr* dst,
-                      uint8_t src_device) {
+                      uint16_t src_device) {
   int device = -1;
   struct StaticKey k;
   memcpy(&k.addr, dst, sizeof(struct ether_addr));
@@ -78,8 +73,8 @@ int bridge_get_device(struct ether_addr* dst,
 }
 
 void bridge_put_update_entry(struct ether_addr* src,
-                             uint8_t src_device,
-                             uint32_t time) {
+                             uint16_t src_device,
+                             time_t time) {
   int index = -1;
   int hash = ether_addr_hash(src);
   int present = map_get(dynamic_ft.map, src, &index);
@@ -122,7 +117,7 @@ void allocate_static_ft(int capacity) {
 
 struct str_field_descr static_map_key_fields[] = {
   {offsetof(struct StaticKey, addr), sizeof(struct ether_addr), "addr"},
-  {offsetof(struct StaticKey, device), sizeof(uint8_t), "device"},
+  {offsetof(struct StaticKey, device), sizeof(uint16_t), "device"},
 };
 
 struct nested_field_descr static_map_key_nested_fields[] = {
@@ -153,7 +148,7 @@ struct str_field_descr dynamic_vector_key_fields[] = {
 };
 
 struct str_field_descr dynamic_vector_value_fields[] = {
-  {0, sizeof(uint8_t), "device"},
+  {0, sizeof(uint16_t), "device"},
 };
 
 int stat_map_condition(void* key, int index) {
@@ -337,7 +332,7 @@ void nf_core_init(void) {
 #endif//KLEE_VERIFICATION
 }
 
-int nf_core_process(uint8_t device,
+int nf_core_process(uint16_t device,
                     struct rte_mbuf* mbuf,
                     time_t now) {
   struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
@@ -357,6 +352,12 @@ int nf_core_process(uint8_t device,
     return device;
   }
 
+#ifdef KLEE_VERIFICATION
+  // HACK concretize it - need to fix/move this
+  klee_assume(dst_device < rte_eth_dev_count());
+  for(unsigned d = 0; d < rte_eth_dev_count(); d++) if (dst_device == d) { dst_device = d; break; }
+#endif
+
   return dst_device;
 }
 
@@ -375,7 +376,7 @@ void nf_print_config() {
 #ifdef KLEE_VERIFICATION
 
 void nf_loop_iteration_begin(unsigned lcore_id,
-                             uint32_t time) {
+                             time_t time) {
   bridge_loop_iteration_begin(&dynamic_ft.heap,
                               &dynamic_ft.map,
                               &dynamic_ft.keys,
@@ -388,7 +389,7 @@ void nf_loop_iteration_begin(unsigned lcore_id,
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
-                                       uint32_t time) {
+                                       time_t time) {
   bridge_loop_iteration_assumptions(&dynamic_ft.heap,
                                     &dynamic_ft.map,
                                     &dynamic_ft.keys,
@@ -400,7 +401,7 @@ void nf_add_loop_iteration_assumptions(unsigned lcore_id,
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,
-                           uint32_t time) {
+                           time_t time) {
   bridge_loop_iteration_end(&dynamic_ft.heap,
                             &dynamic_ft.map,
                             &dynamic_ft.keys,

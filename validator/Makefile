@@ -26,3 +26,6 @@ clean:
 
 validate-nat: clean
 	./test_all.sh ../nf/vignat/klee-last out ../nf nat_fspec.cmo
+
+validate-bridge: clean
+	./test_all.sh ../nf/bridge/klee-last out ../nf bridge_fspec.cmo

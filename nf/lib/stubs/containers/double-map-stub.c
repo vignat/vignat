@@ -131,7 +131,7 @@ int dmap_allocate(map_keys_equality eq_a,
   }
   return 0;
 }
-#include "lib/flow.h"
+
 int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,

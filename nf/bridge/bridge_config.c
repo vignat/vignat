@@ -1,18 +1,13 @@
 #include <getopt.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <string.h>
 
-#if KLEE_VERIFICATION
-#  include "lib/stubs/rte_stubs.h"
-#else
-  // DPDK needs these but doesn't include them. :|
-#  include <linux/limits.h>
-#  include <sys/types.h>
-
-#  include <rte_common.h>
-#  include <rte_ethdev.h>
-#endif
-
+// DPDK needs these but doesn't include them. :|
+#include <linux/limits.h>
+#include <sys/types.h>
+#include <rte_common.h>
+#include <rte_ethdev.h>
 #include <cmdline_parse_etheraddr.h>
 #include <cmdline_parse_ipaddr.h>
 
@@ -79,7 +74,7 @@ void bridge_config_init(struct bridge_config* config,
 
 void bridge_config_cmdline_print_usage(void)
 {
-  printf("Usage:\n"
+  NF_INFO("Usage:\n"
          "[DPDK EAL options] --\n"
          "\t--expire <time>: flow expiration time, default: %" PRIu32 ".\n"
          "\t--capacity <n>: dynamic mac learning table capacity,"

@@ -1,6 +1,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "rte_config.h"
+#include "rte_ether.h"
+#include "rte_ip.h"
+#include "rte_mbuf.h"
+#include "rte_tcp.h"
+#include "lib/stubs/core_stub.h"
 #include "lib/expirator.h"
 #include "lib/stubs/time_stub_control.h"
 #include "lib/containers/double-map.h"
@@ -12,84 +17,6 @@
 
 //@ #include "lib/abstract-state.h"
 //@ #include "lib/bridge-abstract-state.h"
-
-// DPDK driver stub - copy/pasted here because VeriFast's C parser is awful so #ifdefs are painful
-//                    (it seems it even parses stuff inside an #ifdef that it won't use...)
-struct stub_mbuf_content {
-	struct ether_hdr ether;
-	struct ipv4_hdr ipv4;
-	struct tcp_hdr tcp;
-};
-struct stub_queue {
-	struct rte_mempool* mb_pool;
-	uint16_t port_id;
-};
-struct stub_device {
-	struct stub_queue rx_queues[RTE_MAX_QUEUES_PER_PORT];
-	struct stub_queue tx_queues[RTE_MAX_QUEUES_PER_PORT];
-};
-// DPDK stuff - but since this is used by VeriFast, we can't include rte_ things (VeriFast's preprocessor is lacking)
-struct rte_mempool;
-struct rte_mbuf {
-	struct stub_mbuf_content* buf_addr; // <- WARNING this has changed from void* to struct stub_mbuf_content* !!!
-	uint64_t buf_iova;
-	uint16_t data_off;
-	uint16_t refcnt;
-	uint16_t nb_segs;
-	uint16_t port;
-	uint64_t ol_flags;
-	uint32_t packet_type;
-	uint32_t pkt_len;
-	uint16_t data_len;
-	uint16_t vlan_tci;
-	uint32_t hash;
-	uint16_t vlan_tci_outer;
-	uint16_t buf_len;
-	uint64_t timestamp;
-	uint64_t udata64;
-	struct rte_mempool* pool;
-	struct rte_mbuf* next;
-	uint64_t tx_offload;
-	uint16_t priv_size;
-	uint16_t timesync;
-	uint32_t seqn;
-};
-struct ether_addr {
-        uint8_t a;
-        uint8_t b;
-        uint8_t c;
-        uint8_t d;
-        uint8_t e;
-        uint8_t f;
-};
-struct ether_hdr {
-	struct ether_addr d_addr;
-	struct ether_addr s_addr;
-	uint16_t ether_type;
-};
-struct ipv4_hdr {
-	uint8_t  version_ihl;
-	uint8_t  type_of_service;
-	uint16_t total_length;
-	uint16_t packet_id;
-	uint16_t fragment_offset;
-	uint8_t  time_to_live;
-	uint8_t  next_proto_id;
-	uint16_t hdr_checksum;
-	uint32_t src_addr;
-	uint32_t dst_addr;
-};
-struct tcp_hdr {
-	uint16_t src_port;
-	uint16_t dst_port;
-	uint32_t sent_seq;
-	uint32_t recv_ack;
-	uint8_t  data_off;
-	uint8_t  tcp_flags;
-	uint16_t rx_win;
-	uint16_t cksum;
-	uint16_t tcp_urp;
-};
 
 int flow_consistency(void* key_a, void* key_b, int index, void* value)
 /*@ requires true; @*/

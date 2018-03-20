@@ -19,9 +19,9 @@
     stub_hardware_receive_packet(); \
     time_t VIGOR_NOW = current_time(); \
     /* concretize the device to avoid leaking symbols into DPDK */ \
-    unsigned _vigor_devices_count = rte_eth_dev_count(); \
-    unsigned VIGOR_DEVICE = klee_range(0, _vigor_devices_count, "VIGOR_DEVICE"); \
-    for(unsigned _d = 0; _d < _vigor_devices_count; _d++) if (VIGOR_DEVICE == _d) { VIGOR_DEVICE = _d; break; }
+    unsigned VIGOR_DEVICES_COUNT = rte_eth_dev_count(); \
+    unsigned VIGOR_DEVICE = klee_range(0, VIGOR_DEVICES_COUNT, "VIGOR_DEVICE"); \
+    for(unsigned _d = 0; _d < VIGOR_DEVICES_COUNT; _d++) if (VIGOR_DEVICE == _d) { VIGOR_DEVICE = _d; break; }
 #define VIGOR_LOOP_END \
     stub_hardware_reset_receive(); \
     nf_loop_iteration_end(_vigor_lcore_id, VIGOR_NOW); \
@@ -144,6 +144,30 @@ nf_init_device(uint16_t device, struct rte_mempool *mbuf_pool)
   return 0;
 }
 
+
+// Flood method for the bridge
+#ifdef KLEE_VERIFICATION
+void flood(struct rte_mbuf* frame, uint16_t skip_device, uint16_t nb_devices); // defined in stubs
+#else
+void
+flood(struct rte_mbuf* frame, uint16_t skip_device, uint16_t nb_devices) {
+  for (uint16_t device = 0; device < nb_devices; device++) {
+    if (device == skip_device) continue;
+    struct rte_mbuf* copy = rte_pktmbuf_clone(frame, clone_pool);
+    if (copy == NULL) {
+      rte_exit(EXIT_FAILURE, "Cannot clone a frame for flooding");
+    }
+    uint16_t actual_tx_len = rte_eth_tx_burst(device, 0, &copy, 1);
+
+    if (actual_tx_len == 0) {
+      rte_pktmbuf_free(copy);
+    }
+  }
+  rte_pktmbuf_free(frame);
+}
+#endif//!KLEE_VERIFICATION
+
+
 // --- Per-core work ---
 
 static void
@@ -163,10 +187,14 @@ lcore_main(void)
   VIGOR_LOOP_BEGIN
     struct rte_mbuf* buf = NULL;
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
+
     if (actual_rx_len != 0) {
-      uint8_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
+      uint16_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
+
       if (dst_device == VIGOR_DEVICE) {
         rte_pktmbuf_free(buf);
+      } else if (dst_device == FLOOD_FRAME) {
+        flood(buf, VIGOR_DEVICE, VIGOR_DEVICES_COUNT);
       } else {
         uint16_t actual_tx_len = rte_eth_tx_burst(dst_device, 0, &buf, 1);
         if (actual_tx_len == 0) {
@@ -176,27 +204,6 @@ lcore_main(void)
     }
   VIGOR_LOOP_END
 }
-
-
-// Flood method for the bridge
-#ifndef KLEE_VERIFICATION
-void
-flood(struct rte_mbuf* frame, uint8_t skip_device, uint8_t nb_devices) {
-  for (uint8_t device = 0; device < nb_devices; device++) {
-    if (device == skip_device) continue;
-    struct rte_mbuf* copy = rte_pktmbuf_clone(frame, clone_pool);
-    if (copy == NULL) {
-      rte_exit(EXIT_FAILURE, "Cannot clone a frame for flooding");
-    }
-    uint16_t actual_tx_len = rte_eth_tx_burst(device, 0, &copy, 1);
-
-    if (actual_tx_len == 0) {
-      rte_pktmbuf_free(copy);
-    }
-  }
-  rte_pktmbuf_free(frame);
-}
-#endif//!KLEE_VERIFICATION
 
 
 // --- Main ---

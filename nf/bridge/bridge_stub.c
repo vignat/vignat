@@ -1,17 +1,13 @@
-#include "lib/stubs/core_stub.h"
 #include "lib/stubs/containers/str-descr.h"
 
-#include <stdlib.h>
-#include <string.h>
-
-#include <rte_byteorder.h>
-#include <rte_mbuf.h>
-#include <rte_mbuf_ptype.h>
-#include <rte_memory.h>
+#include <inttypes.h>
 
 #include <klee/klee.h>
 
+#include <rte_mbuf.h>
 
+
+// TODO DEDUPLICATE THIS
 static struct str_field_descr mbuf_descrs[] = {
   //Do not forget about "buf_addr" -- it is a pointer that is why it is not listed here.
   {offsetof(struct rte_mbuf, buf_iova), sizeof(rte_iova_t), "buf_iova"},
@@ -93,16 +89,6 @@ static struct nested_nested_field_descr stub_mbuf_content_n2[] = {
                                         mbuf_descrs[i].name,                                                                           \
                                         dir);                                                                                          \
   }
-#define KLEE_TRACE_MBUF_EPTR(m_ptr, pname, dir)                                                                               \
-  klee_trace_extra_ptr(m_ptr, sizeof(*m_ptr), pname, "", dir);                                                                \
-  klee_trace_extra_ptr_field(m_ptr, offsetof(struct rte_mbuf, buf_addr), sizeof(struct stub_mbuf_content*), "buf_addr", dir); \
-  for (int i = 0; i < sizeof(mbuf_descrs)/sizeof(mbuf_descrs[0]); ++i) {                                                      \
-    klee_trace_extra_ptr_field(m_ptr,                                                                                         \
-                               mbuf_descrs[i].offset,                                                                         \
-                               mbuf_descrs[i].width,                                                                          \
-                               mbuf_descrs[i].name,                                                                           \
-                               dir);                                                                                          \
-  }
 #define KLEE_TRACE_MBUF_CONTENT(u_ptr, dir)                                                                             \
   klee_trace_extra_ptr(u_ptr, sizeof(struct stub_mbuf_content), "user_buf_addr", "", dir);                              \
   klee_trace_extra_ptr_field(u_ptr, offsetof(struct stub_mbuf_content, ether), sizeof(struct ether_hdr), "ether", dir); \
@@ -128,125 +114,18 @@ static struct nested_nested_field_descr stub_mbuf_content_n2[] = {
   }
 
 
-void
-stub_core_trace_rx(struct rte_mbuf** mbuf)
-{
-	klee_trace_param_ptr(mbuf, sizeof(struct rte_mbuf*), "mbuf");
-	KLEE_TRACE_MBUF_EPTR(*mbuf, "incoming_package", TD_OUT);
-	KLEE_TRACE_MBUF_CONTENT((*mbuf)->buf_addr, TD_OUT);
-}
-
-uint8_t
-stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device)
-{
-	klee_trace_ret();
-	KLEE_TRACE_MBUF(mbuf, "mbuf", TD_IN);
-	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
-	klee_trace_param_u16(device, "device");
-
-	if (klee_int("sent") == 0) {
-		return 0;
-	}
-
-	return 1;
-}
-
-void
-stub_core_trace_free(struct rte_mbuf* mbuf)
-{
-	KLEE_TRACE_MBUF(mbuf, "mbuf", TD_IN);
-	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
-}
-
-
-bool
-stub_core_mbuf_create(uint16_t device, struct rte_mempool* pool, struct rte_mbuf** mbufp)
-{
-	uint16_t priv_size = rte_pktmbuf_priv_size(pool);
-	uint16_t mbuf_size = sizeof(struct rte_mbuf) + priv_size;
-	uint16_t buf_len = rte_pktmbuf_data_room_size(pool);
-
-	*mbufp = rte_mbuf_raw_alloc(pool);
-	if (*mbufp == NULL) {
-		return false;
-	}
-
-	struct rte_mbuf* buf_symbol = (struct rte_mbuf*) malloc(pool->elt_size);
-	if (buf_symbol == NULL) {
-		rte_pktmbuf_free(*mbufp);
-		return false;
-	}
-
-	// Make the packet symbolic
-	klee_make_symbolic(buf_symbol, pool->elt_size, "buf_value");
-	memcpy(*mbufp, buf_symbol, pool->elt_size);
-	free(buf_symbol);
-
-	// Explicitly make the content symbolic - validator depends on an user_buf symbol for the proof
-	struct stub_mbuf_content* buf_content_symbol = (struct stub_mbuf_content*) malloc(sizeof(struct stub_mbuf_content));
-	if (buf_content_symbol == NULL) {
-		rte_pktmbuf_free(*mbufp);
-		return false;
-	}
-	klee_make_symbolic(buf_content_symbol, sizeof(struct stub_mbuf_content), "user_buf");
-	memcpy((char*) *mbufp + mbuf_size, buf_content_symbol, sizeof(struct stub_mbuf_content));
-	free(buf_content_symbol);
-
-	// We do not support chained mbufs for now, make sure the NF doesn't touch them
-	struct rte_mbuf* buf_next = (struct rte_mbuf*) malloc(pool->elt_size);
-	if (buf_next == NULL) {
-		rte_pktmbuf_free(*mbufp);
-		return false;
-	}
-	klee_forbid_access(buf_next, pool->elt_size, "buf_next");
-
-	// Keep concrete values for what a driver guarantees
-	// (assignments are in the same order as the rte_mbuf declaration)
-	(*mbufp)->buf_addr = (char*) (*mbufp) + mbuf_size;
-	(*mbufp)->buf_iova = (rte_iova_t) (*mbufp)->buf_addr; // we assume VA = PA
-	// TODO: make data_off symbolic (but then we get symbolic pointer addition...)
-	// Alternative: Somehow prove that the code never touches anything outside of the [data_off, data_off+data_len] range...
-	(*mbufp)->data_off = 0; // klee_range(0, pool->elt_size - sizeof(struct stub_mbuf_content), "data_off");
-	(*mbufp)->refcnt = 1;
-	(*mbufp)->nb_segs = 1; // TODO do we want to make a possibility of multiple packets? Or we could just prove the NF never touches this...
-	(*mbufp)->port = device;
-	(*mbufp)->ol_flags = 0;
-	// packet_type is symbolic
-	(*mbufp)->pkt_len = sizeof(struct stub_mbuf_content);
-	(*mbufp)->data_len = sizeof(struct stub_mbuf_content); // TODO ideally those should be symbolic...
-	// vlan_tci is symbolic
-	// hash is symbolic
-	// vlan_tci_outer is symbolic
-	(*mbufp)->buf_len = (uint16_t) buf_len;
-	// timestamp is symbolic
-	(*mbufp)->userdata = NULL;
-	(*mbufp)->pool = pool;
-	(*mbufp)->next = buf_next;
-	// tx_offload is symbolic
-	(*mbufp)->priv_size = priv_size;
-	// timesync is symbolic
-	// seqn is symbolic
-
-	// Force the IPv4 content to have sane values for symbex...
-	struct stub_mbuf_content* buf_content = rte_pktmbuf_mtod(*mbufp, struct stub_mbuf_content*);
-	if(RTE_ETH_IS_IPV4_HDR((*mbufp)->packet_type)) {
-		// TODO can we make version_ihl symbolic?
-		buf_content->ipv4.version_ihl = (4 << 4) | 5; // IPv4, 5x4 bytes - concrete to avoid symbolic indexing
-		buf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
-	}
-
-	rte_mbuf_sanity_check(*mbufp, 1 /* is head mbuf */);
-
-	return true;
-}
-
-void
-stub_core_mbuf_free(struct rte_mbuf* mbuf)
-{
-	// Undo our pseudo-chain trickery (see stub_core_mbuf_create)
-	klee_allow_access(mbuf->next, mbuf->pool->elt_size);
-	free(mbuf->next);
-	mbuf->next = NULL;
-
-	rte_mbuf_raw_free(mbuf);
+// TODO why does this even exist?
+void flood(struct rte_mbuf* frame,
+           uint16_t skip_device,
+           uint16_t nb_devices) {
+  klee_trace_ret();
+  KLEE_TRACE_MBUF(frame, "frame", TD_IN);
+  KLEE_TRACE_MBUF_CONTENT(frame->buf_addr, TD_BOTH);
+  klee_trace_param_i32(skip_device, "skip_device");
+  klee_trace_param_i32(nb_devices, "nb_devices");
+//  klee_forbid_access(frame->buf_addr, sizeof(struct stub_mbuf_content),
+//                     "pkt flooded");
+//  klee_forbid_access(frame,
+//                     sizeof(struct rte_mbuf),
+//                     "pkt flooded");
 }

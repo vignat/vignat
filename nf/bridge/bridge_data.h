@@ -3,7 +3,7 @@
 
 #include "stdbool.h"
 
-#include "lib/custom_ether_addr_def.h"
+#include "rte_ether.h"
 
 struct Map;
 struct Vector;
