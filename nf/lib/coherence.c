@@ -335,3 +335,28 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     close dmap_dchain_coherent(m, ch);
   }
   @*/
+
+/*@
+  lemma void forall2_nth<t1,t2>(list<t1> l1, list<t2> l2,
+                                fixpoint(t1,t2,bool) f, int index)
+  requires 0 <= index &*& index < length(l1) &*& index < length(l2) &*&
+           true == forall2(l1, l2, f);
+  ensures true == f(nth(index, l1), nth(index, l2));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void kkeeper_erase_one<t>(list<void*> addrs,
+                                  list<pair<t, bool> > contents,
+                                  list<pair<t, void*> > addr_map,
+                                  int index)
+  requires 0 <= index &*& index <= length(contents) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map));
+  ensures true == forall2(vector_erase_fp(contents, index), addrs,
+                          (kkeeper)(map_erase_fp(addr_map, fst(nth(index, contents)))));
+  {
+  assume(false);//TODO
+  }
+  @*/

@@ -43,23 +43,42 @@ struct Vector {
     malloc_block(data, el_size*cap) &*&
     data + el_size*cap <= (void*)UINTPTR_MAX;
 
+  fixpoint list<void*> gen_vector_addrs_impl_fp<t>(void* data,
+                                                   int el_size,
+                                                   nat how_many) {
+    switch(how_many) {
+      case zero: return nil;
+      case succ(n):
+        return cons(data, gen_vector_addrs_impl_fp(data + el_size,
+                                                   el_size,
+                                                   n));
+    }
+  }
+
+  fixpoint list<void*> gen_vector_addrs_fp<t>(void* data, int el_size, int cap) {
+    return gen_vector_addrs_impl_fp(data, el_size, nat_of_int(cap));
+  }
 
   predicate vectorp<t>(struct Vector* vector,
                        predicate (void*;t) entp,
-                       list<pair<t, bool> > values) =
+                       list<pair<t, bool> > values,
+                       list<void*> addrs) =
     vector_basep<t>(vector, ?el_size, ?cap, ?data) &*&
     cap == length(values) &*&
-    entsp(data, el_size, entp, cap, values);
+    entsp(data, el_size, entp, cap, values) &*&
+    addrs == gen_vector_addrs_fp(data, el_size, cap);
 
   predicate vector_accp<t>(struct Vector* vector,
                            predicate (void*;t) entp,
                            list<pair<t, bool> > values,
+                           list<void*> addrs,
                            int accessed_idx,
                            void* entry) =
     vector_basep<t>(vector, ?el_size, ?cap, ?data) &*&
     cap == length(values) &*&
     0 <= accessed_idx &*& accessed_idx < cap &*&
     entry == data + el_size*accessed_idx &*&
+    addrs == gen_vector_addrs_fp(data, el_size, cap) &*&
     entsp(data, el_size, entp, accessed_idx, take(accessed_idx, values)) &*&
     entsp(data + el_size*(accessed_idx + 1), el_size, entp,
           cap - accessed_idx - 1, drop(accessed_idx + 1, values));
@@ -112,7 +131,7 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
               (*vector_out |-> old_vo) :
               (*vector_out |-> ?new_vo &*&
                result == 1 &*&
-               vectorp(new_vo, entp, ?contents) &*&
+               vectorp(new_vo, entp, ?contents, ?addrs) &*&
                length(contents) == capacity &*&
                true == forall(contents, snd)); @*/
 {
@@ -168,7 +187,8 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
     //@ elems = append(elems, cons(pair(x, true), nil));
   }
   //@ open upperbounded_ptr(_);
-  //@ close vectorp(*vector_out, entp, elems);
+  //@ list<void*> addrs = gen_vector_addrs_fp((*vector_out)->data, elem_size, capacity);
+  //@ close vectorp(*vector_out, entp, elems, addrs);
   return 1;
 }
 
@@ -196,21 +216,44 @@ int vector_allocate/*@ <t> @*/(int elem_size, int capacity,
   }
   @*/
 
+/*@
+  lemma void gen_addrs_index_impl(void* data, int el_size, int index, nat n)
+  requires 0 <= index &*& index < int_of_nat(n);
+  ensures nth(index, gen_vector_addrs_impl_fp(data, el_size, n)) == data + el_size*index;
+  {
+    switch(n) {
+      case zero: return;
+      case succ(m):
+        if (index == 0) return;
+        gen_addrs_index_impl(data + el_size, el_size, index - 1, m);
+    }
+  }
+
+  lemma void gen_addrs_index(void* data, int el_size, int cap, int index)
+  requires 0 <= index &*& index < cap;
+  ensures nth(index, gen_vector_addrs_fp(data, el_size, cap)) == data + el_size*index;
+  {
+    gen_addrs_index_impl(data, el_size, index, nat_of_int(cap));
+  }
+  @*/
+
 void vector_borrow_full/*@ <t> @*/(struct Vector* vector, int index, void** val_out)
-/*@ requires vectorp<t>(vector, ?entp, ?values) &*&
+/*@ requires vectorp<t>(vector, ?entp, ?values, ?addrs) &*&
              0 <= index &*& index < length(values) &*&
              nth(index, values) == pair(?val, true) &*&
              *val_out |-> _; @*/
 /*@ ensures *val_out |-> ?vo &*&
-            vector_accp<t>(vector, entp, values, index, vo) &*&
+            vector_accp<t>(vector, entp, values, addrs, index, vo) &*&
+            vo == nth(index, addrs) &*&
             entp(vo, val); @*/
 {
-  //@ open vectorp<t>(vector, entp, values);
+  //@ open vectorp<t>(vector, entp, values, addrs);
   //@ extract_by_index_full<t>(vector->data, index);
   //@ mul_mono_strict(index, length(values), vector->elem_size);
   //@ mul_bounds(index, length(values), vector->elem_size, 4096);
   *val_out = vector->data + index*vector->elem_size;
-  //@ close vector_accp<t>(vector, entp, values, index, *val_out);
+  //@ gen_addrs_index(vector->data, vector->elem_size, length(values), index);
+  //@ close vector_accp<t>(vector, entp, values, addrs, index, *val_out);
 }
 
 /*@
@@ -259,20 +302,22 @@ void vector_borrow_full/*@ <t> @*/(struct Vector* vector, int index, void** val_
   }
   @*/
 void vector_borrow_half/*@ <t> @*/(struct Vector* vector, int index, void** val_out)
-/*@ requires vectorp<t>(vector, ?entp, ?values) &*&
+/*@ requires vectorp<t>(vector, ?entp, ?values, ?addrs) &*&
              0 <= index &*& index < length(values) &*&
              nth(index, values) == pair(?val, false) &*&
              *val_out |-> _; @*/
 /*@ ensures *val_out |-> ?vo &*&
-            vector_accp<t>(vector, entp, values, index, vo) &*&
+            vector_accp<t>(vector, entp, values, addrs, index, vo) &*&
+            vo == nth(index, addrs) &*&
             [0.5]entp(vo, val); @*/
 {
-  //@ open vectorp<t>(vector, entp, values);
+  //@ open vectorp<t>(vector, entp, values, addrs);
   //@ extract_by_index_half<t>(vector->data, index);
   //@ mul_mono_strict(index, length(values), vector->elem_size);
   //@ mul_bounds(index, length(values), vector->elem_size, 4096);
   *val_out = vector->data + index*vector->elem_size;
-  //@ close vector_accp<t>(vector, entp, values, index, *val_out);
+  //@ gen_addrs_index(vector->data, vector->elem_size, length(values), index);
+  //@ close vector_accp<t>(vector, entp, values, addrs, index, *val_out);
 }
 
 /*@
@@ -298,28 +343,28 @@ void vector_borrow_half/*@ <t> @*/(struct Vector* vector, int index, void** val_
   @*/
 
 void vector_return_full/*@ <t> @*/(struct Vector* vector, int index, void* value)
-/*@ requires vector_accp<t>(vector, ?entp, ?values, index, value) &*&
+/*@ requires vector_accp<t>(vector, ?entp, ?values, ?addrs, index, value) &*&
              entp(value, ?v); @*/
-/*@ ensures vectorp(vector, entp, update(index, pair(v, true), values)); @*/
+/*@ ensures vectorp(vector, entp, update(index, pair(v, true), values), addrs); @*/
 {
-  //@ open vector_accp<t>(vector, entp, values, index, value);
+  //@ open vector_accp<t>(vector, entp, values, addrs, index, value);
   //@ take_update_unrelevant(index, index, pair(v, true), values);
   //@ drop_update_unrelevant(index + 1, index, pair(v, true), values);
   //@ glue_by_index_full(vector->data, index, update(index, pair(v, true), values));
-  //@ close vectorp<t>(vector, entp, update(index, pair(v, true), values));
+  //@ close vectorp<t>(vector, entp, update(index, pair(v, true), values), addrs);
 }
 
 
 void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value)
-/*@ requires vector_accp<t>(vector, ?entp, ?values, index, value) &*&
+/*@ requires vector_accp<t>(vector, ?entp, ?values, ?addrs, index, value) &*&
              [0.5]entp(value, ?v); @*/
-/*@ ensures vectorp(vector, entp, update(index, pair(v, false), values)); @*/
+/*@ ensures vectorp(vector, entp, update(index, pair(v, false), values), addrs); @*/
 {
-  //@ open vector_accp<t>(vector, entp, values, index, value);
+  //@ open vector_accp<t>(vector, entp, values, addrs, index, value);
   //@ take_update_unrelevant(index, index, pair(v, false), values);
   //@ drop_update_unrelevant(index + 1, index, pair(v, false), values);
   //@ glue_by_index_half(vector->data, index, update(index, pair(v, false), values));
-  //@ close vectorp<t>(vector, entp, update(index, pair(v, false), values));
+  //@ close vectorp<t>(vector, entp, update(index, pair(v, false), values), addrs);
 }
 
 

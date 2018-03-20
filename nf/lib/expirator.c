@@ -114,25 +114,25 @@ int expire_items/*@<K1,K2,V> @*/(struct DoubleChain* chain,
   }
   @*/
 
-// FIXME: generalize once VeriFast catches up, see coherence.h comment
-int expire_items_single_map(struct DoubleChain* chain,
-                            struct Vector* vector,
-                            struct Map* map,
-                            time_t time)
-/*@ requires mapp<ether_addri>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
-             vectorp<ether_addri>(vector, (kkeeperp)(addrs, kp), ?v) &*&
+int expire_items_single_map/*@ <kt> @*/(struct DoubleChain* chain,
+                                        struct Vector* vector,
+                                        struct Map* map,
+                                        time_t time)
+/*@ requires mapp<kt>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
+             vectorp<kt>(vector, kp, ?v, ?vaddrs) &*&
+             true == forall2(v, vaddrs, (kkeeper)(addrs)) &*&
              double_chainp(?ch, chain) &*&
              length(v) == cap &*&
              dchain_index_range_fp(ch) < INT_MAX &*&
-             map_vec_chain_coherent<ether_addri>(m, v, ch); @*/
-/*@ ensures mapp<ether_addri>(map, kp, hsh, recp, mapc(cap, ?nm, ?naddrs)) &*&
-            vectorp<ether_addri>(vector, kkeeperp(naddrs, kp), ?nv) &*&
+             map_vec_chain_coherent<kt>(m, v, ch); @*/
+/*@ ensures mapp<kt>(map, kp, hsh, recp, mapc(cap, ?nm, ?naddrs)) &*&
+            vectorp<kt>(vector, kp, ?nv, vaddrs) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
             nm == map_erase_all_fp(m, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
             naddrs == map_erase_all_fp(addrs, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
             nv == vector_erase_all_fp(v, dchain_get_expired_indexes_fp(ch, time)) &*&
-            map_vec_chain_coherent<ether_addri>(nm, nv, nch) &*&
+            map_vec_chain_coherent<kt>(nm, nv, nch) &*&
             length(nv) == length(v) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 {
@@ -143,15 +143,16 @@ int expire_items_single_map(struct DoubleChain* chain,
   //@ double_chainp_to_sorted(ch);
   //@ dchain_expired_indexes_limited(ch, time);
   //@ double_chain_nodups(ch);
+  //@ vector_addrs_same_len(vector);
   //@ dchain cur_ch = ch;
-  //@ list<pair<ether_addri, uint32_t> > cur_m = m;
-  //@ list<pair<ether_addri, void*> > cur_addrs = addrs;
-  //@ list<pair<ether_addri, bool> > cur_v = v;
+  //@ list<pair<kt, uint32_t> > cur_m = m;
+  //@ list<pair<kt, void*> > cur_addrs = addrs;
+  //@ list<pair<kt, bool> > cur_v = v;
   while (dchain_expire_one_index(chain, &index, time))
     /*@ invariant double_chainp(cur_ch, chain) &*&
                   dchain_is_sortedp(ch) &*&
                   cur_ch == expire_n_indexes(ch, time, count) &*&
-                  mapp<ether_addri>(map, kp, hsh, recp,
+                  mapp<kt>(map, kp, hsh, recp,
                                     mapc(cap, cur_m, cur_addrs)) &*&
                   cur_m == map_erase_all_fp
                              (m, vector_get_values_fp
@@ -163,11 +164,13 @@ int expire_items_single_map(struct DoubleChain* chain,
                                            (v, take(count,
                                                     dchain_get_expired_indexes_fp
                                                       (ch, time)))) &*&
-                  vectorp<ether_addri>(vector, kkeeperp(cur_addrs, kp), cur_v) &*&
+                  vectorp<kt>(vector, kp, cur_v, vaddrs) &*&
+                  true == forall2(cur_v, vaddrs, (kkeeper)(cur_addrs)) &*&
+                  length(vaddrs) == length(cur_v) &*&
                   cur_v == vector_erase_all_fp(v, take(count,
                                                        dchain_get_expired_indexes_fp
                                                          (ch, time))) &*&
-                  map_vec_chain_coherent<ether_addri>(cur_m, cur_v, cur_ch) &*&
+                  map_vec_chain_coherent<kt>(cur_m, cur_v, cur_ch) &*&
                   integer(&index, _) &*&
                   dchain_nodups(cur_ch) &*&
                   0 <= count &*&
@@ -180,9 +183,10 @@ int expire_items_single_map(struct DoubleChain* chain,
     //@ mvc_coherent_index_busy(cur_m, cur_v, cur_ch, dchain_get_oldest_index_fp(cur_ch));
     void* key;
     vector_borrow_half(vector, index, &key);
-    //@ open kkeeperp(cur_addrs, kp)(key, ?k);
+    //@ assert *&key |-> ?key_pointer;
+    //@ assert [_]kp(key_pointer, ?k);
+    //@ forall2_nth(cur_v, vaddrs, (kkeeper)(cur_addrs), index);
     map_erase(map, key, &key);
-    //@ close kkeeperp(cur_addrs, kp)(key, k);
     vector_return_full(vector, index, key);
     //@ dchain_still_more_to_expire(ch, time, count);
     //@ expire_n_plus_one(ch, time, count);
@@ -195,7 +199,7 @@ int expire_items_single_map(struct DoubleChain* chain,
     //@ dchain_remove_keeps_nodups(cur_ch, index);
     //@ vector_erase_all_same_len(v, cur_exp_indices);
     //@ vector_erase_all_keeps_val(v, cur_exp_indices, index);
-    //@ kkeeperp_erase_one(vector, cur_v, cur_addrs, kp, index);
+    //@ kkeeper_erase_one(vaddrs, cur_v, cur_addrs, index);
     //@ mvc_coherent_expire_one(cur_m, cur_v, cur_ch, index, k);
     //@ cur_ch = dchain_remove_index_fp(cur_ch, index);
     //@ cur_m = map_erase_fp(cur_m, k);

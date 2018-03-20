@@ -62,24 +62,25 @@ typedef void entry_pack_key/*@ <kt,et> (predicate (void*;kt) kp,
              true == right_offsets(entry, key); @*/
 /*@ ensures [fr]full_ep(entry, e); @*/
 
-int expire_items_single_map(struct DoubleChain* chain,
-                            struct Vector* vector,
-                            struct Map* map,
-                            time_t time);
-/*@ requires mapp<ether_addri>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
-             vectorp<ether_addri>(vector, (kkeeperp)(addrs, kp), ?v) &*&
+int expire_items_single_map/*@ <kt> @*/(struct DoubleChain* chain,
+                                        struct Vector* vector,
+                                        struct Map* map,
+                                        time_t time);
+/*@ requires mapp<kt>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
+             vectorp<kt>(vector, kp, ?v, ?vaddrs) &*&
+             true == forall2(v, vaddrs, (kkeeper)(addrs)) &*&
              double_chainp(?ch, chain) &*&
              length(v) == cap &*&
              dchain_index_range_fp(ch) < INT_MAX &*&
-             map_vec_chain_coherent<ether_addri>(m, v, ch); @*/
-/*@ ensures mapp<ether_addri>(map, kp, hsh, recp, mapc(cap, ?nm, ?naddrs)) &*&
-            vectorp<ether_addri>(vector, (kkeeperp)(naddrs, kp), ?nv) &*&
+             map_vec_chain_coherent<kt>(m, v, ch); @*/
+/*@ ensures mapp<kt>(map, kp, hsh, recp, mapc(cap, ?nm, ?naddrs)) &*&
+            vectorp<kt>(vector, kp, ?nv, vaddrs) &*&
             double_chainp(?nch, chain) &*&
             nch == dchain_expire_old_indexes_fp(ch, time) &*&
             nm == map_erase_all_fp(m, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
             naddrs == map_erase_all_fp(addrs, vector_get_values_fp(v, dchain_get_expired_indexes_fp(ch, time))) &*&
             nv == vector_erase_all_fp(v, dchain_get_expired_indexes_fp(ch, time)) &*&
-            map_vec_chain_coherent<ether_addri>(nm, nv, nch) &*&
+            map_vec_chain_coherent<kt>(nm, nv, nch) &*&
             length(nv) == length(v) &*&
             result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
 #endif //_EXPIRATOR_H_INCLUDED_

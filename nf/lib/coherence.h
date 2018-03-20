@@ -4,8 +4,6 @@
 #include "containers/map.h"
 #include "containers/double-map.h"
 #include "containers/double-chain.h"
-// FIXME: remove, once generalized. see below.
-#include "../bridge/bridge_data.h"
 
 
 /*@
@@ -17,17 +15,13 @@
                                        list<pair<kt, bool> > v, dchain ch);
   @*/
 
-// FIXME: VeriFast currently does not support generic predicate constructors,
-// so kkeeperp is specialized to its immediate use case. Need to revisit this
-// and dependent places, once the support is implemented.
 /*@
-  predicate_ctor kkeeperp(list<pair<ether_addri, void*> > addrs,
-                          predicate (void*;ether_addri) entp)(
-                          void* ptr;
-                          ether_addri key) =
-    true == map_has_fp(addrs, key) &*&
-    ptr == map_get_fp(addrs, key) &*&
-    entp(ptr, key);
+  fixpoint bool kkeeper<t>(list<pair<t, void*> > addr_map,
+                           pair<t, bool> entry, void* ptr) {
+    return snd(entry) ? true :
+             (map_has_fp(addr_map, fst(entry)) &&
+              ptr == map_get_fp(addr_map, fst(entry)));
+  }
   @*/
 
 /*@
@@ -143,16 +137,36 @@
   @*/
 
 /*@
-  lemma void kkeeperp_erase_one(struct Vector* vector,
-                                list<pair<ether_addri, bool> > contents,
-                                list<pair<ether_addri, void*> > addrs,
-                                predicate (void*;ether_addri) kp,
-                                int index);
+  fixpoint bool forall2<t1,t2>(list<t1> l1, list<t2> l2, fixpoint (t1,t2,bool) f) {
+    switch(l1) {
+      case nil: return true;
+      case cons(h1,t1):
+        return switch(l2) {
+          case nil: return true;
+          case cons(h2,t2):
+            return f(h1, h2) && forall2(t1, t2, f);
+        };
+    }
+  }
+  @*/
+
+/*@
+  lemma void forall2_nth<t1,t2>(list<t1> l1, list<t2> l2,
+                                fixpoint(t1,t2,bool) f, int index);
+  requires 0 <= index &*& index < length(l1) &*& index < length(l2) &*&
+           true == forall2(l1, l2, f);
+  ensures true == f(nth(index, l1), nth(index, l2));
+  @*/
+
+/*@
+  lemma void kkeeper_erase_one<t>(list<void*> addrs,
+                                  list<pair<t, bool> > contents,
+                                  list<pair<t, void*> > addr_map,
+                                  int index);
   requires 0 <= index &*& index <= length(contents) &*&
-           vectorp<ether_addri>(vector, kkeeperp(addrs, kp),
-                                vector_erase_fp(contents, index));
-  ensures vectorp<ether_addri>(vector, kkeeperp(map_erase_fp(addrs, fst(nth(index, contents))), kp),
-                               vector_erase_fp(contents, index));
+           true == forall2(contents, addrs, (kkeeper)(addr_map));
+  ensures true == forall2(vector_erase_fp(contents, index), addrs,
+                          (kkeeper)(map_erase_fp(addr_map, fst(nth(index, contents)))));
   @*/
 
 /*@
