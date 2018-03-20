@@ -136,12 +136,19 @@ stub_core_trace_rx(struct rte_mbuf** mbuf)
 	KLEE_TRACE_MBUF_CONTENT((*mbuf)->buf_addr, TD_OUT);
 }
 
-void
+uint8_t
 stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device)
 {
+	klee_trace_ret();
 	KLEE_TRACE_MBUF(mbuf, "mbuf", TD_IN);
 	KLEE_TRACE_MBUF_CONTENT(mbuf->buf_addr, TD_IN);
 	klee_trace_param_u16(device, "device");
+
+	if (klee_int("sent") == 0) {
+		return 0;
+	}
+
+	return 1;
 }
 
 void

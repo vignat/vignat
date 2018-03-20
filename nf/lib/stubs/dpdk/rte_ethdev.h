@@ -150,12 +150,11 @@ rte_eth_tx_burst(uint16_t port_id, uint16_t queue_id,
 	klee_assert(queue_id == 0); // we only support that
 	klee_assert(nb_pkts == 1); // same
 
-	if (klee_int("sent") == 0) {
+	uint8_t ret = stub_core_trace_tx(*tx_pkts, port_id);
+	if (ret == 0) {
 		return 0;
 	}
 
-	stub_core_trace_tx(*tx_pkts, port_id);
 	stub_core_mbuf_free(*tx_pkts);
-
 	return 1;
 }

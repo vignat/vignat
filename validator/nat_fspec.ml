@@ -136,15 +136,14 @@ let rec simplify_c_string str =
   let str0 = Str.global_replace (Str.regexp "(\\*\\([^)]+\\).\\([^)]+\\)") "\\1->\\2" str0 in (* ( *a ).b  ==>  a->b *)
   if str = str0 then str else simplify_c_string str0 (* find a fixpoint *)
 
-(* TODO try removing this? *)
-let copy_stub_mbuf_content var_name ptr = ""
-  (*("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
+let copy_stub_mbuf_content var_name ptr =
+  ("struct stub_mbuf_content* tmp_smc_ptr" ^ var_name ^
    " = (" ^ ptr ^ ")->buf_addr;\n") ^
   deep_copy
     {Ir.name=var_name;
      Ir.value={v=Deref {v=Ir.Id ("tmp_smc_ptr" ^ var_name);
                         t=Ptr stub_mbuf_content_struct};
-               t=stub_mbuf_content_struct}}*)
+               t=stub_mbuf_content_struct}}
 
 let fun_types =
   String.Map.of_alist_exn
@@ -724,7 +723,7 @@ let fun_types =
                                           ("*" ^ (List.nth_exn params.args 0))));
                                  ];};
      "stub_core_trace_tx", {
-                 ret_type = Static Void;
+                 ret_type = Static Uint8;
                  arg_types = stt [Ptr rte_mbuf_struct; Uint16];
                  extra_ptr_types = estt ["user_buf_addr",
                                          stub_mbuf_content_struct];
@@ -740,7 +739,6 @@ let fun_types =
                               sent_pkt ^ "->port;\n" ^
                               "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
-                 (* TODO do something with a_packet_sent *)
                  lemmas_after = [(fun params -> "a_packet_sent = true;\n");];
                  };
      "stub_core_trace_free", {

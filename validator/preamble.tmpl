@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 #include "rte_config.h"
 #include "lib/expirator.h"
 #include "lib/stubs/time_stub_control.h"
@@ -199,9 +200,9 @@ void stub_core_trace_rx(struct rte_mbuf** mbuf);
 //@ requires *mbuf |-> _;
 //@ ensures *mbuf |-> ?mb &*& mbufp(mb, _);
 
-void stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
-//@ requires mbufp(mbuf, _);
-//@ ensures true;
+uint8_t stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
+//@ requires mbufp(mbuf, ?mb);
+//@ ensures result <= 1 &*& (result == 0 ? mbufp(mbuf, mb) : true);
 
 void stub_core_trace_free(struct rte_mbuf* mbuf);
 //@ requires mbufp(mbuf,_);

@@ -21,9 +21,14 @@ struct stub_mbuf_content {
 // TODO add tracing for packet details
 
 // mbuf tracing
+// HACK:
+// - First, we use a double-pointer for trace_rx because the Validator doesn't support single-pointer out params
+// - Second, we make _tx return a int (instead of letting callers just not call it) because the Validator
+//   is currently written with the assumption that "sending" means "trying to send"; we'd need to fix that...
+// - Third, we use an int instead of a bool because the Validator doesn't support bools
 struct rte_mbuf;
 void stub_core_trace_rx(struct rte_mbuf** mbuf);
-void stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
+uint8_t stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device);
 void stub_core_trace_free(struct rte_mbuf* mbuf);
 
 
