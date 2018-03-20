@@ -137,28 +137,6 @@
   @*/
 
 /*@
-  fixpoint bool forall2<t1,t2>(list<t1> l1, list<t2> l2, fixpoint (t1,t2,bool) f) {
-    switch(l1) {
-      case nil: return true;
-      case cons(h1,t1):
-        return switch(l2) {
-          case nil: return true;
-          case cons(h2,t2):
-            return f(h1, h2) && forall2(t1, t2, f);
-        };
-    }
-  }
-  @*/
-
-/*@
-  lemma void forall2_nth<t1,t2>(list<t1> l1, list<t2> l2,
-                                fixpoint(t1,t2,bool) f, int index);
-  requires 0 <= index &*& index < length(l1) &*& index < length(l2) &*&
-           true == forall2(l1, l2, f);
-  ensures true == f(nth(index, l1), nth(index, l2));
-  @*/
-
-/*@
   lemma void kkeeper_erase_one<t>(list<void*> addrs,
                                   list<pair<t, bool> > contents,
                                   list<pair<t, void*> > addr_map,
