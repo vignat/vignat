@@ -2542,6 +2542,36 @@ int map_impl_size/*@ <kt> @*/(int* busybits, int capacity)
 }
 
 /*@
+  lemma void map_erase_swap<kt,vt>(list<pair<kt, vt> > m, kt k1, kt k2)
+  requires true;
+  ensures map_erase_fp(map_erase_fp(m, k1), k2) ==
+          map_erase_fp(map_erase_fp(m, k2), k1);
+  {
+    switch(m) {
+      case nil: return;
+      case cons(h,t):
+        if (fst(h) != k1 && fst(h) != k2)
+          map_erase_swap(t, k1, k2);
+    }
+  }
+
+  lemma void map_erase_another_one<kt,vt>(list<pair<kt,vt> > m,
+                                          list<kt> keys,
+                                          kt key)
+  requires true;
+  ensures map_erase_fp(map_erase_all_fp(m, keys), key) ==
+          map_erase_all_fp(m, append(keys, cons(key, nil)));
+  {
+    switch(keys) {
+      case nil: return;
+      case cons(h,t):
+        map_erase_another_one(m, t, key);
+        map_erase_swap(map_erase_all_fp(m, t), key, h);
+    }
+  }
+  @*/
+
+/*@
   lemma void map_get_keeps_recp<kt>(list<pair<kt,int> > m, kt k)
   requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
                    ?cap, ?bbs, ?kps, ?khs, ?chns, ?vals) &*&
