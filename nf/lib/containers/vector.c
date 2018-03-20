@@ -321,3 +321,45 @@ void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value
   //@ glue_by_index_half(vector->data, index, update(index, pair(v, false), values));
   //@ close vectorp<t>(vector, entp, update(index, pair(v, false), values));
 }
+
+
+/*@
+  lemma void vector_get_values_append<t>(list<pair<t, bool> > vector,
+                                         list<int> indices,
+                                         int index, t v)
+  requires 0 <= index &*& index < length(vector) &*&
+           nth(index, vector) == pair(v, _);
+  ensures append(vector_get_values_fp(vector, indices), cons(v, nil)) ==
+          vector_get_values_fp(vector, append(indices, cons(index, nil)));
+  {
+    switch(indices) {
+      case nil: return;
+      case cons(h,t):
+        vector_get_values_append(vector, t, index, v);
+    }
+  }
+  @*/
+
+/*@
+  lemma void vector_erase_all_keeps_val<t>(list<pair<t, bool> > vector,
+                                           list<int> indices,
+                                           int index)
+  requires 0 <= index &*& index < length(vector);
+  ensures nth(index, vector_erase_all_fp(vector, indices)) ==
+          nth(index, vector);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+   lemma void vector_erase_one_more<t>(list<pair<t, bool> > vector,
+                                       list<int> indices,
+                                       int index)
+   requires true;
+   ensures vector_erase_fp(vector_erase_all_fp(vector, indices), index) ==
+           vector_erase_all_fp(vector, append(indices, cons(index, nil)));
+  {
+    assume(false);//TODO
+  }
+  @*/
