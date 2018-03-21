@@ -13,7 +13,7 @@ struct int_key {
   uint16_t dst_port;
   uint32_t int_src_ip;
   uint32_t dst_ip;
-  uint8_t int_device_id;
+  uint16_t int_device_id;
   uint8_t protocol;
 };
 
@@ -27,7 +27,7 @@ struct ext_key {
   uint16_t dst_port;
   uint32_t ext_src_ip;
   uint32_t dst_ip;
-  uint8_t ext_device_id;
+  uint16_t ext_device_id;
   uint8_t protocol;
 };
 
@@ -46,8 +46,8 @@ struct flow {
   uint32_t int_src_ip;
   uint32_t ext_src_ip;
   uint32_t dst_ip;
-  uint8_t int_device_id;
-  uint8_t ext_device_id;
+  uint16_t int_device_id;
+  uint16_t ext_device_id;
   uint8_t protocol;
 };
 

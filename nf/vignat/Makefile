@@ -19,4 +19,5 @@ NF_VERIF_ARGS := --lan-dev 0 \
                  --eth-dest 0,01:23:45:67:89:00 \
                  --eth-dest 1,01:23:45:67:89:01
 
-include ../Makefile
+# Include parent (in a convoluted way cause of DPDK)
+include $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/../Makefile

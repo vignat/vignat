@@ -18,6 +18,7 @@
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
+#include <cmdline_parse_etheraddr.h>
 
 #include "lib/nf_forward.h"
 #include "lib/nf_util.h"
@@ -37,7 +38,17 @@ struct DynamicFilterTable dynamic_ft;
 
 int bridge_expire_entries(time_t time) {
   if (time < config.expiration_time) return 0;
-  time_t min_time = time - config.expiration_time;
+
+  // This is convoluted - we want to make sure the sanitization doesn't
+  // extend our time_t value in 128 bits, which would confuse the validator.
+  // So we "prove" by hand that it's OK...
+  // We know time >= 0 since time >= config.expiration_time
+  assert(sizeof(time_t) <= sizeof(uint64_t));
+  uint64_t time_u = (uint64_t) time; // OK since assert above passed and time > 0
+  uint64_t min_time_u = time_u - config.expiration_time; // OK because time >= expiration_time >= 0
+  assert(sizeof(uint64_t) <= sizeof(time_t));
+  time_t min_time = (time_t) min_time_u; // OK since the assert above passed
+
   return expire_items_single_map(dynamic_ft.heap, dynamic_ft.keys,
                                  dynamic_ft.map,
                                  min_time);
@@ -332,16 +343,15 @@ void nf_core_init(void) {
 #endif//KLEE_VERIFICATION
 }
 
-int nf_core_process(uint16_t device,
-                    struct rte_mbuf* mbuf,
+int nf_core_process(struct rte_mbuf* mbuf,
                     time_t now) {
   struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
 
   bridge_expire_entries(now);
-  bridge_put_update_entry(&ether_header->s_addr, device, now);
+  bridge_put_update_entry(&ether_header->s_addr, mbuf->port, now);
 
   int dst_device = bridge_get_device(&ether_header->d_addr,
-                                     device);
+                                     mbuf->port);
 
   if (dst_device == -1) {
     return FLOOD_FRAME;
@@ -349,7 +359,7 @@ int nf_core_process(uint16_t device,
 
   if (dst_device == -2) {
     NF_DEBUG("filtered frame");
-    return device;
+    return mbuf->port;
   }
 
 #ifdef KLEE_VERIFICATION

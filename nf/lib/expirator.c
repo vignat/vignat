@@ -1,7 +1,7 @@
 #include <assert.h>
-#include "containers/double-chain.h"
-#include "coherence.h"
-#include "expirator.h"
+#include "lib/containers/double-chain.h"
+#include "lib/coherence.h"
+#include "lib/expirator.h"
 
 
 /*@

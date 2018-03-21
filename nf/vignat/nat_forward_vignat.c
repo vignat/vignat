@@ -33,7 +33,7 @@ void nf_core_init()
 	}
 }
 
-int nf_core_process(uint16_t device, struct rte_mbuf* mbuf, time_t now)
+int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
@@ -45,28 +45,27 @@ int nf_core_process(uint16_t device, struct rte_mbuf* mbuf, time_t now)
 	struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 	if (ipv4_header == NULL) {
 		NF_DEBUG("Not IPv4, dropping");
-		return device;
+		return mbuf->port;
 	}
 
 	struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 	if (tcpudp_header == NULL) {
 		NF_DEBUG("Not TCP/UDP, dropping");
-		return device;
+		return mbuf->port;
 	}
 
-	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu8, device);
+	NF_DEBUG("Forwarding an IPv4 packet on device %" PRIu16, mbuf->port);
 
 	uint16_t dst_device;
-
-	if (device == config.wan_device) {
-		NF_DEBUG("Device %" PRIu8 " is external", device);
+	if (mbuf->port == config.wan_device) {
+		NF_DEBUG("Device %" PRIu16 " is external", mbuf->port);
 
 		struct ext_key key = {
 			.ext_src_port = tcpudp_header->dst_port, //intentionally swapped.
 			.dst_port = tcpudp_header->src_port,
 			.ext_src_ip = ipv4_header->dst_addr, //Note, they are switched for
 			.dst_ip = ipv4_header->src_addr, // the backwards traffic
-			.ext_device_id = device,
+			.ext_device_id = mbuf->port,
 			.protocol = ipv4_header->next_proto_id
 		};
 
@@ -84,17 +83,17 @@ int nf_core_process(uint16_t device, struct rte_mbuf* mbuf, time_t now)
 			dst_device = f.int_device_id;
 		} else {
 			NF_DEBUG("Unknown flow, dropping");
-			return device;
+			return mbuf->port;
 		}
 	} else {
-		NF_DEBUG("Device %" PRIu8 " is internal (not %" PRIu8 ")", device, config.wan_device);
+		NF_DEBUG("Device %" PRIu16 " is internal (not %" PRIu16 ")", mbuf->port, config.wan_device);
 
 		struct int_key key = {
 			.int_src_port = tcpudp_header->src_port,
 			.dst_port = tcpudp_header->dst_port,
 			.int_src_ip = ipv4_header->src_addr,
 			.dst_ip = ipv4_header->dst_addr,
-			.int_device_id = device,
+			.int_device_id = mbuf->port,
 			.protocol = ipv4_header->next_proto_id
 		};
 
@@ -108,7 +107,7 @@ int nf_core_process(uint16_t device, struct rte_mbuf* mbuf, time_t now)
 
 			if (!allocate_flow(&key, now, &f)) {
 				NF_DEBUG("No space for the flow, dropping");
-				return device;
+				return mbuf->port;
 			}
 		}
 

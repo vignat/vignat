@@ -139,8 +139,8 @@ void nat_print_config(struct nat_config* config)
 	NF_INFO("External IP: %s", ext_ip_str);
 	free(ext_ip_str);
 
-	uint8_t nb_devices = rte_eth_dev_count();
-	for (uint8_t dev = 0; dev < nb_devices; dev++) {
+	uint16_t nb_devices = rte_eth_dev_count();
+	for (uint16_t dev = 0; dev < nb_devices; dev++) {
 		char* dev_mac_str = nf_mac_to_str(&(config->device_macs[dev]));
 		char* end_mac_str = nf_mac_to_str(&(config->endpoint_macs[dev]));
 

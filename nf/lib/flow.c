@@ -196,7 +196,7 @@ struct str_field_descr int_key_descrs[] = {
   {offsetof(struct int_key, dst_port), sizeof(uint16_t), "dst_port"},
   {offsetof(struct int_key, int_src_ip), sizeof(uint32_t), "int_src_ip"},
   {offsetof(struct int_key, dst_ip), sizeof(uint32_t), "dst_ip"},
-  {offsetof(struct int_key, int_device_id), sizeof(uint8_t), "int_device_id"},
+  {offsetof(struct int_key, int_device_id), sizeof(uint16_t), "int_device_id"},
   {offsetof(struct int_key, protocol), sizeof(uint8_t), "protocol"},
 };
 struct str_field_descr ext_key_descrs[] = {
@@ -204,7 +204,7 @@ struct str_field_descr ext_key_descrs[] = {
   {offsetof(struct ext_key, dst_port), sizeof(uint16_t), "dst_port"},
   {offsetof(struct ext_key, ext_src_ip), sizeof(uint32_t), "ext_src_ip"},
   {offsetof(struct ext_key, dst_ip), sizeof(uint32_t), "dst_ip"},
-  {offsetof(struct ext_key, ext_device_id), sizeof(uint8_t), "ext_device_id"},
+  {offsetof(struct ext_key, ext_device_id), sizeof(uint16_t), "ext_device_id"},
   {offsetof(struct ext_key, protocol), sizeof(uint8_t), "protocol"},
 };
 struct nested_field_descr flow_nests[] = {
@@ -217,7 +217,7 @@ struct nested_field_descr flow_nests[] = {
   {offsetof(struct flow, ik), offsetof(struct int_key, dst_ip),
    sizeof(uint32_t), "dst_ip"},
   {offsetof(struct flow, ik), offsetof(struct int_key, int_device_id),
-   sizeof(uint8_t), "int_device_id"},
+   sizeof(uint16_t), "int_device_id"},
   {offsetof(struct flow, ik), offsetof(struct int_key, protocol),
    sizeof(uint8_t), "protocol"},
 
@@ -230,7 +230,7 @@ struct nested_field_descr flow_nests[] = {
   {offsetof(struct flow, ek), offsetof(struct ext_key, dst_ip),
    sizeof(uint32_t), "dst_ip"},
   {offsetof(struct flow, ek), offsetof(struct ext_key, ext_device_id),
-   sizeof(uint8_t), "ext_device_id"},
+   sizeof(uint16_t), "ext_device_id"},
   {offsetof(struct flow, ek), offsetof(struct ext_key, protocol),
    sizeof(uint8_t), "protocol"},
 };
@@ -244,8 +244,8 @@ struct str_field_descr flow_descrs[] = {
   {offsetof(struct flow, int_src_ip), sizeof(uint32_t), "int_src_ip"},
   {offsetof(struct flow, ext_src_ip), sizeof(uint32_t), "ext_src_ip"},
   {offsetof(struct flow, dst_ip), sizeof(uint32_t), "dst_ip"},
-  {offsetof(struct flow, int_device_id), sizeof(uint8_t), "int_device_id"},
-  {offsetof(struct flow, ext_device_id), sizeof(uint8_t), "ext_device_id"},
+  {offsetof(struct flow, int_device_id), sizeof(uint16_t), "int_device_id"},
+  {offsetof(struct flow, ext_device_id), sizeof(uint16_t), "ext_device_id"},
   {offsetof(struct flow, protocol), sizeof(uint8_t), "protocol"},
 };
 

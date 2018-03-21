@@ -13,11 +13,11 @@ struct DoubleChain;
 
 struct StaticKey {
   struct ether_addr addr;
-  uint8_t device;
+  uint16_t device;
 };
 
 struct DynamicValue {
-  uint8_t device;
+  uint16_t device;
 };
 
 struct DynamicFilterTable {
@@ -40,7 +40,7 @@ struct StaticFilterTable {
     ether_addrp(&ptr->addr, ?addr) &*&
     k == stkc(device, addr);
 
-  predicate dyn_valp(struct DynamicValue *ptr; uint8_t dev) =
+  predicate dyn_valp(struct DynamicValue *ptr; uint16_t dev) =
     struct_DynamicValue_padding(ptr) &*&
     ptr->device |-> dev;
 

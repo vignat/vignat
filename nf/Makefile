@@ -9,13 +9,13 @@
 
 # get current dir
 # see https://stackoverflow.com/a/8080530
-SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-
-# allow the use of extglob in paths
-SHELL = /bin/bash -O extglob -c
+SELF_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # DPDK stuff
 include $(RTE_SDK)/mk/rte.vars.mk
+
+# allow the use of extglob in paths
+SHELL = /bin/bash -O extglob -c
 
 # NF base source
 SRCS-y := $(SELF_DIR)/nf_main.c \
@@ -29,19 +29,18 @@ SRCS-y := $(SELF_DIR)/nf_main.c \
 # NF specific source
 SRCS-y += $(NF_FILES)
 
-# gcc flags
+# compiler flags
+CFLAGS += -I $(SELF_DIR)
 CFLAGS += -std=gnu99
 CFLAGS += -O3
 #CFLAGS += -O0 -g -rdynamic -DENABLE_LOG -Wfatal-errors
 
 # disable warnings triggered by DPDK
-CFLAGS += -Wno-implicit-function-declaration
-CFLAGS += -Wno-nested-externs
+#CFLAGS += -Wno-implicit-function-declaration
+#CFLAGS += -Wno-nested-externs
 
 # DPDK stuff
 include $(RTE_SDK)/mk/rte.extapp.mk
-
-
 
 ### VeriFast verification ###
 # we use DPDK stubs in there (e.g. rte_config.h)
@@ -53,13 +52,9 @@ verifast:
 		$(SELF_DIR)/lib/containers/double-chain.c \
 		$(SELF_DIR)/lib/containers/map-impl.c \
 		$(SELF_DIR)/lib/containers/double-map.c \
-		$(SELF_DIR)/lib/containers/batcher.c \
+		$(SELF_DIR)/lib/containers/vector.c \
 		$(SELF_DIR)/lib/coherence.c \
 		$(SELF_DIR)/lib/expirator.c \
-		$(SELF_DIR)/lib/containers/array-bat-verifast.c \
-		$(SELF_DIR)/lib/containers/array-rq-verifast.c \
-		$(SELF_DIR)/lib/containers/array-u16-verifast.c \
-		$(SELF_DIR)/lib/containers/array-lcc-verifast.c \
 		$(SELF_DIR)/lib/abstract-state-verify-lemmas.c
 
 
@@ -76,7 +71,7 @@ VERIF_INCLUDES := -I $(SELF_DIR) -I $(KLEE_INCLUDE)
 VERIF_INCLUDES += -I $(RTE_SDK)/lib/librte_cmdline
 
 # Defines. TODO remove _GNU_SOURCE from here, #define it in files
-VERIF_DEFS := -D_GNU_SOURCE -DKLEE_VERIFICATION -DVIGOR_STUB_$(STUB_KIND)
+VERIF_DEFS := -D_GNU_SOURCE -DKLEE_VERIFICATION
 
 # Basic files
 # NF base
@@ -148,7 +143,7 @@ NF_VERIF_BASE_ARGS := nf.bc --no-shconf --
 verify-dpdk:
 	$(CLEAN_COMMAND)
 	# Use DPDK stub headers
-	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_INCLUDES) -I $(SELF_DIR)/lib/stubs/dpdk $(VERIF_FILES) $(VERIF_FLAGS)
+	$(COMPILE_COMMAND) $(VERIF_DEFS) -DVIGOR_STUB_DPDK $(VERIF_INCLUDES) -I $(SELF_DIR)/lib/stubs/dpdk $(VERIF_FILES) $(VERIF_FLAGS)
 	$(LINK_COMMAND)
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)
@@ -156,7 +151,7 @@ verify-dpdk:
 verify-driver:
 	$(CLEAN_COMMAND)
 	# Use DPDK stuff + stub driver
-	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_DPDK_DEFS) $(VERIF_INCLUDES) $(VERIF_DPDK_INCLUDES) $(VERIF_FILES) $(VERIF_DPDK_FILES) $(SELF_DIR)/lib/stubs/driver_stub.c $(VERIF_FLAGS)
+	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_DPDK_DEFS) -DVIGOR_STUB_DRIVER $(VERIF_INCLUDES) $(VERIF_DPDK_INCLUDES) $(VERIF_FILES) $(VERIF_DPDK_FILES) $(SELF_DIR)/lib/stubs/driver_stub.c $(VERIF_FLAGS)
 	$(LINK_COMMAND)
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)
@@ -164,7 +159,7 @@ verify-driver:
 verify-hardware:
 	$(CLEAN_COMMAND)
 	# Use DPDK stuff + stub hardware
-	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_DPDK_DEFS) $(VERIF_INCLUDES) $(VERIF_DPDK_INCLUDES) $(VERIF_FILES) $(VERIF_DPDK_FILES) $(SELF_DIR)/lib/stubs/hardware_stub.c $(VERIF_FLAGS)
+	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_DPDK_DEFS) -DVIGOR_STUB_HARDWARE $(VERIF_INCLUDES) $(VERIF_DPDK_INCLUDES) $(VERIF_FILES) $(VERIF_DPDK_FILES) $(SELF_DIR)/lib/stubs/hardware_stub.c $(VERIF_FLAGS)
 	$(LINK_COMMAND)
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)

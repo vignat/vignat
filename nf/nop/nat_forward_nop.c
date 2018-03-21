@@ -16,7 +16,7 @@ void nf_core_init(void)
 {
 }
 
-int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
+int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
 	// Mark now as unused, we don't care about time
 	(void) now;
@@ -26,7 +26,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 	// and all packets from WAN to the main LAN port, and let the recipient ignore the useless ones.
 
 	uint8_t dst_device;
-	if(device == config.wan_device) {
+	if(mbuf->port == config.wan_device) {
 		dst_device = config.lan_main_device;
 	} else {
 		dst_device = config.wan_device;

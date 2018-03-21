@@ -2,7 +2,7 @@ assert mapp<ether_addri>(_, ether_addrp, eth_addr_hash, nop_true, ?final_dyn_map
 assert mapp<stat_keyi>(_, static_keyp, st_key_hash, nop_true, ?stat_map);//TODO: do not assume that stat_map does not change
 assert vectorp<ether_addri>(_, ether_addrp, ?final_dyn_key_vec);
 assert vectorp<stat_keyi>(_, static_keyp, ?final_stat_key_vec);
-assert vectorp<uint8_t>(_, dyn_valp, ?final_dyn_val_vec);
+assert vectorp<uint16_t>(_, dyn_valp, ?final_dyn_val_vec);
 assert double_chainp(?final_chain,_);
 
 //TODO: check that the packet is intact

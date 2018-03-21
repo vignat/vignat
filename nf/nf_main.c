@@ -30,8 +30,8 @@
 #define VIGOR_LOOP_BEGIN \
   while (1) { \
     time_t VIGOR_NOW = current_time(); \
-    unsigned _vigor_devices_count = rte_eth_dev_count(); \
-    for (uint8_t VIGOR_DEVICE = 0; VIGOR_DEVICE < _vigor_devices_count; VIGOR_DEVICE++) {
+    unsigned VIGOR_DEVICES_COUNT = rte_eth_dev_count(); \
+    for (uint16_t VIGOR_DEVICE = 0; VIGOR_DEVICE < VIGOR_DEVICES_COUNT; VIGOR_DEVICE++) {
 #define VIGOR_LOOP_END } }
 #endif
 
@@ -174,7 +174,7 @@ static void
 lcore_main(void)
 {
   // TODO is this check useful?
-  for (uint8_t device = 0; device < rte_eth_dev_count(); device++) {
+  for (uint16_t device = 0; device < rte_eth_dev_count(); device++) {
     if (rte_eth_dev_socket_id(device) > 0 && rte_eth_dev_socket_id(device) != (int) rte_socket_id()) {
       NF_INFO("Device %" PRIu8 " is on remote NUMA node to polling thread.", device);
     }
@@ -189,7 +189,7 @@ lcore_main(void)
     uint16_t actual_rx_len = rte_eth_rx_burst(VIGOR_DEVICE, 0, &buf, 1);
 
     if (actual_rx_len != 0) {
-      uint16_t dst_device = nf_core_process(VIGOR_DEVICE, buf, VIGOR_NOW);
+      uint16_t dst_device = nf_core_process(buf, VIGOR_NOW);
 
       if (dst_device == VIGOR_DEVICE) {
         rte_pktmbuf_free(buf);

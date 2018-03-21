@@ -106,8 +106,8 @@ let ether_addr_struct = Ir.Str ( "ether_addr", ["a", Uint8;
                                                 "e", Uint8;
                                                 "f", Uint8;])
 let static_key_struct = Ir.Str ( "StaticKey", ["addr", ether_addr_struct;
-                                               "device", Uint8] )
-let dynamic_value_struct = Ir.Str ( "DynamicValue", ["device", Uint8] )
+                                               "device", Uint16] )
+let dynamic_value_struct = Ir.Str ( "DynamicValue", ["device", Uint16] )
 let ether_hdr_struct = Ir.Str ("ether_hdr", ["d_addr", ether_addr_struct;
                                              "s_addr", ether_addr_struct;
                                              "ether_type", Uint16;])
@@ -186,13 +186,13 @@ let rec simplify_c_string str =
 
 let fun_types =
   String.Map.of_alist_exn
-    ["current_time", {ret_type = Static Uint32;
+    ["current_time", {ret_type = Static Sint64;
                       arg_types = [];
                       extra_ptr_types = [];
                       lemmas_before = [];
                       lemmas_after = [
                         (fun params ->
-                           "uint32_t now = " ^ (params.ret_name) ^ ";\n")];};
+                           "int64_t now = " ^ (params.ret_name) ^ ";\n")];};
      "bridge_loop_invariant_consume", {ret_type = Static Void;
                                        arg_types = stt
                                            [Ptr (Ptr dchain_struct);
@@ -202,8 +202,8 @@ let fun_types =
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
                                             Uint32;
-                                            Uint32;
-                                            Uint8];
+                                            Sint64;
+                                            Uint16];
                                        extra_ptr_types = [];
                                        lemmas_before = [
                                          (fun {args;_} ->
@@ -227,8 +227,8 @@ let fun_types =
                                             Ptr (Ptr map_struct);
                                             Ptr (Ptr vector_struct);
                                             Uint32;
-                                            Ptr Uint32;
-                                            Uint8];
+                                            Ptr Sint64;
+                                            Uint16];
                                        extra_ptr_types = [];
                                        lemmas_before = [];
                                        lemmas_after = [
@@ -249,7 +249,7 @@ let fun_types =
                                             ", _));\n\
                                              assert vectorp<ether_addri>(_, _, ?" ^ (tmp_gen "dv") ^
                                             ");\n\
-                                             assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "dv_init") ^
+                                             assert vectorp<uint16_t>(_, _, ?" ^ (tmp_gen "dv_init") ^
                                             ");\n\
                                              assert map_vec_chain_coherent<ether_addri>(" ^
                                             (tmp_gen "dm") ^ ", " ^
@@ -426,7 +426,7 @@ let fun_types =
                                       (tmp_gen "dv") ^ ", ?" ^
                                       (tmp_gen "dh") ^
                                       ");\n\
-                                       assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "dv_exprnd") ^
+                                       assert vectorp<uint16_t>(_, _, ?" ^ (tmp_gen "dv_exprnd") ^
                                       ");\n\
                                        assert mapp<ether_addri>(_, _, _, _, ?" ^ (tmp_gen "dm_full") ^
                                       ");\n\
@@ -666,7 +666,7 @@ let fun_types =
                  "sent_packet_type = (" ^
                  sent_pkt ^ ")->packet_type;")];
                lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];};
-     "start_time", {ret_type = Static Uint32;
+     "start_time", {ret_type = Static Sint64;
                     arg_types = [];
                     extra_ptr_types = [];
                     lemmas_before = [];
@@ -682,7 +682,7 @@ let fun_types =
                              "if (stat_vec_allocated) {\n\
                               if (dyn_keys_allocated) {\n\
                               produce_function_pointer_chunk \
-                              vector_init_elem<uint8_t>(init_nothing_dv)\
+                              vector_init_elem<uint16_t>(init_nothing_dv)\
                               (dyn_valp, sizeof(struct DynamicValue))(a) \
                               {\
                               call();\
@@ -732,18 +732,18 @@ let fun_types =
                                    when String.equal name "StaticKey"->
                                    "/*@ {\n\
                                     if (!dyn_ks_borrowed) close hide_vector<ether_addri>(_, _, _);\n\
-                                    if (!dyn_vs_borrowed) close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    if (!dyn_vs_borrowed) close hide_vector<uint16_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "ether_addr"->
                                    "/*@ {\n\
                                     if (!stat_vec_borrowed) close hide_vector<stat_keyi>(_, _, _);\n\
-                                    if (!dyn_vs_borrowed) close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    if (!dyn_vs_borrowed) close hide_vector<uint16_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "DynamicValue"->
                                    "/*@ {\n\
                                     if (!dyn_ks_borrowed) close hide_vector<ether_addri>(_, _, _);\n\
                                     if (!stat_vec_borrowed) close hide_vector<stat_keyi>(_, _, _);\n\
-                                    assert vectorp<uint8_t>(_, _, ?" ^ (tmp_gen "vec") ^
+                                    assert vectorp<uint16_t>(_, _, ?" ^ (tmp_gen "vec") ^
                                    ");\n\
                                     forall_mem(nth(" ^ (List.nth_exn args 1) ^ ", " ^
                                    (tmp_gen "vec") ^ "), " ^ (tmp_gen "vec") ^ ", snd);\n} @*/"
@@ -756,13 +756,13 @@ let fun_types =
                                    when String.equal name "StaticKey"->
                                    "/*@ {\n\
                                     if (!dyn_ks_borrowed) open hide_vector<ether_addri>(_, _, _);\n\
-                                    if (!dyn_vs_borrowed) open hide_vector<uint8_t>(_, _, _);\n} @*/\n\
+                                    if (!dyn_vs_borrowed) open hide_vector<uint16_t>(_, _, _);\n} @*/\n\
                                     stat_vec_borrowed = true;"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "ether_addr"->
                                    "/*@ {\n\
                                     if (!stat_vec_borrowed) open hide_vector<stat_keyi>(_, _, _);\n\
-                                    if (!dyn_vs_borrowed) open hide_vector<uint8_t>(_, _, _);\n} @*/\n\
+                                    if (!dyn_vs_borrowed) open hide_vector<uint16_t>(_, _, _);\n} @*/\n\
                                     dyn_ks_borrowed = true;"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "DynamicValue"->
@@ -791,12 +791,12 @@ let fun_types =
                                    when String.equal name "StaticKey"->
                                    "/*@ {\n\
                                     close hide_vector<ether_addri>(_, _, _);\n\
-                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    close hide_vector<uint16_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "ether_addr"->
                                    "/*@ {\n\
                                     close hide_vector<stat_keyi>(_, _, _);\n\
-                                    close hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    close hide_vector<uint16_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "DynamicValue"->
                                    "/*@ {\n\
@@ -811,12 +811,12 @@ let fun_types =
                                    when String.equal name "StaticKey"->
                                    "/*@ {\n\
                                     open hide_vector<ether_addri>(_, _, _);\n\
-                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    open hide_vector<uint16_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "ether_addr"->
                                    "/*@ {\n\
                                     open hide_vector<stat_keyi>(_, _, _);\n\
-                                    open hide_vector<uint8_t>(_, _, _);\n} @*/"
+                                    open hide_vector<uint16_t>(_, _, _);\n} @*/"
                                  | Ptr (Ptr (Str (name, _)))
                                    when String.equal name "DynamicValue"->
                                    "/*@ {\n\
@@ -854,9 +854,9 @@ let fun_types =
                                  | Ptr (Str (name, _))
                                    when String.equal name "DynamicValue"->
                                    "\n/*@ {\n\
-                                    assert vector_accp<uint8_t>(_, _, ?" ^ (tmp_gen "vec") ^
+                                    assert vector_accp<uint16_t>(_, _, ?" ^ (tmp_gen "vec") ^
                                    ", _, _);\n\
-                                    forall_update<pair<uint8_t, bool> >(" ^ (tmp_gen "vec") ^
+                                    forall_update<pair<uint16_t, bool> >(" ^ (tmp_gen "vec") ^
                                    ", snd, " ^ (List.nth_exn args 1) ^
                                    ", pair(" ^ (List.nth_exn args 2) ^ "->device, true));\n\
                                     update_id(" ^ (List.nth_exn args 1) ^
@@ -896,12 +896,12 @@ let fun_types =
                                      when String.equal name "StaticKey" ->
                                      "/*@ {\n\
                                       if (dyn_ks_borrowed) close hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
-                                      if (dyn_vs_borrowed) close hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/"
+                                      if (dyn_vs_borrowed) close hide_vector_acc<uint16_t>(_, _, _, _, _);\n} @*/"
                                    | Ptr (Str (name, _))
                                      when String.equal name "ether_addr" ->
                                      "/*@ {\n\
                                       if (stat_vec_borrowed) close hide_vector_acc<stat_keyi>(_, _, _, _, _);\n\
-                                      if (dyn_vs_borrowed) close hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/"
+                                      if (dyn_vs_borrowed) close hide_vector_acc<uint16_t>(_, _, _, _, _);\n} @*/"
                                    | Ptr (Str (name, _))
                                      when String.equal name "DynamicValue" ->
                                      "/*@ {\n\
@@ -916,13 +916,13 @@ let fun_types =
                                      when String.equal name "StaticKey" ->
                                      "/*@ {\n\
                                       if (dyn_ks_borrowed) open hide_vector_acc<ether_addri>(_, _, _, _, _);\n\
-                                      if (dyn_vs_borrowed) open hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/\n\
+                                      if (dyn_vs_borrowed) open hide_vector_acc<uint16_t>(_, _, _, _, _);\n} @*/\n\
                                       stat_vec_borrowed = false;"
                                    | Ptr (Str (name, _))
                                      when String.equal name "ether_addr" ->
                                      "/*@ {\n\
                                       if (stat_vec_borrowed) open hide_vector_acc<stat_keyi>(_, _, _, _, _);\n\
-                                      if (dyn_vs_borrowed) open hide_vector_acc<uint8_t>(_, _, _, _, _);\n} @*/\n\
+                                      if (dyn_vs_borrowed) open hide_vector_acc<uint16_t>(_, _, _, _, _);\n} @*/\n\
                                       dyn_ks_borrowed = false;"
                                    | Ptr (Str (name, _))
                                      when String.equal name "DynamicValue" ->
@@ -943,11 +943,11 @@ struct
                  "void to_verify()\n\
                   /*@ requires true; @*/ \n\
                   /*@ ensures true; @*/\n{\n\
-                  uint8_t received_on_port;\n\
+                  uint16_t received_on_port;\n\
                   uint32_t received_packet_type;\n\
                   struct stub_mbuf_content the_received_packet;\n\
                   int the_index_allocated = -1;\n\
-                  uint32_t time_for_allocated_index = 0;\n\
+                  int64_t time_for_allocated_index = 0;\n\
                   bool a_packet_received = false;\n\
                   struct stub_mbuf_content sent_packet;\n\
                   uint16_t sent_on_port;\n\
@@ -957,18 +957,18 @@ struct
                   bool a_packet_sent = false;\n"
                  ^ "//@ mapi<ether_addri> initial_dyn_map;\n"
                  ^ "//@ dchain initial_chain;\n"
-                 ^ "//@ list<pair<uint8_t, bool> > initial_dyn_val_vec;\n"
+                 ^ "//@ list<pair<uint16_t, bool> > initial_dyn_val_vec;\n"
                  ^ "//@ list<pair<ether_addri, bool> > initial_dyn_key_vec;\n"
                  ^ "//@ mapi<ether_addri> exprnd_dyn_map;\n"
-                 ^ "//@ list<pair<uint8_t, bool> > exprnd_dyn_val_vec;\n"
+                 ^ "//@ list<pair<uint16_t, bool> > exprnd_dyn_val_vec;\n"
                  ^ "//@ dchain exprnd_chain;\n"
                  ^
                  "/*@ //TODO: this hack should be \
                   converted to a system \n\
                   assume(sizeof(struct ether_addr) == 6);\n@*/\n\
-                  /*@ assume(sizeof(struct DynamicValue) == 1);\n@*/\n\
+                  /*@ assume(sizeof(struct DynamicValue) == 2);\n@*/\n\
                   /*@\
-                  assume(sizeof(struct StaticKey) == 7);\n@*/\n"
+                  assume(sizeof(struct StaticKey) == 8);\n@*/\n"
                  ^
                  "/*@ assume(ether_addr_eq != static_key_eq); @*/\n"
                  ^

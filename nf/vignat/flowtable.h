@@ -11,7 +11,7 @@ void set_flow(int index, struct flow* flow);
 int add_flow(struct flow *f, int index);
 int remove_flow(int index);
 
-int allocate_flowtables(uint8_t nb_ports, int max_flows);
+int allocate_flowtables(uint16_t nb_ports, int max_flows);
 
 struct DoubleMap;
 struct DoubleMap* get_flow_table(void);

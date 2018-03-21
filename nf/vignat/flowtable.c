@@ -81,7 +81,7 @@ struct DoubleMap **get_dmap_pp(void) {
 
 #endif //KLEE_VERIFICATION
 
-int allocate_flowtables(uint8_t nb_ports, int max_flows) {
+int allocate_flowtables(uint16_t nb_ports, int max_flows) {
     (void)nb_ports;
 #ifdef KLEE_VERIFICATION
     dmap_set_layout(int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),

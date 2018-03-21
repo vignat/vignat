@@ -579,7 +579,7 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     if (String.equal w "w32") then
       get_sexp_value src t ~at
     else if (String.equal w "w64") then
-      failwith "get_sexp_value extract w64 not supported"
+      get_sexp_value src t ~at (*failwith "get_sexp_value extract w64 not supported"*)
     else
       {v=Cast (t, allocate_tmp (get_sexp_value src Sint32 ~at));t}
   | Sexp.List [Sexp.Atom f; Sexp.Atom offset; src;]
@@ -707,6 +707,7 @@ let update_ptee_variants nval older =
 let rec add_to_known_addresses
     (base_value: tterm) breakdown addr
     callid depth =
+  lprintf "ATK %s : %s\n" (render_tterm base_value) (ttype_to_str base_value.t);
   begin match base_value.t with
   | Ptr (Str (_,fields) as ptee_type) ->
     let fields = List.fold fields ~init:String.Map.empty
@@ -1042,9 +1043,9 @@ let allocate_args ftype_of tpref arg_name_gen =
                 ptee_t
                 (moment_before call.id)
         with
-        | Some _ -> None
-          (* failwith "nested ptr value dynamics too complex :/" *)
-        | None -> let p_name = arg_name_gen#generate in
+        (*| Some _ -> None
+          failwith "nested ptr value dynamics too complex :/"*)
+        | _ -> let p_name = arg_name_gen#generate in
           let moment = if 0 < call.id then After (call.id - 1) else Beginning in
           lprintf "allocating nested %Ld -> %s = &%Ld:%s\n"
             ptr_addr p_name ptee_addr (ttype_to_str (Ptr ptee_t));
@@ -1056,7 +1057,8 @@ let allocate_args ftype_of tpref arg_name_gen =
             ptee_addr moment 0;
         Some {name=p_name;value={v=Undef;t=Ptr ptee_t}}
     in
-    List.filter_mapi call.args ~f:(fun i {aname=_;value;ptr;} ->
+    List.filter_mapi call.args ~f:(fun i {aname;value;ptr;} ->
+        lprintf "filtermapi %s %s\n" call.fun_name aname;
         match ptr with
         | Nonptr -> None
         | Funptr _ -> None
@@ -1325,8 +1327,8 @@ let extract_common_call_context
                      t=Unknown}).v
   in
   let extra_pre_conditions =
-    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of)@
-    (take_arg_ptrs_into_pre_cond call.args call ftype_of)
+    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of) (*@
+    (take_arg_ptrs_into_pre_cond call.args call ftype_of)*)
   in
   let post_lemmas =
     compose_post_lemmas

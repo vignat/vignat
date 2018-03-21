@@ -19,14 +19,14 @@
                                   struct Map* st_map,
                                   struct Vector* st_vec,
                                   uint32_t capacity,
-                                  uint32_t time,
+                                  time_t time,
                                   uint32_t dev_count) =
     double_chainp(?dh, dyn_heap) &*&
     mapp<ether_addri>(dyn_map, ether_addrp, eth_addr_hash,
                       nop_true,
                       mapc(capacity, ?dm, ?daddrs)) &*&
     vectorp<ether_addri>(dyn_keys, ether_addrp, ?dks) &*&
-    vectorp<uint8_t>(dyn_vals, dyn_valp, ?dvs) &*&
+    vectorp<uint16_t>(dyn_vals, dyn_valp, ?dvs) &*&
     mapp<stat_keyi>(st_map, static_keyp,
                     st_key_hash,
                     nop_true,
@@ -49,7 +49,7 @@ void bridge_loop_invariant_consume(struct DoubleChain** dyn_heap,
                                    struct Map** st_map,
                                    struct Vector** st_vec,
                                    uint32_t capacity,
-                                   uint32_t time,
+                                   time_t time,
                                    uint32_t dev_count);
 /*@ requires *dyn_heap |-> ?dh &*&
              *dyn_map |-> ?dm &*&
@@ -75,7 +75,7 @@ void bridge_loop_invariant_produce(struct DoubleChain** dyn_heap,
                                    struct Map** st_map,
                                    struct Vector** st_vec,
                                    uint32_t capacity,
-                                   uint32_t* time,
+                                   time_t* time,
                                    uint32_t dev_count);
 /*@ requires *dyn_heap |-> ?dh &*&
              *dyn_map |-> ?dm &*&
@@ -102,8 +102,8 @@ void bridge_loop_iteration_begin(struct DoubleChain** dyn_heap,
                                  struct Map** st_map,
                                  struct Vector** st_vec,
                                  uint32_t capacity,
-                                 uint32_t time,
-                                 uint8_t dev_count);
+                                 time_t time,
+                                 uint16_t dev_count);
 /*@ requires true; @*/
 /*@ ensures true; @*/
 
@@ -114,8 +114,8 @@ void bridge_loop_iteration_end(struct DoubleChain** dyn_heap,
                                struct Map** st_map,
                                struct Vector** st_vec,
                                uint32_t capacity,
-                               uint32_t time,
-                               uint8_t dev_count);
+                               time_t time,
+                               uint16_t dev_count);
 /*@ requires true; @*/
 /*@ ensures true; @*/
 
@@ -126,7 +126,7 @@ void bridge_loop_iteration_assumptions(struct DoubleChain** dyn_heap,
                                        struct Map** st_map,
                                        struct Vector** st_vec,
                                        uint32_t capacity,
-                                       uint32_t time);
+                                       time_t time);
 /*@ requires true; @*/
 /*@ ensures true; @*/
 

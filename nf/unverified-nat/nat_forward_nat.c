@@ -96,7 +96,7 @@ void nf_core_init(void)
 	NF_DEBUG("Initialized");
 }
 
-int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
+int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
 	// Set this iteration's time
 	NF_DEBUG("It is %" PRIu32, now);
@@ -131,19 +131,19 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 
 
 	// Redirect packets
-	if (device == config.wan_device) {
+	if (mbuf->port == config.wan_device) {
 		NF_DEBUG("External packet");
 
 		struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 		if (ipv4_header == NULL) {
 			NF_DEBUG("Not IPv4, dropping");
-			return device;
+			return mbuf->port;
 		}
 
 		struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 		if (tcpudp_header == NULL) {
 			NF_DEBUG("Not TCP/UDP, dropping");
-			return device;
+			return mbuf->port;
 		}
 
 		struct nat_flow_id flow_id = nat_flow_id_from_ipv4(ipv4_header);
@@ -152,7 +152,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 		struct nat_flow* flow;
 		if (!nat_map_get(flows_from_outside, flow_id, &flow)) {
 			NF_DEBUG("Unknown flow, dropping");
-			return device;
+			return mbuf->port;
 		}
 
 		// Refresh
@@ -177,13 +177,13 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 		struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 		if (ipv4_header == NULL) {
 			NF_DEBUG("Not IPv4, dropping");
-			return device;
+			return mbuf->port;
 		}
 
 		struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 		if (tcpudp_header == NULL) {
 			NF_DEBUG("Not TCP/UDP, dropping");
-			return device;
+			return mbuf->port;
 		}
 
 		struct nat_flow_id flow_id = nat_flow_id_from_ipv4(ipv4_header);
@@ -193,7 +193,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 		if (!nat_map_get(flows_from_inside, flow_id, &flow)) {
 			if (available_ports.empty()) {
 				NF_DEBUG("No available ports, dropping");
-				return device;
+				return mbuf->port;
 			}
 
 			uint16_t flow_port = available_ports.back();
@@ -206,7 +206,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 
 			flow->id = flow_id;
 			flow->external_port = flow_port;
-			flow->internal_device = device;
+			flow->internal_device = mbuf->port;
 			flow->last_packet_timestamp = 0;
 
 			struct nat_flow_id flow_from_outside;

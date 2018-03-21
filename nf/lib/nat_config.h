@@ -8,10 +8,10 @@
 
 struct nat_config {
 	// "Main" LAN (i.e. internal) device, used for dumb forwarding
-	uint8_t lan_main_device;
+	uint16_t lan_main_device;
 
 	// WAN device, i.e. external
-	uint8_t wan_device;
+	uint16_t wan_device;
 
 	// External IP address
 	uint32_t external_addr;

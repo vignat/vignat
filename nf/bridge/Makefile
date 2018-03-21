@@ -10,4 +10,5 @@ NF_VERIF_FILES := bridge_loop.c bridge_stub.c
 # Verification arguments
 NF_VERIF_ARGS := --expire 10 --capacity 100 --config no-file.cfg
 
-include ../Makefile
+# Include parent (in a convoluted way cause of DPDK)
+include $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/../Makefile

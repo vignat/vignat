@@ -5,10 +5,18 @@
 #include <rte_memory.h>
 #include <rte_mempool.h>
 
+#include <lib/stubs/mbuf_content.h>
+
 // VeriFast doesn't support unions, so this is a bit messy...
 struct rte_mbuf {
 //	MARKER cacheline0;
-	void *buf_addr;
+#ifdef KLEE_VERIFICATION
+	// If KLEE, use the real definition
+	void* buf_addr;
+#else
+	// HACK: Else, use the stub_mbuf_content cause the validator assumes it...
+	struct stub_mbuf_content* buf_addr;
+#endif
 //	union {
 		rte_iova_t buf_iova;
 // deprecated:	rte_iova_t buf_physaddr;

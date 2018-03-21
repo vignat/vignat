@@ -15,7 +15,7 @@ void bridge_loop_iteration_assumptions(struct DoubleChain** dyn_heap,
                                        struct Map** st_map,
                                        struct Vector** st_vec,
                                        uint32_t capacity,
-                                       uint32_t time) {
+                                       time_t time) {
   dchain_reset(*dyn_heap, capacity);
   map_reset(*dyn_map);
   vector_reset(*dyn_keys);
@@ -30,7 +30,7 @@ void bridge_loop_invariant_consume(struct DoubleChain** dyn_heap,
                                    struct Map** st_map,
                                    struct Vector** st_vec,
                                    uint32_t capacity,
-                                   uint32_t time,
+                                   time_t time,
                                    uint32_t dev_count) {
   klee_trace_ret();
   klee_trace_param_ptr(dyn_heap, sizeof(struct DoubleChain*), "dyn_heap");
@@ -52,7 +52,7 @@ void bridge_loop_invariant_produce(struct DoubleChain** dyn_heap,
                                    struct Map** st_map,
                                    struct Vector** st_vec,
                                    uint32_t capacity,
-                                   uint32_t* time,
+                                   time_t* time,
                                    uint32_t dev_count) {
   klee_trace_ret();
   klee_trace_param_ptr(dyn_heap, sizeof(struct DoubleChain*), "dyn_heap");
@@ -77,8 +77,8 @@ void bridge_loop_iteration_begin(struct DoubleChain** dyn_heap,
                                  struct Map** st_map,
                                  struct Vector** st_vec,
                                  uint32_t capacity,
-                                 uint32_t time,
-                                 uint8_t dev_count) {
+                                 time_t time,
+                                 uint16_t dev_count) {
   bridge_loop_invariant_consume(dyn_heap, dyn_map, dyn_keys, dyn_vals,
                                 st_map, st_vec, capacity,
                                 time, dev_count);
@@ -94,8 +94,8 @@ void bridge_loop_iteration_end(struct DoubleChain** dyn_heap,
                                struct Map** st_map,
                                struct Vector** st_vec,
                                uint32_t capacity,
-                               uint32_t time,
-                               uint8_t dev_count) {
+                               time_t time,
+                               uint16_t dev_count) {
   bridge_loop_invariant_consume(dyn_heap, dyn_map, dyn_keys, dyn_vals,
                                 st_map, st_vec, capacity,
                                 time, dev_count);

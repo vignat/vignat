@@ -15,7 +15,7 @@
 
 uint16_t starting_port = 0;
 uint32_t ext_src_ip = 0;
-uint8_t ext_device_id = 0;
+uint16_t ext_device_id = 0;
 uint32_t expiration_time = 0; /*seconds*/
 struct DoubleChain* chain;
 
@@ -37,9 +37,9 @@ void concretize_devices(struct flow* f) {
 }
 #endif//KLEE_VERIFICATION
 
-int allocate_flowmanager(uint8_t nb_ports,
+int allocate_flowmanager(uint16_t nb_ports,
                          uint16_t _starting_port, uint32_t _ext_src_ip,
-                         uint8_t _ext_device_id,
+                         uint16_t _ext_device_id,
                          uint32_t _expiration_time,
                          int max_flows) {
 #ifdef KLEE_VERIFICATION

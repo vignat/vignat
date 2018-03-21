@@ -1,4 +1,5 @@
-#include "containers/double-chain-impl.h"
+#define VIGOR_STUB_DPDK 0
+#include "lib/containers/double-chain-impl.h"
 
 /*@
   lemma void dcell_layout_assumptions(struct dchain_cell* p)
