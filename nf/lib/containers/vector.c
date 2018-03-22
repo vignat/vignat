@@ -468,3 +468,42 @@ void vector_return_half/*@ <t> @*/(struct Vector* vector, int index, void* value
     }
   }
   @*/
+/*@
+  lemma void gen_vector_addrs_non_mem(void* ptr1, void* ptr2,
+                                      int el_size, nat len)
+  requires ptr1 < ptr2 &*& 0 <= el_size;
+  ensures false == mem(ptr1, gen_vector_addrs_impl_fp(ptr2, el_size, len));
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n):
+        gen_vector_addrs_non_mem(ptr1, ptr2 + el_size, el_size, n);
+    }
+  }
+
+  lemma void gen_vector_addrs_same_len_nodups(void* data,
+                                              int el_size,
+                                              nat len)
+  requires true;
+  ensures length(gen_vector_addrs_impl_fp(data, el_size, len)) == int_of_nat(len) &*&
+          true == no_dups(gen_vector_addrs_impl_fp(data, el_size, len));
+  {
+    switch(len) {
+      case zero: return;
+      case succ(n):
+        gen_vector_addrs_same_len_nodups(data + el_size, el_size, n);
+        assume(false == mem(data, gen_vector_addrs_impl_fp(data + el_size, el_size, n)));
+    }
+  }
+
+  lemma void vector_addrs_same_len_nodups<t>(struct Vector* vector)
+  requires vectorp<t>(vector, ?entp, ?values, ?addrs);
+  ensures vectorp<t>(vector, entp, values, addrs) &*&
+          length(values) == length(addrs) &*&
+          true == no_dups(addrs);
+  {
+    open vectorp(vector, entp, values, addrs);
+    gen_vector_addrs_same_len_nodups(vector->data, vector->elem_size, nat_of_int(vector->capacity));
+    close vectorp(vector, entp, values, addrs);
+  }
+  @*/
