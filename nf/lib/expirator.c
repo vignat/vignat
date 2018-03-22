@@ -143,7 +143,7 @@ int expire_items_single_map/*@ <kt> @*/(struct DoubleChain* chain,
   //@ double_chainp_to_sorted(ch);
   //@ dchain_expired_indexes_limited(ch, time);
   //@ double_chain_nodups(ch);
-  //@ vector_addrs_same_len(vector);
+  //@ vector_addrs_same_len_nodups(vector);
   //@ dchain cur_ch = ch;
   //@ list<pair<kt, uint32_t> > cur_m = m;
   //@ list<pair<kt, void*> > cur_addrs = addrs;

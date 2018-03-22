@@ -83,6 +83,14 @@ typedef bool map_keys_equality/*@<K>(predicate (void*; K) keyp) @*/(void* k1, vo
   @*/
 
 /*@
+  lemma void map_erase_keeps_others<kt,vt>(list<pair<kt,vt> > m,
+                                           kt v1, kt v2);
+  requires v1 != v2;
+  ensures map_has_fp(m, v2) == map_has_fp(map_erase_fp(m, v1), v2) &*&
+          map_get_fp(m, v2) == map_get_fp(map_erase_fp(m, v1), v2);
+  @*/
+
+/*@
   lemma void map_get_keeps_recp<kt>(list<pair<kt,int> > m, kt k);
   requires mapping(m, ?addrs, ?kp, ?rp, ?hsh,
                    ?cap, ?bbs, ?kps, ?khs, ?chns, ?vals) &*&

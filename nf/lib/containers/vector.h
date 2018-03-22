@@ -42,10 +42,11 @@ struct Vector;
   @*/
 
 /*@
-  lemma void vector_addrs_same_len<t>(struct Vector* vector);
+  lemma void vector_addrs_same_len_nodups<t>(struct Vector* vector);
   requires vectorp<t>(vector, ?entp, ?values, ?addrs);
   ensures vectorp<t>(vector, entp, values, addrs) &*&
-          length(values) == length(addrs);
+          length(values) == length(addrs) &*&
+          true == no_dups(addrs);
   @*/
 
 /*@

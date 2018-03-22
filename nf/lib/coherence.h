@@ -141,8 +141,11 @@
                                   list<pair<t, bool> > contents,
                                   list<pair<t, void*> > addr_map,
                                   int index);
-  requires 0 <= index &*& index <= length(contents) &*&
-           true == forall2(contents, addrs, (kkeeper)(addr_map));
+  requires 0 <= index &*& index < length(contents) &*&
+           length(contents) <= length(addrs) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           nth(index, contents) == pair(?val, false) &*&
+           true == no_dups(addrs);
   ensures true == forall2(vector_erase_fp(contents, index), addrs,
                           (kkeeper)(map_erase_fp(addr_map, fst(nth(index, contents)))));
   @*/

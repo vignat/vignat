@@ -337,15 +337,152 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   @*/
 
 /*@
+  lemma void kkeeper_erase_one_from_vec<t>(list<void*> addrs,
+                                           list<pair<t, bool> > contents,
+                                           list<pair<t, void*> > addr_map,
+                                           int index)
+  requires 0 <= index &*& index < length(contents) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map));
+  ensures true == forall2(vector_erase_fp(contents, index), addrs,
+                          (kkeeper)(addr_map));
+  {
+    switch(contents) {
+      case nil: return;
+      case cons(ch, ct):
+        switch(addrs) {
+          case nil: return;
+          case cons(ah, at):
+            if (index == 0) return;
+            kkeeper_erase_one_from_vec(at, ct, addr_map, index - 1);
+      }
+    }
+  }
+
+  fixpoint bool owned_or_not_this<t>(t val, pair<t, bool> cell) {
+    return snd(cell) || fst(cell) != val;
+  }
+
+  lemma void kkeeper_erase_one_from_map<t>(list<void*> addrs,
+                                           list<pair<t, bool> > contents,
+                                           list<pair<t, void*> > addr_map,
+                                           t val)
+  requires true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           true == forall(contents, (owned_or_not_this)(val));
+  ensures true == forall2(contents, addrs,
+                          (kkeeper)(map_erase_fp(addr_map, val)));
+  {
+    switch(contents) {
+      case nil: return;
+      case cons(ch, ct):
+        switch(addrs) {
+          case nil: return;
+          case cons(ah, at):
+            if (!snd(ch)) {
+              map_erase_keeps_others(addr_map, val, fst(ch));
+            }
+            kkeeper_erase_one_from_map(at, ct, addr_map, val);
+      }
+    }
+  }
+
+  lemma void kkeeper_nth_addrs_is_map_get<t>(list<void*> addrs,
+                                             list<pair<t, bool> > contents,
+                                             list<pair<t, void*> > addr_map,
+                                             int index)
+  requires 0 <= index &*& index < length(contents) &*&
+           length(contents) <= length(addrs) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           nth(index, contents) == pair(?val, false);
+  ensures map_get_fp(addr_map, val) == nth(index, addrs);
+  {
+    switch(contents) {
+      case nil: return;
+      case cons(ch, ct):
+        switch(addrs) {
+          case nil: return;
+          case cons(ah, at):
+            if (index == 0) {
+              return;
+            }
+            kkeeper_nth_addrs_is_map_get(at, ct, addr_map, index - 1);
+        }
+     }
+  }
+
+  lemma void kkeeper_non_mem_non_mem<t>(list<void*> addrs,
+                                        list<pair<t, bool> > contents,
+                                        list<pair<t, void*> > addr_map,
+                                        t val)
+  requires true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           length(contents) <= length(addrs) &*&
+           false == mem(map_get_fp(addr_map, val), addrs);
+  ensures true == forall(contents, (owned_or_not_this)(val));
+  {
+    switch(contents) {
+      case nil: return;
+      case cons(ch, ct):
+        switch(addrs) {
+          case nil: return;
+          case cons(ah, at):
+            kkeeper_non_mem_non_mem(at, ct, addr_map, val);
+      }
+    }
+  }
+
+  lemma void kkeeper_no_dups_owned_or_not_this<t>(list<void*> addrs,
+                                                  list<pair<t, bool> > contents,
+                                                  list<pair<t, void*> > addr_map,
+                                                  int index)
+  requires 0 <= index &*& index < length(contents) &*&
+           length(contents) <= length(addrs) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           nth(index, contents) == pair(?val, false) &*&
+           true == no_dups(addrs);
+  ensures true == forall(vector_erase_fp(contents, index),
+                         (owned_or_not_this)(val));
+  {
+    switch(contents) {
+      case nil: return;
+      case cons(ch, ct):
+        switch(addrs) {
+          case nil: return;
+          case cons(ah, at):
+            if (index == 0) {
+              assert false == mem(ah, at);
+              assert map_get_fp(addr_map, val) == ah;
+              kkeeper_non_mem_non_mem(at, ct, addr_map, val);
+              assert true == forall(ct, (owned_or_not_this)(val));
+              return;
+            }
+            kkeeper_no_dups_owned_or_not_this(at, ct, addr_map, index - 1);
+            if (!snd(ch)) {
+              if (fst(ch) == fst(nth(index, contents))) {
+                kkeeper_nth_addrs_is_map_get(addrs, contents, addr_map, index);
+                assert ah == nth(index, addrs);
+                assert true == mem(ah, addrs);
+                assert false;
+              }
+            }
+      }
+    }
+  }
+
   lemma void kkeeper_erase_one<t>(list<void*> addrs,
                                   list<pair<t, bool> > contents,
                                   list<pair<t, void*> > addr_map,
                                   int index)
-  requires 0 <= index &*& index <= length(contents) &*&
-           true == forall2(contents, addrs, (kkeeper)(addr_map));
+  requires 0 <= index &*& index < length(contents) &*&
+           length(contents) <= length(addrs) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           nth(index, contents) == pair(?val, false) &*&
+           true == no_dups(addrs);
   ensures true == forall2(vector_erase_fp(contents, index), addrs,
-                          (kkeeper)(map_erase_fp(addr_map, fst(nth(index, contents)))));
+                          (kkeeper)(map_erase_fp(addr_map, val)));
   {
-  assume(false);//TODO
+    kkeeper_erase_one_from_vec(addrs, contents, addr_map, index);
+    nth_update(index, index, pair(val, true), contents);
+    kkeeper_no_dups_owned_or_not_this(addrs, contents, addr_map, index);
+    kkeeper_erase_one_from_map(addrs, vector_erase_fp(contents, index),
+                               addr_map, val);
   }
   @*/
