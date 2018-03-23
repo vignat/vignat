@@ -35,10 +35,6 @@ CFLAGS += -std=gnu99
 CFLAGS += -O3
 #CFLAGS += -O0 -g -rdynamic -DENABLE_LOG -Wfatal-errors
 
-# disable warnings triggered by DPDK
-#CFLAGS += -Wno-implicit-function-declaration
-#CFLAGS += -Wno-nested-externs
-
 # DPDK stuff
 include $(RTE_SDK)/mk/rte.extapp.mk
 
@@ -57,6 +53,7 @@ verifast:
 		$(SELF_DIR)/lib/expirator.c \
 		$(SELF_DIR)/lib/abstract-state-verify-lemmas.c
 
+# ^^^ TODO ^^^ put this back in: bridge_data.c
 
 
 ### KLEE verification ###
