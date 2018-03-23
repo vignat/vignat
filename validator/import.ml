@@ -205,6 +205,8 @@ let is_int str =
   (* As a hack: handle -10 in 64bits.
      TODO: handle more generally*)
   if (String.equal str "18446744073709551606") then true
+  (* As another hack: handle -300 in 64bits. *)
+  else if (String.equal str "18446744073709551316") then true
   else
     try ignore (int_of_string str); true
     with _ -> false
@@ -385,6 +387,8 @@ let get_sint_in_bounds v =
   (*Special case for 64bit -10, for now,
     FIXME: make a more general case.*)
   if (String.equal v "18446744073709551606") then -10
+  (* also -300 *)
+  else if (String.equal v "18446744073709551316") then -300
   else
     let integer_val = Int.of_string v in
     if Int.(integer_val > 2147483647) then
@@ -598,6 +602,9 @@ let rec get_sexp_value exp ?(at=Beginning) t =
            TODO: generalize*)
         if (String.equal str "18446744073709551606") then
           {v=Bop (Sub,(get_sexp_value rhs t ~at),{v=(Int 10);t});t}
+        (* and -300 *)
+          else if (String.equal str "18446744073709551316") then
+            {v=Bop (Sub,(get_sexp_value rhs t ~at),{v=(Int 300);t});t}
           else
             let ival = int_of_string str in (* avoid overflow *)
             if ival > 2147483648 then
