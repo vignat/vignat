@@ -54,24 +54,8 @@ struct FlowManager* allocate_flowmanager(uint16_t nb_ports,
     GLOBAL_starting_port = starting_port;
 #endif//KLEE_VERIFICATION
 
-    struct DoubleMap* flow_table = allocate_flowtables(nb_ports, max_flows);
-    if (flow_table == NULL) {
-        return NULL;
-    }
-
-#ifdef KLEE_VERIFICATION
-    dmap_set_entry_condition(flow_table, flow_consistency);
-#endif
-
-    struct DoubleChain* chain;
-    if (0 == dchain_allocate(max_flows, &chain)) {
-        free(flow_table);
-        return NULL;
-    }
-
     struct FlowManager* manager = (struct FlowManager*) malloc(sizeof(struct FlowManager));
     if (manager == NULL) {
-        free(flow_table);
         return NULL;
     }
 
@@ -79,8 +63,21 @@ struct FlowManager* allocate_flowmanager(uint16_t nb_ports,
     manager->ext_src_ip = ext_src_ip;
     manager->ext_device_id = ext_device_id;
     manager->expiration_time = expiration_time; /*seconds*/
-    manager->chain = chain;
-    manager->flow_table = flow_table;
+
+    if (0 == allocate_flowtables(nb_ports, max_flows, &(manager->flow_table))) {
+        free(manager);
+        return NULL;
+    }
+
+    if (0 == dchain_allocate(max_flows, &(manager->chain))) {
+        free(manager->flow_table);
+        free(manager);
+        return NULL;
+    }
+
+#ifdef KLEE_VERIFICATION
+    dmap_set_entry_condition(manager->flow_table, flow_consistency);
+#endif
 
     return manager;
 }
