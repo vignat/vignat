@@ -2,8 +2,8 @@
 
 #include <inttypes.h>
 
-// rte_ether
-struct ether_addr;
+#include <rte_config.h>
+#include <rte_ether.h>
 
 
 struct dmz_config {

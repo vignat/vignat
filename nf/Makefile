@@ -3,6 +3,7 @@
 # - APP := <binary name>
 # - NF_FILES := <NF files for both runtime and verif-time>
 # - NF_VERIF_FILES := <verif-time only NF files>
+# - NF_VERIF_DEFS := <verif-time only defs (-Dxxx)>
 # - NF_VERIF_ARGS := <arguments to pass to the NF at verif-time>
 
 # -----------------------------------------------------------------------
@@ -69,6 +70,8 @@ VERIF_INCLUDES += -I $(RTE_SDK)/lib/librte_cmdline
 
 # Defines. TODO remove _GNU_SOURCE from here, #define it in files
 VERIF_DEFS := -D_GNU_SOURCE -DKLEE_VERIFICATION
+# Specific NF
+VERIF_DEFS += $(NF_VERIF_DEFS)
 
 # Basic files
 # NF base

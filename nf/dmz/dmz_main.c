@@ -1,21 +1,16 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
-#ifdef KLEE_VERIFICATION
-#  include <klee/klee.h>
-#  include "lib/stubs/rte_stubs.h"
-#  include "loop.h"
-#else
 // DPDK uses these but doesn't include them. :|
-#  include <linux/limits.h>
-#  include <sys/types.h>
-#  include <unistd.h>
+#include <linux/limits.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#  include <rte_ethdev.h>
-#  include <rte_ether.h>
-#  include <rte_ip.h>
-#  include <rte_mbuf.h>
-#endif
+#include <rte_common.h>
+#include <rte_ethdev.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_mbuf.h>
 
 #include "../lib/flowmanager.h"
 #include "../lib/nf_forward.h"
@@ -221,15 +216,28 @@ void nf_print_config() {
 }
 
 #ifdef KLEE_VERIFICATION
+#include "dmz_loop.h"
 void nf_loop_iteration_begin(unsigned lcore_id,
                              time_t time) {
+	dmz_loop_iteration_begin(get_dchain_pp(internet_manager), get_dchain_pp(dmz_manager),
+				 get_dmap_pp(internet_manager), get_dmap_pp(dmz_manager),
+				 time,
+				 config.max_flows);
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        time_t time) {
+	dmz_loop_iteration_assumptions(get_dchain_pp(internet_manager), get_dchain_pp(dmz_manager),
+				       get_dmap_pp(internet_manager), get_dmap_pp(dmz_manager),
+				       time,
+				       config.max_flows);
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,
                            time_t time) {
+	dmz_loop_iteration_end(get_dchain_pp(internet_manager), get_dchain_pp(dmz_manager),
+			       get_dmap_pp(internet_manager), get_dmap_pp(dmz_manager),
+			       time,
+			       config.max_flows);
 }
 #endif //KLEE_VERIFICATION

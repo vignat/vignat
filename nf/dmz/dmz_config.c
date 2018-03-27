@@ -1,16 +1,14 @@
 #include <getopt.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
-#if KLEE_VERIFICATION
-	#include "stubs/rte_stubs.h"
-#else
-	// DPDK needs these but doesn't include them. :|
-	#include <linux/limits.h>
-	#include <sys/types.h>
+// DPDK needs these but doesn't include them. :|
+#include <linux/limits.h>
+#include <sys/types.h>
 
-	#include <rte_common.h>
-	#include <rte_ethdev.h>
-#endif
+#include <rte_common.h>
+#include <rte_config.h>
+#include <rte_ethdev.h>
 
 #include <cmdline_parse_etheraddr.h>
 #include <cmdline_parse_ipaddr.h>
@@ -26,7 +24,8 @@
 
 
 static uintmax_t
-dmz_config_parse_int(const char* str, const char* name, int base, char next) {
+dmz_config_parse_int(const char* str, const char* name, int base, char next)
+{
 	char* temp;
 	intmax_t result = strtoimax(str, &temp, base);
 
@@ -39,7 +38,8 @@ dmz_config_parse_int(const char* str, const char* name, int base, char next) {
 }
 
 static uint32_t
-dmz_config_parse_ipv4(const char* str, const char* name) {
+dmz_config_parse_ipv4(const char* str, const char* name)
+{
 	struct cmdline_token_ipaddr tk;
 	tk.ipaddr_data.flags = CMDLINE_IPADDR_V4;
 
@@ -55,7 +55,6 @@ void dmz_config_init(struct dmz_config* config,
                      int argc, char** argv)
 {
 	unsigned nb_devices = rte_eth_dev_count();
-
 	struct option long_options[] = {
 		{"inter-dev",		required_argument,	NULL, 'a'},
 		{"dmz-dev",		required_argument,	NULL, 'b'},
@@ -71,7 +70,7 @@ void dmz_config_init(struct dmz_config* config,
 	};
 
 	// Set the devices' own MACs
-	for (uint8_t device = 0; device < nb_devices; device++) {
+	for (uint16_t device = 0; device < nb_devices; device++) {
 		rte_eth_macaddr_get(device, &(config->device_macs[device]));
 	}
 
@@ -148,7 +147,7 @@ void dmz_config_init(struct dmz_config* config,
 
 void dmz_config_cmdline_print_usage(void)
 {
-	printf("Usage:\n"
+	NF_INFO("Usage:\n"
 		"[DPDK EAL options] --\n"
 		"\t--eth-dest <device>,<mac>: MAC address of the endpoint linked to a device.\n"
 		"\t--expire <time>: flow expiration time.\n"

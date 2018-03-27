@@ -7,17 +7,24 @@ NF_FILES := dmz_main.c dmz_config.c \
             ../lib/flowmanager.c ../lib/flowtable.c
 
 # Verification files
-#NF_VERIF_FILES := loop-stub.c
+NF_VERIF_FILES := dmz_loop.c
+
+# Verification definitions
+# Need 3 devices otherwise the concept of a DMZ doesn't make sense
+NF_VERIF_DEFS := -DSTUB_DEVICES_COUNT=3
 
 # Verification arguments
-#NF_VERIF_ARGS := --lan-dev 0 \
-#                 --wan 1 \
-#                 --expire 10 \
-#                 --starting-port 0 \
-#                 --max-flows 65536 \
-#                 --extip 0.0.0.0 \
-#                 --eth-dest 0,01:23:45:67:89:00 \
-#                 --eth-dest 1,01:23:45:67:89:01
+NF_VERIF_ARGS := --inter-dev 0 \
+                 --dmz-dev 1 \
+                 --intra-dev 2 \
+                 --dmz-addr 0.0.0.0 \
+                 --dmz-mask 255.0.0.0 \
+                 --intra-addr 1.0.0.0 \
+                 --intra-mask 255.0.0.0 \
+                 --expire 10 \
+                 --max-flows 65535 \
+                 --eth-dest 0,01:23:45:67:89:00 \
+                 --eth-dest 1,01:23:45:67:89:01
 
 # Include parent (in a convoluted way cause of DPDK)
 include $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/../Makefile

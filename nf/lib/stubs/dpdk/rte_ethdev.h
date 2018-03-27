@@ -5,8 +5,14 @@
 
 #include "lib/stubs/core_stub.h"
 
+#include <klee/klee.h>
 
+
+#ifdef STUB_DEVICES_COUNT
+#define STUB_DPDK_DEVICES_COUNT STUB_DEVICES_COUNT
+#else
 #define STUB_DPDK_DEVICES_COUNT 2
+#endif
 
 
 struct rte_eth_link {
@@ -38,7 +44,7 @@ static struct rte_mempool* devices_rx_mempool[STUB_DPDK_DEVICES_COUNT];
 static inline uint16_t
 rte_eth_dev_count(void)
 {
-	return 2;
+	return STUB_DPDK_DEVICES_COUNT;
 }
 
 static inline int
