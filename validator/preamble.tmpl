@@ -12,10 +12,10 @@
 #include "lib/containers/double-chain.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
 #include "vignat/loop.h"
-#include "bridge/bridge_loop.h"
+//#include "bridge/bridge_loop.h"
 
 //@ #include "lib/abstract-state.h"
-//@ #include "lib/bridge-abstract-state.h"
+// //@ #include "lib/bridge-abstract-state.h"
 
 int flow_consistency(void* key_a, void* key_b, int index, void* value)
 /*@ requires true; @*/
@@ -49,17 +49,17 @@ ensures 0 == (0&x);
       is_map_key_hash<t>(fun, keyp, hsh);
  @*/
 
-/*@ predicate hide_mapp<t>(struct Map* p,
+/* @ predicate hide_mapp<t>(struct Map* p,
                            predicate (void*;t) kp,
                            fixpoint (t,int) hsh,
                            fixpoint (t,int,bool) recp,
                            mapi<t> m) = mapp<t>(p, kp, hsh, recp, m); @*/
 
-/*@ predicate hide_vector<t>(struct Vector* vector,
+/* @ predicate hide_vector<t>(struct Vector* vector,
                              predicate (void*;t) entp,
                              list<pair<t, bool> > values) = vectorp<t>(vector, entp, values); @*/
 
-/*@ predicate hide_vector_acc<t>(struct Vector* vector,
+/* @ predicate hide_vector_acc<t>(struct Vector* vector,
                                  predicate (void*;t) entp,
                                  list<pair<t, bool> > values,
                                  int accessed_idx,

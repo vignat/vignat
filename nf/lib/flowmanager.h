@@ -9,7 +9,7 @@ struct FlowManager* allocate_flowmanager(uint16_t nb_ports,
                                          uint16_t starting_port,
                                          uint32_t ext_src_ip,
                                          uint16_t ext_device_id,
-                                         time_t expiration_time,
+                                         uint32_t expiration_time,
                                          int max_flows);
 
 int allocate_flow(struct FlowManager* manager, struct int_key *ik, time_t time, struct flow* out);

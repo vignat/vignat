@@ -242,7 +242,7 @@ let fun_types =
                          tx_l "empty_dmap_cap\
                                <int_k,ext_k,flw>(65536);";];};
      "dmap_set_entry_condition", {ret_type = Static Void;
-                                  arg_types = stt [Ptr (Ctm "entry_condition")];
+                                  arg_types = stt [Ptr dmap_struct; Ptr (Ctm "entry_condition")];
                                   extra_ptr_types = [];
                                   lemmas_before = [];
                                   lemmas_after = [];};
@@ -713,14 +713,15 @@ let fun_types =
                                          "user_buf_addr",
                                          stub_mbuf_content_struct];
                  lemmas_before = [];
-                 lemmas_after = [(fun params -> "a_packet_received = true;\n" ^
+                 lemmas_after = [(fun params -> let arg0 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
+                                       "a_packet_received = true;\n" ^
                                        simplify_c_string (
                                          "received_on_port = " ^
-                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->port;\n" ^
+                                         "(*" ^ arg0 ^ ")->port;\n" ^
                                          "received_packet_type = " ^
-                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->packet_type;\n") ^
+                                         "(*" ^ arg0 ^ ")->packet_type;\n") ^
                                          (copy_stub_mbuf_content "the_received_packet"
-                                          ("*" ^ (List.nth_exn params.args 0))));
+                                          ("*" ^ arg0)));
                                  ];};
      "stub_core_trace_tx", {
                  ret_type = Static Uint8;
@@ -730,7 +731,7 @@ let fun_types =
                  lemmas_before = [
                      (fun params ->
                           let sent_pkt =
-                            (List.nth_exn params.args 0)
+                            Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0)
                           in
                             (copy_stub_mbuf_content "sent_packet"
                              (sent_pkt)) ^ "\n" ^

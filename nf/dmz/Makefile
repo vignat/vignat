@@ -1,23 +1,23 @@
-include $(RTE_SDK)/mk/rte.vars.mk
+# Binary name
+APP := dmz
 
-# binary name
-APP = dmz
+# Runtime and verification files
+NF_FILES := dmz_main.c dmz_config.c \
+            ../lib/flow.c ../lib/flow-log.c \
+            ../lib/flowmanager.c ../lib/flowtable.c
 
-# sources
-SRCS-y := dmz_main.c dmz_config.c ../nf_main.c ../lib/nf_time.c ../lib/nf_util.c \
-          ../lib/flow.c ../lib/flow-log.c ../lib/flowmanager.c ../lib/flowtable.c \
-          ../lib/expirator.c \
-          ../lib/containers/double-chain.c ../lib/containers/double-chain-impl.c \
-          ../lib/containers/map-impl.c ../lib/containers/double-map.c \
-          ../lib/containers/vector.c ../lib/containers/map.c
-# gcc flags
-CFLAGS += -O3
-CFLAGS += -I..
-CFLAGS += -I../..
-CFLAGS += -std=gnu99
+# Verification files
+#NF_VERIF_FILES := loop-stub.c
 
-# disable warnings triggered by DPDK
-CFLAGS += -Wno-implicit-function-declaration
-CFLAGS += -Wno-nested-externs
+# Verification arguments
+#NF_VERIF_ARGS := --lan-dev 0 \
+#                 --wan 1 \
+#                 --expire 10 \
+#                 --starting-port 0 \
+#                 --max-flows 65536 \
+#                 --extip 0.0.0.0 \
+#                 --eth-dest 0,01:23:45:67:89:00 \
+#                 --eth-dest 1,01:23:45:67:89:01
 
-include $(RTE_SDK)/mk/rte.extapp.mk
+# Include parent (in a convoluted way cause of DPDK)
+include $(abspath $(dir $(lastword $(MAKEFILE_LIST))))/../Makefile

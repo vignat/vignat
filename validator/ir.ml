@@ -62,6 +62,17 @@ let is_void = function | Void -> true | _ -> false
 let get_pointee = function | Ptr t -> t
                            | x -> failwith ((ttype_to_str x) ^
                                             " is not a plain pointer")
+let is_pointer (tt: tterm) = 
+  match tt.t with 
+  | Ptr _ -> begin match tt.v with
+             | Id _ -> true
+             | _ -> false
+             end
+  | _ -> false
+let is_pointer_t (t: ttype) = 
+  match t with 
+  | Ptr _ -> true
+  | _ -> false
 
 type fun_call_context = {
   extra_pre_conditions: eq_condition list;
@@ -238,7 +249,7 @@ let call_recursively_on_term (f:term -> term option) tterm =
       | Some v -> Some {v;t}
       | None -> None) tterm
 
-let rec simplify_tterm tterm =
+let simplify_tterm tterm =
   call_recursively_on_term (function
       | Deref {t=_;v=Addr x} -> Some x.v
       | Str_idx ({v=Struct (strname,fields);
@@ -283,6 +294,25 @@ and replace_term_in_tterm old_t new_t tterm =
 and replace_term_in_tterms old_t new_t tterm_list =
   List.map tterm_list ~f:(replace_term_in_tterm old_t new_t)
 
+
+let rec append_id_in_term_id_starting_with prefix suffix term = match term with
+  | Bop (opa, lhs, rhs) -> Bop(opa, append_id_in_tterm_id_starting_with prefix suffix lhs, append_id_in_tterm_id_starting_with prefix suffix rhs)
+  | Apply (f, args) -> Apply(f, List.map args ~f:(append_id_in_tterm_id_starting_with prefix suffix))
+  | Id x -> if String.is_prefix x ~prefix:prefix then Id (x ^ suffix) else Id x
+  | Struct (name, fields) -> failwith "not supported here, too lazy"
+  | Int _ -> term
+  | Bool _ -> term
+  | Not tt -> Not (append_id_in_tterm_id_starting_with prefix suffix tt)
+  | Str_idx (tterm, field) -> Str_idx (append_id_in_tterm_id_starting_with prefix suffix tterm, field)
+  | Deref tterm -> Deref (append_id_in_tterm_id_starting_with prefix suffix tterm)
+  | Fptr _ -> term
+  | Addr tterm -> Addr (append_id_in_tterm_id_starting_with prefix suffix tterm)
+  | Cast (ctype, tterm) -> Cast (ctype, append_id_in_tterm_id_starting_with prefix suffix tterm)
+  | Undef -> Undef
+  | Zeroptr -> Zeroptr
+  | Utility _ -> term
+and append_id_in_tterm_id_starting_with prefix suffix tterm =
+  {tterm with v=(append_id_in_term_id_starting_with prefix suffix tterm.v)}
 
 let rec collect_nodes f tterm =
   let collect_on_utility f = function

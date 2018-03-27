@@ -64,7 +64,9 @@ typedef void uq_value_destr/*@ <V>
 /*@ ensures chars(vp, val_size, _); @*/
 
 
-struct DoubleMap {
+struct DoubleMap
+#ifndef KLEE_VERIFICATION
+{
   int value_size;
 
   uq_value_copy* cpy;
@@ -94,7 +96,9 @@ struct DoubleMap {
   int n_vals;
   int capacity;
   int keys_capacity;
-};
+}
+#endif
+;
 
 /*@
   inductive dmap<t1,t2,vt> = dmap(list<pair<t1,int> >, list<pair<t2,int> >,

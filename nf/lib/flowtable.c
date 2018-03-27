@@ -69,18 +69,7 @@ int add_flow(struct DoubleMap* map, struct flow *f, int index) {
 
 struct DoubleMap* allocate_flowtables(uint16_t nb_ports, int max_flows) {
     (void)nb_ports;
-#ifdef KLEE_VERIFICATION
-    dmap_set_layout(int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),
-                    ext_key_descrs, sizeof(ext_key_descrs)/sizeof(struct str_field_descr),
-                    flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr),
-                    flow_nests, sizeof(flow_nests)/sizeof(struct nested_field_descr));
-#endif //KLEE_VERIFICATION
-
-    struct DoubleMap* flow_map = (struct DoubleMap*) malloc(sizeof(struct DoubleMap));
-    if (flow_map == NULL) {
-        return NULL;
-    }
-
+    struct DoubleMap* flow_map;
     int alloc_result = dmap_allocate(int_key_eq, int_key_hash,
                                      ext_key_eq, ext_key_hash,
                                      sizeof(struct flow), flow_cpy,
@@ -91,9 +80,16 @@ struct DoubleMap* allocate_flowtables(uint16_t nb_ports, int max_flows) {
                                      max_flows,
                                      &flow_map);
     if(alloc_result == 0) { // Allocation failure
-        free(flow_map);
         return NULL;
     }
+
+#ifdef KLEE_VERIFICATION
+    dmap_set_layout(flow_map,
+                    int_key_descrs, sizeof(int_key_descrs)/sizeof(struct str_field_descr),
+                    ext_key_descrs, sizeof(ext_key_descrs)/sizeof(struct str_field_descr),
+                    flow_descrs, sizeof(flow_descrs)/sizeof(struct str_field_descr),
+                    flow_nests, sizeof(flow_nests)/sizeof(struct nested_field_descr));
+#endif //KLEE_VERIFICATION
 
     return flow_map;
 }

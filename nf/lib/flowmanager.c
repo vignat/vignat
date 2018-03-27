@@ -52,13 +52,16 @@ struct FlowManager* allocate_flowmanager(uint16_t nb_ports,
 #ifdef KLEE_VERIFICATION
     // HACK HACK HACK HACK only works if the two starting ports are the same (see definition in flow.h)
     GLOBAL_starting_port = starting_port;
-    dmap_set_entry_condition(flow_consistency);
 #endif//KLEE_VERIFICATION
 
     struct DoubleMap* flow_table = allocate_flowtables(nb_ports, max_flows);
     if (flow_table == NULL) {
         return NULL;
     }
+
+#ifdef KLEE_VERIFICATION
+    dmap_set_entry_condition(flow_table, flow_consistency);
+#endif
 
     struct DoubleChain* chain;
     if (0 == dchain_allocate(max_flows, &chain)) {

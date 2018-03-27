@@ -1102,6 +1102,10 @@ let allocate_args ftype_of tpref arg_name_gen =
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
 
+let make_lemma_args_hack (args: tterm list) =
+  let replaced_args = List.map args ~f:(fun arg -> if is_pointer arg then append_id_in_tterm_id_starting_with "arg" "bis" arg else arg) in
+  List.map replaced_args ~f:render_tterm
+
 let get_lemmas_before (ftype_of,_) call =
   (ftype_of call.fun_name).lemmas_before
 
@@ -1111,7 +1115,7 @@ let get_fun_exptr_types (ftype_of,guessed_types)
 
 let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
   (List.map (get_lemmas_before ftype_of call) ~f:(fun l ->
-       l {args=List.map args ~f:render_tterm;
+       l {args=make_lemma_args_hack args;
           arg_exps=args;tmp_gen;is_tip;arg_types;
           exptr_types=get_fun_exptr_types ftype_of call;
           ret_type=get_fun_ret_type ftype_of call}))
@@ -1181,7 +1185,7 @@ let compose_post_lemmas ~is_tip ftype_of call ret_spec args arg_types tmp_gen =
   let result = render_tterm ret_spec.value in
   List.map (get_lemmas_after ftype_of call)
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
-                    args=List.map args ~f:render_tterm;
+                    args=make_lemma_args_hack args;
                     arg_exps=args;tmp_gen;is_tip;arg_types;
                     exptr_types=get_fun_exptr_types ftype_of call;
                     ret_type=get_fun_ret_type ftype_of call})

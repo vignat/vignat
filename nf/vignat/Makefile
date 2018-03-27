@@ -1,5 +1,3 @@
-<<<<<<< 8e986866112bf55e829cc3dc75f55375714ae47d
-<<<<<<< 60a712cbb9c80d304b80b30d1ae2ac22c18c0759
 # Binary name
 APP := nat
 

@@ -69,7 +69,7 @@ void nf_core_init(void)
         }
 }
 
-int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
+int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
@@ -82,35 +82,35 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 	struct ipv4_hdr* ipv4_header = nf_get_mbuf_ipv4_header(mbuf);
 	if (ipv4_header == NULL) {
 		NF_DEBUG("Not IPv4, dropping");
-		return device;
+		return mbuf->port;
 	}
 
 	struct tcpudp_hdr* tcpudp_header = nf_get_ipv4_tcpudp_header(ipv4_header);
 	if (tcpudp_header == NULL) {
 		NF_DEBUG("Not TCP/UDP, dropping");
-		return device;
+		return mbuf->port;
 	}
 
-	NF_DEBUG("Forwarding a packet from device %" PRIu8, device);
+	NF_DEBUG("Forwarding a packet from device %" PRIu16, mbuf->port);
 
 	enum zone src_zone = get_zone(ipv4_header->src_addr);
-	if (src_zone == DMZ && device != config.dmz_device) {
+	if (src_zone == DMZ && mbuf->port != config.dmz_device) {
 		NF_DEBUG("IP says from DMZ, but device says no, dropping");
-		return device;
+		return mbuf->port;
 	}
-	if (src_zone == INTRANET && device != config.intranet_device) {
+	if (src_zone == INTRANET && mbuf->port != config.intranet_device) {
 		NF_DEBUG("IP says from intranet, but device says no, dropping");
-		return device;
+		return mbuf->port;
 	}
-	if (src_zone == INTERNET && device != config.internet_device) {
+	if (src_zone == INTERNET && mbuf->port != config.internet_device) {
 		NF_DEBUG("IP says from internet, but device says no, dropping");
-		return device;
+		return mbuf->port;
 	}
 
 	enum zone dst_zone = get_zone(ipv4_header->dst_addr);
 	if (src_zone == dst_zone) {
 		NF_DEBUG("Same src/dst zones, dropping");
-		return device;
+		return mbuf->port;
 	}
 
 	if (src_zone == INTERNET && dst_zone == DMZ) {
@@ -121,7 +121,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 		return config.internet_device;
 	}
 
-	uint8_t dst_device;
+	uint16_t dst_device;
 	if (src_zone == INTRANET) {
 		NF_DEBUG("From Intranet");
 
@@ -152,7 +152,7 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 
 			if (!allocate_flow(manager, &key, now, &f)) {
 				NF_DEBUG("No space for the flow, dropping");
-				return device;
+				return mbuf->port;
 			}
 		}
 	} else {
@@ -191,16 +191,11 @@ int nf_core_process(uint8_t device, struct rte_mbuf* mbuf, time_t now)
 			log_flow(&f);
 		} else {
 			NF_DEBUG("Unknown flow, dropping");
-			return device;
+			return mbuf->port;
 		}
 
 		dst_device = config.intranet_device;
 	}
-
-	#ifdef KLEE_VERIFICATION
-	klee_assert(dst_device >= 0);
-	klee_assert(dst_device < RTE_MAX_ETHPORTS);
-	#endif
 
 	NF_DEBUG("Setting MACs");
 	ether_header->s_addr = config.device_macs[dst_device];
@@ -227,14 +222,14 @@ void nf_print_config() {
 
 #ifdef KLEE_VERIFICATION
 void nf_loop_iteration_begin(unsigned lcore_id,
-                             uint32_t time) {
+                             time_t time) {
 }
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
-                                       uint32_t time) {
+                                       time_t time) {
 }
 
 void nf_loop_iteration_end(unsigned lcore_id,
-                           uint32_t time) {
+                           time_t time) {
 }
 #endif //KLEE_VERIFICATION
