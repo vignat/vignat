@@ -8,9 +8,9 @@
 
 struct dmz_config {
 	// Devices
-	uint8_t internet_device;
-	uint8_t dmz_device;
-	uint8_t intranet_device;
+	uint16_t internet_device;
+	uint16_t dmz_device;
+	uint16_t intranet_device;
 
 	// IP blocks
 	uint32_t dmz_block_addr;

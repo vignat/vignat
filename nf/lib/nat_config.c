@@ -26,7 +26,7 @@
 void nat_config_init(struct nat_config* config,
                      int argc, char** argv)
 {
-	unsigned nb_devices = rte_eth_dev_count();
+	uint16_t nb_devices = rte_eth_dev_count();
 
 	struct option long_options[] = {
 		{"eth-dest",		required_argument,	NULL, 'm'},
