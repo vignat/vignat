@@ -125,7 +125,7 @@ int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 			.dst_port = tcpudp_header->dst_port,
 			.int_src_ip = ipv4_header->src_addr,
 			.dst_ip = ipv4_header->dst_addr,
-			.int_device_id = 0, // see remark in the else block
+			.int_device_id = -1, // see remark in the else block
 			.protocol = ipv4_header->next_proto_id
 		};
 
@@ -160,13 +160,14 @@ int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 		// Therefore, we treat all flows as internal from the flow manager's point of view.
 		// All we have to do is swap the src/dst... so basically we're using it as a single map.
 		// We also ignore the device, since there is only 1 on each side per flow manager.
+		// (but the device has to be != 0, flows expect to have different int/ext devices)
 		// TODO: Just use the map directly. Perhaps extract flow management ouf of the manager.
 		struct int_key key = {
 			.int_src_port = tcpudp_header->dst_port,
 			.dst_port = tcpudp_header->src_port,
 			.int_src_ip = ipv4_header->dst_addr,
 			.dst_ip = ipv4_header->src_addr,
-			.int_device_id = 0,
+			.int_device_id = -1,
 			.protocol = ipv4_header->next_proto_id
 		};
 
