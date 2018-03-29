@@ -486,3 +486,16 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
                                addr_map, val);
   }
   @*/
+
+/*@
+  lemma void empty_kkeeper<t>(list<void*> addrs,
+                              list<pair<t, bool> > contents,
+                              list<pair<t, void*> > addr_map,
+                              int capacity)
+  requires length(contents) == capacity &*&
+           true == forall(contents, snd);
+  ensures true == forall2(contents, addrs, (kkeeper)(addr_map));
+  {
+    assume(false);//TODO
+  }
+  @*/

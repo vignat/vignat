@@ -151,6 +151,16 @@
   @*/
 
 /*@
+  lemma void empty_kkeeper<t>(list<void*> addrs,
+                              list<pair<t, bool> > contents,
+                              list<pair<t, void*> > addr_map,
+                              int capacity);
+  requires length(contents) == capacity &*&
+           true == forall(contents, snd);
+  ensures true == forall2(contents, addrs, (kkeeper)(addr_map));
+  @*/
+
+/*@
 lemma void empty_dmap_dchain_coherent<t1,t2,vt>(int len);
 requires 0 <= len;
 ensures dmap_dchain_coherent<t1,t2,vt>

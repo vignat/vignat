@@ -28,7 +28,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
      | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | Undef -> failwith "// render_eq_sttmt undef...\n"
+  | Undef -> failwith ("// render_eq_sttmt undef for " ^ (render_tterm out_arg))
   | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_prelemmas context =

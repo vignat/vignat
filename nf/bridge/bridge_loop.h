@@ -25,13 +25,14 @@
     mapp<ether_addri>(dyn_map, ether_addrp, eth_addr_hash,
                       nop_true,
                       mapc(capacity, ?dm, ?daddrs)) &*&
-    vectorp<ether_addri>(dyn_keys, ether_addrp, ?dks) &*&
-    vectorp<uint16_t>(dyn_vals, dyn_valp, ?dvs) &*&
+    vectorp<ether_addri>(dyn_keys, ether_addrp, ?dks, ?dkaddrs) &*&
+    true == forall2(dks, dkaddrs, (kkeeper)(daddrs)) &*&
+    vectorp<uint16_t>(dyn_vals, dyn_valp, ?dvs, ?dvaddrs) &*&
     mapp<stat_keyi>(st_map, static_keyp,
                     st_key_hash,
                     nop_true,
                     mapc(?stcap, ?sm, ?saddrs)) &*&
-    vectorp<stat_keyi>(st_vec, static_keyp, ?sv) &*&
+    vectorp<stat_keyi>(st_vec, static_keyp, ?sv, ?skaddrs) &*&
     0 < capacity &*&
     length(dks) == capacity &*&
     length(dvs) == capacity &*&
@@ -40,6 +41,8 @@
     dchain_high_fp(dh) <= time &*&
     last_time(time) &*&
     true == forall(sm, (st_entry_bound)(dev_count));
+
+    //TODO: true == forall2(sv, skaddrs, (kkeeper)(saddrs))  ?
   @*/
 
 void bridge_loop_invariant_consume(struct DoubleChain** dyn_heap,

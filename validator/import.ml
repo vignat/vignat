@@ -516,12 +516,16 @@ let find_first_known_address_comply addr tt at property ~earliest =
        Option.map ~f:(fun addr_sp -> addr_sp.value)
          (find_the_right (legit_candidates lst)))
 
+let moment_to_str = function
+  | Beginning -> "<|"
+  | After x -> ("> " ^ (string_of_int x))
+
 let find_first_known_address addr tt at =
-  lprintf "looking for first *%Ld\n" addr;
+  lprintf "looking for first *%Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
   find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:true
 
 let find_last_known_address addr tt at =
-  lprintf "looking for last *%Ld\n" addr;
+  lprintf "looking for last *%Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
   find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:false
 
 let rec printable_tterm cand =
@@ -533,10 +537,6 @@ let rec printable_tterm cand =
   | {v=Deref x;t=_} -> printable_tterm x
   | _ -> lprintf "nope\n";
     false
-
-let moment_to_str = function
-  | Beginning -> "<|"
-  | After x -> ("> " ^ (string_of_int x))
 
 let find_first_symbol_by_address addr tt at =
   lprintf "looking for a first symbol at *%Ld : %s at %s\n"
@@ -994,9 +994,9 @@ let allocate_extra_ptrs ftype_of tpref =
     List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
         let addr = value in
         let ptee_type = get_fun_extra_ptr_type ftype_of call pname in
-        let mk_ptr value = {t=Ptr value.t;v = Addr value} in
-        lprintf "allocating extra ptr: %s addr %Ld : %s\n"
-          pname addr (ttype_to_str ptee_type);
+        let mk_ptr value = {t=Ptr value.t;v=Addr value} in
+        lprintf "allocating extra ptr in %s (%d): %s addr %Ld : %s\n"
+          call.fun_name call.id pname addr (ttype_to_str ptee_type);
         match ptee with
         | Opening x ->
           add_to_known_addresses (mk_ptr (get_struct_val_value x ptee_type))
@@ -1008,9 +1008,9 @@ let allocate_extra_ptrs ftype_of tpref =
           None
         | Changing (x,y) ->
           add_to_known_addresses (mk_ptr (get_struct_val_value x ptee_type))
-            x.break_down addr (After call.id) 0;
+            x.break_down addr (moment_before call.id) 0;
           add_to_known_addresses (mk_ptr (get_struct_val_value y ptee_type))
-            y.break_down addr (moment_before call.id) 0;
+            y.break_down addr (After call.id) 0;
           None)
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_extra_ptrs)
@@ -1050,10 +1050,13 @@ let allocate_args ftype_of tpref arg_name_gen =
                 ptee_t
                 (moment_before call.id)
         with
-        (*| Some _ -> None
-          failwith "nested ptr value dynamics too complex :/"*)
-        | _ -> let p_name = arg_name_gen#generate in
-          let moment = if 0 < call.id then After (call.id - 1) else Beginning in
+        | Some _ -> lprintf "not allocating symbol for %Ld, because it \
+                             is apparently already allocated (%s)"
+                      ptee_addr (moment_to_str (moment_before call.id));
+          None
+         (* failwith "nested ptr value dynamics too complex :/"*)
+        | None -> let p_name = arg_name_gen#generate in
+          let moment = moment_before call.id in
           lprintf "allocating nested %Ld -> %s = &%Ld:%s\n"
             ptr_addr p_name ptee_addr (ttype_to_str (Ptr ptee_t));
           add_known_symbol_at_address
