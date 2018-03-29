@@ -1300,6 +1300,18 @@ let take_extra_ptrs_into_pre_cond ptrs call ftype_of =
         | Closing o -> gen_eq_by_struct_val x o
         | Changing (o,_) -> gen_eq_by_struct_val x o)
 
+let allocate_dummy addr t =
+  let name = ("dummy_" ^ (Int64.to_string addr)) in
+  allocated_dummies := {vname=name; t={w=Noidea;
+                                       s=Noidea;
+                                       precise=t}}::!allocated_dummies;
+  known_addresses :=
+    Int64.Map.add !known_addresses
+      ~key:addr ~data:[{value={v=Id name;t}; callid=Beginning;
+                        str_depth=0; tt=t;
+                        breakdown=String.Map.empty}];
+  {v=Id name;t}
+
 let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
   let moment_before = moment_before call.id in
   List.filter_mapi args ~f:(fun i arg ->
@@ -1324,15 +1336,58 @@ let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
             | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
         end)
 
+let fixup_placeholder_ptrs_in_tterm moment tterm ~need_symbol =
+  let replace_placeholder = function
+    | {v=Utility (Ptr_placeholder addr); t=Ptr ptee_t} ->
+      lprintf "fixing placeholder for %Ld\n" addr;
+      let search_function =
+        if need_symbol then
+          find_first_symbol_by_address else
+          find_first_known_address
+      in
+      begin match ptee_t, search_function addr ptee_t moment with
+        | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
+                                  (render_tterm tterm))
+        | _, Some x -> Some x
+        | _, None -> let dummy_value = allocate_dummy addr ptee_t in
+          Some {v=Addr dummy_value; t=Ptr ptee_t}
+      end
+    | {v=Utility _;t} ->
+      failwith ("Ptr placeholder type is not a pointer:" ^
+                (render_tterm tterm) ^ " : " ^ (ttype_to_str t))
+    | x -> lprintf "fxphdr called on %s\n" (render_tterm x); None
+  in
+  lprintf "fixup_placeholder_ptrs_in_tterm called upon %s\n" (render_tterm tterm);
+  call_recursively_on_tterm replace_placeholder tterm
+
+let fixup_placeholder_ptrs moment vars =
+  List.map vars ~f:(fun {name;value} ->
+    {name;value=fixup_placeholder_ptrs_in_tterm moment value ~need_symbol:false})
+
+let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
+  lprintf "fixing pph in %s == %s\n" (render_tterm lhs) (render_tterm rhs);
+  match rhs.v with
+  | Utility (Ptr_placeholder addr) ->
+    begin match find_first_known_address addr rhs.t moment with
+      | Some x -> {lhs=lhs; rhs=x}
+      | None ->
+        known_addresses :=
+          Int64.Map.add !known_addresses
+            ~key:addr ~data:[{value=lhs; callid=moment;
+                              str_depth=0; tt=rhs.t;
+                              breakdown=String.Map.empty}];
+        {lhs=lhs;rhs=lhs}
+    end
+  | _ ->
+    {lhs=fixup_placeholder_ptrs_in_tterm moment lhs ~need_symbol:true;
+     rhs=fixup_placeholder_ptrs_in_tterm moment rhs ~need_symbol:false}
+
 let extract_common_call_context
     ~is_tip ftype_of call ret_spec args unique_postfix
     (free_vars:var_spec String.Map.t) =
   let tmp_gen = gen_unique_tmp_name unique_postfix in
   let ret_type = get_fun_ret_type ftype_of call in
   let arg_types = List.map args ~f:(fun {t;v=_} -> t) in
-  let pre_lemmas =
-    compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip
-  in
   let application =
     (simplify_tterm {v=Apply (call.fun_name,args);
                      t=Unknown}).v
@@ -1349,6 +1404,18 @@ let extract_common_call_context
     | Some ret_spec -> Some ret_spec.name
     | None -> None
   in
+  (* TODO fixup placeholders in args here *)
+  let extra_pre_conditions = List.map extra_pre_conditions
+       ~f:(fixup_placeholder_ptrs_in_eq_cond (After call.id))
+  in
+  let application = (fixup_placeholder_ptrs_in_tterm
+                    (After call.id)
+                    {v=application;t=Unknown}
+                    ~need_symbol:true).v
+  in
+  let pre_lemmas =
+    compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip
+  in
   {extra_pre_conditions;pre_lemmas;
    application;
    post_lemmas;ret_name;ret_type;call_id=call.id}
@@ -1363,17 +1430,26 @@ let extract_hist_call ftype_of call rets free_vars =
   (*   args_post_conditions *)
   (* in *)
   let uniq = string_of_int call.id in
-  match Int.Map.find rets call.id with
-  | Some ret ->
-    {context=extract_common_call_context
-         ~is_tip:false ftype_of call (Some ret) args uniq
-         free_vars;
-     result={args_post_conditions;ret_val=ret.value}}
-  | None ->
-    {context=extract_common_call_context
-         ~is_tip:false ftype_of call None args uniq
-         free_vars;
-     result={args_post_conditions;ret_val={t=Unknown;v=Undef;}}}
+  let context = match Int.Map.find rets call.id with
+                | Some ret -> extract_common_call_context
+                              ~is_tip:false ftype_of call (Some ret) args uniq free_vars
+                | None -> extract_common_call_context
+                          ~is_tip:false ftype_of call None args uniq free_vars
+  in
+  let ret_val = match Int.Map.find rets call.id with
+                | Some ret -> ret.value
+                | None -> {t=Unknown;v=Undef;}
+  in
+  let result =
+       {args_post_conditions=List.map args_post_conditions
+            ~f:(fixup_placeholder_ptrs_in_eq_cond
+                  (After context.call_id));
+        ret_val=fixup_placeholder_ptrs_in_tterm
+            (After context.call_id)
+            ret_val
+            ~need_symbol:false}
+  in
+  {context;result}
 
 let convert_ctxt_list l = List.map l ~f:(fun e ->
     (get_sexp_value e Boolean))
@@ -1401,9 +1477,18 @@ let extract_tip_calls ftype_of calls rets free_vars =
     | [] -> failwith "There must be at least one tip call."
     | _ ->
       List.map calls ~f:(fun tip ->
-          {args_post_conditions = compose_args_post_conditions tip ftype_of args;
-           ret_val = get_ret_val tip;
-           post_statements = convert_ctxt_list tip.ret_context})
+          let args_post_conditions = compose_args_post_conditions tip ftype_of args in
+          let ret_val = get_ret_val tip in
+          let post_statements = convert_ctxt_list tip.ret_context in
+          let args_post_conditions = List.map args_post_conditions
+                                              ~f:(fixup_placeholder_ptrs_in_eq_cond
+                                                  (After context.call_id)) in
+          let ret_val = fixup_placeholder_ptrs_in_tterm (After context.call_id) ret_val ~need_symbol:false in
+          let post_statements = List.map post_statements
+                                         ~f:(fixup_placeholder_ptrs_in_tterm
+                                             (After context.call_id)
+                                             ~need_symbol:false) in
+          {args_post_conditions;ret_val;post_statements})
   in
   lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
@@ -1505,106 +1590,6 @@ let typed_vars_to_varspec free_vars =
     ~f:(fun acc {vname;t;} ->
         String.Map.add acc ~key:vname
           ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
-
-let allocate_dummy addr t =
-  let name = ("dummy_" ^ (Int64.to_string addr)) in
-  allocated_dummies := {vname=name; t={w=Noidea;
-                                       s=Noidea;
-                                       precise=t}}::!allocated_dummies;
-  known_addresses :=
-    Int64.Map.add !known_addresses
-      ~key:addr ~data:[{value={v=Id name;t}; callid=Beginning;
-                        str_depth=0; tt=t;
-                        breakdown=String.Map.empty}];
-  {v=Id name;t}
-
-let fixup_placeholder_ptrs_in_tterm moment tterm ~need_symbol =
-  let replace_placeholder = function
-    | {v=Utility (Ptr_placeholder addr); t=Ptr ptee_t} ->
-      lprintf "fixing placeholder for %Ld\n" addr;
-      let search_function =
-        if need_symbol then
-          find_first_symbol_by_address else
-          find_first_known_address
-      in
-      begin match ptee_t, search_function addr ptee_t moment with
-        | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
-                                  (render_tterm tterm))
-        | _, Some x -> Some x
-        | _, None -> let dummy_value = allocate_dummy addr ptee_t in
-          Some {v=Addr dummy_value; t=Ptr ptee_t}
-      end
-    | {v=Utility _;t} ->
-      failwith ("Ptr placeholder type is not a pointer:" ^
-                (render_tterm tterm) ^ " : " ^ (ttype_to_str t))
-    | x -> lprintf "fxphdr called on %s\n" (render_tterm x); None
-  in
-  lprintf "fixup_placeholder_ptrs_in_tterm called upon %s\n" (render_tterm tterm);
-  call_recursively_on_tterm replace_placeholder tterm
-
-let fixup_placeholder_ptrs moment vars =
-  List.map vars ~f:(fun {name;value} ->
-    {name;value=fixup_placeholder_ptrs_in_tterm moment value ~need_symbol:false})
-
-let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
-  lprintf "fixing pph in %s == %s\n" (render_tterm lhs) (render_tterm rhs);
-  match rhs.v with
-  | Utility (Ptr_placeholder addr) ->
-    begin match find_first_known_address addr rhs.t moment with
-      | Some x -> {lhs=lhs; rhs=x}
-      | None ->
-        known_addresses :=
-          Int64.Map.add !known_addresses
-            ~key:addr ~data:[{value=lhs; callid=moment;
-                              str_depth=0; tt=rhs.t;
-                              breakdown=String.Map.empty}];
-        {lhs=lhs;rhs=lhs}
-    end
-  | _ ->
-    {lhs=fixup_placeholder_ptrs_in_tterm moment lhs ~need_symbol:true;
-     rhs=fixup_placeholder_ptrs_in_tterm moment rhs ~need_symbol:false}
-
-let fixup_placeholder_ptrs_in_context context =
-  lprintf "fixing placeholders in %s\n" (render_term context.application);
-  {context with
-   extra_pre_conditions = List.map context.extra_pre_conditions
-       ~f:(fixup_placeholder_ptrs_in_eq_cond (After context.call_id));
-   application = (fixup_placeholder_ptrs_in_tterm
-                    (After context.call_id)
-                    {v=context.application;t=Unknown}
-                    ~need_symbol:true).v}
-
-let fixup_placeholder_ptrs_in_hist_calls hist_calls =
-  let in_one_call {context;result} =
-    {context = fixup_placeholder_ptrs_in_context context;
-     result=
-       {args_post_conditions=List.map result.args_post_conditions
-            ~f:(fixup_placeholder_ptrs_in_eq_cond
-                  (After context.call_id));
-        ret_val=fixup_placeholder_ptrs_in_tterm
-            (After context.call_id)
-            result.ret_val
-            ~need_symbol:false}}
-  in
-  List.map hist_calls ~f:in_one_call
-
-let fixup_placeholder_ptrs_in_tip_call tip_call =
-  let in_one_result {args_post_conditions;ret_val;post_statements} =
-    {args_post_conditions = List.map args_post_conditions
-         ~f:(fixup_placeholder_ptrs_in_eq_cond
-               (After tip_call.context.call_id));
-     ret_val = fixup_placeholder_ptrs_in_tterm
-         (After tip_call.context.call_id)
-         ret_val
-         ~need_symbol:false;
-     post_statements = List.map post_statements
-         ~f:(fixup_placeholder_ptrs_in_tterm
-               (After tip_call.context.call_id)
-               ~need_symbol:false)}
-  in
-  {context = fixup_placeholder_ptrs_in_context tip_call.context;
-   results = List.map tip_call.results
-       ~f:in_one_result}
 
 let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
   let type_match tag t str_val =
@@ -1744,12 +1729,10 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in
-  let context_assumptions = collect_context pref in
-  let cmplxs = !allocated_complex_vals in
-  let hist_calls = fixup_placeholder_ptrs_in_hist_calls hist_calls in
-  let tip_call = fixup_placeholder_ptrs_in_tip_call tip_call in
   let arguments = fixup_placeholder_ptrs Beginning arguments in
   let tmps = !allocated_tmp_vals in
+  let context_assumptions = collect_context pref in
+  let cmplxs = !allocated_complex_vals in
   (* Do not render the allocated_dummies *)
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
