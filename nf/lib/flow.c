@@ -254,23 +254,6 @@ int flow_consistency(void* key_a, void* key_b,
   struct int_key* int_key = key_a;
   struct ext_key* ext_key = key_b;
   struct flow* flow = value;
-
-klee_print_expr("ext src port", flow->ext_src_port);
-klee_print_expr("esp 2", ext_key->ext_src_port);
-klee_print_expr("0",( 0 <= flow->int_device_id ));
-          klee_print_expr("1",( flow->int_device_id < RTE_MAX_ETHPORTS ));
-    klee_print_expr("2",( 0 <= flow->ext_device_id )); //FIXME: Klee translates this to signed variable
-          klee_print_expr("3",(flow->ext_device_id < RTE_MAX_ETHPORTS ));
-    klee_print_expr("4",( ext_key->ext_device_id == flow->ek.ext_device_id ));
-    klee_print_expr("5",( ext_key->ext_device_id == flow->ext_device_id ));
-    klee_print_expr("6",( int_key->int_device_id == flow->ik.int_device_id ));
-    klee_print_expr("7",( int_key->int_device_id == flow->int_device_id ));
-    klee_print_expr("8",( flow->int_device_id != flow->ext_device_id ));
-    klee_print_expr("9",( ext_key->ext_src_port == GLOBAL_starting_port + index));
-    klee_print_expr("10",( flow->ext_src_port == GLOBAL_starting_port + index ));
-    klee_print_expr("11",( flow->ek.ext_src_port == GLOBAL_starting_port + index ));
-klee_print_expr("GLOBAL port", GLOBAL_starting_port);
-klee_print_expr("index", index);
   return
 #if 0 //Semantics - inessential for the crash-freedom.
     ( int_key->int_src_port == flow->int_src_port ) &
