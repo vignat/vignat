@@ -22,7 +22,7 @@ NF_VERIF_ARGS := --inter-dev 0 \
                  --intra-addr 1.0.0.0 \
                  --intra-mask 255.0.0.0 \
                  --expire 10 \
-                 --max-flows 65535 \
+                 --max-flows 65536 \
                  --eth-dest 0,01:23:45:67:89:00 \
                  --eth-dest 1,01:23:45:67:89:01
 

@@ -11,7 +11,7 @@ void dmz_loop_invariant_consume(struct DoubleChain** int_chain,
                                 struct DoubleMap** int_map,
                                 struct DoubleMap** dmz_map,
                                 time_t time,
-                                uint16_t max_flows)
+                                uint32_t max_flows)
 /*@ requires *int_chain |-> ?ic &*& *dmz_chain |-> ?dc &*&
              *int_map |-> ?im &*& *dmz_map |-> ?dm &*&
              dmz_loop_invariant(ic, dc, im, dm,
@@ -24,7 +24,7 @@ void dmz_loop_invariant_consume(struct DoubleChain** int_chain,
 	klee_trace_param_ptr(int_map, sizeof(struct DoubleChain*), "int_map");
 	klee_trace_param_ptr(dmz_map, sizeof(struct DoubleChain*), "dmz_map");
 	klee_trace_param_i64(time, "time");
-	klee_trace_param_u16(max_flows, "max_flows");
+	klee_trace_param_u32(max_flows, "max_flows");
 }
 
 
@@ -33,7 +33,7 @@ void dmz_loop_invariant_produce(struct DoubleChain** int_chain,
                                 struct DoubleMap** int_map,
                                 struct DoubleMap** dmz_map,
                                 time_t* time,
-                                uint16_t max_flows)
+                                uint32_t max_flows)
 /*@ requires *int_chain |-> ?ic &*& *dmz_chain |-> ?dc &*&
              *int_map |-> ?im &*& *dmz_map |-> ?dm &*&
              *time |-> _; @*/
@@ -48,7 +48,7 @@ void dmz_loop_invariant_produce(struct DoubleChain** int_chain,
 	klee_trace_param_ptr(int_map, sizeof(struct DoubleChain*), "int_map");
 	klee_trace_param_ptr(dmz_map, sizeof(struct DoubleChain*), "dmz_map");
 	klee_trace_param_ptr(time, sizeof(struct DoubleChain*), "time");
-	klee_trace_param_u16(max_flows, "max_flows");
+	klee_trace_param_u32(max_flows, "max_flows");
 	dchain_reset(*int_chain, max_flows);
 	dchain_reset(*dmz_chain, max_flows);
 	*time = restart_time();
@@ -59,7 +59,7 @@ void dmz_loop_iteration_begin(struct DoubleChain** int_chain,
                               struct DoubleMap** int_map,
                               struct DoubleMap** dmz_map,
                               time_t time,
-                              uint16_t max_flows)
+                              uint32_t max_flows)
 /*@ requires true; @*/
 /*@ ensures true; @*/
 {
@@ -72,7 +72,7 @@ void dmz_loop_iteration_end(struct DoubleChain** int_chain,
                             struct DoubleMap** int_map,
                             struct DoubleMap** dmz_map,
                             time_t time,
-                            uint16_t max_flows)
+                            uint32_t max_flows)
 /*@ requires true; @*/
 /*@ ensures true; @*/
 {
@@ -85,7 +85,7 @@ void dmz_loop_iteration_assumptions(struct DoubleChain** int_chain,
                                     struct DoubleMap** int_map,
                                     struct DoubleMap** dmz_map,
                                     time_t time,
-                                    uint16_t max_flows)
+                                    uint32_t max_flows)
 /*@ requires true; @*/
 /*@ ensures true; @*/
 {

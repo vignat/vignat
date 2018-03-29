@@ -185,14 +185,14 @@ void dmz_print_config(struct dmz_config* config)
 		char* dev_mac_str = nf_mac_to_str(&(config->device_macs[dev]));
 		char* end_mac_str = nf_mac_to_str(&(config->endpoint_macs[dev]));
 
-		NF_INFO("Device %" PRIu8 " own-mac: %s, end-mac: %s", dev, dev_mac_str, end_mac_str);
+		NF_INFO("Device %" PRIu16 " own-mac: %s, end-mac: %s", dev, dev_mac_str, end_mac_str);
 
 		free(dev_mac_str);
 		free(end_mac_str);
 	}
 
 	NF_INFO("Expiration time: %" PRIu32, config->expiration_time);
-	NF_INFO("Max flows: %" PRIu16, config->max_flows);
+	NF_INFO("Max flows: %" PRIu32, config->max_flows);
 
 	NF_INFO("\n--- --- ------ ---\n");
 }
