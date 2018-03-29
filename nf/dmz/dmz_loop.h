@@ -7,6 +7,17 @@
 #include "lib/nf_time.h"
 
 /*@
+fixpoint bool dmz_int_fp(int_k ik, int index) {
+    return 0 <= int_k_get_idid(ik) &&
+           int_k_get_idid(ik) < RTE_MAX_ETHPORTS;
+}
+
+fixpoint bool dmz_ext_fp(int start_port, ext_k ek, int index) {
+    return ext_k_get_esp(ek) == start_port + index &&
+           0 <= ext_k_get_edid(ek) &&
+           ext_k_get_edid(ek) < RTE_MAX_ETHPORTS;
+}
+
   predicate dmz_loop_invariant(struct DoubleChain* int_chain,
                                struct DoubleChain* dmz_chain,
                                struct DoubleMap* int_map,
@@ -18,11 +29,11 @@
     dmappingp<int_k,ext_k,flw>(?im, int_k_p, ext_k_p, int_hash, ext_hash,
                                flw_p, flow_p, flow_keys_offsets_fp,
                                sizeof(struct flow), flw_get_ik, flw_get_ek,
-                               nat_int_fp, (nat_ext_fp)(0), int_map) &*&
+                               dmz_int_fp, (dmz_ext_fp)(0), int_map) &*&
     dmappingp<int_k,ext_k,flw>(?dm, int_k_p, ext_k_p, int_hash, ext_hash,
                                flw_p, flow_p, flow_keys_offsets_fp,
                                sizeof(struct flow), flw_get_ik, flw_get_ek,
-                               nat_int_fp, (nat_ext_fp)(0), dmz_map) &*&
+                               dmz_int_fp, (dmz_ext_fp)(0), dmz_map) &*&
     dmap_dchain_coherent(im, ic) &*&
     dmap_dchain_coherent(dm, dc) &*&
     last_time(time) &*&
@@ -42,8 +53,8 @@ void dmz_loop_invariant_consume(struct DoubleChain** int_chain,
              *int_map |-> ?im &*& *dmz_map |-> ?dm &*&
              dmz_loop_invariant(ic, dc, im, dm,
                                 time, max_flows); @*/
-/*@ ensures *int_chain |-> ?ic &*& *dmz_chain |-> ?dc &*&
-            *int_map |-> ?im &*& *dmz_map |-> ?dm; @*/
+/*@ ensures *int_chain |-> ic &*& *dmz_chain |-> dc &*&
+            *int_map |-> im &*& *dmz_map |-> dm; @*/
 
 
 void dmz_loop_invariant_produce(struct DoubleChain** int_chain,
@@ -55,8 +66,8 @@ void dmz_loop_invariant_produce(struct DoubleChain** int_chain,
 /*@ requires *int_chain |-> ?ic &*& *dmz_chain |-> ?dc &*&
              *int_map |-> ?im &*& *dmz_map |-> ?dm &*&
              *time |-> _; @*/
-/*@ ensures *int_chain |-> ?ic &*& *dmz_chain |-> ?dc &*&
-            *int_map |-> ?im &*& *dmz_map |-> ?dm &*&
+/*@ ensures *int_chain |-> ic &*& *dmz_chain |-> dc &*&
+            *int_map |-> im &*& *dmz_map |-> dm &*&
             *time |-> ?t &*&
             dmz_loop_invariant(ic, dc, im, dm,
                                t, max_flows); @*/

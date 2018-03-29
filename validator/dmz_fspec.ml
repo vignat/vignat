@@ -235,9 +235,8 @@ let fun_types =
                                            ekc(0,0,0,0,0,0),\
                                            0,0,0,0,0,0,0,0,0));";
                          tx_bl "close dmap_record_property1(nat_int_fp);";
-                         (fun _ -> "int start_port;\n");
                          tx_bl "close dmap_record_property2\
-                                ((nat_ext_fp)(start_port));"];
+                                ((nat_ext_fp)(0));"];
                        lemmas_after = [
                          tx_l "empty_dmap_cap\
                                <int_k,ext_k,flw>(65536);";];};
@@ -265,9 +264,6 @@ let fun_types =
                                 extra_ptr_types = [];
                                 lemmas_before = [
                                   (fun {args;_} ->
-                                     "//@ assume(start_port == " ^
-                                     List.nth_exn args 5 ^");");
-                                  (fun {args;_} ->
                                      "/*@ close dmz_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
                                      List.nth_exn args 1 ^ ", " ^
@@ -285,9 +281,7 @@ let fun_types =
                                              Ptr Sint64;
                                              Uint16];
                                 extra_ptr_types = [];
-                                lemmas_before = [
-                                  (fun _ ->
-                                     "int start_port;\n");];
+                                lemmas_before = [];
                                 lemmas_after = [
                                   (fun params ->
                                      "/*@ open dmz_loop_invariant(?mp, \
@@ -296,9 +290,6 @@ let fun_types =
                                      List.nth_exn params.args 3 ^ ", " ^
                                      List.nth_exn params.args 4 ^ ", " ^
                                      List.nth_exn params.args 5 ^ ");@*/");
-                                  (fun params ->
-                                     "//@ assume(" ^
-                                     List.nth_exn params.args 5 ^ " == start_port);");
                                   tx_l "assert dmap_dchain_coherent(?map,?chain);";
                                   tx_l "coherent_same_cap(map, chain);";
                                   tx_l "dmap<int_k,ext_k,flw> initial_double_map = map;";
