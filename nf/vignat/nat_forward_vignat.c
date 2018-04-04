@@ -12,7 +12,7 @@
 #include <rte_mbuf.h>
 
 #include "lib/flow.h"
-#include "flowmanager.h"
+#include "lib/flowmanager.h"
 
 #include "lib/nat_config.h"
 #include "lib/nf_forward.h"
@@ -20,15 +20,20 @@
 #include "lib/nf_util.h"
 
 struct nat_config config;
+struct FlowManager* flow_manager;
 
 void nf_core_init()
 {
-	if (!allocate_flowmanager(rte_eth_dev_count(),
-                            config.start_port,
-                            config.external_addr,
-                            config.wan_device,
-                            config.expiration_time,
-                            config.max_flows)) {
+	flow_manager = allocate_flowmanager(
+		rte_eth_dev_count(),
+                config.start_port,
+                config.external_addr,
+                config.wan_device,
+                config.expiration_time,
+                config.max_flows
+	);
+
+	if (flow_manager == NULL) {
 		rte_exit(EXIT_FAILURE, "Could not allocate flow manager");
 	}
 }
@@ -37,7 +42,7 @@ int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
 	NF_DEBUG("It is %" PRIu32, now);
 
-	expire_flows(now);
+	expire_flows(flow_manager, now);
 	NF_DEBUG("Flows have been expired");
 
 	struct ether_hdr* ether_header = nf_get_mbuf_ether_header(mbuf);
@@ -73,7 +78,7 @@ int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 		log_ext_key(&key);
 
 		struct flow f;
-		int flow_exists = get_flow_by_ext_key(&key, now, &f);
+		int flow_exists = get_flow_by_ext_key(flow_manager, &key, now, &f);
 		if (flow_exists) {
 			NF_DEBUG("Found flow:");
 			log_flow(&f);
@@ -101,11 +106,11 @@ int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 		log_int_key(&key);
 
 		struct flow f;
-		int flow_exists = get_flow_by_int_key(&key, now, &f);
+		int flow_exists = get_flow_by_int_key(flow_manager, &key, now, &f);
 		if (!flow_exists) {
 			NF_DEBUG("New flow");
 
-			if (!allocate_flow(&key, now, &f)) {
+			if (!allocate_flow(flow_manager, &key, now, &f)) {
 				NF_DEBUG("No space for the flow, dropping");
 				return mbuf->port;
 			}
@@ -144,7 +149,7 @@ void nf_print_config() {
 
 void nf_loop_iteration_begin(unsigned lcore_id,
                              time_t time) {
-	loop_iteration_begin(get_dmap_pp(), get_dchain_pp(),
+  loop_iteration_begin(get_dmap_pp(flow_manager), get_dchain_pp(flow_manager),
                        lcore_id, time,
                        config.max_flows,
                        config.start_port);
@@ -152,7 +157,7 @@ void nf_loop_iteration_begin(unsigned lcore_id,
 
 void nf_add_loop_iteration_assumptions(unsigned lcore_id,
                                        time_t time) {
-  loop_iteration_assumptions(get_dmap_pp(), get_dchain_pp(),
+  loop_iteration_assumptions(get_dmap_pp(flow_manager), get_dchain_pp(flow_manager),
                              lcore_id, time,
                              config.max_flows,
                              config.start_port);
@@ -160,7 +165,7 @@ void nf_add_loop_iteration_assumptions(unsigned lcore_id,
 
 void nf_loop_iteration_end(unsigned lcore_id,
                            time_t time) {
-  loop_iteration_end(get_dmap_pp(), get_dchain_pp(),
+  loop_iteration_end(get_dmap_pp(flow_manager), get_dchain_pp(flow_manager),
                      lcore_id, time,
                      config.max_flows,
                      config.start_port);

@@ -3,6 +3,7 @@
 # - APP := <binary name>
 # - NF_FILES := <NF files for both runtime and verif-time>
 # - NF_VERIF_FILES := <verif-time only NF files>
+# - NF_VERIF_DEFS := <verif-time only defs (-Dxxx)>
 # - NF_VERIF_ARGS := <arguments to pass to the NF at verif-time>
 
 # -----------------------------------------------------------------------
@@ -69,6 +70,8 @@ VERIF_INCLUDES += -I $(RTE_SDK)/lib/librte_cmdline
 
 # Defines. TODO remove _GNU_SOURCE from here, #define it in files
 VERIF_DEFS := -D_GNU_SOURCE -DKLEE_VERIFICATION
+# Specific NF
+VERIF_DEFS += $(NF_VERIF_DEFS)
 
 # Basic files
 # NF base
@@ -130,9 +133,9 @@ COMPILE_COMMAND := clang
 # Linking
 LINK_COMMAND := llvm-link -o nf.bc *.bc
 # KLEE verification
-# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex
+# if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex (to avoid symbolic indices)
 VERIF_COMMAND := /usr/bin/time -v \
-                 klee -libc=uclibc -no-externals -dump-call-traces -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error -max-memory=750000
+                 klee -libc=uclibc -no-externals -dump-call-traces -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs
 # NF args for the verification
 NF_VERIF_BASE_ARGS := nf.bc --no-shconf --
 

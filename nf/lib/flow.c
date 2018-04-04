@@ -286,7 +286,7 @@ int flow_consistency(void* key_a, void* key_b,
     ( ext_key->protocol == flow->ek.protocol ) &
 #endif//0 -- inessential for crash freedom part.
     ( 0 <= flow->int_device_id ) &
-          (flow->int_device_id < RTE_MAX_ETHPORTS ) &
+          ( flow->int_device_id < RTE_MAX_ETHPORTS ) &
     ( 0 <= flow->ext_device_id ) & //FIXME: Klee translates this to signed variable
           (flow->ext_device_id < RTE_MAX_ETHPORTS ) &
     ( ext_key->ext_device_id == flow->ek.ext_device_id ) &
@@ -294,9 +294,9 @@ int flow_consistency(void* key_a, void* key_b,
     ( int_key->int_device_id == flow->ik.int_device_id ) &
     ( int_key->int_device_id == flow->int_device_id ) &
     ( flow->int_device_id != flow->ext_device_id ) &
-    ( ext_key->ext_src_port == starting_port + index) &
-    ( flow->ext_src_port == starting_port + index ) &
-    ( flow->ek.ext_src_port == starting_port + index );
+    ( ext_key->ext_src_port == GLOBAL_starting_port + index ) &
+    ( flow->ext_src_port == GLOBAL_starting_port + index ) &
+    ( flow->ek.ext_src_port == GLOBAL_starting_port + index );
     //(0 == memcmp(ext_key, &flow->ek, sizeof(struct ext_key)));
 }
 #endif//KLEE_VERIFICATION

@@ -234,10 +234,9 @@ let fun_types =
                                       flwc(ikc(0,0,0,0,0,0),\
                                            ekc(0,0,0,0,0,0),\
                                            0,0,0,0,0,0,0,0,0));";
-                         tx_bl "close dmap_record_property1(nat_int_fp);";
-                         (fun _ -> "int start_port;\n");
+                         tx_bl "close dmap_record_property1(dmz_int_fp);";
                          tx_bl "close dmap_record_property2\
-                                ((nat_ext_fp)(start_port));"];
+                                ((dmz_ext_fp)(0));"];
                        lemmas_after = [
                          tx_l "empty_dmap_cap\
                                <int_k,ext_k,flw>(65536);";];};
@@ -255,54 +254,44 @@ let fun_types =
                                "empty_dmap_dchain_coherent\
                                 <int_k,ext_k,flw>(65536);";
                            tx_l "index_range_of_empty(65536, 0);";];};
-     "loop_invariant_consume", {ret_type = Static Void;
-                                arg_types = stt [Ptr (Ptr dmap_struct);
+     "dmz_loop_invariant_consume", {ret_type = Static Void;
+                                arg_types = stt [Ptr (Ptr dchain_struct);
                                              Ptr (Ptr dchain_struct);
-                                             Uint32;
+                                             Ptr (Ptr dmap_struct);
+                                             Ptr (Ptr dmap_struct);
                                              Sint64;
-                                             Sint32;
-                                             Sint32];
+                                             Uint32];
                                 extra_ptr_types = [];
                                 lemmas_before = [
                                   (fun {args;_} ->
-                                     "//@ assume(start_port == " ^
-                                     List.nth_exn args 5 ^");");
-                                  (fun {args;_} ->
-                                     "/*@ close evproc_loop_invariant(*" ^
+                                     "/*@ close dmz_loop_invariant(*" ^
                                      List.nth_exn args 0 ^ ", *" ^
-                                     List.nth_exn args 1 ^ ", " ^
-                                     List.nth_exn args 2 ^ ", " ^
+                                     List.nth_exn args 1 ^ ", *" ^
+                                     List.nth_exn args 2 ^ ", *" ^
                                      List.nth_exn args 3 ^ ", " ^
                                      List.nth_exn args 4 ^ ", " ^
                                      List.nth_exn args 5 ^ "); @*/");
                                 ];
                                 lemmas_after = [];};
-     "loop_invariant_produce", {ret_type = Static Void;
-                                arg_types = stt [Ptr (Ptr dmap_struct);
+     "dmz_loop_invariant_produce", {ret_type = Static Void;
+                                arg_types = stt [Ptr (Ptr dchain_struct);
                                              Ptr (Ptr dchain_struct);
-                                             Ptr Uint32;
+                                             Ptr (Ptr dmap_struct);
+                                             Ptr (Ptr dmap_struct);
                                              Ptr Sint64;
-                                             Sint32;
-                                             Sint32];
+                                             Uint32];
                                 extra_ptr_types = [];
-                                lemmas_before = [
-                                  (fun _ ->
-                                     "int start_port;\n");];
+                                lemmas_before = [];
                                 lemmas_after = [
                                   (fun params ->
-                                     "/*@ open evproc_loop_invariant(?mp, \
-                                      ?chp, *" ^
-                                     List.nth_exn params.args 2 ^ ", *" ^
-                                     List.nth_exn params.args 3 ^ ", " ^
+                                     "/*@ open dmz_loop_invariant(?ic, ?dc, ?im, ?dm, *" ^
                                      List.nth_exn params.args 4 ^ ", " ^
                                      List.nth_exn params.args 5 ^ ");@*/");
-                                  (fun params ->
-                                     "//@ assume(" ^
-                                     List.nth_exn params.args 5 ^ " == start_port);");
-                                  tx_l "assert dmap_dchain_coherent(?map,?chain);";
-                                  tx_l "coherent_same_cap(map, chain);";
-                                  tx_l "dmap<int_k,ext_k,flw> initial_double_map = map;";
-                                  tx_l "dchain initial_double_chain = chain;"
+(* commented out cause idk how to make that work, since dmap_dchain_coherent exists twice 
+                                  tx_l "assert dmap_dchain_coherent(?m1, ?c1);";
+                                  tx_l "assert dmap_dchain_coherent(?m2, ?c2);";
+                                  tx_l "coherent_same_cap(m1, c1);";
+                                  tx_l "coherent_same_cap(m2, c2);"; *)
                                 ];};
      "dmap_get_b", {ret_type = Static Sint32;
                     arg_types = stt [Ptr dmap_struct; Ptr ext_key_struct; Ptr Sint32;];
@@ -752,11 +741,11 @@ let fun_types =
 
 let fixpoints =
   String.Map.of_alist_exn [
-    "nat_int_fp", {Ir.v=Bop(And,
+    "dmz_int_fp", {Ir.v=Bop(And,
                             {v=Bop(Le,{v=Int 0;t=Sint32},{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown});t=Unknown},
                             {v=Bop(Lt,{v=Str_idx({v=Id "Arg0";t=Unknown},"idid");t=Unknown},
                                    {v=Int 2;t=Sint32});t=Unknown});t=Boolean};
-    "nat_ext_fp", {v=Bop(And,
+    "dmz_ext_fp", {v=Bop(And,
                          {v=Bop(And,
                                 {v=Bop(Le,
                                        {v=Int 0;t=Sint32},
@@ -834,7 +823,7 @@ struct
   let eventproc_iteration_begin = "loop_invariant_produce"
   let eventproc_iteration_end = "loop_invariant_consume"
   let user_check_for_complete_iteration =
-    (In_channel.read_all "forwarding_property.tmpl")
+    (In_channel.read_all "dmz_forwarding_property.tmpl")
 end
 
 (* Register the module *)

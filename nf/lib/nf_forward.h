@@ -13,6 +13,7 @@ static const uint16_t FLOOD_FRAME = -1;
 int nf_core_process(struct rte_mbuf* mbuf, time_t now);
 
 void nf_config_init(int argc, char** argv);
+void nf_config_set(void* value);
 void nf_config_cmdline_print_usage(void);
 void nf_print_config(void);
 

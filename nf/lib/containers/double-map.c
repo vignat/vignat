@@ -5,38 +5,6 @@
 
 //@ #include "arith.gh"
 
-struct DoubleMap {
-  int value_size;
-
-  uq_value_copy* cpy;
-  uq_value_destr* dstr;
-
-  uint8_t *values;
-
-  int *bbs_a;
-  void **kps_a;
-  int *khs_a;
-  int *chns_a;
-  int *inds_a;
-  map_keys_equality *eq_a;
-  map_key_hash *hsh_a;
-
-  int *bbs_b;
-  void **kps_b;
-  int *khs_b;
-  int *chns_b;
-  int *inds_b;
-  map_keys_equality *eq_b;
-  map_key_hash *hsh_b;
-
-  dmap_extract_keys *exk;
-  dmap_pack_keys *pk;
-
-  int n_vals;
-  int capacity;
-  int keys_capacity;
-};
-
 /*@
   predicate valsp<t1,t2,vt>(void* values, int val_size,
                             predicate (void*,vt) fvp,

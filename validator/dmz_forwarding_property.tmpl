@@ -1,0 +1,35 @@
+// TODO other fields should be changed either
+#define UNRELEVANT_FIELDS_UNCHANGED(before,after)               \
+    after.ether.ether_type     == before.ether.ether_type &&      \
+    after.ipv4.version_ihl     == before.ipv4.version_ihl &&      \
+    after.ipv4.type_of_service == before.ipv4.type_of_service &&  \
+    after.ipv4.total_length    == before.ipv4.total_length &&     \
+    after.ipv4.packet_id       == before.ipv4.packet_id &&        \
+    after.ipv4.fragment_offset == before.ipv4.fragment_offset &&  \
+    after.ipv4.time_to_live    == before.ipv4.time_to_live &&     \
+    after.ipv4.next_proto_id   == before.ipv4.next_proto_id
+
+#define UNRELEVANT_TCP_FIELDS_UNCHANGED(before,after)         \
+    after.tcp.sent_seq         == before.tcp.sent_seq &&        \
+    after.tcp.recv_ack         == before.tcp.recv_ack &&      \
+    after.tcp.data_off         == before.tcp.data_off &&      \
+    after.tcp.tcp_flags        == before.tcp.tcp_flags &&     \
+    after.tcp.rx_win           == before.tcp.rx_win &&        \
+    after.tcp.tcp_urp          == before.tcp.tcp_urp
+
+bit_and_zero(0x00000010);
+if (10 < now) {// consider only normal moments, remote from the start of the epoch
+  // 0x10 -> IPv4
+  if (a_packet_received && (received_packet_type & 0x00000010)) {
+    // 6/17 -> TCP/UDP
+    if (the_received_packet.ipv4.next_proto_id == 6 ||
+        the_received_packet.ipv4.next_proto_id == 17) {
+    } else {
+      // Non TCP or UDP packet
+      assert false == a_packet_sent;
+    }
+  } else {
+    // Non IPv4 packet
+    assert false == a_packet_sent;
+  }
+}

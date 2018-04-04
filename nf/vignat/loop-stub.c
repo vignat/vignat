@@ -4,9 +4,6 @@
 #include "lib/stubs/containers/double-chain-stub-control.h"
 #include "lib/stubs/containers/double-map-stub-control.h"
 
-//TODO: this is a copy-paste from array_lcc.h and other array headers
-//. Move it to a separate file.
-
 void loop_iteration_assumptions(struct DoubleMap** m, struct DoubleChain** ch,
                                 unsigned int lcore_id,
                                 time_t time, int max_flows, int start_port)
@@ -30,7 +27,6 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_param_ptr(m, sizeof(struct DoubleMap*), "m");
   klee_trace_param_ptr(ch, sizeof(struct DoubleChain*), "ch");
   klee_trace_param_i32(lcore_id, "lcore_id");
-  //ARRAY_LCC_EL_TRACE_ARG_BREAKDOWN(cur_lcc);
   klee_trace_param_i64(time, "time");
   klee_trace_param_i32(max_flows, "max_flows");
   klee_trace_param_i32(start_port, "start_port");
@@ -44,7 +40,6 @@ void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_param_ptr(m, sizeof(struct DoubleMap*), "m");
   klee_trace_param_ptr(ch, sizeof(struct DoubleChain*), "ch");
   klee_trace_param_ptr(lcore_id, sizeof(unsigned int), "lcore_id");
-  //ARRAY_LCC_EL_TRACE_ARG_BREAKDOWN(cur_lcc);
   klee_trace_param_ptr(time, sizeof(time_t), "time");
   klee_trace_param_i32(max_flows, "max_flows");
   klee_trace_param_i32(start_port, "start_port");

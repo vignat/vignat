@@ -638,6 +638,22 @@ let render_allocated_args args =
        ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
                        (spec.name) ^ ";")) ^ "\n"
 
+let render_args_hack args =
+  (* Render declarations first, VeriFast complains otherwise *)
+  String.concat ~sep:"\n"
+    (List.map (List.filter args ~f:(fun spec -> is_pointer_t spec.value.t))
+       ~f:(fun spec -> (ttype_to_str spec.value.t) ^ " " ^
+                       (spec.name) ^ "bis;")) ^ "\n" ^
+  (* Then the assignments *)
+  String.concat ~sep:"\n"
+    (List.map (List.filter args ~f:(fun spec -> is_pointer_t spec.value.t))
+       ~f:(fun spec -> (spec.name) ^ " = " ^ (spec.name) ^ "bis;\n" ^
+                       "*(&(" ^ (spec.name) ^ ")) = " ^ (spec.name) ^ "bis;")) ^ "\n" ^
+  (* Then the assumptions, which would be overwritten by assignments otherwise *)
+  String.concat ~sep:"\n"
+    (List.map (List.filter args ~f:(fun spec -> is_pointer_t spec.value.t))
+       ~f:(fun spec -> "//@ assume(" ^ (spec.name) ^ " == " ^ (spec.name) ^ "bis);")) ^ "\n"
+
 let render_final finishing ~catch_leaks =
   if finishing && catch_leaks then
     "/* This sequence must terminate cleanly: no need for assume(false); */\n"
@@ -706,6 +722,7 @@ let render_ir ir fout ~render_assertions =
       Out_channel.output_string cout (render_vars_declarations
                                         (String.Map.data ir.free_vars));
       Out_channel.output_string cout (render_allocated_args ir.arguments);
+      Out_channel.output_string cout (render_args_hack ir.arguments);
       Out_channel.output_string cout (render_context_assumptions
                                         ir.context_assumptions);
       (* Out_channel.output_string cout (render_context_assumptions *)
