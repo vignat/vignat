@@ -1225,8 +1225,8 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
             | Some out_arg ->
               lprintf "processing %s argptr: %s| strval: %s\n" 
                       arg.aname (ttype_to_str out_arg.t)
-                      (render_tterm (get_struct_val_value ptee.after (get_pointee out_arg.t)));
-              begin match get_struct_val_value ptee.after (get_pointee out_arg.t) with
+                      (render_tterm (get_struct_val_value ptee.after out_arg.t));
+              begin match get_struct_val_value ptee.after out_arg.t with
               | {v=Utility (Ptr_placeholder addr);t=Ptr ptee} ->
                 begin
                   match find_first_known_address addr ptee (After call.id) with
@@ -1424,6 +1424,7 @@ let extract_common_call_context
    post_lemmas;ret_name;ret_type;call_id=call.id}
 
 let extract_hist_call ftype_of call rets free_vars =
+  lprintf "extract hist call: %s\n" call.fun_name;
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call ftype_of args in
   (* XXX: what does it mean extra_ptrs post conditions?
@@ -1464,6 +1465,7 @@ let split_common_assumptions a1 a2 =
       List.exists as2 ~f:(fun other -> other = assumption))
 
 let extract_tip_calls ftype_of calls rets free_vars =
+  lprintf "extract tip call: %s\n" (List.hd_exn calls).fun_name;
   let call = List.hd_exn calls in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context
