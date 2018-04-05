@@ -150,10 +150,8 @@ let get_fun_extra_ptr_type
     (Int.Map.find_exn type_guesses call.id).extra_ptr_types
     exptr_name
 
-let get_fun_ret_type
-    (ftype_of, type_guesses)
-    (call : Trace_prefix.call_node) =
-  (Int.Map.find_exn type_guesses call.id).ret_type
+let get_fun_ret_type (ftype_of, type_guesses) call_id =
+  (Int.Map.find_exn type_guesses call_id).ret_type
 
 let get_num_args ((ftype_of:string->fun_spec), _) call =
   List.length (ftype_of call.fun_name).arg_types
@@ -878,7 +876,7 @@ let get_basic_vars ftype_of tpref =
       | Some ret ->
         complex_value_vars
           ret.value ret.ptr
-          (get_fun_ret_type ftype_of call) true extra_ptr_vars
+          (get_fun_ret_type ftype_of call.id) true extra_ptr_vars
       | None -> extra_ptr_vars in
     let add_vars_from_ctxt vars ctxt =
       map_set_n_update_alist vars
@@ -899,7 +897,7 @@ let get_basic_vars ftype_of tpref =
 
 let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
   let alloc_dummy_for_call (rets, acc_dummies) call =
-    let ret_type = get_fun_ret_type ftype_of call in
+    let ret_type = get_fun_ret_type ftype_of call.id in
     let add_the_dummy_to_tables value =
       let name = (Int.Map.find_exn rets call.id).name in
       let dummy_name = "tip_ret_dummy"^(Int.to_string call.id) in
@@ -921,7 +919,7 @@ let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
 
 let allocate_rets ftype_of tpref =
   let alloc_call_ret acc_rets call =
-    let ret_type = get_fun_ret_type ftype_of call in
+    let ret_type = get_fun_ret_type ftype_of call.id in
     match call.ret with
     | Some {value;ptr;} ->
       let name = "ret"^(Int.to_string call.id) in
@@ -1109,19 +1107,18 @@ let make_lemma_args_hack (args: tterm list) =
   let replaced_args = List.map args ~f:(fun arg -> if is_pointer arg then append_id_in_tterm_id_starting_with "arg" "bis" arg else arg) in
   List.map replaced_args ~f:render_tterm
 
-let get_lemmas_before (ftype_of,_) call =
-  (ftype_of call.fun_name).lemmas_before
+let get_lemmas_before (ftype_of,_) fun_name =
+  (ftype_of fun_name).lemmas_before
 
-let get_fun_exptr_types (ftype_of,guessed_types)
-    (call : Trace_prefix.call_node) =
-  (Int.Map.find_exn guessed_types call.id).extra_ptr_types
+let get_fun_exptr_types (ftype_of,guessed_types) call_id =
+  (Int.Map.find_exn guessed_types call_id).extra_ptr_types
 
-let compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip =
-  (List.map (get_lemmas_before ftype_of call) ~f:(fun l ->
+let compose_pre_lemmas ftype_of fun_name call_id args arg_types tmp_gen ~is_tip =
+  (List.map (get_lemmas_before ftype_of fun_name) ~f:(fun l ->
        l {args=make_lemma_args_hack args;
           arg_exps=args;tmp_gen;is_tip;arg_types;
-          exptr_types=get_fun_exptr_types ftype_of call;
-          ret_type=get_fun_ret_type ftype_of call}))
+          exptr_types=get_fun_exptr_types ftype_of call_id;
+          ret_type=get_fun_ret_type ftype_of call_id}))
 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
@@ -1177,21 +1174,21 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
           | _ ->
             get_allocated_arg arg a_type)
 
-let get_lemmas_after (ftype_of, _) call =
-  (ftype_of call.fun_name).lemmas_after
+let get_lemmas_after (ftype_of, _) fun_name =
+  (ftype_of fun_name).lemmas_after
 
-let compose_post_lemmas ~is_tip ftype_of call ret_spec args arg_types tmp_gen =
+let compose_post_lemmas ~is_tip ftype_of fun_name call_id ret_spec args arg_types tmp_gen =
   let ret_spec = match ret_spec with
     | Some ret_spec -> ret_spec
     | None -> {name="";value={v=Undef;t=Unknown}}
   in
   let result = render_tterm ret_spec.value in
-  List.map (get_lemmas_after ftype_of call)
+  List.map (get_lemmas_after ftype_of fun_name)
     ~f:(fun l -> l {ret_name=ret_spec.name;ret_val=result;
                     args=make_lemma_args_hack args;
                     arg_exps=args;tmp_gen;is_tip;arg_types;
-                    exptr_types=get_fun_exptr_types ftype_of call;
-                    ret_type=get_fun_ret_type ftype_of call})
+                    exptr_types=get_fun_exptr_types ftype_of call_id;
+                    ret_type=get_fun_ret_type ftype_of call_id})
 
 let deref_tterm {v;t} =
   simplify_tterm {v = Deref {v;t};
@@ -1386,11 +1383,10 @@ let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
      rhs=fixup_placeholder_ptrs_in_tterm moment rhs ~need_symbol:false}
 
 let extract_common_call_context
-    ~is_tip ftype_of call ret_spec args unique_postfix
+    ~is_tip ftype_of call ret_spec args
     (free_vars:var_spec String.Map.t) =
-  let tmp_gen = gen_unique_tmp_name unique_postfix in
-  let ret_type = get_fun_ret_type ftype_of call in
-  let arg_types = List.map args ~f:(fun {t;v=_} -> t) in
+  let ret_type = get_fun_ret_type ftype_of call.id in
+  let pre_lemmas = ["Render lemmas at the last moment"] in
   let application =
     (simplify_tterm {v=Apply (call.fun_name,args);
                      t=Unknown}).v
@@ -1399,10 +1395,7 @@ let extract_common_call_context
     (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of) (*@
     (take_arg_ptrs_into_pre_cond call.args call ftype_of)*)
   in
-  let post_lemmas =
-    compose_post_lemmas
-      ~is_tip ftype_of call ret_spec args arg_types tmp_gen
-  in
+  let post_lemmas = ["Render lemmas at the last moment"] in
   let ret_name = match ret_spec with
     | Some ret_spec -> Some ret_spec.name
     | None -> None
@@ -1415,9 +1408,6 @@ let extract_common_call_context
                     (After call.id)
                     {v=application;t=Unknown}
                     ~need_symbol:true).v
-  in
-  let pre_lemmas =
-    compose_fcall_preamble ftype_of call args arg_types tmp_gen is_tip
   in
   {extra_pre_conditions;pre_lemmas;
    application;
@@ -1433,27 +1423,16 @@ let extract_hist_call ftype_of call rets free_vars =
   (*   (compose_extra_ptrs_post_conditions call ftype_of)@ *)
   (*   args_post_conditions *)
   (* in *)
-  let uniq = string_of_int call.id in
-  let context = match Int.Map.find rets call.id with
-                | Some ret -> extract_common_call_context
-                              ~is_tip:false ftype_of call (Some ret) args uniq free_vars
-                | None -> extract_common_call_context
-                          ~is_tip:false ftype_of call None args uniq free_vars
-  in
-  let ret_val = match Int.Map.find rets call.id with
-                | Some ret -> ret.value
-                | None -> {t=Unknown;v=Undef;}
-  in
-  let result =
-       {args_post_conditions=List.map args_post_conditions
-            ~f:(fixup_placeholder_ptrs_in_eq_cond
-                  (After context.call_id));
-        ret_val=fixup_placeholder_ptrs_in_tterm
-            (After context.call_id)
-            ret_val
-            ~need_symbol:false}
-  in
-  {context;result}
+  match Int.Map.find rets call.id with
+  | Some ret ->
+    {context=extract_common_call_context
+         ~is_tip:false ftype_of call (Some ret) args free_vars;
+     result={args_post_conditions;ret_val=ret.value}}
+  | None ->
+    {context=extract_common_call_context
+         ~is_tip:false ftype_of call None args
+         free_vars;
+     result={args_post_conditions;ret_val={t=Unknown;v=Undef;}}}
 
 let convert_ctxt_list l = List.map l ~f:(fun e ->
     (get_sexp_value e Boolean))
@@ -1469,7 +1448,7 @@ let extract_tip_calls ftype_of calls rets free_vars =
   let call = List.hd_exn calls in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context
-      ~is_tip:true ftype_of call (Int.Map.find rets call.id) args "tip"
+      ~is_tip:true ftype_of call (Int.Map.find rets call.id) args
       free_vars
   in
   let get_ret_val call =
@@ -1698,6 +1677,74 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
                  arg_types=List.rev arg_type_guesses;
                  extra_ptr_types=ex_ptr_type_guesses})
 
+let call_fun_name call_context =
+  match call_context.application with
+  | Apply (fun_name,_) -> fun_name
+  | x -> failwith ((render_term x) ^ " is not a function application")
+
+let call_args call_context =
+  match call_context.application with
+  | Apply (_,args) -> args
+  | x -> failwith ((render_term x) ^ " is not a function application")
+
+let ttypes_of_tterms (tterms : tterm list) =
+  List.map tterms ~f:(fun t -> t.t)
+
+let render_hist_lemmas ftype_of hist_calls =
+  List.map hist_calls ~f:(fun (call : hist_call) ->
+      let ret_spec = match call.context.ret_name with
+        | Some name -> Some {name;value=call.result.ret_val}
+        | None -> None
+      in
+      let tmp_gen =
+        gen_unique_tmp_name (string_of_int call.context.call_id)
+      in
+      {call with
+       context = {call.context with
+                  pre_lemmas = compose_pre_lemmas
+                      ftype_of
+                      (call_fun_name call.context)
+                      call.context.call_id
+                      (call_args call.context)
+                      (ttypes_of_tterms (call_args call.context))
+                      tmp_gen
+                      ~is_tip:false;
+                  post_lemmas = compose_post_lemmas
+                      ~is_tip:false
+                      ftype_of
+                      (call_fun_name call.context)
+                      call.context.call_id
+                      ret_spec
+                      (call_args call.context)
+                      (ttypes_of_tterms (call_args call.context))
+                      tmp_gen}})
+
+let render_tip_lemmas ftype_of (tip_call : tip_call) =
+  let ret_spec = match tip_call.context.ret_name with
+    | Some name -> Some {name;value=(List.hd_exn tip_call.results).ret_val}
+    | None -> None
+  in
+  let tmp_gen = gen_unique_tmp_name "tip" in
+  {tip_call with
+   context = {tip_call.context with
+              pre_lemmas = compose_pre_lemmas
+                  ftype_of
+                  (call_fun_name tip_call.context)
+                  tip_call.context.call_id
+                  (call_args tip_call.context)
+                  (ttypes_of_tterms (call_args tip_call.context))
+                  tmp_gen
+                  ~is_tip:false;
+              post_lemmas = compose_post_lemmas
+                  ~is_tip:false
+                  ftype_of
+                  (call_fun_name tip_call.context)
+                  tip_call.context.call_id
+                  ret_spec
+                  (call_args tip_call.context)
+                  (ttypes_of_tterms (call_args tip_call.context))
+                  tmp_gen}}
+
 let build_ir fun_types fin preamble boundary_fun finishing_fun
   eventproc_iteration_begin eventproc_iteration_end =
   let ftype_of fun_name =
@@ -1735,6 +1782,8 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in
   let arguments = fixup_placeholder_ptrs Beginning arguments in
+  let hist_calls = render_hist_lemmas ftype_of hist_calls in
+  let tip_call = render_tip_lemmas ftype_of tip_call in
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
