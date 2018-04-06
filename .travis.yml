@@ -4,6 +4,9 @@ language: cpp
 compiler:
   - gcc
 
-install: ./fake-install.sh
+env:
+  VIGOR_INSTALL_MODE=auto
+
+install: ./travis-install.sh
 
 script: ./test-vigor.sh
