@@ -21,7 +21,7 @@ esac
 
 echo "install mode: $VIGOR_INSTALL_MODE"
 
-if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$OS" != "docker" ] && [ "$VIGOR_INSTALL_MODE" != "auto"] ; then
+if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$OS" != "docker" ] && [ "$VIGOR_INSTALL_MODE" != "auto" ] ; then
   echo 'It is not recommented to install the dependencies into the project root directory.'
   echo "We recommend you to run the script from the parent directory like this: . $VNDSDIR/install.sh"
   read -p "Continue installing into $BUILDDIR? [y/n]" -n 1 -r
