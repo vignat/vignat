@@ -1,0 +1,9 @@
+sudo: required
+dist: trusty
+language: cpp
+compiler:
+  - gcc
+
+install: ./fake-install.sh
+
+script: ./test-vigor.sh
