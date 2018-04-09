@@ -21,7 +21,7 @@ esac
 
 echo "install mode: $VIGOR_INSTALL_MODE"
 
-if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$OS" != "docker" ] && [ "$VIGOR_INSTALL_MODE" != "auto" ] ; then
+if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$OS" != "docker" ] && [ "$VIGOR_INSTALL_MODE" != "travis" ] ; then
   echo 'It is not recommented to install the dependencies into the project root directory.'
   echo "We recommend you to run the script from the parent directory like this: . $VNDSDIR/install.sh"
   read -p "Continue installing into $BUILDDIR? [y/n]" -n 1 -r
@@ -44,7 +44,7 @@ echo ". $PATHSFILE" >> "$HOME/.profile"
 sudo apt-get update
 
 sudo apt-get install -y \
-                     libpcap-dev `# for DPDK` \
+                     libpcap-dev libnuma-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
 # On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
@@ -55,7 +55,7 @@ if [ "$OS" = 'microsoft' ]; then
   # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
   sudo apt install "linux-headers-$KERNEL_VER-generic"
   export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
-elif [ "$OS" = 'linux' ]; then
+elif [ "$OS" = 'linux' ] || [ "$VIGOR_INSTALL_MODE" = "travis" ] ; then
   sudo apt-get install -y "linux-headers-$KERNEL_VER"
 fi
 

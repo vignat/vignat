@@ -5,7 +5,7 @@ compiler:
   - gcc
 
 env:
-  VIGOR_INSTALL_MODE=auto
+  VIGOR_INSTALL_MODE=travis
 
 install: ./travis-install.sh
 
