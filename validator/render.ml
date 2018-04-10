@@ -3,8 +3,16 @@ open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
-  match out_val.v with
-  | Addr ptee ->
+  match out_val.v, out_val.t with
+  | Id ovid, Str (_, ovfields) ->
+    begin match out_arg.v with
+    | Id oaid ->
+      if out_val.t <> out_arg.t then failwith "not the right type!";
+      String.concat (List.map ovfields ~f:(fun (name,_) ->
+                       "//@ " ^ head ^ "(" ^ ovid ^ "." ^ name ^ " == " ^ oaid ^ "." ^ name ^ ");\n"))
+    | _ -> failwith "not supported, sorry"
+    end
+  | Addr ptee, _ ->
     begin match out_arg.t with
       | Ptr Void ->
         render_eq_sttmt
@@ -18,7 +26,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
           {v=Deref out_arg;t=get_pointee out_arg.t}
           ptee
     end
-  | Struct (_, fields) ->
+  | Struct (_, fields), _ ->
     if out_val.t <> out_arg.t then
       failwith ("arg and val types inconsistent: arg:" ^
                 (ttype_to_str out_arg.t) ^ " <> val: " ^
@@ -28,8 +36,8 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
      | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | Undef -> failwith ("// render_eq_sttmt undef for " ^ (render_tterm out_arg))
-  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
+  | Undef, _ -> failwith ("// render_eq_sttmt undef for " ^ (render_tterm out_arg))
+  | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_prelemmas context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
