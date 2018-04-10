@@ -13,6 +13,11 @@ let last_device_id = ref ""
 let last_time_for_index_alloc = ref ""
 
 
+let counter = ref 0
+let make_unique_name name =
+  let unique_name = name ^ (string_of_int !counter) in
+  counter := !counter + 1; unique_name
+
 let gen_get_fp map_name =
   match !last_index_key with
   | Int-> "dmap_get_k1_fp(" ^ map_name ^ ", " ^ !last_index_gotten ^ ")"
@@ -622,9 +627,9 @@ let fun_types =
                            (params.tmp_gen "map_after_exp") ^
                            ", " ^ (params.tmp_gen "ch_after_exp") ^ ");");
                         (fun params ->
-                           "//@ dmap<int_k,ext_k,flw> map_after_expiration = " ^
+                           "//@ dmap<int_k,ext_k,flw> " ^ (make_unique_name "map_after_expiration") ^ " = " ^
                            (params.tmp_gen "map_after_exp") ^";\n" ^
-                           "dchain chain_after_expiration = " ^
+                           "dchain " ^ (make_unique_name "chain_after_expiration") ^ " = " ^
                            (params.tmp_gen "ch_after_exp") ^ ";";);
                       ];};
      "dchain_allocate_new_index", {ret_type = Static Sint32;
@@ -818,10 +823,10 @@ struct
                   bool a_packet_sent = false;\n"
   let fun_types = fun_types
   let fixpoints = fixpoints
-  let boundary_fun = "loop_invariant_produce"
-  let finishing_fun = "loop_invariant_consume"
-  let eventproc_iteration_begin = "loop_invariant_produce"
-  let eventproc_iteration_end = "loop_invariant_consume"
+  let boundary_fun = "dmz_loop_invariant_produce"
+  let finishing_fun = "dmz_loop_invariant_consume"
+  let eventproc_iteration_begin = "dmz_loop_invariant_produce"
+  let eventproc_iteration_end = "dmz_loop_invariant_consume"
   let user_check_for_complete_iteration =
     (In_channel.read_all "dmz_forwarding_property.tmpl")
 end

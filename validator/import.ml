@@ -784,17 +784,15 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
     lprintf "Pdestruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
         lprintf "for %s : %s\n" fname (ttype_to_str ftype);
-        let field_addr = match find_field_addr strname fname with
-          | Some fa -> fa
-          | None -> failwith ("failed to find field " ^ fname ^
-                              " at the address " ^ (Int64.to_string addr))
-        in
-        lprintf "recursing: %s\n" (render_tterm value);
-        add_known_symbol_at_address
-          {v=Addr {v=Str_idx ({v=Deref value; t=Str (strname,fields)}, fname);
-                   t=ftype};
-           t=Ptr ftype}
-          field_addr callid (depth + 1))
+        begin match find_field_addr strname fname with
+        | Some fa -> lprintf "recursing: %s\n" (render_tterm value);
+                     add_known_symbol_at_address
+                     {v=Addr {v=Str_idx ({v=Deref value; t=Str (strname,fields)}, fname);
+                              t=ftype};
+                      t=Ptr ftype}
+                     fa callid (depth + 1)
+        | None -> lprintf "failed to find field %s at the address %s\n" fname (Int64.to_string addr)
+        end)
   | Str (strname,fields) ->
     lprintf "destruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
@@ -1048,11 +1046,10 @@ let allocate_args ftype_of tpref arg_name_gen =
                 ptee_t
                 (moment_before call.id)
         with
-        | Some _ -> lprintf "not allocating symbol for %Ld, because it \
-                             is apparently already allocated (%s)"
-                      ptee_addr (moment_to_str (moment_before call.id));
-          None
-         (* failwith "nested ptr value dynamics too complex :/"*)
+        | Some a -> lprintf "not allocating symbol for %Ld, because it \
+                             is apparently already allocated (%s %s)\n"
+                      ptee_addr (render_tterm a) (moment_to_str (moment_before call.id));
+          failwith "nested ptr value dynamics too complex :/"
         | None -> let p_name = arg_name_gen#generate in
           let moment = moment_before call.id in
           lprintf "allocating nested %Ld -> %s = &%Ld:%s\n"
@@ -1776,8 +1773,8 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let free_vars = get_basic_vars ftype_of pref in
   let free_vars = typed_vars_to_varspec free_vars in
   (* let double_ptr_args = get_double_ptr_args ftype_of pref in *)
-  let arguments = (allocate_extra_ptrs ftype_of pref) in
-  let arguments = (allocate_args ftype_of pref (name_gen "arg"))@arguments in
+  let arguments = (allocate_args ftype_of pref (name_gen "arg")) in
+  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in
