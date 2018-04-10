@@ -320,9 +320,9 @@ let guess_support_assignments constraints symbs =
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
-          (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+1 *)
+          (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+2 *)
           if List.exists constraints (fun cstr -> match cstr with {v=Bop (Eq,{v=Bool false;_},{v=Bop (Eq,{v=Id _;_},{v=Id r;_});_});_} when r = x -> true | _ -> false) then
-              ({lhs={v=Id x;t};rhs={v=Int (i+1);t=lt}}::assignments, String.Set.remove symbs x)
+              ({lhs={v=Id x;t};rhs={v=Int (i+2);t=lt}}::assignments, String.Set.remove symbs x)
           else if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lt}}::assignments, String.Set.remove symbs x)
           else
