@@ -3,7 +3,16 @@ open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
+  printf "render_eq_sttmt %s %s\n" (render_tterm out_val) (ttype_to_str out_val.t);
   match out_val.v, out_val.t with
+  (* A struct and its first member have the same address... oh and this is a hack so let's support doubly-nested structs *)
+  | Id ovid, Uint16 ->
+    begin match out_arg.v, out_arg.t with
+      | Id oaid, Str (_, (outerfname,Str(_,(fname,_)::_))::_) -> "//@ " ^ head ^ "(" ^ oaid ^ "." ^ outerfname ^ "." ^ fname ^ " == " ^ ovid ^ ");\n"
+      | Id oaid, Str (_, (fname,_)::_) -> "//@ " ^ head ^ "(" ^ oaid ^ "." ^ fname ^ " == " ^ ovid ^ ");\n"
+      | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
+    end
+  (* Don't use == over structs, VeriFast doesn't understand it and returns a confusing message about dereferencing pointers *)
   | Id ovid, Str (_, ovfields) ->
     begin match out_arg.v with
     | Id oaid ->
@@ -63,9 +72,9 @@ let render_post_assumptions post_statements =
                                   (render_tterm t) ^
                                   ");@*/")))
 
-let render_ret_equ_sttmt ~is_assert ret_name ret_val =
+let render_ret_equ_sttmt ~is_assert ret_name ret_type ret_val =
   match ret_name with
-  | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
+  | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=ret_type} ret_val) ^ "\n"
   | None -> "\n"
 
 let render_assignment {lhs;rhs;} =
@@ -168,7 +177,7 @@ let render_hist_fun_call {context;result} =
                  "//@ assume(" ^ (Option.value_exn context.ret_name) ^
                  " != " ^ "0);\n") ^
               "/* Do not render the return ptee assumption for hist calls */\n"
-   | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val) ^
+   | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name context.ret_type result.ret_val) ^
   "// POSTLEMMAS\n" ^
   (render_postlemmas context) (* postlemmas can depend on the return value *) ^
   "// POSTCONDITIONS\n" ^
@@ -262,12 +271,7 @@ let split_constraints tterms symbols =
       Set.for_all (ids_from_term tterm) ~f:(String.Set.mem symbols))
 
 let render_some_assignments_as_assumptions assignments =
-  String.concat ~sep:"\n" (List.map assignments ~f:(fun {lhs;rhs} ->
-      match lhs,rhs with
-      | {v=Id _;t=_},{v=Id _;t=_} ->
-        "//@ assume(" ^ (render_tterm lhs) ^ " == " ^ (render_tterm rhs) ^ ");"
-      | _ -> "//skip this assume: " ^ (render_tterm lhs) ^ " == " ^
-             (render_tterm rhs) ^ " -- too complicated"))
+  String.concat ~sep:"\n" (List.map assignments ~f:(fun {lhs;rhs} -> render_eq_sttmt ~is_assert:false lhs rhs))
 
 let render_concrete_assignments_as_assertions assignments =
   String.concat ~sep:"\n"
@@ -398,7 +402,7 @@ let render_output_check
   "// Output check\n" ^
   "// Input assumptions\n" ^
   (render_input_assumptions input_constraints) ^ "\n" ^
-  "// Support assignments of unbinded symbols\n" ^
+  "// Support assignments of unbound symbols\n" ^
   (* VV For the "if (...)" condition, which involves
      VV the original value (non-renamed)*)
   (render_some_assignments_as_assumptions symbolic_var_assignments) ^ "\n" ^
