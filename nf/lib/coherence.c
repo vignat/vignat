@@ -499,3 +499,45 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     assume(false);//TODO
   }
   @*/
+
+
+/*@
+  lemma void mvc_coherent_bounds<kt>(list<pair<kt, int> > m,
+                                     list<pair<kt, bool> > v, dchain ch)
+  requires map_vec_chain_coherent<kt>(m, v, ch);
+  ensures dchain_index_range_fp(ch) == length(v) &*&
+          map_vec_chain_coherent<kt>(m, v, ch);
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void mvc_coherent_expire_one<kt>(list<pair<kt, int> > m,
+                                         list<pair<kt, bool> > v, dchain ch,
+                                         int index,
+                                         kt key)
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
+           nth(index, v) == pair(key, false);
+  ensures map_vec_chain_coherent<kt>(map_erase_fp(m, key),
+                                     vector_erase_fp(v, index),
+                                     dchain_remove_index_fp(ch, index));
+  {
+    assume(false);//TODO
+  }
+  @*/
+
+/*@
+  lemma void mvc_coherent_index_busy<kt>(list<pair<kt, int> > m,
+                                         list<pair<kt, bool> > v, dchain ch,
+                                         uint32_t index)
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
+           true == dchain_allocated_fp(ch, index);
+  ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
+          nth(index, v) == pair(?key, false) &*&
+          true == map_has_fp(m, key) &*&
+          map_get_fp(m, key) == index;
+  {
+    assume(false);//TODO
+  }
+  @*/

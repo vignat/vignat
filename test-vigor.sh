@@ -1,7 +1,10 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 . paths.sh
 
+# TODO: make verify-* (use travis jobs to parellelize)
 pushd nf/vignat
   make verify-dpdk
 popd
@@ -10,3 +13,9 @@ pushd nf/bridge
 popd
 
 echo "All symbex succeeded"
+
+pushd nf
+  make verifast
+popd
+
+echo "All verifast checks pass"

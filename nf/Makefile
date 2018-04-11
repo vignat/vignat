@@ -51,6 +51,7 @@ verifast:
 		$(SELF_DIR)/lib/containers/double-map.c \
 		$(SELF_DIR)/lib/containers/vector.c \
 		$(SELF_DIR)/lib/coherence.c \
+		$(SELF_DIR)/lib/containers/map.c \
 		$(SELF_DIR)/lib/expirator.c \
 		$(SELF_DIR)/lib/abstract-state-verify-lemmas.c
 
