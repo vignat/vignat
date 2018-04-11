@@ -1,3 +1,12 @@
 #!/bin/bash
 
-echo "Hello from the othe side!"
+. paths.sh
+
+pushd nf/vignat
+  make verify-dpdk
+popd
+pushd nf/bridge
+  make verify-dpdk
+popd
+
+echo "All symbex succeeded"

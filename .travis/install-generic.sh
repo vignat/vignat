@@ -132,7 +132,7 @@ pushd "$BUILDDIR/klee-uclibc"
    --with-cc="../llvm/Release/bin/clang"
 
   # Use our minimalistic config
-  cp "$VNDSDIR/klee-uclibc.config" '.config'
+  cp "$VNDSDIR/install/klee-uclibc.config" '.config'
 
   make -j $(nproc)
 popd

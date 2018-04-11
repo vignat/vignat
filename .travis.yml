@@ -7,17 +7,17 @@ compiler:
 services:
   - docker
 
-env:
-  VIGOR_INSTALL_MODE=travis
-
 before_install:
   - docker pull azaostro/vignat-deps
 
 install:
   - docker run -dt --name=vignat-deps azaostro/vignat-deps
   - docker cp nf vignat-deps:/home/vigor/
+  - docker exec vignat-deps sudo chown -R vigor:vigor /home/vigor/nf
   - docker cp validator vignat-deps:/home/vigor/
+  - docker exec vignat-deps sudo chown -R vigor:vigor /home/vigor/validator
   - docker cp test-vigor.sh vignat-deps:/home/vigor/
+  - docker exec vignat-deps sudo chown vigor:vigor /home/vigor/test-vigor.sh
 
 script:
   - docker exec vignat-deps /bin/bash test-vigor.sh
