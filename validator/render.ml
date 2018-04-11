@@ -3,7 +3,7 @@ open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
-  printf "render_eq_sttmt %s %s\n" (render_tterm out_val) (ttype_to_str out_val.t);
+  (*printf "render_eq_sttmt %s %s\n" (render_tterm out_val) (ttype_to_str out_val.t);*)
   match out_val.v, out_val.t with
   (* A struct and its first member have the same address... oh and this is a hack so let's support doubly-nested structs *)
   | Id ovid, Uint16 ->
