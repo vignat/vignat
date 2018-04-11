@@ -24,7 +24,7 @@ _build/dmz_fspec.cmo: .PHONY
 .PHONY:
 
 clean:
-	rm -rf aaa
+	rm -rf out
 	rm -rf _build
 	find -iname '*.cmo' -delete
 	find -iname '*.log' -delete

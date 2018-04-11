@@ -3,8 +3,25 @@ open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
-  match out_val.v with
-  | Addr ptee ->
+  (*printf "render_eq_sttmt %s %s\n" (render_tterm out_val) (ttype_to_str out_val.t);*)
+  match out_val.v, out_val.t with
+  (* A struct and its first member have the same address... oh and this is a hack so let's support doubly-nested structs *)
+  | Id ovid, Uint16 ->
+    begin match out_arg.v, out_arg.t with
+      | Id oaid, Str (_, (outerfname,Str(_,(fname,_)::_))::_) -> "//@ " ^ head ^ "(" ^ oaid ^ "." ^ outerfname ^ "." ^ fname ^ " == " ^ ovid ^ ");\n"
+      | Id oaid, Str (_, (fname,_)::_) -> "//@ " ^ head ^ "(" ^ oaid ^ "." ^ fname ^ " == " ^ ovid ^ ");\n"
+      | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
+    end
+  (* Don't use == over structs, VeriFast doesn't understand it and returns a confusing message about dereferencing pointers *)
+  | Id ovid, Str (_, ovfields) ->
+    begin match out_arg.v with
+    | Id oaid ->
+      if out_val.t <> out_arg.t then failwith "not the right type!";
+      String.concat (List.map ovfields ~f:(fun (name,_) ->
+                       "//@ " ^ head ^ "(" ^ ovid ^ "." ^ name ^ " == " ^ oaid ^ "." ^ name ^ ");\n"))
+    | _ -> failwith "not supported, sorry"
+    end
+  | Addr ptee, _ ->
     begin match out_arg.t with
       | Ptr Void ->
         render_eq_sttmt
@@ -18,7 +35,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
           {v=Deref out_arg;t=get_pointee out_arg.t}
           ptee
     end
-  | Struct (_, fields) ->
+  | Struct (_, fields), _ ->
     if out_val.t <> out_arg.t then
       failwith ("arg and val types inconsistent: arg:" ^
                 (ttype_to_str out_arg.t) ^ " <> val: " ^
@@ -28,8 +45,8 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
      | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | Undef -> failwith ("// render_eq_sttmt undef for " ^ (render_tterm out_arg))
-  | _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
+  | Undef, _ -> failwith ("// render_eq_sttmt undef for " ^ (render_tterm out_arg))
+  | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_prelemmas context =
   (String.concat ~sep:"\n" context.pre_lemmas) ^ "\n" ^
@@ -55,9 +72,9 @@ let render_post_assumptions post_statements =
                                   (render_tterm t) ^
                                   ");@*/")))
 
-let render_ret_equ_sttmt ~is_assert ret_name ret_val =
+let render_ret_equ_sttmt ~is_assert ret_name ret_type ret_val =
   match ret_name with
-  | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=Unknown} ret_val) ^ "\n"
+  | Some name -> (render_eq_sttmt ~is_assert {v=Id name;t=ret_type} ret_val) ^ "\n"
   | None -> "\n"
 
 let render_assignment {lhs;rhs;} =
@@ -125,6 +142,7 @@ let rec gen_plain_equalities {lhs;rhs} =
   | _, Undef -> []
   | _ -> match lhs.v, rhs.v with
          | Deref lref, Deref rref -> gen_plain_equalities {lhs=lref; rhs=rref}
+         | Id x, Deref {v=Addr {v=Id y;t=_};t=_} when x = y -> [{lhs;rhs}]
          | _ -> failwith ("unsupported output type:rhs.t=" ^
                           (ttype_to_str rhs.t) ^
                           " : rhs=" ^
@@ -160,7 +178,7 @@ let render_hist_fun_call {context;result} =
                  "//@ assume(" ^ (Option.value_exn context.ret_name) ^
                  " != " ^ "0);\n") ^
               "/* Do not render the return ptee assumption for hist calls */\n"
-   | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name result.ret_val) ^
+   | _ -> render_ret_equ_sttmt ~is_assert:false context.ret_name context.ret_type result.ret_val) ^
   "// POSTLEMMAS\n" ^
   (render_postlemmas context) (* postlemmas can depend on the return value *) ^
   "// POSTCONDITIONS\n" ^
@@ -213,6 +231,7 @@ let split_assignments assignments =
         (*  (render_tterm assignment.rhs); *)
         (concrete,symbolic)
       | Str_idx _ -> (assignment::concrete,symbolic)
+      | Deref _ -> (assignment::concrete,symbolic)
       | _ -> failwith ("unsupported assignment in split_assignments: " ^
                        (render_tterm assignment.lhs) ^
                        " = " ^ (render_tterm assignment.rhs)))
@@ -254,12 +273,7 @@ let split_constraints tterms symbols =
       Set.for_all (ids_from_term tterm) ~f:(String.Set.mem symbols))
 
 let render_some_assignments_as_assumptions assignments =
-  String.concat ~sep:"\n" (List.map assignments ~f:(fun {lhs;rhs} ->
-      match lhs,rhs with
-      | {v=Id _;t=_},{v=Id _;t=_} ->
-        "//@ assume(" ^ (render_tterm lhs) ^ " == " ^ (render_tterm rhs) ^ ");"
-      | _ -> "//skip this assume: " ^ (render_tterm lhs) ^ " == " ^
-             (render_tterm rhs) ^ " -- too complicated"))
+  String.concat ~sep:"\n" (List.map assignments ~f:(fun {lhs;rhs} -> render_eq_sttmt ~is_assert:false lhs rhs))
 
 let render_concrete_assignments_as_assertions assignments =
   String.concat ~sep:"\n"
@@ -312,9 +326,9 @@ let guess_support_assignments constraints symbs =
           (* printf "match 2nd\n"; *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
-          (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+1 *)
+          (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+2 *)
           if List.exists constraints (fun cstr -> match cstr with {v=Bop (Eq,{v=Bool false;_},{v=Bop (Eq,{v=Id _;_},{v=Id r;_});_});_} when r = x -> true | _ -> false) then
-              ({lhs={v=Id x;t};rhs={v=Int (i+1);t=lt}}::assignments, String.Set.remove symbs x)
+              ({lhs={v=Id x;t};rhs={v=Int (i+2);t=lt}}::assignments, String.Set.remove symbs x)
           else if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lt}}::assignments, String.Set.remove symbs x)
           else
@@ -390,7 +404,7 @@ let render_output_check
   "// Output check\n" ^
   "// Input assumptions\n" ^
   (render_input_assumptions input_constraints) ^ "\n" ^
-  "// Support assignments of unbinded symbols\n" ^
+  "// Support assignments of unbound symbols\n" ^
   (* VV For the "if (...)" condition, which involves
      VV the original value (non-renamed)*)
   (render_some_assignments_as_assumptions symbolic_var_assignments) ^ "\n" ^
