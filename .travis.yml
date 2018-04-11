@@ -4,9 +4,20 @@ language: cpp
 compiler:
   - gcc
 
+services:
+  - docker
+
 env:
   VIGOR_INSTALL_MODE=travis
 
-install: ./travis-install.sh
+before_install:
+  - docker pull azaostro/vignat-deps
 
-script: ./test-vigor.sh
+install:
+  - docker run -dt --name=vignat-deps azaostro/vignat-deps
+  - docker cp nf vignat-deps:/home/vigor/
+  - docker cp validator vignat-deps:/home/vigor/
+  - docker cp test-vigor.sh vignat-deps:/home/vigor/
+
+script:
+  - docker exec vignat-deps /bin/bash test-vigor.sh
