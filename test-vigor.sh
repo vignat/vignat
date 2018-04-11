@@ -20,3 +20,9 @@ pushd nf
 popd
 
 echo "All verifast checks pass"
+
+pushd validator
+  mkdir test-results
+  make all
+  ./run-test.sh basic test-results
+popd
