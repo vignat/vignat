@@ -71,11 +71,10 @@ show_result(){
 validate_file() {
     FNAME=$1
     UNIQUE_PREFIX="${WORK_DIR}/$(echo $FNAME | egrep -o '[[:digit:]]{6}' | head -n1)"
-    SRC_FNAME="${UNIQUE_PREFIX}.c"
     VALID_RESULT="${UNIQUE_PREFIX}.validator_result"
     VERIF_RESULT="${UNIQUE_PREFIX}.vf_result"
     cp $FNAME $UNIQUE_PREFIX.src
-    CMD1="$BASE_DIR/validator.byte $FSPEC_PLUGIN $FNAME $SRC_FNAME $UNIQUE_PREFIX $VERIFAST $SPEC_DIR"
+    CMD1="$BASE_DIR/validator.byte $FSPEC_PLUGIN $FNAME $UNIQUE_PREFIX $VERIFAST $SPEC_DIR"
     echo "(cd $BASE_DIR && make all) && $CMD1" > "${UNIQUE_PREFIX}.cmd"
     $CMD1 &> $VALID_RESULT
     VERIF_RESULT="${UNIQUE_PREFIX}.verify.stdout"

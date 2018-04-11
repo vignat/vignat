@@ -1,7 +1,7 @@
 open Core
 open Ir
 
-let validate_prefix fin fout intermediate_pref verifast_bin proj_root =
+let validate_prefix fin intermediate_pref verifast_bin proj_root =
   let spec_mod =  match !Fspec_api.spec with
     | Some m -> m
     | None -> failwith "Failed: could not find function spec dynamic module"
@@ -54,4 +54,4 @@ let load_plug fname =
 
 let () =
   load_plug Sys.argv.(1);
-  validate_prefix Sys.argv.(2) Sys.argv.(3) Sys.argv.(4) Sys.argv.(5) Sys.argv.(6)
+  validate_prefix Sys.argv.(2) Sys.argv.(3) Sys.argv.(4) Sys.argv.(5)
