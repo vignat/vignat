@@ -142,6 +142,7 @@ let rec gen_plain_equalities {lhs;rhs} =
   | _, Undef -> []
   | _ -> match lhs.v, rhs.v with
          | Deref lref, Deref rref -> gen_plain_equalities {lhs=lref; rhs=rref}
+         | Id x, Deref {v=Addr {v=Id y;t=_};t=_} when x = y -> [{lhs;rhs}]
          | _ -> failwith ("unsupported output type:rhs.t=" ^
                           (ttype_to_str rhs.t) ^
                           " : rhs=" ^
@@ -230,6 +231,7 @@ let split_assignments assignments =
         (*  (render_tterm assignment.rhs); *)
         (concrete,symbolic)
       | Str_idx _ -> (assignment::concrete,symbolic)
+      | Deref _ -> (assignment::concrete,symbolic)
       | _ -> failwith ("unsupported assignment in split_assignments: " ^
                        (render_tterm assignment.lhs) ^
                        " = " ^ (render_tterm assignment.rhs)))

@@ -1389,9 +1389,7 @@ let extract_common_call_context
                      t=Unknown}).v
   in
   let extra_pre_conditions =
-    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of) (*@
-    (take_arg_ptrs_into_pre_cond call.args call ftype_of)*)
-  in
+    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of) (* @ (take_arg_ptrs_into_pre_cond call.args call ftype_of) *) in
   let post_lemmas = ["Render lemmas at the last moment"] in
   let ret_name = match ret_spec with
     | Some ret_spec -> Some ret_spec.name
