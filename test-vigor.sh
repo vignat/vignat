@@ -1,8 +1,9 @@
 #!/bin/bash
 
+. paths.sh
+
 set -euxo pipefail
 
-. paths.sh
 
 # TODO: make verify-* (use travis jobs to parellelize)
 pushd nf/vignat
