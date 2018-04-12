@@ -1309,7 +1309,7 @@ let allocate_dummy addr t =
                                        s=Noidea;
                                        precise=t}}::!allocated_dummies;
   known_addresses :=
-    Int64.Map.add_exn !known_addresses
+    Int64.Map.set !known_addresses
       ~key:addr ~data:[{value={v=Id name;t}; callid=Beginning;
                         str_depth=0; tt=t;
                         breakdown=String.Map.empty}];
@@ -1374,8 +1374,8 @@ let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
     begin match find_first_known_address addr rhs.t moment with
       | Some x -> {lhs=lhs; rhs=x}
       | None ->
-        known_addresses :=
-          Int64.Map.add_exn !known_addresses
+        known_addresses := (* TODO why are we not using the method for this? *)
+          Int64.Map.set !known_addresses
             ~key:addr ~data:[{value=lhs; callid=moment;
                               str_depth=0; tt=rhs.t;
                               breakdown=String.Map.empty}];
