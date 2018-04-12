@@ -757,7 +757,7 @@ let rec add_to_known_addresses
       ~f:(fun acc {fname;value=_;addr} ->
           String.Map.add_exn acc ~key:fname ~data:addr)
   in
-  known_addresses := Int64.Map.add_exn !known_addresses
+  known_addresses := Int64.Map.set !known_addresses
       ~key:addr ~data:(update_ptee_variants
                          {value=base_value;
                           callid;
@@ -1024,10 +1024,10 @@ let allocate_args ftype_of tpref arg_name_gen =
       lprintf "aa: looking for *%Ld (%s):\n" addr (moment_to_str moment);
       match Int64.Map.find !known_addresses addr with
       | Some spec -> known_addresses :=
-          Int64.Map.add_exn !known_addresses
+          Int64.Map.set !known_addresses
             ~key:addr ~data:(List.map spec ~f:(fun spec ->
                 {spec with value=update_tterm spec.value tterm}));
-        lprintf "found some, adding\n";
+        lprintf "found some, adding\n"; (* TODO why are we adding directly and not through the method? *)
         None
       | None -> let p_name = arg_name_gen#generate in
         lprintf "found none, inserting\n";
