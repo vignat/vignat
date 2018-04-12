@@ -22,9 +22,9 @@ popd
 echo "All verifast checks pass"
 
 pushd validator
-  mkdir test-results
   make all
-  ./run-test.sh basic test-results
+  mkdir test-results
+  make check -j$(nproc)
   rm -r test-results
 popd
 

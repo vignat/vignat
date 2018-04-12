@@ -38,3 +38,10 @@ validate-bridge: clean
 
 validate-dmz: clean
 	./test_all.sh ../nf/dmz/klee-last out ../nf dmz_fspec.cmo
+
+# Regression test suite
+test-results/%.done: regression-tests/%
+	./run-test.sh $* test-results
+	touch $@
+
+check: $(patsubst regression-tests/%,test-results/%.done,$(wildcard regression-tests/*))
