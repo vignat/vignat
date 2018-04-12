@@ -82,7 +82,7 @@ let expand_shorted_sexp sexp =
     let rec do_list lst =
       match lst with
       | Sexp.Atom v :: def :: tl when String.is_suffix v ~suffix:":" ->
-        merge_defs (get_defs def) (String.Map.add (do_list tl)
+        merge_defs (get_defs def) (String.Map.add_exn (do_list tl)
                                      ~key:(String.prefix v ((String.length v) - 1))
                                      ~data:(remove_defs def))
       | hd :: tl -> merge_defs (get_defs hd) (do_list tl)
@@ -197,7 +197,7 @@ let rec canonicalize_sexp sexp =
 
 let map_set_n_update_alist mp lst =
   List.fold lst ~init:mp ~f:(fun acc (key,data) ->
-      String.Map.add acc ~key ~data)
+      (String.Map.add_exn acc ~key ~data))
 
 let is_int str =
   (* As a hack: handle -10 in 64bits.
@@ -402,7 +402,7 @@ let make_cmplx_val exp t =
     let name = complex_val_name_gen#generate in
     let value = {v=Id key;t} in
     allocated_complex_vals :=
-      String.Map.add !allocated_complex_vals ~key
+      String.Map.add_exn !allocated_complex_vals ~key
         ~data:{name;value};
     {v=Id name;t}
 
@@ -413,7 +413,7 @@ let allocate_tmp value =
   | None ->
     let name = tmp_val_name_gen#generate in
     allocated_tmp_vals :=
-      String.Map.add !allocated_tmp_vals
+      String.Map.add_exn !allocated_tmp_vals
         ~key
         ~data:{name; value};
     {v=Id name;t=value.t}
@@ -717,7 +717,7 @@ let rec add_to_known_addresses
   | Ptr (Str (_,fields) as ptee_type) ->
     let fields = List.fold fields ~init:String.Map.empty
         ~f:(fun fields (name,t) ->
-            String.Map.add fields ~key:name ~data:t)
+            String.Map.add_exn fields ~key:name ~data:t)
     in
     List.iter breakdown ~f:(fun {fname;value;addr} ->
         let ftype = match String.Map.find fields fname with
@@ -752,9 +752,9 @@ let rec add_to_known_addresses
   let breakdown =
     List.fold breakdown ~init:String.Map.empty
       ~f:(fun acc {fname;value=_;addr} ->
-          String.Map.add acc ~key:fname ~data:addr)
+          String.Map.add_exn acc ~key:fname ~data:addr)
   in
-  known_addresses := Int64.Map.add !known_addresses
+  known_addresses := Int64.Map.add_exn !known_addresses
       ~key:addr ~data:(update_ptee_variants
                          {value=base_value;
                           callid;
@@ -899,10 +899,10 @@ let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
     let add_the_dummy_to_tables value =
       let name = (Int.Map.find_exn rets call.id).name in
       let dummy_name = "tip_ret_dummy"^(Int.to_string call.id) in
-      (Int.Map.add rets ~key:call.id
+      (Int.Map.add_exn rets ~key:call.id
          ~data:{name;value={t=ret_type;v=Addr {v=Id dummy_name;
                                                t=get_pointee ret_type}}},
-       Int.Map.add acc_dummies ~key:call.id
+       Int.Map.add_exn acc_dummies ~key:call.id
          ~data:{name=dummy_name;value=value})
     in
     match call.ret with
@@ -939,7 +939,7 @@ let allocate_rets ftype_of tpref =
           {name;value={t=ret_type;v=Addr (get_struct_val_value
                                             ptee.after (get_pointee ret_type))}}
       in
-      Int.Map.add acc_rets ~key:call.id ~data
+      Int.Map.add_exn acc_rets ~key:call.id ~data
     | None -> acc_rets
   in
   let rets =
@@ -952,7 +952,7 @@ let allocate_rets ftype_of tpref =
           rets
         else
           let ret = Int.Map.find_exn rets call.id in
-          Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"})
+          Int.Map.add_exn rets ~key:call.id ~data:{ret with name="tip_ret"})
 
 (* let alloc_or_update_address addr name str_value (tterm:tterm) call_id = *)
 (*   lprintf "looking for *%Ld /name:%s\n" addr name; *)
@@ -1018,7 +1018,7 @@ let allocate_args ftype_of tpref arg_name_gen =
       lprintf "aa: looking for *%Ld (%s):\n" addr (moment_to_str moment);
       match Int64.Map.find !known_addresses addr with
       | Some spec -> known_addresses :=
-          Int64.Map.add !known_addresses
+          Int64.Map.add_exn !known_addresses
             ~key:addr ~data:(List.map spec ~f:(fun spec ->
                 {spec with value=update_tterm spec.value tterm}));
         lprintf "found some, adding\n";
@@ -1303,7 +1303,7 @@ let allocate_dummy addr t =
                                        s=Noidea;
                                        precise=t}}::!allocated_dummies;
   known_addresses :=
-    Int64.Map.add !known_addresses
+    Int64.Map.add_exn !known_addresses
       ~key:addr ~data:[{value={v=Id name;t}; callid=Beginning;
                         str_depth=0; tt=t;
                         breakdown=String.Map.empty}];
@@ -1369,7 +1369,7 @@ let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
       | Some x -> {lhs=lhs; rhs=x}
       | None ->
         known_addresses :=
-          Int64.Map.add !known_addresses
+          Int64.Map.add_exn !known_addresses
             ~key:addr ~data:[{value=lhs; callid=moment;
                               str_depth=0; tt=rhs.t;
                               breakdown=String.Map.empty}];
@@ -1567,7 +1567,7 @@ let ttype_of_guess = function
 let typed_vars_to_varspec free_vars =
   List.fold (String.Map.data free_vars) ~init:String.Map.empty
     ~f:(fun acc {vname;t;} ->
-        String.Map.add acc ~key:vname
+        String.Map.add_exn acc ~key:vname
           ~data:{name=vname;value={v=Undef;t=ttype_of_guess t}})
 
 let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
@@ -1651,7 +1651,7 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
                 | Opening x
                 | Closing x
                 | Changing (x,_) ->
-                  String.Map.add acc ~key:pname
+                  String.Map.add_exn acc ~key:pname
                     ~data:(get_pointee
                              (guess_type
                                 (all_ptrs ts) x ("ex_ptr: " ^ pname) call)))
@@ -1667,7 +1667,7 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
           | _, Static t -> t
           | None,_ -> Void
         in
-        Int.Map.add acc ~key:call.id
+        Int.Map.add_exn acc ~key:call.id
           ~data:{ret_type=ret_type_guess;
                  arg_types=List.rev arg_type_guesses;
                  extra_ptr_types=ex_ptr_type_guesses})

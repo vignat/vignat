@@ -295,7 +295,7 @@ let expand_conjunctions terms =
   List.join (List.map terms ~f:expand_tterm)
 
 let bubble_equalities tterms =
-  List.sort tterms ~cmp:(fun t1 t2 ->
+  List.sort tterms ~compare:(fun t1 t2 ->
       match (t1.v,t2.v) with
       | (Bop (Eq,_,_), Bop (Eq,_,_)) -> 0
       | (Bop (Eq,_,_), _) -> -1
@@ -600,7 +600,7 @@ let render_tip_fun_call
   (render_export_point export_point) ^
   (if render_assertions then
      let dtree = build_decision_tree
-         (List.sort ~cmp:(fun res1 res2 ->
+         (List.sort ~compare:(fun res1 res2 ->
               (List.length res1.post_statements) -
               (List.length res2.post_statements))
          results) in
@@ -636,7 +636,7 @@ let render_cmplexes cmplxes =
       (render_tterm var.value))) ^ "\n"
 
 let render_tmps tmps =
-  String.concat ~sep:"\n" (List.map (List.sort ~cmp:(fun a b ->
+  String.concat ~sep:"\n" (List.map (List.sort ~compare:(fun a b ->
       (String.compare a.name b.name))
       (String.Map.data tmps))
       ~f:(fun tmp ->
