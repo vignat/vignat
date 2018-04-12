@@ -50,18 +50,18 @@ ensures 0 == (0&x);
       is_map_key_hash<t>(fun, keyp, hsh);
  @*/
 
-/* @ predicate hide_mapp<t>(struct Map* p,
+/*@ predicate hide_mapp<t>(struct Map* p,
                            predicate (void*;t) kp,
                            fixpoint (t,int) hsh,
                            fixpoint (t,int,bool) recp,
                            mapi<t> m) = mapp<t>(p, kp, hsh, recp, m); @*/
 
-/* @ predicate hide_vector<t>(struct Vector* vector,
+/*@ predicate hide_vector<t>(struct Vector* vector,
                              predicate (void*;t) entp,
                              list<pair<t, bool> > values,
                              list<void*> addrs) = vectorp<t>(vector, entp, values, addrs); @*/
 
-/* @ predicate hide_vector_acc<t>(struct Vector* vector,
+/*@ predicate hide_vector_acc<t>(struct Vector* vector,
                                  predicate (void*;t) entp,
                                  list<pair<t, bool> > values,
                                  list<void*> addrs,
