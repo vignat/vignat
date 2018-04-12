@@ -197,7 +197,10 @@ let rec canonicalize_sexp sexp =
 
 let map_set_n_update_alist mp lst =
   List.fold lst ~init:mp ~f:(fun acc (key,data) ->
-      (String.Map.add_exn acc ~key ~data))
+      (match String.Map.add acc ~key ~data
+       with
+       | `Ok new_map -> new_map
+       | `Duplicate -> acc))
 
 let is_int str =
   (* As a hack: handle -10 in 64bits.
@@ -952,7 +955,10 @@ let allocate_rets ftype_of tpref =
           rets
         else
           let ret = Int.Map.find_exn rets call.id in
-          Int.Map.add_exn rets ~key:call.id ~data:{ret with name="tip_ret"})
+          match Int.Map.add rets ~key:call.id ~data:{ret with name="tip_ret"}
+          with
+          | `Ok new_map -> new_map
+          | `Duplicate -> rets (* nevermind *))
 
 (* let alloc_or_update_address addr name str_value (tterm:tterm) call_id = *)
 (*   lprintf "looking for *%Ld /name:%s\n" addr name; *)
