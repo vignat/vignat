@@ -25,4 +25,7 @@ pushd validator
   mkdir test-results
   make all
   ./run-test.sh basic test-results
+  rm -r test-results
 popd
+
+echo "All validator checks pass"
