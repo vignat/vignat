@@ -1,0 +1,138 @@
+diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
+index 3a10300..b2378e4 100644
+--- a/drivers/net/ixgbe/ixgbe_rxtx.c
++++ b/drivers/net/ixgbe/ixgbe_rxtx.c
+@@ -1594,10 +1594,12 @@ ixgbe_rx_scan_hw_ring(struct ixgbe_rx_queue *rxq)
+ 			break;
+ 	}
+ 
++#ifndef KLEE_VERIFICATION
+ 	/* clear software ring entries so we can cleanup correctly */
+ 	for (i = 0; i < nb_rx; ++i) {
+ 		rxq->sw_ring[rxq->rx_tail + i].mbuf = NULL;
+ 	}
++#endif
+ 
+ 
+ 	return nb_rx;
+@@ -1685,7 +1687,9 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+ 	/* update internal queue state */
+ 	rxq->rx_next_avail = 0;
+ 	rxq->rx_nb_avail = nb_rx;
++#ifndef KLEE_VERIFICATION
+ 	rxq->rx_tail = (uint16_t)(rxq->rx_tail + nb_rx);
++#endif
+ 
+ 	/* if required, allocate new buffers to replenish descriptors */
+ 	if (rxq->rx_tail > rxq->rx_free_trigger) {
+@@ -1706,9 +1710,11 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+ 			 * allocate new buffers to replenish the old ones.
+ 			 */
+ 			rxq->rx_nb_avail = 0;
++#ifndef KLEE_VERIFICATION
+ 			rxq->rx_tail = (uint16_t)(rxq->rx_tail - nb_rx);
+ 			for (i = 0, j = rxq->rx_tail; i < nb_rx; ++i, ++j)
+ 				rxq->sw_ring[j].mbuf = rxq->rx_stage[i];
++#endif
+ 
+ 			return 0;
+ 		}
+@@ -1719,8 +1725,10 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+ 					    cur_free_trigger);
+ 	}
+ 
++#ifndef KLEE_VERIFICATION
+ 	if (rxq->rx_tail >= rxq->nb_rx_desc)
+ 		rxq->rx_tail = 0;
++#endif
+ 
+ 	/* received any packets this loop? */
+ 	if (rxq->rx_nb_avail)
+@@ -1863,7 +1871,9 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+ 		}
+ 
+ 		rxm = rxe->mbuf;
++#ifndef KLEE_VERIFICATION
+ 		rxe->mbuf = nmb;
++#endif
+ 		dma_addr =
+ 			rte_cpu_to_le_64(rte_mbuf_data_iova_default(nmb));
+ 		rxdp->read.hdr_addr = 0;
+@@ -1921,7 +1931,9 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+ 		 */
+ 		rx_pkts[nb_rx++] = rxm;
+ 	}
++#ifndef KLEE_VERIFICATION
+ 	rxq->rx_tail = rx_id;
++#endif
+ 
+ 	/*
+ 	 * If the number of free RX descriptors is greater than the RX free
+@@ -2164,13 +2176,18 @@ ixgbe_recv_pkts_lro(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts,
+ 			 * Update RX descriptor with the physical address of the
+ 			 * new data buffer of the new allocated mbuf.
+ 			 */
++#ifndef KLEE_VERIFICATION
+ 			rxe->mbuf = nmb;
++#endif
+ 
+ 			rxm->data_off = RTE_PKTMBUF_HEADROOM;
+ 			rxdp->read.hdr_addr = 0;
+ 			rxdp->read.pkt_addr = dma;
+-		} else
++		} else {
++#ifndef KLEE_VERIFICATION
+ 			rxe->mbuf = NULL;
++#endif
++		}
+ 
+ 		/*
+ 		 * Set data length & data buffer address of mbuf.
+@@ -2266,10 +2283,12 @@ ixgbe_recv_pkts_lro(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts,
+ 		rx_pkts[nb_rx++] = first_seg;
+ 	}
+ 
++#ifndef KLEE_VERIFICATION
+ 	/*
+ 	 * Record index of the next RX descriptor to probe.
+ 	 */
+ 	rxq->rx_tail = rx_id;
++#endif
+ 
+ 	/*
+ 	 * If the number of free RX descriptors is greater than the RX free
+@@ -2666,7 +2685,9 @@ ixgbe_rx_queue_release_mbufs(struct ixgbe_rx_queue *rxq)
+ 		for (i = 0; i < rxq->nb_rx_desc; i++) {
+ 			if (rxq->sw_ring[i].mbuf != NULL) {
+ 				rte_pktmbuf_free_seg(rxq->sw_ring[i].mbuf);
++#ifndef KLEE_VERIFICATION
+ 				rxq->sw_ring[i].mbuf = NULL;
++#endif
+ 			}
+ 		}
+ 		if (rxq->rx_nb_avail) {
+diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
+index 9789a31..19c7e50 100644
+--- a/drivers/net/ixgbe/ixgbe_rxtx.c
++++ b/drivers/net/ixgbe/ixgbe_rxtx.c
+@@ -278,8 +278,10 @@ tx_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
+ 	if (unlikely(nb_pkts == 0))
+ 		return 0;
+ 
++#ifndef KLEE_VERIFICATION
+ 	/* Use exactly nb_pkts descriptors */
+ 	txq->nb_tx_free = (uint16_t)(txq->nb_tx_free - nb_pkts);
++#endif
+ 
+ 	/*
+ 	 * At this point, we know there are enough descriptors in the
+@@ -311,7 +313,9 @@ tx_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
+ 
+ 	/* Fill H/W descriptor ring with mbuf data */
+ 	ixgbe_tx_fill_hw_ring(txq, tx_pkts + n, (uint16_t)(nb_pkts - n));
++#ifndef KLEE_VERIFICATION
+ 	txq->tx_tail = (uint16_t)(txq->tx_tail + (nb_pkts - n));
++#endif
+ 
+ 	/*
+ 	 * Determine if RS bit should be set

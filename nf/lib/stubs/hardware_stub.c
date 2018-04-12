@@ -33,7 +33,7 @@ static uint64_t TIME;
 
 // Helper bit macros
 #define GET_BIT(n, k) (((n) >> (k)) & 1)
-#define SET_BIT(n, k, v) if (v == 0) { n = (n & ~(1 << (k))); } else { n = (n | (1 << (k))); }
+#define SET_BIT(n, k, v) if ((v) == 0) { n = (n & ~(1 << (k))); } else { n = (n | (1 << (k))); }
 
 // Helper register macros
 #define DEV_MEM(dev, offset, type) *((type*) (dev->mem_shadow + (offset)))
@@ -75,13 +75,11 @@ stub_device_start(struct stub_device* dev)
 	// Get the address of the receive descriptor for queue 0
 	uint64_t rdba =  ((uint64_t) DEV_REG(dev, 0x01000)) // RDBAL
 		      | (((uint64_t) DEV_REG(dev, 0x01004)) << 32); // RDBAH
-klee_print_expr("RDBA", rdba);
 
 	// Clear the head of the descriptor
 	DEV_REG(dev, 0x01010) = 0; // RDH
 	// Make sure we have enough space
 	uint32_t rdt = DEV_REG(dev, 0x01018);
-klee_print_expr("rdt", rdt);
 	klee_assert(rdt >= 1);
 
 	if (klee_int("received") == 0) {
@@ -100,8 +98,6 @@ klee_print_expr("rdt", rdt);
 	// normally headers shouldn't be split
 	uint64_t mbuf_addr = descr[0];
 	uint64_t head_addr = descr[1];
-klee_print_expr("mbuf addr", mbuf_addr);
-klee_print_expr("head addr", head_addr);
 	klee_assert(head_addr == 0);
 
 	dev->old_mbuf_addr = mbuf_addr;
@@ -123,7 +119,6 @@ klee_print_expr("head addr", head_addr);
 	// 31: Split Header (1 - not split)
 	// 32-63: RSS Hash or FCOE_PARAM or Flow Director Filters ID or Fragment Checksum (0 - not supported)
 	uint64_t wb0 = 0b0000000000000000000000000000000010000000000000000000000000000000;
-klee_print_expr("and now for some path explosion...",0);
 #if 0
 	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
 	bool is_ipv6 = !is_ipv4 && klee_int("received_is_ipv6") != 0;
@@ -172,7 +167,7 @@ klee_print_expr("and now for some path explosion...",0);
 #if __BYTE_ORDER == __BIG_ENDIAN
 		mbuf_content->ether.ether_type = 0x0800;
 #else
-		mbuf_content->ether.ether_type = 0x0080;
+		mbuf_content->ether.ether_type = 0x0008;
 #endif
 
 		if (is_tcp) {
@@ -186,7 +181,7 @@ klee_print_expr("and now for some path explosion...",0);
 #if __BYTE_ORDER == __BIG_ENDIAN
 		mbuf_content->ether.ether_type = 0x86DD;
 #else
-		mbuf_content->ether.ether_type = 0xDD68;
+		mbuf_content->ether.ether_type = 0xDD86;
 #endif
 	}
 
@@ -240,7 +235,6 @@ klee_print_expr("and now for some path explosion...",0);
 	// Get device index
 	int device_index = 0;
 	while (dev != &DEVICES[device_index]) { device_index++; }
-klee_print_expr("put the mbuf for device", device_index);
 }
 
 
@@ -804,6 +798,14 @@ stub_register_tdh_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 	return new_value;
 }
 
+static uint32_t
+stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
+{
+	// SW wrote to TDT, meaning it has a packet for us
+	// TODO
+	return new_value;
+}
+
 
 static uint32_t
 stub_register_needsrxen0_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
@@ -1151,6 +1153,7 @@ stub_registers_init(void)
 	for (int n = 0; n <= 127; n++) {
 		REG(0x06018 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000000000000001111111111111111);
+		REGISTERS[0x06018 + 0x40*n].write = stub_register_tdt_write;
 	}
 
 
