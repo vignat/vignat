@@ -295,6 +295,26 @@ and replace_term_in_tterms old_t new_t tterm_list =
   List.map tterm_list ~f:(replace_term_in_tterm old_t new_t)
 
 
+let rec replace_tterm old_tt new_tt tterm =
+  if tterm = old_tt then new_tt else 
+  match tterm.v with
+  | Bop (opa, lhs, rhs) -> {v=Bop (opa, replace_tterm old_tt new_tt lhs, replace_tterm old_tt new_tt rhs);t=tterm.t}
+  | Apply (f, args) -> {v=Apply(f, List.map args ~f:(replace_tterm old_tt new_tt));t=tterm.t}
+  | Struct (name, fields) -> {v=Struct (name, List.map fields ~f:(fun fi -> {fi with value = replace_tterm old_tt new_tt fi.value}));t=tterm.t}
+  | Not tt -> {v=Not (replace_tterm old_tt new_tt tt);t=tterm.t}
+  | Str_idx (term, field) -> {v=Str_idx (replace_tterm old_tt new_tt term, field);t=tterm.t}
+  | Deref tt -> {v=Deref (replace_tterm old_tt new_tt tt);t=tterm.t}
+  | Addr tt -> {v=Addr (replace_tterm old_tt new_tt tt);t=tterm.t}
+  | Cast (ct, tt) -> {v=Cast (ct, replace_tterm old_tt new_tt tt);t=tterm.t}
+  | Utility _
+  | Fptr _
+  | Undef
+  | Zeroptr
+  | Id _
+  | Int _
+  | Bool _ -> tterm
+
+
 let rec append_id_in_term_id_starting_with prefix suffix term = match term with
   | Bop (opa, lhs, rhs) -> Bop(opa, append_id_in_tterm_id_starting_with prefix suffix lhs, append_id_in_tterm_id_starting_with prefix suffix rhs)
   | Apply (f, args) -> Apply(f, List.map args ~f:(append_id_in_tterm_id_starting_with prefix suffix))
@@ -313,6 +333,26 @@ let rec append_id_in_term_id_starting_with prefix suffix term = match term with
   | Utility _ -> term
 and append_id_in_tterm_id_starting_with prefix suffix tterm =
   {tterm with v=(append_id_in_term_id_starting_with prefix suffix tterm.v)}
+
+
+let rec fix_type_of_id_in_tterm (vars: var_spec list) tterm = match tterm.v with
+  | Bop (opa, lhs, rhs) -> {v=Bop(opa, fix_type_of_id_in_tterm vars lhs, fix_type_of_id_in_tterm vars rhs);t=tterm.t}
+  | Apply (f, args) -> {v=Apply(f, List.map args ~f:(fix_type_of_id_in_tterm vars));t=tterm.t}
+  | Id x -> begin match List.find vars ~f:(fun v -> v.name = x) with
+            | Some v -> {v=Id v.name;t=v.value.t}
+            | None -> tterm end
+  | Struct (name, fields) -> {v=Struct(name, List.map fields ~f:(fun vs -> {vs with value=fix_type_of_id_in_tterm vars vs.value}));t=tterm.t}
+  | Int _ -> tterm
+  | Bool _ -> tterm
+  | Not tt -> {v=Not (fix_type_of_id_in_tterm vars tt);t=tterm.t}
+  | Str_idx (tt, field) -> {v=Str_idx (fix_type_of_id_in_tterm vars tt, field);t=tterm.t}
+  | Deref tt -> {v=Deref (fix_type_of_id_in_tterm vars tt);t=tterm.t}
+  | Fptr _ -> tterm
+  | Addr tt -> {v=Addr (fix_type_of_id_in_tterm vars tt);t=tterm.t}
+  | Cast (ctype, tt) -> {v=Cast (ctype, fix_type_of_id_in_tterm vars tt);t=tterm.t}
+  | Undef -> tterm
+  | Zeroptr -> tterm
+  | Utility _ -> tterm
 
 let rec collect_nodes f tterm =
   let collect_on_utility f = function

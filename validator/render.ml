@@ -3,7 +3,7 @@ open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
-  (*printf "render_eq_sttmt %s %s\n" (render_tterm out_val) (ttype_to_str out_val.t);*)
+  (*printf "render_eq_sttmt %s %s --- %s %s\n" (render_tterm out_arg) (ttype_to_str out_arg.t) (render_tterm out_val) (ttype_to_str out_val.t);*)
   match out_val.v, out_val.t with
   (* A struct and its first member have the same address... oh and this is a hack so let's support doubly-nested structs *)
   | Id ovid, Uint16 ->
@@ -12,13 +12,20 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
       | Id oaid, Str (_, (fname,_)::_) -> "//@ " ^ head ^ "(" ^ oaid ^ "." ^ fname ^ " == " ^ ovid ^ ");\n"
       | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
     end
+  | Id ovid, Ptr _ -> (* HUGE HACK assume the type is wrongly guessed and it's actually an integer *)
+      render_eq_sttmt ~is_assert:is_assert out_arg {v=out_val.v;t=Uint16}
   (* Don't use == over structs, VeriFast doesn't understand it and returns a confusing message about dereferencing pointers *)
   | Id ovid, Str (_, ovfields) ->
-    begin match out_arg.v with
-    | Id oaid ->
-      if out_val.t <> out_arg.t then failwith "not the right type!";
+    begin match out_arg.v, out_arg.t with
+    | Id oaid, Ptr oat -> (* HUGE HACK assume the type is wrongly guessed and it's actually an integer *)
+      render_eq_sttmt ~is_assert:is_assert out_val {v=out_arg.v;t=Uint16}
+    | Id oaid, Uint16 ->
+      render_eq_sttmt ~is_assert:is_assert out_val out_arg
+    | Id oaid, _ ->
+      if out_val.t <> out_arg.t then failwith ("not the right type! " ^ ovid ^ ":" ^ (ttype_to_str out_val.t) ^ " <> " ^ oaid ^ ":" ^ (ttype_to_str out_arg.t));
       String.concat (List.map ovfields ~f:(fun (name,_) ->
                        "//@ " ^ head ^ "(" ^ ovid ^ "." ^ name ^ " == " ^ oaid ^ "." ^ name ^ ");\n"))
+
     | _ -> failwith "not supported, sorry"
     end
   | Addr ptee, _ ->
@@ -238,7 +245,7 @@ let split_assignments assignments =
 
 let apply_assignments assignments terms =
   List.fold assignments ~init:terms ~f:(fun terms {lhs;rhs} ->
-      List.map terms ~f:(replace_term_in_tterm lhs.v rhs.v))
+      List.map terms ~f:(replace_tterm lhs rhs))
 
 let render_assumptions assumptions  =
   String.concat ~sep:"\n" (List.map assumptions ~f:(fun t ->
@@ -310,20 +317,20 @@ let is_there_device_constraint constraints =
       | _ -> false)
 
 let guess_support_assignments constraints symbs =
-  (* printf "guess constraints\n"; *)
-  (* List.iter constraints ~f:(fun xxx -> printf "%s\n" (render_tterm xxx)); *)
-  (* printf "symbols:\n"; *)
-  (* Set.iter symbs ~f:(fun name -> printf "%s\n" name;); *)
+  (*printf "guess constraints\n";
+  List.iter constraints ~f:(fun xxx -> printf "%s\n" (render_tterm xxx));
+  printf "symbols:\n";
+  Set.iter symbs ~f:(fun name -> printf "%s\n" name;);*)
   let there_is_a_device_constraint = is_there_device_constraint constraints in
   let (assignments,_) =
     List.fold (bubble_equalities constraints) ~init:([],symbs) ~f:(fun (assignments,symbs) tterm ->
         (* printf "considering %s\n" (render_tterm tterm); *)
         match tterm.v with
         | Bop (Eq, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
-          (* printf "match 1st\n"; *)
+          (*printf "match 1st %s: %s\n" x (ttype_to_str t);*)
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | Bop (Eq, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          (* printf "match 2nd\n"; *)
+          (*printf "match 2nd %s: %s\n" x (ttype_to_str t);*)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
           (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+2 *)
@@ -346,8 +353,7 @@ let ids_from_varspecs_map vars =
 let simplify_assignments assignments =
   List.fold assignments ~init:assignments ~f:(fun acc assignment ->
       List.map acc ~f:(fun {lhs;rhs} ->
-          {lhs;rhs = replace_term_in_tterm
-                   assignment.lhs.v assignment.rhs.v rhs}))
+          {lhs;rhs = replace_tterm assignment.lhs assignment.rhs rhs}))
 
 let fix_mistyped_tip_ret tterm =
   match tterm.v with
@@ -412,8 +418,9 @@ let render_output_check
   (render_concrete_assignments_as_assertions concrete_assignments) ^ "\n" ^
   "// Model constraints: \n" ^
   (String.concat ~sep:"\n"
-     (List.map upd_model_constraints ~f:(fun constr ->
-          "/*@ assert(" ^ (render_tterm (fix_mistyped_tip_ret constr)) ^ "); @*/")))
+     (List.map upd_model_constraints ~f:(fun constr -> match (fix_mistyped_tip_ret constr) with
+                                                       | {v=Bop (Eq, lhs, rhs);t=_} -> render_eq_sttmt ~is_assert:true lhs rhs
+                                                       | c -> "/*@ assert(" ^ (render_tterm c) ^ "); @*/")))
 
 let tterm_list_to_string tterms =
   String.concat ~sep:"\n" (List.map tterms ~f:render_tterm)

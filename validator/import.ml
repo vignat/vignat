@@ -1746,6 +1746,9 @@ let render_tip_lemmas ftype_of (tip_call : tip_call) =
                   (ttypes_of_tterms (call_args tip_call.context))
                   tmp_gen}}
 
+let fix_term (known_vars: var_spec list) term =
+  fix_type_of_id_in_tterm known_vars term
+
 let build_ir fun_types fin preamble boundary_fun finishing_fun
   eventproc_iteration_begin eventproc_iteration_end =
   let ftype_of fun_name =
@@ -1788,6 +1791,17 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
+
+  (* And now for some type-assignments... *)
+  let known_vars = (arguments@(String.Map.data free_vars)@(String.Map.data cmplxs)) in
+  let fix_condition cond = {lhs=fix_term known_vars cond.lhs;rhs=fix_term known_vars cond.rhs} in
+  let context_assumptions = List.map context_assumptions ~f:(fix_term known_vars) in
+  let hist_calls = List.map hist_calls ~f:(fun c -> {c with context={c.context with extra_pre_conditions=(List.map c.context.extra_pre_conditions ~f:fix_condition)};
+                                                            result={c.result with args_post_conditions=(List.map c.result.args_post_conditions ~f:fix_condition)}}) in
+  let tip_call = {tip_call with context={tip_call.context with extra_pre_conditions=(List.map tip_call.context.extra_pre_conditions ~f:fix_condition)};
+                                results=List.map tip_call.results ~f:(fun r -> {r with args_post_conditions=(List.map r.args_post_conditions ~f:fix_condition);
+                                                                                       post_statements=List.map r.post_statements ~f:(fix_term known_vars)})} in
+
   (* Do not render the allocated_dummies *)
   {preamble;free_vars;arguments;tmps;
    cmplxs;context_assumptions;hist_calls;tip_call;
