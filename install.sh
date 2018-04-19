@@ -43,6 +43,7 @@ echo ". $PATHSFILE" >> "$HOME/.profile"
 sudo apt-get update
 
 sudo apt-get install -y \
+                     ca-certificates software-properties-common patch `# to download and install stuff` \
                      libpcap-dev libnuma-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
@@ -98,6 +99,10 @@ fi
 
 ### Non-DPDK initialization
 
+# make sure we have the right OCaml packages, use their PPAs...
+sudo add-apt-repository -y ppa:avsm/ppa
+sudo apt-get update
+
 sudo apt-get install -y \
                      time `# to measure verification time` \
                      bison flex zlib1g-dev libncurses5-dev libcap-dev cmake subversion `# for KLEE/LLVM` \
@@ -105,12 +110,11 @@ sudo apt-get install -y \
                      opam m4 `# for OCaml; m4 is not a dependency in theory but it is in practice` \
 
 # for VeriFast
-# directly from VeriFast's readme
+# inspired from VeriFast's readme
 sudo apt-get install -y --no-install-recommends \
-                     ca-certificates m4 \
-                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
-                     valac gtksourceview2.0-dev \
-                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
+                     m4 \
+                     ocaml-native-compilers gcc camlp4 unzip \
+                     valac
 
 # OCaml uses variables in its scripts without defining it first - we're in strict mode!
 if [ -z ${PERL5LIB+x} ]; then
