@@ -43,7 +43,7 @@ echo ". $PATHSFILE" >> "$HOME/.profile"
 sudo apt-get update
 
 sudo apt-get install -y \
-                     libpcap-dev `# for DPDK` \
+                     libpcap-dev libnuma-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
 # On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token

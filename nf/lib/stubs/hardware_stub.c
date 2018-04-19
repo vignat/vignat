@@ -10,6 +10,8 @@
 #include "rte_cycles.h" // to include the next one cleanly
 #include "generic/rte_cycles.h" // for rte_delay_us_callback_register
 
+#include "rte_mbuf.h"
+
 #include <klee/klee.h>
 
 
@@ -235,6 +237,34 @@ stub_device_start(struct stub_device* dev)
 	// Get device index
 	int device_index = 0;
 	while (dev != &DEVICES[device_index]) { device_index++; }
+
+	// Trace the mbuf
+	struct rte_mbuf mbuf;
+	mbuf.buf_addr = mbuf_content;
+	mbuf.buf_iova = (rte_iova_t) mbuf_content;
+	mbuf.data_off = 0;
+	mbuf.refcnt = 1;
+	mbuf.nb_segs = 1;
+	mbuf.port = device_index;
+	mbuf.ol_flags = 0; // TODO?
+	mbuf.packet_type = (wb0 >> 4) & 0b111111111111;
+	mbuf.pkt_len = packet_length;
+	mbuf.data_len = packet_length;
+	mbuf.vlan_tci = 0; // TODO?
+	mbuf.hash.rss = 0; // TODO?
+	mbuf.vlan_tci_outer = 0; // TODO?
+	mbuf.buf_len = packet_length;
+	mbuf.timestamp = 0; // TODO?
+	mbuf.userdata = NULL;
+	mbuf.pool = NULL;
+	mbuf.next = NULL;
+	mbuf.tx_offload = 0; // TODO?
+	mbuf.priv_size = 0;
+	mbuf.timesync = 0; // TODO?
+	mbuf.seqn = 0; // TODO?
+
+	struct rte_mbuf* trace_mbuf_addr = &mbuf;
+	stub_core_trace_rx(&trace_mbuf_addr);
 }
 
 
