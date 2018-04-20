@@ -832,7 +832,119 @@ static uint32_t
 stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_value)
 {
 	// SW wrote to TDT, meaning it has a packet for us
-	// TODO
+        // Get the address of the transmit descriptor for queue 0
+        uint64_t tdba =  ((uint64_t) DEV_REG(dev, 0x06000)) // TDBAL
+                      | (((uint64_t) DEV_REG(dev, 0x06004)) << 32); // TDBAH
+
+        // Clear the head of the descriptor
+        DEV_REG(dev, 0x06010) = 0; // TDH
+        // Make sure we have enough space
+        uint32_t tdt = new_value;
+	if (tdt == 0) {klee_print_expr("IGNORED TDT WRITE",dev);
+		// No? Probably this is not to send a packet, then.
+		return new_value;
+	}
+
+        if (klee_int("sent") == 0) {
+                // failed
+		return new_value;
+        }
+
+        // Descriptor is 128 bits, see page 353, table 7-39 "Descriptor Read Format"
+        // (which the NIC reads to know how to send a packet)
+        // and page 354, table 7-40 "Descriptor Write-Back Format"
+        // (note that "write" in this context is from the NIC's point of view;
+        //  it writes those descriptors into memory)
+        uint64_t* descr = (uint64_t*) tdba;
+
+        // Read phase
+
+	// Line 0: Address
+        uint64_t buf_addr = descr[0];
+
+	// Line 1: Properties
+	// 0-15: Buffer length
+	// 16-17: Reserved
+	// 18: Whetner LinkSec is applied
+	// 19: Whether the packet has an IEEE1588 timestamp
+	// 20-23: Descriptor type, must be 0011
+	// 24: End of Packet, should be 1 since we don't support multi-buffer packets
+	// 25: Insert FCS (should be 0)
+	// 26: Reserved
+	// 27: Report Status, whether SW wants HW to report DMA completion status in addition to an interrupt
+	// 28: Reserved
+	// 29: Descriptor Extension (must be 1)
+	// 30: VLAN Packet (should be 0)
+	// 31: Transmit Segmentation Enable (should be 0)
+	// 32: Descriptor Done (must be 0, we'll set to 1 once we're done)
+	// 33-35: Reserved
+	// 36-39: Irrelevant
+	// 40: Insert IP Checksum (should be 0)
+	// 41: Insert TCP/UDP Checksum (should be 0)
+	// 42: IPSEC offload request (should be 0)
+	// 43-45: Reserved
+	// 46-63: Payload length (== buffer length in our case)
+	uint64_t buf_props = descr[1];
+
+	uint16_t buf_len = buf_props & 0xFF;
+
+	klee_assert(GET_BIT(buf_props, 18) == 0);
+	klee_assert(GET_BIT(buf_props, 19) == 0);
+
+	klee_assert(GET_BIT(buf_props, 20) == 1);
+	klee_assert(GET_BIT(buf_props, 21) == 1);
+	klee_assert(GET_BIT(buf_props, 22) == 0);
+	klee_assert(GET_BIT(buf_props, 23) == 0);
+
+	klee_assert(GET_BIT(buf_props, 24) == 1);
+	klee_assert(GET_BIT(buf_props, 25) == 1);
+	klee_assert(GET_BIT(buf_props, 27) == 0);
+	klee_assert(GET_BIT(buf_props, 29) == 1);
+	klee_assert(GET_BIT(buf_props, 30) == 0);
+	klee_assert(GET_BIT(buf_props, 31) == 0);
+	klee_assert(GET_BIT(buf_props, 32) == 0);
+	klee_assert(GET_BIT(buf_props, 40) == 0);
+	klee_assert(GET_BIT(buf_props, 41) == 0);
+	klee_assert(GET_BIT(buf_props, 42) == 0);
+
+	uint32_t payload_len = buf_props >> 46;
+	klee_assert(buf_len == payload_len);
+
+	// Get device index
+	int device_index = 0;
+	while (dev != &DEVICES[device_index]) { device_index++; }
+
+	// Trace the mbuf
+	struct rte_mbuf mbuf;
+	mbuf.buf_addr = (void*) buf_addr;
+	mbuf.buf_iova = (rte_iova_t) buf_addr;
+	mbuf.data_off = 0;
+	mbuf.refcnt = 1;
+	mbuf.nb_segs = 1;
+	mbuf.port = device_index;
+	mbuf.ol_flags = 0; // TODO?
+	mbuf.packet_type = 0; // TODO?
+	mbuf.pkt_len = buf_len;
+	mbuf.data_len = buf_len;
+	mbuf.vlan_tci = 0; // TODO?
+	mbuf.hash.rss = 0; // TODO?
+	mbuf.vlan_tci_outer = 0; // TODO?
+	mbuf.buf_len = buf_len;
+	mbuf.timestamp = 0; // TODO?
+	mbuf.userdata = NULL;
+	mbuf.pool = NULL;
+	mbuf.next = NULL;
+	mbuf.tx_offload = 0; // TODO?
+	mbuf.priv_size = 0;
+	mbuf.timesync = 0; // TODO?
+	mbuf.seqn = 0; // TODO?
+
+	stub_core_trace_tx(&mbuf, device_index);
+
+	// Write phase
+	descr[0] = 0; // Reserved
+	descr[1] = ((uint64_t) 1) << 32; // Reserved, except bit 32 which is Descriptor Done and must be 1
+
 	return new_value;
 }
 

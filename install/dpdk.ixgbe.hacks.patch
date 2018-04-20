@@ -1,8 +1,30 @@
 diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
-index 3a10300..b2378e4 100644
+index 3a10300..95627b2 100644
 --- a/drivers/net/ixgbe/ixgbe_rxtx.c
 +++ b/drivers/net/ixgbe/ixgbe_rxtx.c
-@@ -1594,10 +1594,12 @@ ixgbe_rx_scan_hw_ring(struct ixgbe_rx_queue *rxq)
+@@ -278,8 +278,10 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
+ 	if (unlikely(nb_pkts == 0))
+ 		return 0;
+ 
++#ifndef KLEE_VERIFICATION
+ 	/* Use exactly nb_pkts descriptors */
+ 	txq->nb_tx_free = (uint16_t)(txq->nb_tx_free - nb_pkts);
++#endif
+ 
+ 	/*
+ 	 * At this point, we know there are enough descriptors in the
+@@ -340,6 +342,10 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
+ 	rte_wmb();
+ 	IXGBE_PCI_REG_WRITE_RELAXED(txq->tdt_reg_addr, txq->tx_tail);
+ 
++#ifdef KLEE_VERIFICATION
++	txq->tx_tail = 0;
++#endif
++
+ 	return nb_pkts;
+ }
+ 
+@@ -1594,10 +1600,12 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  			break;
  	}
  
@@ -15,7 +37,7 @@ index 3a10300..b2378e4 100644
  
  
  	return nb_rx;
-@@ -1685,7 +1687,9 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+@@ -1685,7 +1693,9 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  	/* update internal queue state */
  	rxq->rx_next_avail = 0;
  	rxq->rx_nb_avail = nb_rx;
@@ -25,7 +47,7 @@ index 3a10300..b2378e4 100644
  
  	/* if required, allocate new buffers to replenish descriptors */
  	if (rxq->rx_tail > rxq->rx_free_trigger) {
-@@ -1706,9 +1710,11 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+@@ -1706,9 +1716,11 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  			 * allocate new buffers to replenish the old ones.
  			 */
  			rxq->rx_nb_avail = 0;
@@ -37,7 +59,7 @@ index 3a10300..b2378e4 100644
  
  			return 0;
  		}
-@@ -1719,8 +1725,10 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+@@ -1719,8 +1731,10 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  					    cur_free_trigger);
  	}
  
@@ -48,7 +70,7 @@ index 3a10300..b2378e4 100644
  
  	/* received any packets this loop? */
  	if (rxq->rx_nb_avail)
-@@ -1863,7 +1871,9 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+@@ -1863,7 +1877,9 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  		}
  
  		rxm = rxe->mbuf;
@@ -58,7 +80,7 @@ index 3a10300..b2378e4 100644
  		dma_addr =
  			rte_cpu_to_le_64(rte_mbuf_data_iova_default(nmb));
  		rxdp->read.hdr_addr = 0;
-@@ -1921,7 +1931,9 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
+@@ -1921,7 +1937,9 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  		 */
  		rx_pkts[nb_rx++] = rxm;
  	}
@@ -68,7 +90,7 @@ index 3a10300..b2378e4 100644
  
  	/*
  	 * If the number of free RX descriptors is greater than the RX free
-@@ -2164,13 +2176,18 @@ ixgbe_recv_pkts_lro(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts,
+@@ -2164,13 +2182,18 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  			 * Update RX descriptor with the physical address of the
  			 * new data buffer of the new allocated mbuf.
  			 */
@@ -88,7 +110,7 @@ index 3a10300..b2378e4 100644
  
  		/*
  		 * Set data length & data buffer address of mbuf.
-@@ -2266,10 +2283,12 @@ ixgbe_recv_pkts_lro(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts,
+@@ -2266,10 +2289,12 @@ uint16_t ixgbe_xmit_fixed_burst_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
  		rx_pkts[nb_rx++] = first_seg;
  	}
  
@@ -101,7 +123,7 @@ index 3a10300..b2378e4 100644
  
  	/*
  	 * If the number of free RX descriptors is greater than the RX free
-@@ -2666,7 +2685,9 @@ ixgbe_rx_queue_release_mbufs(struct ixgbe_rx_queue *rxq)
+@@ -2666,7 +2691,9 @@ static void __attribute__((cold))
  		for (i = 0; i < rxq->nb_rx_desc; i++) {
  			if (rxq->sw_ring[i].mbuf != NULL) {
  				rte_pktmbuf_free_seg(rxq->sw_ring[i].mbuf);
@@ -111,28 +133,3 @@ index 3a10300..b2378e4 100644
  			}
  		}
  		if (rxq->rx_nb_avail) {
-diff --git a/drivers/net/ixgbe/ixgbe_rxtx.c b/drivers/net/ixgbe/ixgbe_rxtx.c
-index 9789a31..19c7e50 100644
---- a/drivers/net/ixgbe/ixgbe_rxtx.c
-+++ b/drivers/net/ixgbe/ixgbe_rxtx.c
-@@ -278,8 +278,10 @@ tx_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
- 	if (unlikely(nb_pkts == 0))
- 		return 0;
- 
-+#ifndef KLEE_VERIFICATION
- 	/* Use exactly nb_pkts descriptors */
- 	txq->nb_tx_free = (uint16_t)(txq->nb_tx_free - nb_pkts);
-+#endif
- 
- 	/*
- 	 * At this point, we know there are enough descriptors in the
-@@ -311,7 +313,9 @@ tx_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
- 
- 	/* Fill H/W descriptor ring with mbuf data */
- 	ixgbe_tx_fill_hw_ring(txq, tx_pkts + n, (uint16_t)(nb_pkts - n));
-+#ifndef KLEE_VERIFICATION
- 	txq->tx_tail = (uint16_t)(txq->tx_tail + (nb_pkts - n));
-+#endif
- 
- 	/*
- 	 * Determine if RS bit should be set
