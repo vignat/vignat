@@ -2394,32 +2394,28 @@ stub_hardware_init(void)
 
 
 void
-stub_hardware_receive_packet(void)
+stub_hardware_receive_packet(uint16_t device)
 {
-	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
-		stub_device_start(&(DEVICES[n]));
-	}
+	stub_device_start(&(DEVICES[device]));
 }
 
 void
-stub_hardware_reset_receive(void)
+stub_hardware_reset_receive(uint16_t device)
 {
-	for (int n = 0; n < STUB_HARDWARE_DEVICES_COUNT; n++) {
-		struct stub_device* dev = &(DEVICES[n]);
+	struct stub_device* dev = &(DEVICES[device]);
 
-		// Reset descriptor ring
-		DEV_REG(dev, 0x01010) = 0;
-		DEV_REG(dev, 0x01018) = 95;
+	// Reset descriptor ring
+	DEV_REG(dev, 0x01010) = 0;
+	DEV_REG(dev, 0x01018) = 95;
 
-		// Reset descriptor
-		uint64_t rdba =  ((uint64_t) DEV_REG(dev, 0x01000)) // RDBAL
-			      | (((uint64_t) DEV_REG(dev, 0x01004)) << 32); // RDBAH
-		uint64_t* descr = (uint64_t*) rdba;
-		descr[0] = dev->old_mbuf_addr;
-		descr[1] = 0;
+	// Reset descriptor
+	uint64_t rdba =  ((uint64_t) DEV_REG(dev, 0x01000)) // RDBAL
+		      | (((uint64_t) DEV_REG(dev, 0x01004)) << 32); // RDBAH
+	uint64_t* descr = (uint64_t*) rdba;
+	descr[0] = dev->old_mbuf_addr;
+	descr[1] = 0;
 
-		memset((char*) descr[0], 0, sizeof(struct stub_mbuf_content));
-	}
+	memset((char*) descr[0], 0, sizeof(struct stub_mbuf_content));
 }
 
 

@@ -42,10 +42,10 @@ struct stub_device DEVICES[STUB_HARDWARE_DEVICES_COUNT];
 
 
 #ifdef VIGOR_STUB_HARDWARE
-void stub_hardware_receive_packet(void);
+void stub_hardware_receive_packet(uint16_t device);
 // HACK this should not be needed :( but it is cause of the current impl. of havocing
-void stub_hardware_reset_receive(void);
+void stub_hardware_reset_receive(uint16_t device);
 #else
-static inline void stub_hardware_receive_packet(void) { }
-static inline void stub_hardware_reset_receive(void) { }
+static inline void stub_hardware_receive_packet(uint16_t device) { }
+static inline void stub_hardware_reset_receive(uint16_t device) { }
 #endif

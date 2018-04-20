@@ -16,14 +16,14 @@
   nf_loop_iteration_begin(_vigor_lcore_id, _vigor_start_time); \
   while(klee_induce_invariants() & _vigor_loop_termination) { \
     nf_add_loop_iteration_assumptions(_vigor_lcore_id, _vigor_start_time); \
-    stub_hardware_receive_packet(); \
     time_t VIGOR_NOW = current_time(); \
     /* concretize the device to avoid leaking symbols into DPDK */ \
     unsigned VIGOR_DEVICES_COUNT = rte_eth_dev_count(); \
     unsigned VIGOR_DEVICE = klee_range(0, VIGOR_DEVICES_COUNT, "VIGOR_DEVICE"); \
-    for(unsigned _d = 0; _d < VIGOR_DEVICES_COUNT; _d++) if (VIGOR_DEVICE == _d) { VIGOR_DEVICE = _d; break; }
+    for(unsigned _d = 0; _d < VIGOR_DEVICES_COUNT; _d++) if (VIGOR_DEVICE == _d) { VIGOR_DEVICE = _d; break; } \
+    stub_hardware_receive_packet(VIGOR_DEVICE);
 #define VIGOR_LOOP_END \
-    stub_hardware_reset_receive(); \
+    stub_hardware_reset_receive(VIGOR_DEVICE); \
     nf_loop_iteration_end(_vigor_lcore_id, VIGOR_NOW); \
   }
 #else
