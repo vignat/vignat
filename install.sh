@@ -72,6 +72,7 @@ pushd "$BUILDDIR"
     rm dpdk.tar.xz
     mv "dpdk-$DPDK_RELEASE" dpdk
 
+
     echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> "$PATHSFILE"
     echo "export RTE_SDK=$BUILDDIR/dpdk" >> "$PATHSFILE"
     . "$PATHSFILE"
@@ -99,9 +100,11 @@ fi
 
 ### Non-DPDK initialization
 
-# make sure we have the right OCaml packages, use their PPAs...
-sudo add-apt-repository -y ppa:avsm/ppa
-sudo apt-get update
+# make sure we have the right OCaml packages on trusty, use their PPAs...
+if [ $(lsb_release -r | awk '{ print $2 }') = '14.04' ]; then
+  sudo add-apt-repository -y ppa:avsm/ppa
+  sudo apt-get update
+fi
 
 sudo apt-get install -y \
                      time `# to measure verification time` \
