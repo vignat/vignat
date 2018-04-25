@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tested on Ubuntu 16.04, Debian Stretch, and the Linux Subsystem for Windows
+# Tested on Ubuntu 14.04 and 16.04, Debian Stretch, and the Linux Subsystem for Windows
 # $1: "dpdk-only" to only install DPDK, or no argument to install everything
 
 # Setup
