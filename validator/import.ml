@@ -715,7 +715,7 @@ let update_ptee_variants nval older =
 let rec add_to_known_addresses
     (base_value: tterm) breakdown addr
     callid depth =
-  lprintf "ATK %s : %s\n" (render_tterm base_value) (ttype_to_str base_value.t);
+  lprintf "ATK %s : %s at %s\n" (render_tterm base_value) (ttype_to_str base_value.t) (moment_to_str callid);
   begin match base_value.t with
   | Ptr (Str (_,fields) as ptee_type) ->
     let fields = List.fold fields ~init:String.Map.empty
@@ -736,10 +736,10 @@ let rec add_to_known_addresses
           addr callid (depth+1);)
   | _ ->
     if (List.length breakdown) <> 0 then
-      lprintf "%s : %s type with %d fields\n" (render_tterm base_value)
+      lprintf "ATK %s : %s type with %d fields\n" (render_tterm base_value)
         (ttype_to_str base_value.t) (List.length breakdown)
     else
-      lprintf "%s : %s type with ZERO fields\n" (render_tterm base_value)
+      lprintf "ATK %s : %s type with ZERO fields\n" (render_tterm base_value)
         (ttype_to_str base_value.t);
     assert((List.length breakdown) = 0)
   end;
@@ -769,8 +769,8 @@ let rec add_to_known_addresses
    it as a pointee into known_addresses*)
 let rec add_known_symbol_at_address (value: tterm) addr callid depth =
   let prev = match Int64.Map.find !known_addresses addr with
-    | Some value -> value
-    | None -> []
+    | Some v -> lprintf "AKS HAS PREV %s\n" (render_tterm value); v
+    | None -> lprintf "AKS NO PREV %s\n" (render_tterm value); []
   in
   let find_field_addr strname fieldname =
     List.find_map prev ~f:(fun aspec ->
@@ -781,20 +781,20 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
           String.Map.find aspec.breakdown fieldname
         | _ -> None)
   in
-  lprintf "addr: %Ld looking for %s\n" addr (ttype_to_str value.t);
+  lprintf "AKS addr: %Ld looking for %s\n" addr (ttype_to_str value.t);
   begin match value.t with
   | Ptr (Str (strname,fields)) ->
     lprintf "Pdestruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
         lprintf "for %s : %s\n" fname (ttype_to_str ftype);
         begin match find_field_addr strname fname with
-        | Some fa -> lprintf "recursing: %s\n" (render_tterm value);
+        | Some fa -> lprintf "AKS recursing: %s\n" (render_tterm value);
                      add_known_symbol_at_address
                      {v=Addr {v=Str_idx ({v=Deref value; t=Str (strname,fields)}, fname);
                               t=ftype};
                       t=Ptr ftype}
                      fa callid (depth + 1)
-        | None -> lprintf "failed to find field %s at the address %s\n" fname (Int64.to_string addr)
+        | None -> failwith ("failed to find field " ^ fname ^ " at the address " ^ (Int64.to_string addr))
         end)
   | Str (strname,fields) ->
     lprintf "destruct\n";
@@ -804,6 +804,7 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
           | None -> failwith ("failed to find field " ^ fname ^
                               " at the address " ^ (Int64.to_string addr))
         in
+        lprintf "AKS recurse struct %s\n" (render_tterm value);
         add_known_symbol_at_address
           {v=Addr {v=Str_idx (value, fname); t=ftype}; t=Ptr ftype}
           field_addr callid (depth + 1))
@@ -813,12 +814,12 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
           (render_tterm (simplify_tterm aspec.value));
         match (simplify_tterm aspec.value).v with
         | Addr {v=Utility (Ptr_placeholder addr);t=_} ->
-          lprintf "recursing to %Ld\n" addr;
+          lprintf "AKS recursing ptr ptr %s %Ld\n" (render_tterm value) addr;
           add_known_symbol_at_address {v=Deref value;
                                        t=Ptr ptee}
             addr callid (depth + 1)
-        | _ -> lprintf "nonplaceholder :/ nope\n")
-  | _ -> lprintf "nope\n";
+        | _ -> lprintf "AKS nonplaceholder %s\n" (render_tterm (simplify_tterm aspec.value)))
+  | _ -> lprintf "AKS nope %s\n" (render_tterm value);
   end;
   add_to_known_addresses (simplify_tterm value) [] addr callid depth
 
@@ -1010,16 +1011,16 @@ let allocate_extra_ptrs ftype_of tpref =
           None
         | Changing (x,y) ->
           add_to_known_addresses (mk_ptr (get_struct_val_value x ptee_type))
-            x.break_down addr (moment_before call.id) 0;
+            x.break_down addr (After call.id) 0;
           add_to_known_addresses (mk_ptr (get_struct_val_value y ptee_type))
-            y.break_down addr (After call.id) 0;
+            y.break_down addr (moment_before call.id) 0;
           None)
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_extra_ptrs)
 
 let allocate_args ftype_of tpref arg_name_gen =
   let alloc_call_args (call:Trace_prefix.call_node) =
-    let alloc_arg addr str_value tterm =
+    let alloc_arg addr str_value tterm aname =
       let moment = if 0 < call.id then After (call.id - 1) else Beginning in
       lprintf "aa: looking for *%Ld (%s):\n" addr (moment_to_str moment);
       match Int64.Map.find !known_addresses addr with
@@ -1027,10 +1028,10 @@ let allocate_args ftype_of tpref arg_name_gen =
           Int64.Map.set !known_addresses
             ~key:addr ~data:(List.map spec ~f:(fun spec ->
                 {spec with value=update_tterm spec.value tterm}));
-        lprintf "found some, adding\n"; (* TODO why are we adding directly and not through the method? *)
+        lprintf "ACA found some, adding: %s\n" aname; (* TODO why are we adding directly and not through the method? *)
         None
       | None -> let p_name = arg_name_gen#generate in
-        lprintf "found none, inserting\n";
+        lprintf "ACA found none, inserting: %s\n" aname;
         add_to_known_addresses
           {v=Addr {v=Id p_name;t=tterm.t};t=Ptr tterm.t}
           str_value.break_down
@@ -1052,11 +1053,11 @@ let allocate_args ftype_of tpref arg_name_gen =
                 ptee_t
                 (moment_before call.id)
         with
-        | Some a -> lprintf "not allocating symbol for %Ld, because it \
-                             is apparently already allocated (%s %s)\n"
+        | Some a when printable_tterm a -> 
+          lprintf "not allocating symbol for %Ld, because it is apparently already allocated (%s %s)\n"
                       ptee_addr (render_tterm a) (moment_to_str (moment_before call.id));
-          failwith "nested ptr value dynamics too complex :/"
-        | None -> let p_name = arg_name_gen#generate in
+          failwith "nested ptr value dynamics too complex :/" (* TODO is this message still relevant? *)
+        | _ -> let p_name = arg_name_gen#generate in
           let moment = moment_before call.id in
           lprintf "allocating nested %Ld -> %s = &%Ld:%s\n"
             ptr_addr p_name ptee_addr (ttype_to_str (Ptr ptee_t));
@@ -1077,7 +1078,7 @@ let allocate_args ftype_of tpref arg_name_gen =
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call i in
           let ptee_type = get_pointee t in
-          alloc_arg addr {full=None;sname=None;break_down=[]} {v=Undef;t=ptee_type;}
+          alloc_arg addr {full=None;sname=None;break_down=[]} {v=Undef;t=ptee_type;} aname
         | Curioptr ptee ->
           let addr = Int64.of_string (Sexp.to_string value) in
           let t = get_fun_arg_type ftype_of call i in
@@ -1102,7 +1103,7 @@ let allocate_args ftype_of tpref arg_name_gen =
                 when x <> 0L ->
                 alloc_dummy_nested_ptr addr x ptee_ptee_t
               | _ -> alloc_arg addr ptee.before (get_struct_val_value
-                                                   ptee.before ptee_type))
+                                                   ptee.before ptee_type) aname)
   in
   List.join (List.map (tpref.history@tpref.tip_calls) ~f:alloc_call_args)
 
@@ -1780,8 +1781,8 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let free_vars = get_basic_vars ftype_of pref in
   let free_vars = typed_vars_to_varspec free_vars in
   (* let double_ptr_args = get_double_ptr_args ftype_of pref in *)
-  let arguments = (allocate_args ftype_of pref (name_gen "arg")) in
-  let arguments = (allocate_extra_ptrs ftype_of pref)@arguments in
+  let arguments = (allocate_extra_ptrs ftype_of pref) in (* ORDER IS IMPORTANT HERE, EXTRA PTRS FIRST otherwise args that contain them fail... *)
+  let arguments = (allocate_args ftype_of pref (name_gen "arg"))@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
   let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in
