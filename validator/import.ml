@@ -675,19 +675,19 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     end
 
 let rec get_struct_val_value valu t =
-  match t with
-  | Str (strname, fields) ->
+  match t, valu.full with
+  | Str (strname, fields), _ ->
     begin
     (*   match get_var_name_of_sexp valu.full with *)
     (* | Some name -> {v=Id name;t} *)
     (* | None -> <^^^ this was working a while ago, may be it should be
        left somewhere *)
-      lprintf "Destruct: %s; Need %d fields got %d fields (%s).\n" strname
+      lprintf "GSVV Destruct: %s; Need %d fields got %d fields (%s).\n" strname
         (List.length fields) (List.length valu.break_down)
         (match valu.sname with | Some x -> x | None -> "?");
       if List.length valu.break_down <>
          List.length fields then begin
-        lprintf "%s expects %d fields but found only %d"
+        lprintf "GSVV %s expects %d fields but found only %d"
           strname (List.length fields) (List.length valu.break_down);
         failwith ("Break down of " ^ strname ^
                   " does not correspond to its type.");
@@ -699,9 +699,9 @@ let rec get_struct_val_value valu t =
       in
       {v=Struct (strname, fields);t}
     end
-  | _ -> match valu.full with
-    | Some v -> get_sexp_value v t
-    | None -> {t;v=Undef}
+  (*| Ptr ptee, None -> failwith ("GSVV given a pointer! " ^ (ttype_to_str ptee))*)
+  | _, Some v -> lprintf "GSVV using sexp for type %s\n" (ttype_to_str t); get_sexp_value v t
+  | _, None -> lprintf "GSVV undef for type %s\n" (ttype_to_str t); {t;v=Undef}
 
 let update_ptee_variants nval older =
   match nval with
@@ -1227,7 +1227,7 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
               lprintf "processing %s argptr: %s| strval: %s\n" 
                       arg.aname (ttype_to_str out_arg.t)
                       (render_tterm (get_struct_val_value ptee.after out_arg.t));
-              begin match get_struct_val_value ptee.after out_arg.t with
+              begin match get_struct_val_value ptee.after (get_pointee out_arg.t) with
               | {v=Utility (Ptr_placeholder addr);t=Ptr ptee} ->
                 begin
                   match find_first_known_address addr ptee (After call.id) with
@@ -1238,43 +1238,43 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
                   | None -> None
                 end
               | {v=Int _;t=_} ->
-                None
+                lprintf "not processing a post cond in arg %s\n" arg.aname; None
               (* XXX: here, suck the value from the known_addresses
                  to generate a complex post condition*)
               (* Skip the two layer pointer.
                  TODO: maybe be allow special case of Zeroptr here.*)
-              | value ->
+              | value -> lprintf "CAPC %s ?= %s\n" (render_tterm (deref_tterm out_arg)) (render_tterm value);
                 Some {lhs=deref_tterm out_arg;
                       rhs=value}
               end
-            | None -> None (* The variable is not allocated,
+            | None -> lprintf "not processing a post cond because 2-layer in %s\n" arg.aname; None (* The variable is not allocated,
                               because it is a 2-layer pointer.*))
 
-(* let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node) *)
-(*   ftype_of = *)
-(*   let gen_post_condition_of_struct_val (val_before : Ir.tterm) val_now = *)
-(*     lprintf "postconditions for %s: %s\n" call.fun_name (ttype_to_str val_before.t); *)
-(*     match get_struct_val_value *)
-(*             val_now (get_pointee val_before.t) with *)
-(*     | {v=Int _;t=_} -> None *)
-(*     (\* Skip the two layer pointer. *)
-(*        TODO: maybe be allow special case of Zeroptr here.*\) *)
-(*     | value -> *)
-(*       Some {lhs=deref_tterm val_before; *)
-(*             rhs=value} *)
-(*   in *)
-(*   List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} -> *)
-(*       let key = value in *)
-(*       match find_first_known_address key *)
-(*               (get_fun_extra_ptr_type ftype_of call pname) with *)
-(*       | Some extra_ptee -> *)
-(*         begin match ptee with *)
-(*           | Opening x -> gen_post_condition_of_struct_val extra_ptee x *)
-(*           | Closing _ -> None *)
-(*           | Changing (_,x) -> gen_post_condition_of_struct_val extra_ptee x *)
-(*         end *)
-(*       | None -> None (\* The variable is not allocated, *)
-(*                         because it is a 2-layer pointer.*\)) *)
+let compose_extra_ptrs_post_conditions (call:Trace_prefix.call_node)
+  ftype_of =
+  let gen_post_condition_of_struct_val (val_before : Ir.tterm) val_now =
+    lprintf "postconditions for %s: %s\n" call.fun_name (ttype_to_str val_before.t);
+    match get_struct_val_value
+            val_now (get_pointee val_before.t) with
+    | {v=Int _;t=_} -> lprintf "CEPPC ignoring int for some reason, val_before=%s\n" (render_tterm val_before); None
+    (* Skip the two layer pointer.
+       TODO: maybe be allow special case of Zeroptr here.*)
+    | value -> lprintf "CEPPC skipping 2-pointer: %s: %s  ?=?  %s: %s\n" (render_tterm (deref_tterm val_before)) (ttype_to_str (deref_tterm val_before).t) (render_tterm value) (ttype_to_str value.t);
+      Some {lhs=deref_tterm val_before;
+            rhs=value}
+  in
+  List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
+      let key = value in
+      match find_first_symbol_by_address key
+              (get_fun_extra_ptr_type ftype_of call pname) (After call.id) with
+      | Some extra_ptee ->
+        begin match ptee with
+          | Opening x -> gen_post_condition_of_struct_val extra_ptee x
+          | Closing _ -> None
+          | Changing (_,x) -> gen_post_condition_of_struct_val extra_ptee x
+        end
+      | None -> None (* The variable is not allocated,
+                        because it is a 2-layer pointer.*))
 
 let gen_unique_tmp_name unique_postfix prefix =
   prefix ^ unique_postfix
@@ -1419,12 +1419,12 @@ let extract_hist_call ftype_of call rets free_vars =
   lprintf "extract hist call: %s\n" call.fun_name;
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call ftype_of args in
-  (* XXX: what does it mean extra_ptrs post conditions?
-     when is it applicable? *)
-  (* let args_post_conditions = *)
-  (*   (compose_extra_ptrs_post_conditions call ftype_of)@ *)
-  (*   args_post_conditions *)
-  (* in *)
+  let args_post_conditions =
+    (compose_extra_ptrs_post_conditions call ftype_of)@args_post_conditions
+  in
+  let args_post_conditions =
+    List.map args_post_conditions ~f:(fixup_placeholder_ptrs_in_eq_cond (After call.id))
+  in
   match Int.Map.find rets call.id with
   | Some ret ->
     {context=extract_common_call_context

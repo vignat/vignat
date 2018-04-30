@@ -3,7 +3,7 @@ open Ir
 
 let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
   let head = (if is_assert then "assert" else "assume") in
-  (*printf "render_eq_sttmt %s %s --- %s %s\n" (render_tterm out_arg) (ttype_to_str out_arg.t) (render_tterm out_val) (ttype_to_str out_val.t);*)
+  (* printf "render_eq_sttmt %s %s --- %s %s\n" (render_tterm out_arg) (ttype_to_str out_arg.t) (render_tterm out_val) (ttype_to_str out_val.t); *)
   match out_val.v, out_val.t with
   (* A struct and its first member have the same address... oh and this is a hack so let's support doubly-nested structs *)
   | Id ovid, Uint16 ->
@@ -52,7 +52,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
      | _ -> "") ^
     String.concat (List.map fields ~f:(fun {name;value} ->
         render_eq_sttmt ~is_assert {v=Str_idx (out_arg, name);t=value.t} value))
-  | Undef, _ -> failwith ("// render_eq_sttmt undef for " ^ (render_tterm out_arg))
+  | Undef, _ -> failwith ("render_eq_sttmt undef for " ^ (render_tterm out_arg) ^ " with val " ^ (render_tterm out_val))
   | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
 
 let render_fcall_with_prelemmas context =
