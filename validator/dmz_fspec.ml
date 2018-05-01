@@ -409,24 +409,24 @@ let fun_types =
                      ", user_buf_23));\n" ^
                      "assert int_k_p(" ^ (List.nth_exn args 1) ^
                      ".ik, ikc(?isp, ?dp, ?isip,\
-                     ?dip, _, user_buf_23));\n" ^
+                     ?dip, ?dpdev, user_buf_23));\n" ^
                      "close ext_k_p(" ^ (List.nth_exn args 1) ^
-                    ".ek, ekc(new_index_4_0, dp, external_ip, dip,\
-                     1, user_buf_23));\n" ^
+                    ".ek, ekc(" ^ (List.nth_exn args 2) ^ ", dp, external_ip, dip,\
+                     0, user_buf_23));\n" ^
                     " close flw_p(" ^ (List.nth_exn args 1) ^
                     ", flwc(ikc(isp, dp, isip, dip,\
                      " ^
                            !last_device_id ^
-                           ", user_buf_23), ekc(new_index_4_0, dp, external_ip, dip,\
-                     1, user_buf_23), isp, new_index_4_0, dp, isip,\
+                           ", user_buf_23), ekc(" ^ (List.nth_exn args 2) ^ ", dp, external_ip, dip,\
+                     0, user_buf_23), isp, " ^ (List.nth_exn args 2) ^ ", dp, isip,\
                      external_ip, dip, " ^
                            !last_device_id ^
-                           ", 1, user_buf_23));\n" ^
+                           ", 0, user_buf_23));\n" ^
                        "assert dmap_dchain_coherent(" ^
                          (tmp_gen "cur_map") ^
                        ", ?cur_ch);\n\
-                        ext_k ek = ekc(new_index_4_0, dp,\
-                        external_ip, dip, 1, user_buf_23);\n\
+                        ext_k ek = ekc(" ^ (List.nth_exn args 2) ^ ", dp,\
+                        external_ip, dip, 0, user_buf_23);\n\
                         if (dmap_has_k2_fp(" ^ (tmp_gen "cur_map") ^
                        ", ek)) {\n\
                         int index = dmap_get_k2_fp(" ^ (tmp_gen "cur_map") ^
@@ -461,24 +461,24 @@ let fun_types =
                         isip, dip, " ^
                            !last_device_id ^
                            ", user_buf_23),\n\
-                        ekc(new_index_4_0, dp, external_ip, dip,\
-                        1, user_buf_23),\n\
-                        isp, new_index_4_0, dp, isip,\n\
+                        ekc(" ^ (List.nth_exn args 2) ^ ", dp, external_ip, dip,\
+                        0, user_buf_23),\n\
+                        isp, "  ^ (List.nth_exn args 2)  ^ ", dp, isip,\n\
                         external_ip, dip, " ^
                            !last_device_id ^
-                           ", 1, user_buf_23)," ^
+                           ", 0, user_buf_23)," ^
                        (tmp_gen "vk1") ^ ", " ^ (tmp_gen "vk2") ^ ");\n" ^
                        "the_inserted_flow = " ^
                        " flwc(ikc(isp, dp,\
                         isip, dip, " ^
                        !last_device_id ^
                        ", user_buf_23),\n\
-                        ekc(new_index_4_0, dp, external_ip, dip,\
-                        1, user_buf_23),\n\
-                        isp, new_index_4_0, dp, isip,\n\
+                        ekc(" ^ (List.nth_exn args 2) ^ ", dp, external_ip, dip,\
+                        0, user_buf_23),\n\
+                        isp, " ^ (List.nth_exn args 2) ^ ", dp, isip,\n\
                         external_ip, dip, " ^
                        !last_device_id ^
-                       ", 1, user_buf_23);\n\
+                       ", 0, user_buf_23);\n\
                        assert dmap_dchain_coherent(" ^ (tmp_gen "cur_map") ^
                       ", ?ch);\n\
                        int_k ik = ikc(isp, dp,\
@@ -491,10 +491,10 @@ let fun_types =
                       (tmp_gen "cur_map") ^
                       ", ch, ek);\n" ^
                       "flw the_flow_to_insert = flwc(ik, ek,\n\
-                       isp, new_index_4_0, dp, isip,\n\
+                       isp, " ^ (List.nth_exn args 2) ^ ", dp, isip,\n\
                        external_ip, dip, " ^
                        !last_device_id ^
-                      ", 1, user_buf_23);\n" ^
+                      ", 0, user_buf_23);\n" ^
                        "add_flow_abstract(" ^ (tmp_gen "cur_map") ^
                        ", ch, the_flow_to_insert, " ^
                        (List.nth_exn args 2) ^ ", " ^
