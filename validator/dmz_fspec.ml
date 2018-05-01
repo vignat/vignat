@@ -688,8 +688,8 @@ let fun_types =
                                    (fun params ->
                                       "/*@ if (" ^ params.ret_name ^
                                       " != 0) { \n" ^
-                                      "assert dmap_dchain_coherent(?cur_map,?ch);\n" ^
-                                      "rejuvenate_preserves_coherent(cur_map, ch, " ^
+                                      "assert dmap_dchain_coherent(cur_map6,?ch);\n" ^
+                                      "rejuvenate_preserves_coherent(cur_map6, ch, " ^
                                       (List.nth_exn params.args 1) ^ ", "
                                       ^ (List.nth_exn params.args 2) ^ ");\n\
                                        rejuvenate_preserves_index_range(ch," ^
