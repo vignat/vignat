@@ -1,4 +1,4 @@
-
+open Str
 open Core
 open Fspec_api
 open Ir
@@ -615,13 +615,14 @@ let fun_types =
                                          stub_mbuf_content_struct];
                  lemmas_before = [];
                  lemmas_after = [(fun params -> "a_packet_received = true;\n" ^
+                                       let arg0 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
                                        simplify_c_string (
                                          "received_on_port = " ^
-                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->port;\n" ^
+                                         "(*" ^ arg0 ^ ")->port;\n" ^
                                          "received_packet_type = " ^
-                                         "(*" ^ (List.nth_exn params.args 0) ^ ")->packet_type;\n") ^
+                                         "(*" ^ arg0 ^ ")->packet_type;\n") ^
                                          (copy_stub_mbuf_content "the_received_packet"
-                                          ("*" ^ (List.nth_exn params.args 0))));
+                                          ("*" ^ arg0)));
                                  ];};
      "stub_core_trace_tx", {
                  ret_type = Static Uint8;
@@ -630,9 +631,7 @@ let fun_types =
                                          stub_mbuf_content_struct];
                  lemmas_before = [
                      (fun params ->
-                          let sent_pkt =
-                            (List.nth_exn params.args 0)
-                          in
+                          let sent_pkt = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
                             (copy_stub_mbuf_content "sent_packet"
                              (sent_pkt)) ^ "\n" ^
                             simplify_c_string (
@@ -654,9 +653,7 @@ let fun_types =
                                        stub_mbuf_content_struct];
                lemmas_before = [
                (fun params ->
-                 let sent_pkt =
-                   (List.nth_exn params.args 0)
-                 in
+                 let sent_pkt = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
                  (copy_stub_mbuf_content "sent_packet"
                     sent_pkt) ^ "\n" ^
                  "flooded_except_port = " ^

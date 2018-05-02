@@ -16,7 +16,7 @@ _build/nat_fspec.cmo: .PHONY
 	corebuild -no-hygiene -lib dynlink -lib str nat_fspec.cmo -cflag -unsafe-string
 
 _build/bridge_fspec.cmo: .PHONY
-	corebuild -no-hygiene -lib dynlinc bridge_fspec.cmo -cflag -unsafe-string
+	corebuild -no-hygiene -lib dynlink -lib str bridge_fspec.cmo -cflag -unsafe-string
 
 _build/dmz_fspec.cmo: .PHONY
 	corebuild -no-hygiene -lib dynlinc dmz_fspec.cmo -cflag -unsafe-string
