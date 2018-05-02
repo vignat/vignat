@@ -870,7 +870,7 @@ let fun_types =
                                    ", _, _, _);\n\
                                     forall_update<pair<uint16_t, bool> >(" ^ (tmp_gen "vec") ^
                                    ", snd, " ^ (List.nth_exn args 1) ^
-                                   ", pair(" ^ (List.nth_exn args 2) ^ "->device, true));\n\
+                                   ", pair(" ^ (Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn args 2)) ^ "->device, true));\n\
                                     update_id(" ^ (List.nth_exn args 1) ^
                                    ", " ^ (tmp_gen "vec") ^ ");\n\
                                    } @*/\n"
