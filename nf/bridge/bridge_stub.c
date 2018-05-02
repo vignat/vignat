@@ -120,7 +120,7 @@ void flood(struct rte_mbuf* frame,
            uint16_t nb_devices) {
   klee_trace_ret();
   KLEE_TRACE_MBUF(frame, "frame", TD_IN);
-  KLEE_TRACE_MBUF_CONTENT(frame->buf_addr, TD_BOTH);
+  KLEE_TRACE_MBUF_CONTENT(frame->buf_addr, TD_IN);
   klee_trace_param_i32(skip_device, "skip_device");
   klee_trace_param_i32(nb_devices, "nb_devices");
 //  klee_forbid_access(frame->buf_addr, sizeof(struct stub_mbuf_content),
