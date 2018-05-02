@@ -62,8 +62,8 @@ let rec innermost_dereference tterm tmpgen =
 
 let generate_2step_dereference tterm tmpgen =
   let (binding1,x) = self_dereference tterm tmpgen in
-  (* let (binding2,x) = innermost_dereference x tmpgen in *)
-  ([binding1(*;binding2*)],x)
+  let (binding2,x) = innermost_dereference x tmpgen in
+  ([binding1;binding2],x)
 
 let hide_the_other_mapp {arg_types;tmp_gen;args;arg_exps;_} =
   match List.nth_exn arg_types 1 with
