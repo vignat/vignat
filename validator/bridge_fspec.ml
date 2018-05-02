@@ -852,14 +852,14 @@ let fun_types =
                                  | Ptr (Str (name, _))
                                    when String.equal name "StaticKey"->
                                    "\n/*@ { \n\
-                                    assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
+                                    assert vector_accp<stat_keyi>(_, _, ?vectr, _, _, _); \n\
                                     update_id(" ^ (List.nth_exn args 1) ^
                                    ", vectr);\n\
                                     } @*/"
                                  | Ptr (Str (name, _))
                                    when String.equal name "ether_addr"->
                                    "\n/*@ { \n\
-                                    assert vector_accp<ether_addri>(_, _, ?vectr, _, _); \n\
+                                    assert vector_accp<ether_addri>(_, _, ?vectr, _, _, _); \n\
                                     update_id(" ^ (List.nth_exn args 1) ^
                                    ", vectr);\n\
                                       } @*/"
@@ -867,7 +867,7 @@ let fun_types =
                                    when String.equal name "DynamicValue"->
                                    "\n/*@ {\n\
                                     assert vector_accp<uint16_t>(_, _, ?" ^ (tmp_gen "vec") ^
-                                   ", _, _);\n\
+                                   ", _, _, _);\n\
                                     forall_update<pair<uint16_t, bool> >(" ^ (tmp_gen "vec") ^
                                    ", snd, " ^ (List.nth_exn args 1) ^
                                    ", pair(" ^ (List.nth_exn args 2) ^ "->device, true));\n\
@@ -891,13 +891,13 @@ let fun_types =
                                    | Ptr (Str (name, _)) ->
                                      if String.equal name "StaticKey" then
                                        "\n/*@ { \n\
-                                        assert vector_accp<stat_keyi>(_, _, ?vectr, _, _); \n\
+                                        assert vector_accp<stat_keyi>(_, _, ?vectr, _, _, _); \n\
                                         update_id(" ^ (List.nth_exn args 1) ^
                                        ", vectr);\n\
                                         } @*/"
                                      else
                                        "\n/*@ { \n\
-                                        assert vector_accp<ether_addri>(_, _, ?vectr, _, _); \n\
+                                        assert vector_accp<ether_addri>(_, _, ?vectr, _, _, _); \n\
                                         update_id(" ^ (List.nth_exn args 1) ^
                                        ", vectr);\n\
                                         } @*/"
