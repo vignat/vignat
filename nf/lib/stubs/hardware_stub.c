@@ -833,7 +833,7 @@ stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
         DEV_REG(dev, 0x06010) = 0; // TDH
         // Make sure we have enough space
         uint32_t tdt = new_value;
-	if (tdt == 0) {klee_print_expr("IGNORED TDT WRITE",dev);
+	if (tdt == 0) {
 		// No? Probably this is not to send a packet, then.
 		return new_value;
 	}
