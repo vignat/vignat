@@ -45,6 +45,7 @@ static uint64_t TIME;
 // Unless otherwise stated, all citations here refer to
 // https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
 
+// We do not model RC registers specially because we don't allow writes to any of them and they all start at 0, so we just leave them alone
 
 static void
 stub_delay_us(unsigned int us)
@@ -281,14 +282,6 @@ stub_register_rw1c_write(struct stub_device* dev, uint32_t offset, uint32_t new_
 			klee_assert(current_value == 0);
 		}
 	}
-	return 0;
-}
-
-
-// RC means a register is cleared on read
-static uint32_t
-stub_register_rc_read(struct stub_device* dev, uint32_t offset)
-{
 	return 0;
 }
 
@@ -2159,7 +2152,6 @@ stub_registers_init(void)
 	for (int n = 0; n < sizeof(stat_regs)/sizeof(stat_regs[0]); n++) {
 		REG(stat_regs[n], 0b00000000000000000000000000000000,
 				  0b00000000000000000000000000000000);
-		REGISTERS[stat_regs[n]].read = stub_register_rc_read;
 	}
 	// these are RW
 	const int stat_regs_rw[] = {
@@ -2214,46 +2206,38 @@ stub_registers_init(void)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x01030 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000000000000000000000000000000);
-		REGISTERS[0x01030 + 0x40*n].read = stub_register_rc_read;
 	}
 	// Queue Packets Received Drop Count — QPRDC[n] (0x01430 + 0x40*n, n=0...15; RC)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x01430 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000000000000000000000000000000);
-		REGISTERS[0x01430 + 0x40*n].read = stub_register_rc_read;
 	}
 	// Queue Bytes Received Count Low — QBRC_L[n] (0x01034 + 0x40*n, n=0...15; RC)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x01034 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000000000000000000000000000000);
-		REGISTERS[0x01034 + 0x40*n].read = stub_register_rc_read;
 	}
 	// Queue Bytes Received Count High — QBRC_H[n] (0x01038 + 0x40*n, n=0...15; RC)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x01038 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000000000000000000000000000000);
-		REGISTERS[0x01038 + 0x40*n].read = stub_register_rc_read;
 	}
 	// Queue Packets Transmitted Count — QPTC[n] (0x08680 + 0x4*n, n=0...15 / 0x06030 + 0x40*n, n=0...15; RC)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x08680 + 0x4*n, 0b00000000000000000000000000000000,
 				     0b00000000000000000000000000000000);
-		REGISTERS[0x08680 + 0x4*n].read = stub_register_rc_read;
 		REG(0x06030 + 0x40*n, 0b00000000000000000000000000000000,
 				      0b00000000000000000000000000000000);
-		REGISTERS[0x06030 + 0x40*n].read = stub_register_rc_read;
 	}
 	// Queue Bytes Transmitted Count Low — QBTC_L[n] (0x08700 + 0x8*n, n=0...15; RC)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x08700 + 0x8*n, 0b00000000000000000000000000000000,
 				     0b00000000000000000000000000000000);
-		REGISTERS[0x08700 + 0x8*n].read = stub_register_rc_read;
 	}
 	// Queue Bytes Transmitted Count High — QBTC_H[n] (0x08704 + 0x8*n, n=0...15; RC)
 	for (int n = 0; n <= 15; n++) {
 		REG(0x08704 + 0x8*n, 0b00000000000000000000000000000000,
 				     0b00000000000000000000000000000000);
-		REGISTERS[0x08704 + 0x8*n].read = stub_register_rc_read;
 	}
 }
 
