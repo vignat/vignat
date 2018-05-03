@@ -379,9 +379,6 @@ end
 
 let complex_val_name_gen = name_gen "cmplx"
 let allocated_complex_vals : var_spec String.Map.t ref = ref String.Map.empty
-
-let tmp_val_name_gen = name_gen "tmp"
-let allocated_tmp_vals = ref String.Map.empty
 let allocated_dummies = ref []
 
 let get_sint_in_bounds v =
@@ -408,18 +405,6 @@ let make_cmplx_val exp t =
       String.Map.add_exn !allocated_complex_vals ~key
         ~data:{name;value};
     {v=Id name;t}
-
-let allocate_tmp value =
-  let key = (render_tterm value) in
-  match String.Map.find !allocated_tmp_vals key with
-  | Some {name;value} -> {v=Id name;t=value.t}
-  | None ->
-    let name = tmp_val_name_gen#generate in
-    allocated_tmp_vals :=
-      String.Map.add_exn !allocated_tmp_vals
-        ~key
-        ~data:{name; value};
-    {v=Id name;t=value.t}
 
 (*TODO: rewrite this in terms of my IR instead of raw Sexps*)
 let eliminate_false_eq_0 exp t =
@@ -580,13 +565,13 @@ let rec get_sexp_value exp ?(at=Beginning) t =
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
     (*FIXME: make sure the typetransformation works.*)
-    (*FIXME: pass a right type to get_sexp_value and llocate_tmp here*)
+    (*FIXME: pass a right type to get_sexp_value here*)
     if (String.equal w "w32") then
       get_sexp_value src t ~at
     else if (String.equal w "w64") then
       get_sexp_value src t ~at (*failwith "get_sexp_value extract w64 not supported"*)
     else
-      {v=Cast (t, allocate_tmp (get_sexp_value src Sint32 ~at));t}
+      get_sexp_value src Sint32 ~at
   | Sexp.List [Sexp.Atom f; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
     get_sexp_value src Boolean ~at
@@ -1789,7 +1774,6 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let arguments = fixup_placeholder_ptrs Beginning arguments in
   let hist_calls = render_hist_lemmas ftype_of hist_calls in
   let tip_call = render_tip_lemmas ftype_of tip_call in
-  let tmps = !allocated_tmp_vals in
   let context_assumptions = collect_context pref in
   let cmplxs = !allocated_complex_vals in
 
@@ -1804,7 +1788,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
                                                                                        post_statements=List.map r.post_statements ~f:(fix_term known_vars)})} in
 
   (* Do not render the allocated_dummies *)
-  {preamble;free_vars;arguments;tmps;
+  {preamble;free_vars;arguments;
    cmplxs;context_assumptions;hist_calls;tip_call;
    export_point;finishing;
    complete_event_loop_iteration = inside_iteration && finishing_iteration;

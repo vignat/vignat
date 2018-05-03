@@ -107,7 +107,6 @@ type ir = {
   preamble:string;
   free_vars:var_spec String.Map.t; (* TODO: var_spec -> typed_var *)
   arguments:var_spec list; (*FIXME: holds also extra ptrs*)
-  tmps:var_spec String.Map.t;
   cmplxs:var_spec String.Map.t;
   context_assumptions:tterm list;
   hist_calls:hist_call list;

@@ -642,14 +642,6 @@ let render_cmplexes cmplxes =
       (ttype_to_str var.value.t) ^ " " ^ var.name ^ ";//" ^
       (render_tterm var.value))) ^ "\n"
 
-let render_tmps tmps =
-  String.concat ~sep:"\n" (List.map (List.sort ~compare:(fun a b ->
-      (String.compare a.name b.name))
-      (String.Map.data tmps))
-      ~f:(fun tmp ->
-          ttype_to_str tmp.value.t ^ " " ^ tmp.name ^ " = " ^
-          render_tterm tmp.value ^ ";")) ^ "\n"
-
 let render_context_assumptions assumptions  =
   render_assumptions assumptions
 
@@ -748,7 +740,6 @@ let render_ir ir fout ~render_assertions =
                                         ir.context_assumptions);
       (* Out_channel.output_string cout (render_context_assumptions *)
       (*                                   tip_input_assumptions); *)
-      Out_channel.output_string cout (render_tmps ir.tmps);
       Out_channel.output_string cout (render_assignments ir.arguments);
       Out_channel.output_string cout (render_hist_calls ir.hist_calls);
       Out_channel.output_string cout (render_semantic_checks ir.semantic_checks);
