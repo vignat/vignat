@@ -571,7 +571,7 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     else if (String.equal w "w64") then
       get_sexp_value src t ~at (*failwith "get_sexp_value extract w64 not supported"*)
     else
-      get_sexp_value src Sint32 ~at
+      {v=Cast (t, get_sexp_value src Sint32 ~at);t}
   | Sexp.List [Sexp.Atom f; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
     get_sexp_value src Boolean ~at

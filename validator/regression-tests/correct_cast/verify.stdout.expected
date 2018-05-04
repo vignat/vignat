@@ -1,0 +1,2 @@
+<beep>/correct_cast.c
+<beep>/correct_cast.c(217,24-37): Type mismatch. Actual: int32. Expected: uint16.
