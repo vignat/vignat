@@ -122,6 +122,8 @@ stub_device_start(struct stub_device* dev)
 	// 31: Split Header (1 - not split)
 	// 32-63: RSS Hash or FCOE_PARAM or Flow Director Filters ID or Fragment Checksum (0 - not supported)
 	uint64_t wb0 = 0b0000000000000000000000000000000010000000000000000000000000000000;
+
+	// NOTE: Allowing all of those to be symbols means the symbex takes an hour and leads to >4000 call prefixes...
 #if 0
 	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
 	bool is_ipv6 = !is_ipv4 && klee_int("received_is_ipv6") != 0;
@@ -140,11 +142,13 @@ stub_device_start(struct stub_device* dev)
 	bool is_nfs = not_ipsec && klee_int("received_is_nfs") != 0;
 
 	bool is_ipsec_esp = !not_ipsec && klee_int("received_is_ipsec_esp") != 0;
-	bool is_ipsec_ah = !not_ipsec ¬&& !is_ipsec_esp &&klee_int("received_is_ipsec_ah") != 0;
+	bool is_ipsec_ah = !not_ipsec && !is_ipsec_esp &&klee_int("received_is_ipsec_ah") != 0;
 #else
-	bool is_ipv4 = true, is_ip = true, is_tcp = true;
-	bool is_ipv6 = false, is_ip_broadcast = false, has_ip_ext = false, is_linksec = false, is_udp = false, is_sctp = false,
-	     not_ipsec = true, is_nfs = false, is_ipsec_esp = false, is_ipsec_ah = false;
+	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
+	bool is_ipv6 = !is_ipv4;
+	bool is_ip = true, is_ip_broadcast = false, has_ip_ext = false, is_linksec = false;
+	bool is_udp = klee_int("received_is_udp") != 0;
+	bool is_tcp = false, is_sctp = false, not_ipsec = true, is_nfs = false, is_ipsec_esp = false, is_ipsec_ah = false;
 #endif
 
 #define BIT(index, cond) SET_BIT(wb0, index, (cond) ? 1 : 0);

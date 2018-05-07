@@ -38,7 +38,7 @@ struct DoubleMap {
 void dmap_set_entry_condition(struct DoubleMap* map, entry_condition* c) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_trace_param_fptr(c, "c");
   ALLOW(map);
   map->ent_cond = c;
@@ -142,7 +142,7 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_trace_param_ptr(key, map->key_a_size_g, "key");
   klee_trace_param_ptr(index, sizeof(int), "index");
   {
@@ -179,7 +179,7 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_trace_param_ptr(key, map->key_b_size_g, "key");
   klee_trace_param_ptr(index, sizeof(int), "index");
   {
@@ -214,7 +214,7 @@ int dmap_put(struct DoubleMap* map, void* value_, int index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_trace_param_ptr(value_, map->value_size_g, "value_");
   klee_trace_param_i32(index, "index");
   {
@@ -261,7 +261,7 @@ int dmap_erase(struct DoubleMap* map, int index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_trace_param_i32(index, "index");
 
   klee_assert(map != NULL);
@@ -274,7 +274,7 @@ void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_trace_param_i32(index, "index");
   klee_trace_param_ptr_directed(value_out, map->value_size_g, "value_out", TD_OUT);
   {
@@ -311,7 +311,7 @@ int dmap_size(struct DoubleMap* map) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
-  klee_trace_param_i32((uint32_t)map, "map");
+  klee_trace_param_u64((uint64_t)map, "map");
   klee_assert(0); //This model does not support size requests.
   return -1;
 }

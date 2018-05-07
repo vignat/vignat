@@ -81,7 +81,7 @@ void vector_set_layout(struct Vector* vector,
 void vector_borrow_full(struct Vector* vector, int index, void** val_out) {
   klee_trace_ret();
   //Avoid dumping the actual contents of vector.
-  klee_trace_param_i32((uint32_t)vector, "vector");
+  klee_trace_param_u64((uint64_t)vector, "vector");
   klee_trace_param_i32(index, "index");
   klee_trace_param_tagged_ptr(val_out, sizeof(void*), "val_out", vector->cell_type, TD_BOTH);
   void* cell = vector->data + vector->elems_claimed*vector->elem_size;
@@ -114,7 +114,7 @@ void vector_borrow_full(struct Vector* vector, int index, void** val_out) {
 void vector_borrow_half(struct Vector* vector, int index, void** val_out) {
   klee_trace_ret();
   //Avoid dumping the actual contents of vector.
-  klee_trace_param_i32((uint32_t)vector, "vector");
+  klee_trace_param_u64((uint64_t)vector, "vector");
   klee_trace_param_i32(index, "index");
   klee_trace_param_tagged_ptr(val_out, sizeof(void*), "val_out", vector->cell_type, TD_BOTH);
   void* cell = vector->data + vector->elems_claimed*vector->elem_size;
@@ -147,7 +147,7 @@ void vector_borrow_half(struct Vector* vector, int index, void** val_out) {
 void vector_return_full(struct Vector* vector, int index, void* value) {
   klee_trace_ret();
   //Avoid dumping the actual contents of vector.
-  klee_trace_param_i32((uint32_t)vector, "vector");
+  klee_trace_param_u64((uint64_t)vector, "vector");
   klee_trace_param_i32(index, "index");
   klee_trace_param_tagged_ptr(value, vector->elem_size, "value",
                               vector->cell_type, TD_IN);
@@ -182,7 +182,7 @@ void vector_return_full(struct Vector* vector, int index, void* value) {
 void vector_return_half(struct Vector* vector, int index, void* value) {
   klee_trace_ret();
   //Avoid dumping the actual contents of vector.
-  klee_trace_param_i32((uint32_t)vector, "vector");
+  klee_trace_param_u64((uint64_t)vector, "vector");
   klee_trace_param_i32(index, "index");
   klee_trace_param_tagged_ptr(value, vector->elem_size, "value",
                               vector->cell_type, TD_IN);

@@ -436,15 +436,20 @@ let guess_type exp t =
         when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
       | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
         when (String.equal f "Concat") && (String.equal w "w64") -> failwith "guess_type w64 not supported yet"
-      | _ -> t
+      | _ -> lprintf "GUESS TYPE FAILURE UUnknown\n"; t
     end
-  | _ -> t
+  | Sunknown -> begin match exp with
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ZExt") && (String.equal w "w32") -> Sint32
+      | _ -> lprintf "GUESS TYPE FAILURE SUnknown\n"; t
+    end
+  | _  -> lprintf "GUESS TYPE FAILURE\n"; t
 
 
 let rec guess_type_l exps t =
   match exps with
   | hd :: tl -> begin match guess_type hd t with
-      | Unknown -> guess_type_l tl t
+      | Unknown | Sunknown | Uunknown -> guess_type_l tl t
       | s -> s
     end
   | [] -> Unknown
@@ -604,7 +609,8 @@ let rec get_sexp_value exp ?(at=Beginning) t =
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Slt") ->
     (*FIXME: get the actual type*)
-    {v=Bop (Lt,(get_sexp_value lhs Sunknown ~at),(get_sexp_value rhs Sunknown ~at));t}
+    let ty = guess_type_l [lhs;rhs] Sunknown in
+    {v=Bop (Lt,(get_sexp_value lhs ty ~at),(get_sexp_value rhs ty ~at));t}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Sle") ->
     (*FIXME: get the actual type*)
@@ -1538,7 +1544,7 @@ let ttype_of_guess = function
       | Noidea -> Sunknown
       | Sure W1 | Tentative W1 -> Boolean
       | Sure W8 | Tentative W8 -> Sint8
-      | Sure W16 | Tentative W16 -> Sunknown
+      | Sure W16 | Tentative W16 -> Sunknown (* TODO need to support Sint16... *)
       | Sure W32 | Tentative W32 -> Sint32
       | Sure W64 | Tentative W64 -> Sint64
       end

@@ -43,7 +43,7 @@ int dchain_allocate_new_index(struct DoubleChain* chain, int *index_out,
     klee_trace_ret();
     //Deliberately trace this pointer as an integer to avoid
     // dereference.
-    klee_trace_param_i32((uint32_t)chain, "chain");
+    klee_trace_param_u64((uint64_t)chain, "chain");
     klee_trace_param_ptr(index_out, sizeof(int), "index_out");
     klee_trace_param_i32(time, "time");
 
@@ -65,7 +65,7 @@ int dchain_rejuvenate_index(struct DoubleChain* chain, int index,
     klee_trace_ret();
     //Deliberately trace this pointer as an integer to avoid
     // dereference.
-    klee_trace_param_i32((uint32_t)chain, "chain");
+    klee_trace_param_u64((uint64_t)chain, "chain");
     klee_trace_param_i32(index, "index");
     klee_trace_param_i32(time, "time");
 
@@ -79,7 +79,7 @@ int dchain_expire_one_index(struct DoubleChain* chain,
   klee_trace_ret();
   //Deliberately trace this pointer as an integer to avoid
   // dereference.
-  klee_trace_param_i32((uint32_t)chain, "chain");
+  klee_trace_param_u64((uint64_t)chain, "chain");
   klee_trace_param_ptr(index_out, sizeof(int), "index_out");
   klee_trace_param_i32(time, "time");
 
