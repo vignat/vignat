@@ -99,7 +99,7 @@ void nf_core_init(void)
 int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
 	// Set this iteration's time
-	NF_DEBUG("It is %" PRIu32, now);
+	NF_DEBUG("It is %" PRId64, now);
 
 	// Expire flows if needed
 	if (now > current_timestamp && !flows_by_time.empty()) {

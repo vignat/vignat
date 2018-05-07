@@ -66,7 +66,7 @@ void nf_core_init(void)
 
 int nf_core_process(struct rte_mbuf* mbuf, time_t now)
 {
-	NF_DEBUG("It is %" PRIu32, now);
+	NF_DEBUG("It is %" PRId64, now);
 
 	expire_flows(dmz_manager, now);
 	expire_flows(internet_manager, now);
