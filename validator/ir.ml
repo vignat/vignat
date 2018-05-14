@@ -117,13 +117,6 @@ type ir = {
   semantic_checks:string;
 } [@@deriving sexp]
 
-let strip_outside_parens str =
-  if (String.is_prefix str ~prefix:"(") &&
-     (String.is_suffix str ~suffix:")") then
-    String.chop_prefix_exn (String.chop_suffix_exn str ~suffix:")")
-      ~prefix:"("
-  else str
-
 let render_bop = function
   | Eq -> "=="
   | Le -> "<="
@@ -144,8 +137,8 @@ let int_type_postfix = function
   | _ -> ""
 
 let rec render_tterm (t:tterm) =
-  match t.v with  (*strip parens: account for weird VeriFast parser*)
-  | Bop (op, lhs, rhs) -> "(" ^ (strip_outside_parens (render_tterm lhs)) ^
+  match t.v with
+  | Bop (op, lhs, rhs) -> "(" ^ (render_tterm lhs) ^
                           " " ^ (render_bop op) ^ " " ^
                           (render_tterm rhs) ^ ")"
   | Apply (fname,args) ->

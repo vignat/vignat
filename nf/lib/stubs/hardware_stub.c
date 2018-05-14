@@ -123,7 +123,7 @@ stub_device_start(struct stub_device* dev)
 	// 32-63: RSS Hash or FCOE_PARAM or Flow Director Filters ID or Fragment Checksum (0 - not supported)
 	uint64_t wb0 = 0b0000000000000000000000000000000010000000000000000000000000000000;
 
-	// NOTE: Allowing all of those to be symbols means the symbex takes an hour and leads to >4000 call prefixes...
+	// NOTE: Allowing all of those to be symbols means the symbex takes suuuuper-long... worth doing sometimes, but not all the time
 #if 0
 	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
 	bool is_ipv6 = !is_ipv4 && klee_int("received_is_ipv6") != 0;
@@ -169,6 +169,8 @@ stub_device_start(struct stub_device* dev)
 	if (mbuf_content == NULL) {
 		klee_abort(); // TODO ahem...
 	}
+
+	klee_make_symbolic(mbuf_content, sizeof(struct stub_mbuf_content), "user_buf");
 
 	if (is_ipv4) {
 #if __BYTE_ORDER == __BIG_ENDIAN
@@ -230,6 +232,12 @@ stub_device_start(struct stub_device* dev)
 			// Or just a broadcast, which can be pretty much anything
 			|| is_ip_broadcast)) {
 		SET_BIT(wb1, 7, 1);
+	}
+
+	if(is_ipv4) {
+		// TODO can we make version_ihl symbolic?
+		mbuf_content->ipv4.version_ihl = (4 << 4) | 5; // IPv4, 5x4 bytes - concrete to avoid symbolic indexing
+		mbuf_content->ipv4.total_length = rte_cpu_to_be_16(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
 	}
 
 	// Write the packet into the proper place
@@ -2341,14 +2349,26 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 }
 
 
+void
+stub_free(struct rte_mbuf* mbuf) {
+	// Undo alias, since otherwise it will recurse infinitely
+	klee_alias_undo("rte_pktmbuf_free[0-9]*");
+
+	stub_core_trace_free(mbuf);
+	rte_mbuf_raw_free(mbuf);
+
+	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
+}
+
 __attribute__((constructor(101))) // Low prio, must execute before other stuff
 static void
 stub_hardware_init(void)
 {
-	// TODO intercept calls to read/write/free to trace
-
 	// Helper method declarations
 	char* stub_pci_name(int index);
+
+	// Intercept free to trace
+	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
 
 	// Register models initializations
 	stub_registers_init();
