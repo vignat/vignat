@@ -11,8 +11,5 @@ rte_eal_init(int argc, char **argv)
 		index++;
 	}
 
-	// Skip it too
-	index++;
-
 	return index;
 }
