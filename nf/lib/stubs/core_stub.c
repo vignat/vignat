@@ -128,6 +128,7 @@ static struct nested_nested_field_descr stub_mbuf_content_n2[] = {
   }
 
 
+__attribute__((noinline))
 void
 stub_core_trace_rx(struct rte_mbuf** mbuf)
 {
@@ -137,6 +138,7 @@ stub_core_trace_rx(struct rte_mbuf** mbuf)
 	KLEE_TRACE_MBUF_CONTENT((*mbuf)->buf_addr, TD_OUT);
 }
 
+__attribute__((noinline))
 uint8_t
 stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device)
 {
@@ -152,6 +154,7 @@ stub_core_trace_tx(struct rte_mbuf* mbuf, uint16_t device)
 	return 1;
 }
 
+__attribute__((noinline))
 void
 stub_core_trace_free(struct rte_mbuf* mbuf)
 {

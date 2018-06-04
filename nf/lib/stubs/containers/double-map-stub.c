@@ -35,6 +35,7 @@ struct DoubleMap {
   dmap_pack_keys* dpk_g;
 };
 
+__attribute__((noinline))
 void dmap_set_entry_condition(struct DoubleMap* map, entry_condition* c) {
   //To avoid symbolic-pointer-dereference,
   // consciously trace "map" as a simple value.
@@ -80,6 +81,7 @@ void dmap_set_layout(struct DoubleMap* map,
   DENY(map);
 }
 
+__attribute__((noinline))
 int dmap_allocate(map_keys_equality eq_a,
                   map_key_hash hsh_a,
                   map_keys_equality eq_b,
@@ -137,6 +139,7 @@ int dmap_allocate(map_keys_equality eq_a,
   return 0;
 }
 
+__attribute__((noinline))
 int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   ALLOW(map);
   klee_trace_ret();
@@ -174,6 +177,7 @@ int dmap_get_a(struct DoubleMap* map, void* key, int* index) {
   return 0;
 }
 
+__attribute__((noinline))
 int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   ALLOW(map);
   klee_trace_ret();
@@ -209,6 +213,7 @@ int dmap_get_b(struct DoubleMap* map, void* key, int* index) {
   return 0;
 }
 
+__attribute__((noinline))
 int dmap_put(struct DoubleMap* map, void* value_, int index) {
   ALLOW(map);
   klee_trace_ret();
@@ -257,6 +262,7 @@ int dmap_put(struct DoubleMap* map, void* value_, int index) {
   return 1;
 }
 
+__attribute__((noinline))
 int dmap_erase(struct DoubleMap* map, int index) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,
@@ -269,6 +275,7 @@ int dmap_erase(struct DoubleMap* map, int index) {
   return 0;
 }
 
+__attribute__((noinline))
 void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   ALLOW(map);
   klee_trace_ret();
@@ -307,6 +314,7 @@ void dmap_get_value(struct DoubleMap* map, int index, void* value_out) {
   DENY(map);
 }
 
+__attribute__((noinline))
 int dmap_size(struct DoubleMap* map) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,

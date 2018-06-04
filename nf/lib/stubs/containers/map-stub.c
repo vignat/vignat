@@ -24,6 +24,7 @@ struct Map {
   map_keys_equality* keq;
 };
 
+__attribute__((noinline))
 int map_allocate(map_keys_equality* keq, map_key_hash* khash,
                  int capacity,
                  struct Map** map_out) {
@@ -114,6 +115,7 @@ void map_set_entry_condition(struct Map* map, map_entry_condition* cond) {
     }                                                                   \
   }
 
+__attribute__((noinline))
 int map_get(struct Map* map, void* key, int* value_out) {
   klee_trace_ret();
   klee_assert(map->has_layout);
@@ -135,6 +137,7 @@ int map_get(struct Map* map, void* key, int* value_out) {
   return 0;
 }
 
+__attribute__((noinline))
 void map_put(struct Map* map, void* key, int value) {
   klee_trace_ret();
   klee_assert(map->has_layout);
@@ -155,6 +158,7 @@ void map_put(struct Map* map, void* key, int value) {
   map->allocated_index = value;
 }
 
+__attribute__((noinline))
 void map_erase(struct Map* map, void* key, void** trash) {
   klee_trace_ret();
   klee_assert(map->has_layout);
@@ -167,6 +171,7 @@ void map_erase(struct Map* map, void* key, void** trash) {
   klee_assert(0); //no support for erasing staff for the moment
 }
 
+__attribute__((noinline))
 int map_size(struct Map* map) {
   klee_trace_ret();
   //To avoid symbolic-pointer-dereference,

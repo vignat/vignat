@@ -19,6 +19,7 @@ void loop_iteration_assertions(struct DoubleMap** m, struct DoubleChain** ch,
 
 }
 
+__attribute__((noinline))
 void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
                             unsigned int lcore_id,
                             time_t time, int max_flows, int start_port)
@@ -32,6 +33,7 @@ void loop_invariant_consume(struct DoubleMap** m, struct DoubleChain** ch,
   klee_trace_param_i32(start_port, "start_port");
 }
 
+__attribute__((noinline))
 void loop_invariant_produce(struct DoubleMap** m, struct DoubleChain** ch,
                             unsigned int* lcore_id,
                             time_t *time, int max_flows, int start_port)
@@ -75,8 +77,6 @@ void loop_enumeration_begin(struct DoubleMap** m, struct DoubleChain** ch,
                          time, max_flows, start_port);
   loop_invariant_produce(m, ch, &lcore_id,
                          &time, max_flows, start_port);
-  //klee_trace_ret();
-  //klee_trace_param_i32(cnt, "cnt");
 }
 
 void loop_enumeration_end(struct DoubleMap** m, struct DoubleChain** ch,
@@ -87,5 +87,4 @@ void loop_enumeration_end(struct DoubleMap** m, struct DoubleChain** ch,
                          time, max_flows, start_port);
   loop_invariant_produce(m, ch, &lcore_id,
                          &time, max_flows, start_port);
-  //klee_trace_ret();
 }

@@ -5,6 +5,7 @@
 time_t starting_time = 0;
 time_t last_time = 0;
 
+__attribute__((noinline))
 time_t start_time(void) {
     klee_trace_ret();
     time_t starting_time;
@@ -21,6 +22,7 @@ time_t restart_time(void) {
   return last_time;
 }
 
+__attribute__((noinline))
 time_t current_time(void) {
     klee_trace_ret();
     time_t next_time;
