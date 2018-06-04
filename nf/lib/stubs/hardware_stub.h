@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include <rte_mbuf.h>
+
 
 // ifdef this so the stdio stubs don't create files that we don't need
 #ifdef VIGOR_STUB_HARDWARE
@@ -39,6 +41,11 @@ struct stub_device {
 };
 
 struct stub_device DEVICES[STUB_HARDWARE_DEVICES_COUNT];
+
+// Required because the validator expects the traced mbuf to stay at the same address throughout.
+// Sound as long as RX and TX are each called once at most, which we check.
+struct rte_mbuf traced_mbuf;
+
 
 
 #ifdef VIGOR_STUB_HARDWARE

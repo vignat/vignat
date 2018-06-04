@@ -10,8 +10,6 @@
 #include "rte_cycles.h" // to include the next one cleanly
 #include "generic/rte_cycles.h" // for rte_delay_us_callback_register
 
-#include "rte_mbuf.h"
-
 #include <klee/klee.h>
 
 
@@ -32,6 +30,10 @@ static struct stub_register REGISTERS[0x20000]; // index == address
 // Incremented at each delay; in nanoseconds.
 static uint64_t TIME;
 
+// Checks for the traced_mbuf hack soundness
+static bool rx_called;
+static bool tx_called;
+static bool free_called;
 
 // Helper bit macros
 #define GET_BIT(n, k) (((n) >> (k)) & 1)
@@ -252,32 +254,36 @@ stub_device_start(struct stub_device* dev)
 	while (dev != &DEVICES[device_index]) { device_index++; }
 
 	// Trace the mbuf
-	struct rte_mbuf mbuf;
-	mbuf.buf_addr = mbuf_content;
-	mbuf.buf_iova = (rte_iova_t) mbuf_content;
-	mbuf.data_off = 0;
-	mbuf.refcnt = 1;
-	mbuf.nb_segs = 1;
-	mbuf.port = device_index;
-	mbuf.ol_flags = 0; // TODO?
-	mbuf.packet_type = (wb0 >> 4) & 0b111111111111;
-	mbuf.pkt_len = packet_length;
-	mbuf.data_len = packet_length;
-	mbuf.vlan_tci = 0; // TODO?
-	mbuf.hash.rss = 0; // TODO?
-	mbuf.vlan_tci_outer = 0; // TODO?
-	mbuf.buf_len = packet_length;
-	mbuf.timestamp = 0; // TODO?
-	mbuf.userdata = NULL;
-	mbuf.pool = NULL;
-	mbuf.next = NULL;
-	mbuf.tx_offload = 0; // TODO?
-	mbuf.priv_size = 0;
-	mbuf.timesync = 0; // TODO?
-	mbuf.seqn = 0; // TODO?
+	memset(&traced_mbuf, 0, sizeof(struct rte_mbuf));
+	traced_mbuf.buf_addr = mbuf_content;
+	traced_mbuf.buf_iova = (rte_iova_t) mbuf_content;
+	traced_mbuf.data_off = 0;
+	traced_mbuf.refcnt = 1;
+	traced_mbuf.nb_segs = 1;
+	traced_mbuf.port = device_index;
+	traced_mbuf.ol_flags = 0; // TODO?
+	traced_mbuf.packet_type = (wb0 >> 4) & 0b111111111111;
+	traced_mbuf.pkt_len = packet_length;
+	traced_mbuf.data_len = packet_length;
+	traced_mbuf.vlan_tci = 0; // TODO?
+	traced_mbuf.hash.rss = 0; // TODO?
+	traced_mbuf.vlan_tci_outer = 0; // TODO?
+	traced_mbuf.buf_len = packet_length;
+	traced_mbuf.timestamp = 0; // TODO?
+	traced_mbuf.userdata = NULL;
+	traced_mbuf.pool = NULL;
+	traced_mbuf.next = NULL;
+	traced_mbuf.tx_offload = 0; // TODO?
+	traced_mbuf.priv_size = 0;
+	traced_mbuf.timesync = 0; // TODO?
+	traced_mbuf.seqn = 0; // TODO?
 
-	struct rte_mbuf* trace_mbuf_addr = &mbuf;
+	struct rte_mbuf* trace_mbuf_addr = &traced_mbuf;
 	stub_core_trace_rx(&trace_mbuf_addr);
+
+	// Soundness for hack
+	klee_assert(!rx_called);
+	rx_called = true;
 }
 
 
@@ -920,31 +926,35 @@ stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 	while (dev != &DEVICES[device_index]) { device_index++; }
 
 	// Trace the mbuf
-	struct rte_mbuf mbuf;
-	mbuf.buf_addr = (void*) buf_addr;
-	mbuf.buf_iova = (rte_iova_t) buf_addr;
-	mbuf.data_off = 0;
-	mbuf.refcnt = 1;
-	mbuf.nb_segs = 1;
-	mbuf.port = device_index;
-	mbuf.ol_flags = 0; // TODO?
-	mbuf.packet_type = 0; // TODO?
-	mbuf.pkt_len = buf_len;
-	mbuf.data_len = buf_len;
-	mbuf.vlan_tci = 0; // TODO?
-	mbuf.hash.rss = 0; // TODO?
-	mbuf.vlan_tci_outer = 0; // TODO?
-	mbuf.buf_len = buf_len;
-	mbuf.timestamp = 0; // TODO?
-	mbuf.userdata = NULL;
-	mbuf.pool = NULL;
-	mbuf.next = NULL;
-	mbuf.tx_offload = 0; // TODO?
-	mbuf.priv_size = 0;
-	mbuf.timesync = 0; // TODO?
-	mbuf.seqn = 0; // TODO?
+	memset(&traced_mbuf, 0, sizeof(struct rte_mbuf));
+	traced_mbuf.buf_addr = (void*) buf_addr;
+	traced_mbuf.buf_iova = (rte_iova_t) buf_addr;
+	traced_mbuf.data_off = 0;
+	traced_mbuf.refcnt = 1;
+	traced_mbuf.nb_segs = 1;
+	traced_mbuf.port = device_index;
+	traced_mbuf.ol_flags = 0; // TODO?
+	traced_mbuf.packet_type = 0; // TODO?
+	traced_mbuf.pkt_len = buf_len;
+	traced_mbuf.data_len = buf_len;
+	traced_mbuf.vlan_tci = 0; // TODO?
+	traced_mbuf.hash.rss = 0; // TODO?
+	traced_mbuf.vlan_tci_outer = 0; // TODO?
+	traced_mbuf.buf_len = buf_len;
+	traced_mbuf.timestamp = 0; // TODO?
+	traced_mbuf.userdata = NULL;
+	traced_mbuf.pool = NULL;
+	traced_mbuf.next = NULL;
+	traced_mbuf.tx_offload = 0; // TODO?
+	traced_mbuf.priv_size = 0;
+	traced_mbuf.timesync = 0; // TODO?
+	traced_mbuf.seqn = 0; // TODO?
 
-	stub_core_trace_tx(&mbuf, device_index);
+	stub_core_trace_tx(&traced_mbuf, device_index);
+
+	// Soundness check
+	klee_assert(!tx_called);
+	tx_called = true;
 
 	// Write phase
 	descr[0] = 0; // Reserved
@@ -2354,10 +2364,18 @@ stub_free(struct rte_mbuf* mbuf) {
 	// Undo alias, since otherwise it will recurse infinitely
 	klee_alias_undo("rte_pktmbuf_free[0-9]*");
 
-	stub_core_trace_free(mbuf);
+	// Ugh, we have to trace an mbuf with the right address, so we copy the whole thing... this is silly
+	memcpy(&traced_mbuf, mbuf, sizeof(struct rte_mbuf));
+	stub_core_trace_free(&traced_mbuf);
+
+	// Still need to free the actual mbuf though
 	rte_mbuf_raw_free(mbuf);
 
 	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
+
+	// Soundness check
+	klee_assert(!free_called);
+	free_called = true;
 }
 
 __attribute__((constructor(101))) // Low prio, must execute before other stuff
@@ -2424,6 +2442,10 @@ stub_hardware_reset_receive(uint16_t device)
 	descr[1] = 0;
 
 	memset((char*) descr[0], 0, sizeof(struct stub_mbuf_content));
+
+	rx_called = false;
+	tx_called = false;
+	free_called = false;
 }
 
 
