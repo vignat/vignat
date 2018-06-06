@@ -482,6 +482,9 @@ stub_stdio_files_init(void)
 	int stub_add_folder(char* path, int children_len, ...);
 
 
+	// KLEE does this usually, but we don't go through it for uclibc
+	klee_alias_function("__libc_open", "open");
+
 	// Files initialization
 	int f = 0;
 	memset(FILES, 0, sizeof(FILES));

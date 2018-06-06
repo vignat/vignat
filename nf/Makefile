@@ -128,19 +128,20 @@ VERIF_DPDK_FILES += $(RTE_SDK)/drivers/net/ixgbe/ixgbe_{fdir,flow,ethdev,ipsec,p
 
 # Commands
 # Cleanup
-CLEAN_COMMAND := rm -f *.bc
+CLEAN_COMMAND := rm -f *.bc *.os
 # Compilation
 COMPILE_COMMAND := clang
-# Linking
-LINK_COMMAND := llvm-link -o nf_raw.bc *.bc
-# Optimization
-OPT_EXCEPTIONS := main,open,read,close,vprintf,fstat,fcntl,__getdents,__syscall_rt_sigaction
-OPT_EXCEPTIONS_STUBS := stub_abort,stub_free,stub_hardware_read,stub_hardware_write,stub_prefetch,stub_rdtsc,stub_socket,stub_strerror
-OPT_COMMAND := opt -internalize -internalize-public-api-list=$(OPT_EXCEPTIONS),$(OPT_EXCEPTIONS_STUBS) -globaldce nf_raw.bc > nf.bc
+# Linking with klee-uclibc, but without some methods we are stubbing (not sure why they're in klee-uclibc.bca)
+LINK_COMMAND := llvm-ar x $(KLEE_INCLUDE)/../build/Release+Debug+Asserts/lib/klee-uclibc.bca && \
+                rm -f sleep.os vfprintf.os && \
+                llvm-link -o nf_raw.bc  *.os *.bc
+# Optimization (exceptions are stubs; also, mem* functions, not sure why it DCEs them since they are used...maybe related to LLVM having intrinsics for them?)
+OPT_EXCEPTIONS := memset,memcpy,memmove,stub_abort,stub_free,stub_hardware_read,stub_hardware_write,stub_prefetch,stub_rdtsc,stub_socket,stub_strerror
+OPT_COMMAND := opt -internalize -internalize-public-api-list=main,$(OPT_EXCEPTIONS) -globaldce nf_raw.bc > nf.bc
 # KLEE verification
 # if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex (to avoid symbolic indices)
 VERIF_COMMAND := /usr/bin/time -v \
-                 klee -libc=uclibc -no-externals -allocate-determ -allocate-determ-start-address=0x00040000000 -dump-call-traces -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs
+                 klee -no-externals -allocate-determ -allocate-determ-start-address=0x00040000000 -dump-call-traces -dump-call-trace-prefixes -solver-backend=z3 -exit-on-error -max-memory=750000 -search=dfs
 # NF args for the verification
 NF_VERIF_BASE_ARGS := nf.bc --no-shconf --
 
