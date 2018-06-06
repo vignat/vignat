@@ -132,7 +132,11 @@ CLEAN_COMMAND := rm -f *.bc
 # Compilation
 COMPILE_COMMAND := clang
 # Linking
-LINK_COMMAND := llvm-link -o nf.bc *.bc
+LINK_COMMAND := llvm-link -o nf_raw.bc *.bc
+# Optimization
+OPT_EXCEPTIONS := main,open,read,close,vprintf,fstat,fcntl,__getdents,__syscall_rt_sigaction
+OPT_EXCEPTIONS_STUBS := stub_abort,stub_free,stub_hardware_read,stub_hardware_write,stub_prefetch,stub_rdtsc,stub_socket,stub_strerror
+OPT_COMMAND := opt -internalize -internalize-public-api-list=$(OPT_EXCEPTIONS),$(OPT_EXCEPTIONS_STUBS) -globaldce nf_raw.bc > nf.bc
 # KLEE verification
 # if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex (to avoid symbolic indices)
 VERIF_COMMAND := /usr/bin/time -v \
@@ -146,6 +150,7 @@ verify-dpdk:
 	# Use DPDK stub headers
 	$(COMPILE_COMMAND) $(VERIF_DEFS) -DVIGOR_STUB_DPDK $(VERIF_INCLUDES) -I $(SELF_DIR)/lib/stubs/dpdk $(VERIF_FILES) $(VERIF_FLAGS)
 	$(LINK_COMMAND)
+	$(OPT_COMMAND)
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)
 
@@ -154,6 +159,7 @@ verify-driver:
 	# Use DPDK stuff + stub driver
 	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_DPDK_DEFS) -DVIGOR_STUB_DRIVER $(VERIF_INCLUDES) $(VERIF_DPDK_INCLUDES) $(VERIF_FILES) $(VERIF_DPDK_FILES) $(SELF_DIR)/lib/stubs/driver_stub.c $(VERIF_FLAGS)
 	$(LINK_COMMAND)
+	$(OPT_COMMAND)
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)
 
@@ -162,5 +168,6 @@ verify-hardware:
 	# Use DPDK stuff + stub hardware
 	$(COMPILE_COMMAND) $(VERIF_DEFS) $(VERIF_DPDK_DEFS) -DVIGOR_STUB_HARDWARE $(VERIF_INCLUDES) $(VERIF_DPDK_INCLUDES) $(VERIF_FILES) $(VERIF_DPDK_FILES) $(SELF_DIR)/lib/stubs/hardware_stub.c $(VERIF_FLAGS)
 	$(LINK_COMMAND)
+	$(OPT_COMMAND)
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)
