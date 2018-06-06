@@ -123,8 +123,8 @@ VERIF_DPDK_FILES += $(RTE_SDK)/lib/!(librte_acl|librte_distributor|librte_power)
 VERIF_DPDK_FILES += $(RTE_SDK)/drivers/bus/vdev/*.c
 # PCI driver support (for ixgbe driver)
 VERIF_DPDK_FILES += $(RTE_SDK)/drivers/bus/pci/*.c $(RTE_SDK)/drivers/bus/pci/linux/*.c
-# ixgbe driver (except bypass, SSE and ARM NEON stuff)
-VERIF_DPDK_FILES += $(RTE_SDK)/drivers/net/ixgbe/!(ixgbe_bypass|ixgbe_82599_bypass|ixgbe_rxtx_vec_sse|ixgbe_rxtx_vec_neon).c $(RTE_SDK)/drivers/net/ixgbe/base/*.c
+# ixgbe driver
+VERIF_DPDK_FILES += $(RTE_SDK)/drivers/net/ixgbe/ixgbe_{fdir,flow,ethdev,ipsec,pf,rxtx,tm}.c $(RTE_SDK)/drivers/net/ixgbe/base/ixgbe_{api,common,phy,82599}.c
 
 # Commands
 # Cleanup
