@@ -135,9 +135,9 @@ COMPILE_COMMAND := clang
 LINK_COMMAND := llvm-ar x $(KLEE_INCLUDE)/../build/Release+Debug+Asserts/lib/klee-uclibc.bca && \
                 rm -f sleep.os vfprintf.os && \
                 llvm-link -o nf_raw.bc  *.os *.bc
-# Optimization (exceptions are stubs; also, mem* functions, not sure why it DCEs them since they are used...maybe related to LLVM having intrinsics for them?)
+# Optimization; analyze and remove as much provably dead code as possible (exceptions are stubs; also, mem* functions, not sure why it DCEs them since they are used...maybe related to LLVM having intrinsics for them?)
 OPT_EXCEPTIONS := memset,memcpy,memmove,stub_abort,stub_free,stub_hardware_read,stub_hardware_write,stub_prefetch,stub_rdtsc,stub_socket,stub_strerror
-OPT_COMMAND := opt -internalize -internalize-public-api-list=main,$(OPT_EXCEPTIONS) -dce -globaldce -die -dse -adce -deadargelim -strip-dead-prototypes -strip-dead-debug-info -loop-deletion nf_raw.bc > nf.bc
+OPT_COMMAND := opt -basicaa -basiccg -internalize -internalize-public-api-list=main,$(OPT_EXCEPTIONS) -constprop -ipconstprop -ipsccp -correlated-propagation -loop-deletion -dce -globaldce -die -dse -adce -deadargelim -instsimplify nf_raw.bc > nf.bc
 # KLEE verification
 # if something takes longer than expected, try --max-solver-time=3 --debug-report-symbdex (to avoid symbolic indices)
 VERIF_COMMAND := /usr/bin/time -v \
