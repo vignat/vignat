@@ -5,7 +5,7 @@
 #include <rte_config.h>
 
 
-static const int STUB_DRIVER_DEVICES_COUNT = 2;
+#define STUB_DRIVER_DEVICES_COUNT 2
 
 
 struct rte_mempool;

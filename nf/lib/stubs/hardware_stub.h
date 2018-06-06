@@ -9,9 +9,9 @@
 
 // ifdef this so the stdio stubs don't create files that we don't need
 #ifdef VIGOR_STUB_HARDWARE
-static const int STUB_HARDWARE_DEVICES_COUNT = 2;
+#define STUB_HARDWARE_DEVICES_COUNT 2
 #else
-static const int STUB_HARDWARE_DEVICES_COUNT = 0;
+#define STUB_HARDWARE_DEVICES_COUNT 0
 #endif
 
 
