@@ -856,11 +856,6 @@ stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 		return new_value;
 	}
 
-        if (klee_int("sent") == 0) {
-                // failed
-		return new_value;
-        }
-
         // Descriptor is 128 bits, see page 353, table 7-39 "Descriptor Read Format"
         // (which the NIC reads to know how to send a packet)
         // and page 354, table 7-40 "Descriptor Write-Back Format"
@@ -950,15 +945,17 @@ stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 	traced_mbuf.timesync = 0; // TODO?
 	traced_mbuf.seqn = 0; // TODO?
 
-	stub_core_trace_tx(&traced_mbuf, device_index);
+	uint8_t ret = stub_core_trace_tx(&traced_mbuf, device_index);
 
 	// Soundness check
 	klee_assert(!tx_called);
 	tx_called = true;
 
-	// Write phase
-	descr[0] = 0; // Reserved
-	descr[1] = ((uint64_t) 1) << 32; // Reserved, except bit 32 which is Descriptor Done and must be 1
+	if (ret != 0) {
+		// Write phase
+		descr[0] = 0; // Reserved
+		descr[1] = ((uint64_t) 1) << 32; // Reserved, except bit 32 which is Descriptor Done and must be 1
+	}
 
 	return new_value;
 }
