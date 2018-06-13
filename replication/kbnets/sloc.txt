@@ -1,4 +1,4 @@
-To replicate Table 1 from the paper, install `sloccount` and run the following commands from the nf/lib folder. (Note that RTE_SDK and RTE_TARGET are required by DPDK; mine are `export RTE_TARGET=x86_64-native-linuxapp-gcc; export RTE_SDK=/home/solal/dpdk`)
+To replicate SLOC counts of Table 1 from the paper, install `sloccount` and run the following commands from the nf/lib folder. (Note that RTE_SDK and RTE_TARGET are required by DPDK; mine are `export RTE_TARGET=x86_64-native-linuxapp-gcc; export RTE_SDK=/home/solal/dpdk`)
 
 DPDK:
 sloccount $RTE_SDK/lib/librte_eal/common/*.c $RTE_SDK/lib/librte_eal/linuxapp/eal/*.c $RTE_SDK/lib/!(librte_acl|librte_distributor|librte_power)/*.c $RTE_SDK/drivers/bus/pci/*.c $RTE_SDK/drivers/bus/pci/linux/*.c $RT
