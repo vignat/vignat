@@ -709,9 +709,9 @@ let fun_types =
                  ret_type = Static Void;
                  arg_types = stt [Ptr (Ptr rte_mbuf_struct);];
                  extra_ptr_types = estt ["incoming_package",
-                                         rte_mbuf_struct;
+                                         Ptr rte_mbuf_struct;
                                          "user_buf_addr",
-                                         stub_mbuf_content_struct];
+                                         Ptr stub_mbuf_content_struct];
                  lemmas_before = [];
                  lemmas_after = [(fun params -> let arg0 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
                                        "a_packet_received = true;\n" ^
@@ -727,7 +727,7 @@ let fun_types =
                  ret_type = Static Uint8;
                  arg_types = stt [Ptr rte_mbuf_struct; Uint16];
                  extra_ptr_types = estt ["user_buf_addr",
-                                         stub_mbuf_content_struct];
+                                         Ptr stub_mbuf_content_struct];
                  lemmas_before = [
                      (fun params ->
                           let sent_pkt =
@@ -745,7 +745,7 @@ let fun_types =
                    ret_type = Static Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
                    extra_ptr_types = estt ["user_buf_addr",
-                                           stub_mbuf_content_struct];
+                                           Ptr stub_mbuf_content_struct];
                    lemmas_before = [];
                    lemmas_after = [];}
     ]

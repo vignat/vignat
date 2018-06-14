@@ -243,7 +243,7 @@ stub_device_start(struct stub_device* dev)
 	}
 
 	// Write the packet into the proper place
-	memcpy((char*) mbuf_addr, mbuf_content, packet_length);
+	memcpy((void*) mbuf_addr, mbuf_content, packet_length);
 
 	// "The 82599 writes back the receive descriptor immediately following the packet write into system memory."
 	descr[0] = wb0;
@@ -254,9 +254,10 @@ stub_device_start(struct stub_device* dev)
 	while (dev != &DEVICES[device_index]) { device_index++; }
 
 	// Trace the mbuf
+	memcpy(&traced_mbuf_content, (void*) mbuf_addr, packet_length);
 	memset(&traced_mbuf, 0, sizeof(struct rte_mbuf));
-	traced_mbuf.buf_addr = mbuf_content;
-	traced_mbuf.buf_iova = (rte_iova_t) mbuf_content;
+	traced_mbuf.buf_addr = &traced_mbuf_content;
+	traced_mbuf.buf_iova = (rte_iova_t) &traced_mbuf_content;
 	traced_mbuf.data_off = 0;
 	traced_mbuf.refcnt = 1;
 	traced_mbuf.nb_segs = 1;
@@ -921,9 +922,10 @@ stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 	while (dev != &DEVICES[device_index]) { device_index++; }
 
 	// Trace the mbuf
+	memcpy(&traced_mbuf_content, (void*) buf_addr, sizeof(struct stub_mbuf_content));
 	memset(&traced_mbuf, 0, sizeof(struct rte_mbuf));
-	traced_mbuf.buf_addr = (void*) buf_addr;
-	traced_mbuf.buf_iova = (rte_iova_t) buf_addr;
+	traced_mbuf.buf_addr = &traced_mbuf_content;
+	traced_mbuf.buf_iova = (rte_iova_t) &traced_mbuf_content;
 	traced_mbuf.data_off = 0;
 	traced_mbuf.refcnt = 1;
 	traced_mbuf.nb_segs = 1;
@@ -2363,6 +2365,8 @@ stub_free(struct rte_mbuf* mbuf) {
 
 	// Ugh, we have to trace an mbuf with the right address, so we copy the whole thing... this is silly
 	memcpy(&traced_mbuf, mbuf, sizeof(struct rte_mbuf));
+	memcpy(&traced_mbuf_content, mbuf->buf_addr, sizeof(struct stub_mbuf_content));
+	traced_mbuf.buf_addr = &traced_mbuf_content;
 	stub_core_trace_free(&traced_mbuf);
 
 	// Still need to free the actual mbuf though

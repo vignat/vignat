@@ -512,11 +512,11 @@ let moment_to_str = function
   | After x -> ("> " ^ (string_of_int x))
 
 let find_first_known_address addr tt at =
-  lprintf "looking for first *%Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
+  lprintf "looking for first %Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
   find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:true
 
 let find_last_known_address addr tt at =
-  lprintf "looking for last *%Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
+  lprintf "looking for last %Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
   find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:false
 
 let rec printable_tterm cand =
@@ -702,7 +702,7 @@ let update_ptee_variants nval older =
     | [{value={t=Unknown;v=_};_}] -> [nval]
     | _ -> nval::older
 
-(* Takes a pointer, records the pointee into known_addresses *)
+(* Takes a pointer, records it into known_addresses *)
 let rec add_to_known_addresses
     (base_value: tterm) breakdown addr
     callid depth =
@@ -715,7 +715,7 @@ let rec add_to_known_addresses
     in
     List.iter breakdown ~f:(fun {fname;value;addr} ->
         let ftype = match String.Map.find fields fname with
-          | Some t -> t | None -> Unknown
+          | Some t -> t | None -> failwith ("Unknown field type for " ^ fname)
         in
         let b_value = {t=Ptr ftype;
                        v=Addr {t=ftype;
@@ -753,22 +753,22 @@ let rec add_to_known_addresses
                          {value=base_value;
                           callid;
                           str_depth=depth;
-                          tt=get_pointee base_value.t;
+                          tt=base_value.t;
                           breakdown}
                          prev)
 (* Takes a symbolic expression and records
    it as a pointee into known_addresses*)
 let rec add_known_symbol_at_address (value: tterm) addr callid depth =
   let prev = match Int64.Map.find !known_addresses addr with
-    | Some v -> lprintf "AKS HAS PREV %s\n" (render_tterm value); v
-    | None -> lprintf "AKS NO PREV %s\n" (render_tterm value); []
+    | Some v -> lprintf "AKS HAS PREV %Ld: %s\n" addr (render_tterm value); v
+    | None -> lprintf "AKS NO PREV %Ld: %s\n" addr (render_tterm value); []
   in
-  let find_field_addr strname fieldname =
+  let find_field_addr strname fieldname fieldtype =
     List.find_map prev ~f:(fun aspec ->
-        lprintf "addr: %Ld considering aspec: %s : %s\n"
-          addr (render_tterm aspec.value) (ttype_to_str aspec.tt);
+        lprintf "find_field_addr %s %s(%s) -> %Ld considering aspec: %s : %s\n"
+          strname fieldname (ttype_to_str fieldtype) addr (render_tterm aspec.value) (ttype_to_str aspec.tt);
         match aspec.tt with
-        | Str (strname1,_) when String.equal strname strname1 ->
+        | Ptr (Str (aspecname, _)) when aspecname = strname -> lprintf "YES %d\n" (String.Map.length aspec.breakdown);
           String.Map.find aspec.breakdown fieldname
         | _ -> None)
   in
@@ -777,8 +777,8 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
   | Ptr (Str (strname,fields)) ->
     lprintf "Pdestruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
-        lprintf "for %s : %s\n" fname (ttype_to_str ftype);
-        begin match find_field_addr strname fname with
+        lprintf "for %s.%s : %s\n" strname fname (ttype_to_str ftype);
+        begin match find_field_addr strname fname ftype with
         | Some fa -> lprintf "AKS recursing: %s\n" (render_tterm value);
                      add_known_symbol_at_address
                      {v=Addr {v=Str_idx ({v=Deref value; t=Str (strname,fields)}, fname);
@@ -790,7 +790,7 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
   | Str (strname,fields) ->
     lprintf "destruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
-        let field_addr = match find_field_addr strname fname with
+        let field_addr = match find_field_addr strname fname ftype with
           | Some fa -> fa
           | None -> failwith ("failed to find field " ^ fname ^
                               " at the address " ^ (Int64.to_string addr))
@@ -862,7 +862,7 @@ let get_basic_vars ftype_of tpref =
     let extra_ptr_vars = List.fold call.extra_ptrs ~init:arg_vars
         ~f:(fun acc {pname;value;ptee} ->
             let ptee_type =
-              get_fun_extra_ptr_type ftype_of call pname in
+              (get_pointee (get_fun_extra_ptr_type ftype_of call pname)) in
           get_extra_ptr_pointee_vars ptee ptee_type acc)
     in
     let ret_vars = match call.ret with
@@ -987,7 +987,7 @@ let allocate_extra_ptrs ftype_of tpref =
   let alloc_call_extra_ptrs call =
     List.filter_map call.extra_ptrs ~f:(fun {pname;value;ptee} ->
         let addr = value in
-        let ptee_type = get_fun_extra_ptr_type ftype_of call pname in
+        let ptee_type = get_pointee (get_fun_extra_ptr_type ftype_of call pname) in
         let mk_ptr value = {t=Ptr value.t;v=Addr value} in
         lprintf "allocating extra ptr in %s (%d): %s addr %Ld : %s\n"
           call.fun_name call.id pname addr (ttype_to_str ptee_type);
@@ -1215,9 +1215,9 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
                     key (get_pointee arg_type) (moment_before call.id)
             with
             | Some out_arg ->
-              lprintf "processing %s argptr: %s| strval: %s\n" 
+              lprintf "processing %s argptr: %s| strval: %s in %s\n" 
                       arg.aname (ttype_to_str out_arg.t)
-                      (render_tterm (get_struct_val_value ptee.after out_arg.t));
+                      (render_tterm (get_struct_val_value ptee.after out_arg.t)) call.fun_name;
               begin match get_struct_val_value ptee.after (get_pointee out_arg.t) with
               | {v=Utility (Ptr_placeholder addr);t=Ptr ptee} ->
                 begin
@@ -1319,28 +1319,28 @@ let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
           let addr = Int64.of_string (Sexp.to_string arg.value) in
           match find_first_symbol_by_address
                   addr
-                  (get_pointee (get_fun_arg_type ftype_of call i))
+                  (get_fun_arg_type ftype_of call i)
                   moment_before
           with
-          | None -> lprintf "not found: %s %s. ignoring\n" call.fun_name arg.aname;
+          | None -> lprintf "TAPIPC not found: %s %s. ignoring\n" call.fun_name arg.aname;
             None
           | Some x ->
-            lprintf "arg. settled on %s %s => %s : %s\n" call.fun_name arg.aname (render_tterm x) (ttype_to_str x.t);
+            lprintf "TAPIPC arg. settled on %s %s => %s : %s\n" call.fun_name arg.aname (render_tterm x) (ttype_to_str x.t);
             match get_struct_val_value ptee.before (get_pointee x.t) with
-            | {v=Undef;t=_} -> lprintf "scratch that..."; None
+            | {v=Undef;t=_} -> lprintf "TAPIPC scratch that...\n"; None
             | y -> Some {lhs={v=Deref x;t=y.t};rhs=y}
         end)
 
 let fixup_placeholder_ptrs_in_tterm moment tterm ~need_symbol =
   let replace_placeholder = function
     | {v=Utility (Ptr_placeholder addr); t=Ptr ptee_t} ->
-      lprintf "fixing placeholder for %Ld\n" addr;
+      lprintf "fixing placeholder for %Ld (%s)\n" addr (if need_symbol then "symbol" else "addr");
       let search_function =
         if need_symbol then
           find_first_symbol_by_address else
           find_first_known_address
       in
-      begin match ptee_t, search_function addr ptee_t moment with
+      begin match ptee_t, search_function addr (Ptr ptee_t) moment with
         | Unknown, _ -> failwith ("Unresolved placeholder of unknown type:" ^
                                   (render_tterm tterm))
         | _, Some x -> Some x
@@ -1387,7 +1387,7 @@ let extract_common_call_context
                      t=Unknown}).v
   in
   let extra_pre_conditions =
-    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of) (* @ (take_arg_ptrs_into_pre_cond call.args call ftype_of) *) in
+    (take_extra_ptrs_into_pre_cond call.extra_ptrs call ftype_of) @ (take_arg_ptrs_into_pre_cond call.args call ftype_of) in
   let post_lemmas = ["Render lemmas at the last moment"] in
   let ret_name = match ret_spec with
     | Some ret_spec -> Some ret_spec.name

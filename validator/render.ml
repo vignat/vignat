@@ -26,7 +26,7 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
       String.concat (List.map ovfields ~f:(fun (name,_) ->
                        "//@ " ^ head ^ "(" ^ ovid ^ "." ^ name ^ " == " ^ oaid ^ "." ^ name ^ ");\n"))
 
-    | _ -> failwith "not supported, sorry"
+    | _ -> failwith ("not supported, sorry: " ^ (render_tterm out_arg) ^ ": " ^ (ttype_to_str out_arg.t) ^ " == " ^ ovid ^ " :" ^ (ttype_to_str out_val.t))
     end
   | Addr ptee, _ ->
     begin match out_arg.t with
