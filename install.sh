@@ -206,7 +206,7 @@ pushd "$BUILDDIR/klee-uclibc"
   make -j $(nproc)
 popd
 
-git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/vignat/klee.git "$BUILDDIR/klee"
+git clone --depth 1 --branch timed-access-dirty-vigor-intrinsics https://github.com/necto/klee.git "$BUILDDIR/klee"
 pushd "$BUILDDIR/klee"
   mkdir build
   pushd build
