@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tested on Ubuntu 16.04, Debian Stretch, and the Linux Subsystem for Windows
+# Tested on Ubuntu 14.04 and 16.04, Debian Stretch, and the Linux Subsystem for Windows
 # $1: "dpdk-only" to only install DPDK, or no argument to install everything
 
 # Setup
@@ -19,6 +19,17 @@ case $(uname -r) in
     ;;
 esac
 
+
+if [ "$BUILDDIR" -ef "$VNDSDIR" ] && [ "$OS" != "docker" ]; then
+  echo 'It is not recommented to install the dependencies into the project root directory.'
+  echo "We recommend you to run the script from the parent directory like this: . $VNDSDIR/install.sh"
+  read -p "Continue installing into $BUILDDIR? [y/n]" -n 1 -r
+  echo # move to a new line
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    [[ "$0" = "$BASH_SOURCE" ]] && exit 1 || return 1 # handle exits from shell or function but don't exit interactive shell
+  fi
+fi
+
 # Bash "strict mode"
 set -euxo pipefail
 
@@ -32,9 +43,17 @@ echo ". $PATHSFILE" >> "$HOME/.profile"
 sudo apt-get update
 
 sudo apt-get install -y \
+                     ca-certificates software-properties-common patch `# to download and install stuff` \
+                     libpcap-dev libnuma-dev `# for DPDK` \
                      wget build-essential git python `# for more or less everything`
 
 ### Non-DPDK initialization
+
+# make sure we have the right OCaml packages on trusty, use their PPAs...
+if [ $(lsb_release -r | awk '{ print $2 }') = '14.04' ]; then
+  sudo add-apt-repository -y ppa:avsm/ppa
+  sudo apt-get update
+fi
 
 sudo apt-get install -y \
                      time `# to measure verification time` \
@@ -137,7 +156,7 @@ pushd "$BUILDDIR/klee-uclibc"
   make -j $(nproc)
 popd
 
-git clone --depth 1 --branch timed-access-dirty-rebased https://github.com/vignat/klee.git "$BUILDDIR/klee"
+git clone --depth 1 --branch timed-access-dirty-vigor-intrinsics https://github.com/necto/klee.git "$BUILDDIR/klee"
 pushd "$BUILDDIR/klee"
   mkdir build
   pushd build

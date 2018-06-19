@@ -8,12 +8,17 @@ sudo sh -c 'echo "deb http://ch.archive.ubuntu.com/ubuntu/ xenial-updates main r
 
 sudo apt-get update --allow-unauthenticated
 
-sudo apt-get install -y \
-     libpcap-dev libnuma-dev `# for DPDK` \
-     wget build-essential git python `# for more or less everything`
+# On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
+KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
 
-KERNEL_VER=$(uname -r)
-sudo apt-get install -y --allow-unauthenticated "linux-headers-$KERNEL_VER"
+# Install the right headers; we do *not* install headers on Docker since it uses the underlying kernel
+if [ "$OS" = 'microsoft' ]; then
+    # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
+    sudo apt install "linux-headers-$KERNEL_VER-generic"
+    export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
+elif [ "$OS" = 'linux' -o "$OS" = 'docker' ]; then
+    sudo apt-get install -y --allow-unauthenticated "linux-headers-$KERNEL_VER"
+fi
 
 ### DPDK
 DPDK_RELEASE='17.11'
@@ -43,3 +48,4 @@ if [ ! -f dpdk/.version ] || [ "$(cat dpdk/.version)" != "$DPDK_RELEASE" ]; then
     echo "$DPDK_RELEASE" > .version
     popd
 fi
+popd
