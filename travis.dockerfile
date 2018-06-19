@@ -13,10 +13,8 @@ WORKDIR /home/vigor
 
 # Get and execute the install script (with --force to bypass the directory check)
 COPY install /home/vigor/install
-COPY .travis/install-generic.sh /home/vigor/install-generic.sh
-COPY .travis/install-dpdk.sh /home/vigor/install-dpdk.sh
-COPY .travis/install-all.sh /home/vigor/install-all.sh
-RUN /home/vigor/install-all.sh
+COPY install.sh /home/vigor/install.sh
+RUN /home/vigor/install.sh
 
 # Pass -l to bash so it reads ~/.profile
 ENTRYPOINT ["/bin/bash", "-l"]

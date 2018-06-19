@@ -72,7 +72,6 @@ pushd "$BUILDDIR"
     rm dpdk.tar.xz
     mv "dpdk-$DPDK_RELEASE" dpdk
 
-
     echo 'export RTE_TARGET=x86_64-native-linuxapp-gcc' >> "$PATHSFILE"
     echo "export RTE_SDK=$BUILDDIR/dpdk" >> "$PATHSFILE"
     . "$PATHSFILE"
@@ -115,9 +114,10 @@ sudo apt-get install -y \
 # for VeriFast
 # inspired from VeriFast's readme
 sudo apt-get install -y --no-install-recommends \
-                     m4 \
-                     ocaml-native-compilers gcc camlp4 unzip \
-                     valac
+                     ca-certificates m4 \
+                     ocaml-native-compilers gcc camlp4 patch unzip libgtk2.0-dev \
+                     valac gtksourceview2.0-dev \
+                     liblablgtk2-ocaml-dev liblablgtksourceview2-ocaml-dev
 
 # OCaml uses variables in its scripts without defining it first - we're in strict mode!
 if [ -z ${PERL5LIB+x} ]; then
