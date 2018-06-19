@@ -1,10 +1,5 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "rte_config.h"
-#include "rte_ether.h"
-#include "rte_ip.h"
-#include "rte_mbuf.h"
-#include "rte_tcp.h"
 #include "lib/stubs/core_stub.h"
 #include "lib/expirator.h"
 #include "lib/stubs/time_stub_control.h"
@@ -34,7 +29,7 @@ void flood(struct rte_mbuf *m, uint8_t skip_device,
 /*@
 lemma void bit_and_hack()
 requires true;
-ensures 0 == (0 & 0x10) &*& 0x10 == (529 & 0x10);
+ensures 0x00 == (0x00 & 0x10) &*& 0x10 == (0x11 & 0x10) &*& 0x00 == (0x41 & 0x10) &*& 0x10 == (0x211 & 0x10) &*& 0x00 == (0x241 & 0x10);
 {
   assume(false);
 }
