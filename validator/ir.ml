@@ -11,6 +11,7 @@ type bop = Eq | Le | Lt | Ge | Gt
 type ttype = | Ptr of ttype
              | Sint64
              | Sint32
+             | Sint16
              | Sint8
              | Uint64
              | Uint32
@@ -49,7 +50,7 @@ type eq_condition = {lhs: tterm; rhs: tterm} [@@deriving sexp]
 
 let rec ttype_to_str = function
   | Ptr c_type -> ttype_to_str c_type ^ "*"
-  | Sint64 -> "int64_t" | Sint32 -> "int32_t" | Sint8 -> "int8_t"
+  | Sint64 -> "int64_t" | Sint32 -> "int32_t" | Sint16 -> "int16_t" | Sint8 -> "int8_t"
   | Uint64 -> "uint64_t"| Uint32 -> "uint32_t"
   | Uint16 -> "uint16_t" | Uint8 -> "uint8_t"
   | Void -> "void" | Str (name, _) -> "struct " ^ name

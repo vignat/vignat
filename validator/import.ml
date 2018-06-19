@@ -36,6 +36,22 @@ type guessed_types = {ret_type: ttype;
 
 let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
+let int64_of_sexp value =
+  let str = Sexp.to_string value in
+  let prefix = String.sub str 0 5 in
+  assert(prefix = "(w64 ");
+  Int64.of_string (String.sub str 5 ((String.length str) - 6)) (* -5 for begining -1 for end paren *)
+
+(* TODO: this should spit out a type to help the validator *)
+let int_str_of_sexp value =
+  let str = Sexp.to_string value in
+  let prefix = String.sub str 0 3 in
+  if prefix = "(w8" then
+    String.sub str 4 ((String.length str - 5))
+  else if prefix = "(w1" || prefix = "(w3" || prefix = "(w6" then (* 16, 32, 64 *)
+    String.sub str 5 ((String.length str - 6))
+  else str
+
 let infer_signed_type w =
   if String.equal w "w64" then Sint64
   else if String.equal w "w32" then Sint32
@@ -202,15 +218,17 @@ let map_set_n_update_alist mp lst =
        | `Ok new_map -> new_map
        | `Duplicate -> acc))
 
-let is_int str =
+let parse_int str =
   (* As a hack: handle -10 in 64bits.
      TODO: handle more generally*)
-  if (String.equal str "18446744073709551606") then true
+  if (String.equal str "18446744073709551606") then Some (-10)
   (* As another hack: handle -300 in 64bits. *)
-  else if (String.equal str "18446744073709551316") then true
+  else if (String.equal str "18446744073709551316") then Some (-300)
   else
-    try ignore (int_of_string str); true
-    with _ -> false
+    try Some (int_of_string str)
+    with _ -> None
+
+let is_int str = match parse_int str with Some _ -> true | None -> false
 
 let guess_sign exp known_vars =
   match get_var_name_of_sexp exp with
@@ -395,11 +413,12 @@ let get_sint_in_bounds v =
       integer_val
 
 let make_cmplx_val exp t =
-  let key = Sexp.to_string exp in
+  let key = int_str_of_sexp exp in
   match String.Map.find !allocated_complex_vals key with
   | Some spec -> {v=Id spec.name;t=spec.value.t}
   | None ->
     let name = complex_val_name_gen#generate in
+    lprintf "CMPLX NAME: %s SEXP: %s TYPE: %s\n" name (Sexp.to_string exp) (ttype_to_str t);
     let value = {v=Id key;t} in
     allocated_complex_vals :=
       String.Map.add_exn !allocated_complex_vals ~key
@@ -429,21 +448,49 @@ let rec is_bool_expr exp =
 
 (* TODO: elaborate. *)
 let guess_type exp t =
-  lprintf "guessing for %s, know %s\n" (Sexp.to_string exp) (ttype_to_str t);
   match t with
   | Uunknown -> begin match exp with
-      | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
+      | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Uint8
+      | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Uint16
+      | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Uint32
+      | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Uint64
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "And") && (String.equal w "w32") -> Uint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
-      | Sexp.List [Sexp.Atom f; Sexp.Atom w; _; _]
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "Concat") && (String.equal w "w64") -> failwith "guess_type w64 not supported yet"
-      | _ -> lprintf "GUESS TYPE FAILURE UUnknown\n"; t
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w16") -> Uint16
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w32") -> Uint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w64") -> Uint64
+      | _ -> failwith ("GUESS TYPE FAILURE UUnknown " ^ (Sexp.to_string exp))
     end
   | Sunknown -> begin match exp with
+      | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Sint8
+      | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Sint16
+      | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Sint32
+      | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Sint64
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "ZExt") && (String.equal w "w32") -> Sint32
-      | _ -> lprintf "GUESS TYPE FAILURE SUnknown\n"; t
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "Concat") && (String.equal w "w32") -> Sint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w16") -> Sint16
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w32") -> Sint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w64") -> Sint64
+      | _ -> failwith ("GUESS TYPE FAILURE SUnknown " ^ (Sexp.to_string exp))
     end
-  | _  -> lprintf "GUESS TYPE FAILURE\n"; t
+  | Unknown ->  begin match exp with
+    | Sexp.Atom f when f = "false" || f = "true" -> Boolean
+    | Sexp.List [Sexp.Atom w; Sexp.Atom f] when w = "w32" && f = "0" -> lprintf "GUESS TYPE BOOL\n"; Boolean
+    | _ -> lprintf "GUESS TYPE UNKNOWN\n"; Uint64
+    end
+  | _  -> t
 
 
 let rec guess_type_l exps t =
@@ -543,29 +590,31 @@ let find_first_known_address_or_dummy addr t at =
 let rec get_sexp_value exp ?(at=Beginning) t =
   let exp = canonicalize_sexp exp in
   let exp = eliminate_false_eq_0 exp t in
+  let t = match t with
+    |Unknown|Sunknown|Uunknown -> guess_type exp t
+    |_ -> t
+  in
+  let exp = match exp with
+    | Sexp.List [Sexp.Atom w; Sexp.Atom f] when w = "w8" || w = "w16" || w = "w32" || w = "w64" -> Sexp.Atom f
+    | _ -> exp
+  in
   match exp with
   | Sexp.Atom v ->
     begin
-      let t = match t with
-        |Unknown|Sunknown|Uunknown -> guess_type exp t
-        |_ -> t
-      in
       match t with
-      | Sint64 -> failwith "get_sexp_value atom Sint64 not supported yet"
-      | Sint32 -> {v=Int (get_sint_in_bounds v);t}
+      | Sint64 | Sint32 | Sint16 | Sint8 -> {v=Int (get_sint_in_bounds v);t}
       | _ ->
         if String.equal v "true" then {v=Bool true;t=Boolean}
         else if String.equal v "false" then {v=Bool false;t=Boolean}
         (*FIXME: deduce the true integer type for the value: *)
-        else if is_int v then
-          let addr = (Int64.of_int (int_of_string v)) in
-          if addr = 0L then {v=Int 0; t}
-          else
-            match t with
-            | Ptr x ->
-              find_first_known_address_or_dummy addr x at
-            | _ -> {v=Int (int_of_string v);t}
-        else {v=Id v;t}
+        else begin match parse_int v with
+          | Some n -> let addr = (Int64.of_int n) in
+                      if addr = 0L then {v=Int 0; t}
+                      else
+                        begin match t with
+                        | Ptr x -> find_first_known_address_or_dummy addr x at
+                        | _ -> {v=Int n;t} end
+          | None -> {v=Id v;t} end
     end
   | Sexp.List [Sexp.Atom f; Sexp.Atom w; Sexp.Atom offset; src;]
     when (String.equal f "Extract") && (String.equal offset "0") ->
@@ -588,23 +637,11 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     begin (* Prefer a variable in the left position
              due to the weird VeriFast type inference rules.*)
       match lhs with
-      | Sexp.Atom str when is_int str ->
-        (* As a hack: special hundling for 64bit -10
-           TODO: generalize*)
-        if (String.equal str "18446744073709551606") then
-          {v=Bop (Sub,(get_sexp_value rhs t ~at),{v=(Int 10);t});t}
-        (* and -300 *)
-          else if (String.equal str "18446744073709551316") then
-            {v=Bop (Sub,(get_sexp_value rhs t ~at),{v=(Int 300);t});t}
-          else
-            let ival = int_of_string str in (* avoid overflow *)
-            if ival > 2147483648 then
-              {v=Bop (Sub,(get_sexp_value rhs t ~at),
-                      {v=(Int (2*2147483648 - ival));t});t}
-            else
-              {v=Bop (Add,(get_sexp_value rhs t ~at),{v=(Int ival);t});t}
-      | _ ->
-        {v=Bop (Add,(get_sexp_value lhs t ~at),(get_sexp_value rhs t ~at));t}
+      | Sexp.Atom str ->
+        begin match parse_int str with
+        | Some n -> {v=Bop (Sub,(get_sexp_value rhs t ~at),{v=(Int n);t});t}
+        | _ -> {v=Bop (Add,(get_sexp_value lhs t ~at),(get_sexp_value rhs t ~at));t} end
+      | _ -> {v=Bop (Add,(get_sexp_value lhs t ~at),(get_sexp_value rhs t ~at));t}
     end
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Slt") ->
@@ -658,10 +695,6 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     begin match get_var_name_of_sexp exp with
       | Some name -> {v=Id name;t}
       | None ->
-        let t = match t with
-          |Unknown|Sunknown|Uunknown -> guess_type exp t
-          |_ -> t
-        in
         make_cmplx_val exp t
     end
 
@@ -920,7 +953,7 @@ let allocate_rets ftype_of tpref =
         | Nonptr -> {name;value=get_sexp_value value ret_type}
         | Funptr _ -> failwith "TODO:support funptr retuns."
         | Apathptr ->
-          let addr = Int64.of_string (Sexp.to_string value) in
+          let addr = int64_of_sexp value in
           if (addr = 0L) then
             {name;value={t=ret_type;v=Zeroptr}}
           else begin
@@ -928,7 +961,7 @@ let allocate_rets ftype_of tpref =
             {name;value={t=ret_type;v=Addr {t=get_pointee ret_type;v=Undef}}}
           end
         | Curioptr ptee ->
-          let addr = Int64.of_string (Sexp.to_string value) in
+          let addr = int64_of_sexp value in
           add_to_known_addresses {v=Id name;t=ret_type}
             ptee.after.break_down addr (After call.id) 0;
           {name;value={t=ret_type;v=Addr (get_struct_val_value
@@ -1066,12 +1099,12 @@ let allocate_args ftype_of tpref arg_name_gen =
         | Nonptr -> None
         | Funptr _ -> None
         | Apathptr ->
-          let addr = Int64.of_string (Sexp.to_string value) in
+          let addr = int64_of_sexp value in
           let t = get_fun_arg_type ftype_of call i in
           let ptee_type = get_pointee t in
           alloc_arg addr {full=None;sname=None;break_down=[]} {v=Undef;t=ptee_type;} aname
         | Curioptr ptee ->
-          let addr = Int64.of_string (Sexp.to_string value) in
+          let addr = int64_of_sexp value in
           let t = get_fun_arg_type ftype_of call i in
           lprintf "%s fun argument %d type is %s\n" call.fun_name i (ttype_to_str t);
           let ptee_type = get_pointee t in
@@ -1118,7 +1151,7 @@ let compose_pre_lemmas ftype_of fun_name call_id args arg_types tmp_gen ~is_tip 
 let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
   let get_allocated_arg (arg: Trace_prefix.arg) arg_type =
     let ptee_t = get_pointee arg_type in
-    let addr = (Int64.of_string (Sexp.to_string arg.value)) in
+    let addr = int64_of_sexp arg.value in
     let arg_var = find_first_symbol_by_address
         addr
         ptee_t
@@ -1155,14 +1188,14 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
                     (* Next try to find the address of the argument itself.
                        May be it was already allocated. *)
                     match find_first_known_address
-                            (Int64.of_string (Sexp.to_string arg.value))
+                            (int64_of_sexp arg.value)
                             t
                             (moment_before call.id)
                     with
                     | Some n -> n
                     | None -> failwith ("nested pointer to unknown: " ^
                                         (Int.to_string x) ^ " -> " ^
-                                        (Sexp.to_string arg.value))
+                                        (Int64.to_string (int64_of_sexp arg.value)))
                 end
               | x -> get_allocated_arg arg a_type
             end
@@ -1209,7 +1242,7 @@ let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args
                 Some {lhs=fun_arg_val;rhs={v=Int 0;t=Uint32}}
             | _ -> failwith "Write your own special case. Sorry." end
         | _ ->
-            let key = Int64.of_string (Sexp.to_string arg.value) in
+            let key = int64_of_sexp arg.value in
             let arg_type = (get_fun_arg_type ftype_of call i) in
             lprintf "trying to process key:%Ld argtype: %s\n" key (ttype_to_str arg_type);
             match find_first_symbol_by_address
@@ -1317,7 +1350,7 @@ let take_arg_ptrs_into_pre_cond (args : Trace_prefix.arg list) call ftype_of =
       | Funptr _ -> None
       | Apathptr -> None
       | Curioptr ptee -> begin
-          let addr = Int64.of_string (Sexp.to_string arg.value) in
+          let addr = int64_of_sexp arg.value in
           match find_first_symbol_by_address
                   addr
                   (get_fun_arg_type ftype_of call i)

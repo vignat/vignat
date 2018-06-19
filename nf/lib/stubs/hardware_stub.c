@@ -125,10 +125,31 @@ stub_device_start(struct stub_device* dev)
 	// 32-63: RSS Hash or FCOE_PARAM or Flow Director Filters ID or Fragment Checksum (0 - not supported)
 	uint64_t wb0 = 0b0000000000000000000000000000000010000000000000000000000000000000;
 
+	struct stub_mbuf_content* mbuf_content = malloc(sizeof(struct stub_mbuf_content));
+	if (mbuf_content == NULL) {
+		klee_abort(); // TODO ahem...
+	}
+	// NOTE: validator depends on this specific name, "user_buf"
+	klee_make_symbolic(mbuf_content, sizeof(struct stub_mbuf_content), "user_buf");
+
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+	bool is_ipv4 = mbuf_content->ether.ether_type == 0x0800;
+	bool is_ipv6 = mbuf_content->ether.ether_type == 0x86DD;
+#else
+	bool is_ipv4 = mbuf_content->ether.ether_type == 0x0008;
+	bool is_ipv6 = mbuf_content->ether.ether_type == 0xDD86;
+#endif
+
+	bool is_tcp = false, is_udp = false, is_sctp = false;
+	if (is_ipv4) {
+		is_tcp = mbuf_content->ipv4.next_proto_id == 6;
+		is_udp = mbuf_content->ipv4.next_proto_id == 17;
+		is_sctp = mbuf_content->ipv4.next_proto_id == 132;
+	}
+
 	// NOTE: Allowing all of those to be symbols means the symbex takes suuuuper-long... worth doing sometimes, but not all the time
 #if 0
-	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
-	bool is_ipv6 = !is_ipv4 && klee_int("received_is_ipv6") != 0;
 	bool is_ip = is_ipv4 || is_ipv6;
 	bool is_ip_broadcast = is_ip && klee_int("received_is_ip_broadcast") != 0;
 
@@ -136,21 +157,13 @@ stub_device_start(struct stub_device* dev)
 
 	bool is_linksec = !is_ip && klee_int("received_is_linksec") != 0;
 
-	bool is_udp = is_ip && klee_int("received_is_udp") != 0;
-	bool is_tcp = is_ip && !is_udp && klee_int("received_is_tcp") != 0;
-	bool is_sctp = is_ip && !is_udp && !is_tcp && klee_int("received_is_sctp") != 0;
-
 	bool not_ipsec = is_udp || is_tcp || is_sctp;
 	bool is_nfs = not_ipsec && klee_int("received_is_nfs") != 0;
 
 	bool is_ipsec_esp = !not_ipsec && klee_int("received_is_ipsec_esp") != 0;
 	bool is_ipsec_ah = !not_ipsec && !is_ipsec_esp &&klee_int("received_is_ipsec_ah") != 0;
 #else
-	bool is_ipv4 = klee_int("received_is_ipv4") != 0;
-	bool is_ipv6 = !is_ipv4;
-	bool is_ip = true, is_ip_broadcast = false, has_ip_ext = false, is_linksec = false;
-	bool is_udp = klee_int("received_is_udp") != 0;
-	bool is_tcp = false, is_sctp = false, not_ipsec = true, is_nfs = false, is_ipsec_esp = false, is_ipsec_ah = false;
+	bool is_ip_broadcast = false, has_ip_ext = false, is_linksec = false, not_ipsec = true, is_nfs = false, is_ipsec_esp = false, is_ipsec_ah = false;
 #endif
 
 #define BIT(index, cond) SET_BIT(wb0, index, (cond) ? 1 : 0);
@@ -169,34 +182,6 @@ stub_device_start(struct stub_device* dev)
 	BIT(16, 0); // reserved
 #undef BIT
 
-	struct stub_mbuf_content* mbuf_content = malloc(sizeof(struct stub_mbuf_content));
-	if (mbuf_content == NULL) {
-		klee_abort(); // TODO ahem...
-	}
-
-	klee_make_symbolic(mbuf_content, sizeof(struct stub_mbuf_content), "user_buf");
-
-	if (is_ipv4) {
-#if __BYTE_ORDER == __BIG_ENDIAN
-		mbuf_content->ether.ether_type = 0x0800;
-#else
-		mbuf_content->ether.ether_type = 0x0008;
-#endif
-
-		if (is_tcp) {
-			mbuf_content->ipv4.next_proto_id = 6;
-		} else if (is_udp) {
-			mbuf_content->ipv4.next_proto_id = 17;
-		} else if (is_sctp) {
-			mbuf_content->ipv4.next_proto_id = 132;
-		}
-	} else if (is_ipv6) {
-#if __BYTE_ORDER == __BIG_ENDIAN
-		mbuf_content->ether.ether_type = 0x86DD;
-#else
-		mbuf_content->ether.ether_type = 0xDD86;
-#endif
-	}
 
 	// Second Line
 	// 0-19: Extended Status / NEXTP
@@ -226,7 +211,7 @@ stub_device_start(struct stub_device* dev)
 	uint16_t packet_length = sizeof(struct stub_mbuf_content);
 	wb1 |= (uint64_t) packet_length << 32;
 
-	if (is_ip && (
+	if (is_ipv4 && (
 			// Multicast addr?
 #if __BYTE_ORDER == __BIG_ENDIAN
 			(mbuf_content->ipv4.dst_addr >= 0xE0000000 && mbuf_content->ipv4.dst_addr < 0xF0000000)
