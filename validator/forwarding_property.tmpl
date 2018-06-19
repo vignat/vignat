@@ -23,11 +23,11 @@ flowtable initial_ft = abstract_function(initial_double_map,
                                          initial_double_chain);
 flowtable final_ft = abstract_function(final_map, final_chain);
    
-bit_and_zero(0x00000010);
+bit_and_hack();
 if (10 < now) {// consider only normal moments, remote from the start of the epoch
 
   // 0x10 -> IPv4
-  if (a_packet_received && (received_packet_type & 0x00000010)) {
+  if (a_packet_received && ((received_packet_type & 0x10) == 0x10)) {
 
     flowtable after_expiration_ft =
       abstract_function(map_after_expiration, chain_after_expiration);

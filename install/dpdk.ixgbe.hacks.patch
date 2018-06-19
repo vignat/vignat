@@ -31,19 +31,6 @@ index 9bc8462..e77145f 100644
  	return nb_pkts;
  }
  
-@@ -1594,10 +1607,12 @@ ixgbe_rx_scan_hw_ring(struct ixgbe_rx_queue *rxq)
- 			break;
- 	}
- 
-+#ifndef KLEE_VERIFICATION
- 	/* clear software ring entries so we can cleanup correctly */
- 	for (i = 0; i < nb_rx; ++i) {
- 		rxq->sw_ring[rxq->rx_tail + i].mbuf = NULL;
- 	}
-+#endif
- 
- 
- 	return nb_rx;
 @@ -1685,7 +1700,9 @@ rx_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
  	/* update internal queue state */
  	rxq->rx_next_avail = 0;

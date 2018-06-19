@@ -39,6 +39,15 @@ index 7830535..f908cbb 100644
  CONFIG_RTE_LIBRTE_IXGBE_BYPASS=n
  
  #
+@@ -625,7 +625,7 @@ CONFIG_RTE_LIBRTE_MBUF=y
+ CONFIG_RTE_LIBRTE_MBUF_DEBUG=n
+ CONFIG_RTE_MBUF_DEFAULT_MEMPOOL_OPS="ring_mp_mc"
+ CONFIG_RTE_MBUF_REFCNT_ATOMIC=y
+-CONFIG_RTE_PKTMBUF_HEADROOM=128
++CONFIG_RTE_PKTMBUF_HEADROOM=0
+ 
+ #
+ # Compile librte_timer
 diff --git a/config/common_linuxapp b/config/common_linuxapp
 index 74c7d64..172208f 100644
 --- a/config/common_linuxapp
@@ -52,3 +61,18 @@ index 74c7d64..172208f 100644
  CONFIG_RTE_KNI_KMOD=y
  CONFIG_RTE_LIBRTE_KNI=y
  CONFIG_RTE_LIBRTE_PMD_KNI=y
+diff --git a/drivers/net/virtio/virtio_ethdev.c b/drivers/net/virtio/virtio_ethdev.c
+index e0328f6..50bcbcc 100644
+--- a/drivers/net/virtio/virtio_ethdev.c
++++ b/drivers/net/virtio/virtio_ethdev.c
+@@ -1587,7 +1587,9 @@ eth_virtio_dev_init(struct rte_eth_dev *eth_dev)
+ 	struct virtio_hw *hw = eth_dev->data->dev_private;
+ 	int ret;
+ 
+-	RTE_BUILD_BUG_ON(RTE_PKTMBUF_HEADROOM < sizeof(struct virtio_net_hdr_mrg_rxbuf));
++	// We don't use virtio, and we need the headroom to be 0, so let's just fail if we ever reached here
++	return -1;
++	//RTE_BUILD_BUG_ON(RTE_PKTMBUF_HEADROOM < sizeof(struct virtio_net_hdr_mrg_rxbuf));
+ 
+ 	eth_dev->dev_ops = &virtio_eth_dev_ops;
+ 

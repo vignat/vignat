@@ -165,6 +165,8 @@ stub_device_start(struct stub_device* dev)
 	BIT(12, is_ipsec_esp);
 	BIT(13, is_ipsec_ah);
 	BIT(14, is_linksec);
+	BIT(15, 0); // non-L2 packet - TODO we should try that, but then the entire meaning of packet_type changes...
+	BIT(16, 0); // reserved
 #undef BIT
 
 	struct stub_mbuf_content* mbuf_content = malloc(sizeof(struct stub_mbuf_content));
@@ -253,17 +255,30 @@ stub_device_start(struct stub_device* dev)
 	int device_index = 0;
 	while (dev != &DEVICES[device_index]) { device_index++; }
 
+	// Get the DPDK packet type
+	uint32_t traced_ptype = 0;
+	traced_ptype |= 0x00000001; // ether; always - see TODO in definition of the ptype above
+	if (is_ipv4) traced_ptype |= 0x00000010;
+	if (is_ipv6) traced_ptype |= 0x00000040;
+	if (has_ip_ext) {
+		if (is_ipv4) traced_ptype |= 0x00000030;
+		if (is_ipv6) traced_ptype |= 0x000000c0;
+	}
+	if (is_udp) traced_ptype |= 0x00000200;
+	if (is_tcp) traced_ptype |= 0x00000100;
+	if (is_sctp) traced_ptype |= 0x00000400;
+
 	// Trace the mbuf
 	memcpy(&traced_mbuf_content, (void*) mbuf_addr, packet_length);
 	memset(&traced_mbuf, 0, sizeof(struct rte_mbuf));
 	traced_mbuf.buf_addr = &traced_mbuf_content;
-	traced_mbuf.buf_iova = (rte_iova_t) &traced_mbuf_content;
+	traced_mbuf.buf_iova = (rte_iova_t) traced_mbuf.buf_addr;
 	traced_mbuf.data_off = 0;
 	traced_mbuf.refcnt = 1;
 	traced_mbuf.nb_segs = 1;
 	traced_mbuf.port = device_index;
 	traced_mbuf.ol_flags = 0; // TODO?
-	traced_mbuf.packet_type = (wb0 >> 4) & 0b111111111111;
+	traced_mbuf.packet_type = traced_ptype;
 	traced_mbuf.pkt_len = packet_length;
 	traced_mbuf.data_len = packet_length;
 	traced_mbuf.vlan_tci = 0; // TODO?
@@ -925,7 +940,7 @@ stub_register_tdt_write(struct stub_device* dev, uint32_t offset, uint32_t new_v
 	memcpy(&traced_mbuf_content, (void*) buf_addr, sizeof(struct stub_mbuf_content));
 	memset(&traced_mbuf, 0, sizeof(struct rte_mbuf));
 	traced_mbuf.buf_addr = &traced_mbuf_content;
-	traced_mbuf.buf_iova = (rte_iova_t) &traced_mbuf_content;
+	traced_mbuf.buf_iova = (rte_iova_t) traced_mbuf.buf_addr;
 	traced_mbuf.data_off = 0;
 	traced_mbuf.refcnt = 1;
 	traced_mbuf.nb_segs = 1;
@@ -2360,19 +2375,14 @@ stub_hardware_write(uint64_t addr, unsigned offset, unsigned size, uint64_t valu
 
 void
 stub_free(struct rte_mbuf* mbuf) {
-	// Undo alias, since otherwise it will recurse infinitely
-	klee_alias_undo("rte_pktmbuf_free[0-9]*");
-
 	// Ugh, we have to trace an mbuf with the right address, so we copy the whole thing... this is silly
 	memcpy(&traced_mbuf, mbuf, sizeof(struct rte_mbuf));
-	memcpy(&traced_mbuf_content, mbuf->buf_addr, sizeof(struct stub_mbuf_content));
-	traced_mbuf.buf_addr = &traced_mbuf_content;
+	memcpy(&traced_mbuf_content, mbuf->buf_addr + mbuf->data_off, sizeof(struct stub_mbuf_content));
+	traced_mbuf.buf_addr = &traced_mbuf_content - mbuf->data_off;
 	stub_core_trace_free(&traced_mbuf);
 
 	// Still need to free the actual mbuf though
 	rte_mbuf_raw_free(mbuf);
-
-	klee_alias_function_regex("rte_pktmbuf_free[0-9]*", "stub_free");
 
 	// Soundness check
 	klee_assert(!free_called);

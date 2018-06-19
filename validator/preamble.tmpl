@@ -30,12 +30,13 @@ void flood(struct rte_mbuf *m, uint8_t skip_device,
 //@ requires mbufp(m,_);
 //@ ensures true;
 
+// VeriFast can't deal with bitwise AND, so we hardcode known cases.
 /*@
-lemma void bit_and_zero(int x)
+lemma void bit_and_hack()
 requires true;
-ensures 0 == (0&x);
+ensures 0 == (0 & 0x10) &*& 0x10 == (529 & 0x10);
 {
-  assume(false);//TODO
+  assume(false);
 }
 @*/
 
