@@ -301,6 +301,12 @@ let expand_conjunctions terms =
   in
   List.join (List.map terms ~f:expand_tterm)
 
+let fix_constraints tterms =
+  let res = List.map tterms ~f:(fun t1 -> match t1.v with
+    | Bop (Eq, {v=Bool false;t=_}, {v=Bop (Eq, {v=Int 0;t=Boolean}, real_value);t=_}) -> expand_conjunctions [real_value]
+    | _ ->  [t1]) in
+  List.join res
+
 let bubble_equalities tterms =
   List.sort tterms ~compare:(fun t1 t2 ->
       match (t1.v,t2.v) with
@@ -317,20 +323,21 @@ let is_there_device_constraint constraints =
       | _ -> false)
 
 let guess_support_assignments constraints symbs =
-  (*printf "guess constraints\n";
+  let constraints = fix_constraints constraints in
+  (* printf "guess constraints\n";
   List.iter constraints ~f:(fun xxx -> printf "%s\n" (render_tterm xxx));
   printf "symbols:\n";
-  Set.iter symbs ~f:(fun name -> printf "%s\n" name;);*)
+  Set.iter symbs ~f:(fun name -> printf "%s\n" name;); *)
   let there_is_a_device_constraint = is_there_device_constraint constraints in
   let (assignments,_) =
     List.fold (bubble_equalities constraints) ~init:([],symbs) ~f:(fun (assignments,symbs) tterm ->
         (* printf "considering %s\n" (render_tterm tterm); *)
         match tterm.v with
         | Bop (Eq, {v=Id x;t}, rhs) when String.Set.mem symbs x ->
-          (*printf "match 1st %s: %s\n" x (ttype_to_str t);*)
+          (* printf "match 1st %s: %s\n" x (ttype_to_str t); *)
           ({lhs={v=Id x;t};rhs}::assignments, String.Set.remove symbs x)
         | Bop (Eq, lhs, {v=Id x;t}) when String.Set.mem symbs x ->
-          (*printf "match 2nd %s: %s\n" x (ttype_to_str t);*)
+          (* printf "match 2nd %s: %s\n" x (ttype_to_str t); *)
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
           (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+2 *)
@@ -629,10 +636,8 @@ let render_vars_declarations ( vars : var_spec list ) =
   String.concat ~sep:"\n"
     (List.map vars ~f:(fun v ->
          match v.value.t with
-         | Unknown | Sunknown | Uunknown ->
-           "//" ^ ttype_to_str v.value.t ^ " " ^ v.name ^ ";"
-         | _ ->
-           ttype_to_str v.value.t ^ " " ^ v.name ^ ";")) ^ "\n"
+         | Unknown | Sunknown | Uunknown -> failwith ("Cannot render var decl '" ^ v.name ^ "' for type " ^ (ttype_to_str v.value.t))
+         | _ -> ttype_to_str v.value.t ^ " " ^ v.name ^ ";")) ^ "\n"
 
 let render_hist_calls hist_funs =
   String.concat ~sep:"\n" (List.map hist_funs ~f:render_hist_fun_call)

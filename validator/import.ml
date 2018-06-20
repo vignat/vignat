@@ -36,6 +36,62 @@ type guessed_types = {ret_type: ttype;
 
 let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
+(* TODO: elaborate. *)
+let guess_type exp t =
+  match t with
+  | Uunknown -> begin match exp with
+      | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Uint8
+      | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Uint16
+      | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Uint32
+      | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Uint64
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "And") && (String.equal w "w32") -> Uint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "Concat") && (String.equal w "w64") -> failwith "guess_type w64 not supported yet"
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w16") -> Uint16
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w32") -> Uint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w64") -> Uint64
+      | _ -> failwith ("GUESS TYPE FAILURE UUnknown " ^ (Sexp.to_string exp))
+    end
+  | Sunknown -> begin match exp with
+      | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Sint8
+      | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Sint16
+      | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Sint32
+      | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Sint64
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ZExt") && (String.equal w "w32") -> Sint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "Concat") && (String.equal w "w32") -> Sint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w16") -> Sint16
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w32") -> Sint32
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "ReadLSB") && (String.equal w "w64") -> Sint64
+      | _ -> failwith ("GUESS TYPE FAILURE SUnknown " ^ (Sexp.to_string exp))
+    end
+  | Unknown ->  begin match exp with
+    | Sexp.Atom f when f = "false" || f = "true" -> Boolean
+    | Sexp.List [Sexp.Atom w; Sexp.Atom f] when w = "w32" && f = "0" -> lprintf "GUESS TYPE BOOL\n"; Boolean
+    | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Uint8
+    | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Uint16
+    | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Uint32
+    | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Uint64
+    | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+      when (String.equal f "ReadLSB") && (String.equal w "w16") -> Uint16
+    | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+      when (String.equal f "ReadLSB") && (String.equal w "w32") -> Uint32
+    | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+      when (String.equal f "ReadLSB") && (String.equal w "w64") -> Uint64
+    | _ -> lprintf "GUESS TYPE UNKNOWN\n"; Uint64
+    end
+  | _  -> t
+
 let int64_of_sexp value =
   let str = Sexp.to_string value in
   let prefix = String.sub str 0 5 in
@@ -179,16 +235,14 @@ let to_symbol str =
 
 let get_var_name_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.Atom pos; Sexp.Atom name]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.List [Sexp.Atom posw; Sexp.Atom pos]; Sexp.Atom name]
     when ( String.equal rd "ReadLSB" ||
-           String.equal rd "Read") -> Some (to_symbol name ^ "_" ^
-                                            pos(* FIXME: '^ w' - this reveals a bug where
-                                               allocated_dmap appears to be w32 and w64*))
+           String.equal rd "Read") -> Some (to_symbol name ^ "_" ^ pos)
   | _ -> None
 
 let get_read_width_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.Atom _; Sexp.Atom _]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom w; Sexp.List _; Sexp.Atom _]
     when (String.equal rd "ReadLSB" ||
           String.equal rd "Read") -> Some w
   | _ -> None
@@ -313,6 +367,9 @@ let sign_to_str s =
 let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.Map.t) : typed_var list =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
+    let precise = begin match precise with
+    | Unknown -> guess_type exp Unknown
+    | _ -> precise end in
     begin match String.Map.find known_vars name with
       | Some spec -> [update_var_spec spec {precise;s;w=convert_str_to_width_confidence w}]
       | None -> [{vname = name; t={precise;s;w=convert_str_to_width_confidence w}}]
@@ -338,14 +395,14 @@ let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.M
         let si = choose_guess (infer_type_sign f) s in
         (List.join (List.map tl ~f:(fun e ->
              get_var_decls_of_sexp e {s=si;w=Noidea;precise} known_vars)))
-    | Sexp.List (Sexp.Atom f :: tl) ->
+    | Sexp.List (Sexp.Atom f :: tl) when f <> "w8" && f <> "w16" && f <> "w32" && f <> "w64" ->
       let si = choose_guess (infer_type_sign f)
           (choose_guess (guess_sign_l tl known_vars) s)
       in
       List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e {s=si;w=Noidea;precise} known_vars))
     | _ -> []
     end
-  | _,_ -> failwith "inconsistency in get_var_name/get_read_width"
+  | _,_ -> failwith ("inconsistency in get_var_name/get_read_width: " ^ (Sexp.to_string exp))
 
 let make_name_alist_from_var_decls (lst: typed_var list) =
   List.map lst ~f:(fun x -> (x.vname,x))
@@ -445,52 +502,6 @@ let rec is_bool_expr exp =
   | Sexp.List [Sexp.Atom ext; _; e] when String.equal ext "ZExt" ->
     is_bool_expr e
   | _ -> false
-
-(* TODO: elaborate. *)
-let guess_type exp t =
-  match t with
-  | Uunknown -> begin match exp with
-      | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Uint8
-      | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Uint16
-      | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Uint32
-      | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Uint64
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "And") && (String.equal w "w32") -> Uint32
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "Concat") && (String.equal w "w64") -> failwith "guess_type w64 not supported yet"
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ReadLSB") && (String.equal w "w16") -> Uint16
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ReadLSB") && (String.equal w "w32") -> Uint32
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ReadLSB") && (String.equal w "w64") -> Uint64
-      | _ -> failwith ("GUESS TYPE FAILURE UUnknown " ^ (Sexp.to_string exp))
-    end
-  | Sunknown -> begin match exp with
-      | Sexp.List [Sexp.Atom w; _] when w = "w8" -> Sint8
-      | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Sint16
-      | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Sint32
-      | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Sint64
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ZExt") && (String.equal w "w32") -> Sint32
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "Concat") && (String.equal w "w32") -> Sint32
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ReadLSB") && (String.equal w "w16") -> Sint16
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ReadLSB") && (String.equal w "w32") -> Sint32
-      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "ReadLSB") && (String.equal w "w64") -> Sint64
-      | _ -> failwith ("GUESS TYPE FAILURE SUnknown " ^ (Sexp.to_string exp))
-    end
-  | Unknown ->  begin match exp with
-    | Sexp.Atom f when f = "false" || f = "true" -> Boolean
-    | Sexp.List [Sexp.Atom w; Sexp.Atom f] when w = "w32" && f = "0" -> lprintf "GUESS TYPE BOOL\n"; Boolean
-    | _ -> lprintf "GUESS TYPE UNKNOWN\n"; Uint64
-    end
-  | _  -> t
 
 
 let rec guess_type_l exps t =
