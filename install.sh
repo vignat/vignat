@@ -55,7 +55,7 @@ if [ "$OS" = 'microsoft' ]; then
   # Fix the kernel dir, since the Linux subsystem for Windows doesn't have an actual Linux kernel...
   sudo apt install "linux-headers-$KERNEL_VER-generic"
   export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
-elif [ "$OS" = 'linux' ]; then
+elif [ "$OS" = 'linux' -o "$OS" = 'docker' ]; then
   sudo apt-get install -y "linux-headers-$KERNEL_VER"
 fi
 
