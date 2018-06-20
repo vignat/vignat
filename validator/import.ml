@@ -702,6 +702,9 @@ let rec get_sexp_value exp ?(at=Beginning) t =
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; Sexp.Atom lhs; rhs;]
     when (String.equal f "Concat") && (String.equal lhs "0") ->
     get_sexp_value rhs t ~at
+  | Sexp.List [Sexp.Atom "Select"; Sexp.Atom _; nested; Sexp.List [Sexp.Atom _; Sexp.Atom "1"]; Sexp.List [Sexp.Atom _; Sexp.Atom "0"]] ->
+    (* This is equivalent to x ? 1 : 0 ==> we just pretend x is a boolean *)
+    get_sexp_value nested Boolean ~at
   | _ ->
     begin match get_var_name_of_sexp exp with
       | Some name -> {v=Id name;t}
@@ -1451,6 +1454,9 @@ let extract_common_call_context
    application;
    post_lemmas;ret_name;ret_type;call_id=call.id}
 
+let convert_ctxt_list l = List.map l ~f:(fun e ->
+    (get_sexp_value e Boolean))
+
 let extract_hist_call ftype_of call rets free_vars =
   lprintf "extract hist call: %s\n" call.fun_name;
   let args = extract_fun_args ftype_of call in
@@ -1461,19 +1467,20 @@ let extract_hist_call ftype_of call rets free_vars =
   let args_post_conditions =
     List.map args_post_conditions ~f:(fixup_placeholder_ptrs_in_eq_cond (After call.id))
   in
+  let post_statements = convert_ctxt_list call.ret_context in
+  let post_statements = List.map post_statements ~f:(fixup_placeholder_ptrs_in_tterm
+                                                     (After call.id)
+                                                     ~need_symbol:false) in  
   match Int.Map.find rets call.id with
   | Some ret ->
     {context=extract_common_call_context
          ~is_tip:false ftype_of call (Some ret) args free_vars;
-     result={args_post_conditions;ret_val=ret.value}}
+     result={args_post_conditions;ret_val=ret.value;post_statements}}
   | None ->
     {context=extract_common_call_context
          ~is_tip:false ftype_of call None args
          free_vars;
-     result={args_post_conditions;ret_val={t=Unknown;v=Undef;}}}
-
-let convert_ctxt_list l = List.map l ~f:(fun e ->
-    (get_sexp_value e Boolean))
+     result={args_post_conditions;ret_val={t=Unknown;v=Undef;};post_statements}}
 
 let split_common_assumptions a1 a2 =
   let as1 = convert_ctxt_list a1 in

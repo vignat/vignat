@@ -189,7 +189,8 @@ let render_hist_fun_call {context;result} =
   "// POSTLEMMAS\n" ^
   (render_postlemmas context) (* postlemmas can depend on the return value *) ^
   "// POSTCONDITIONS\n" ^
-  (render_args_post_conditions ~is_assert:false result.args_post_conditions) (* ret can influence whether args are accessible *)
+  (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^ (* ret can influence whether args are accessible *)
+  (render_post_assumptions result.post_statements)
 
 let find_known_complementaries (sttmts:tterm list) =
   List.filter_map sttmts ~f:(fun sttmt ->
@@ -432,7 +433,7 @@ let render_output_check
 let tterm_list_to_string tterms =
   String.concat ~sep:"\n" (List.map tterms ~f:render_tterm)
 
-type decision_tree = Single_result of Ir.tip_result
+type decision_tree = Single_result of Ir.hist_call_result
                    | Alternative_by_ret of
                        ((Ir.tterm*decision_tree)*(Ir.tterm*decision_tree))
                    | Alternative_by_constraint of

@@ -88,11 +88,6 @@ type fun_call_context = {
 type hist_call_result = {
   args_post_conditions:eq_condition list;
   ret_val:tterm;
-} [@@deriving sexp]
-
-type tip_result = {
-  args_post_conditions:eq_condition list;
-  ret_val:tterm;
   post_statements:tterm list;
 } [@@deriving sexp]
 
@@ -102,7 +97,7 @@ type hist_call = {
 } [@@deriving sexp]
 
 type tip_call = {context:fun_call_context;
-                 results:tip_result list} [@@deriving sexp]
+                 results:hist_call_result list} [@@deriving sexp]
 
 type ir = {
   preamble:string;
