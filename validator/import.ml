@@ -108,19 +108,6 @@ let int_str_of_sexp value =
     String.sub str ~pos:5 ~len:((String.length str - 6))
   else str
 
-let infer_signed_type w =
-  if String.equal w "w64" then Sint64
-  else if String.equal w "w32" then Sint32
-  else if String.equal w "w8" then Sint8
-  else failwith (w ^ " signed is not supported")
-
-let infer_unsigned_type w =
-  if String.equal w "w64" then Uint64
-  else if String.equal w "w32" then Uint32
-  else if String.equal w "w16" then Uint16
-  else if String.equal w "w8" then Uint8
-  else failwith (w ^ " unsigned is not supported")
-
 let infer_type_sign f =
   if String.equal f "Sle" then Sure Sgn
   else if String.equal f "Slt" then Sure Sgn
@@ -333,11 +320,6 @@ let update_var_spec (spec:typed_var) t =
   {vname = spec.vname;
    t = (update_ttype spec.t t);}
 
-let failback_type t1 t2 =
-  match t1 with
-  | Unknown -> t2
-  | _ -> t1
-
 let convert_str_to_width_confidence w =
   if String.equal w "w1" then Sure W1
   else if String.equal w "w8" then Sure W8
@@ -353,14 +335,6 @@ let is_bool_fun fname =
   else if String.equal fname "Ule" then true
   else if String.equal fname "Ult" then true
   else false
-
-let sign_to_str s =
-  match s with
-  | Noidea -> "??"
-  | Tentative Sgn -> "-?"
-  | Sure Sgn -> "-!"
-  | Tentative Unsgn -> "+?"
-  | Sure Unsgn -> "+!"
 
 let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.Map.t) : typed_var list =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
@@ -510,7 +484,7 @@ let rec guess_type_l exps t =
     end
   | [] -> Unknown
 
-let find_first_known_address_comply addr tt at property ~earliest =
+let find_first_known_address_comply addr tt at property =
   let legit_candidates lst =
     List.filter lst ~f:(fun x ->
         (match x.callid, at with
@@ -535,31 +509,19 @@ let find_first_known_address_comply addr tt at property ~earliest =
         (property x))
   in
   let find_the_right candidates =
-    if earliest then (* HACK HACK HACK *)
-      List.reduce ~f:(fun prev cand ->
-          match prev.callid, cand.callid with
-          | Beginning, _ -> prev
-          | _, Beginning -> cand
-          | After x1, After x2 ->
-            if x1 < x2 then prev
-            else if x2 < x1 then cand
-            else if prev.str_depth < cand.str_depth then prev
-            else cand)
-        candidates
-    else
-      List.reduce ~f:(fun prev cand ->
-          match prev.callid, cand.callid with
-          | Beginning, _ -> cand
-          | _, Beginning -> prev
-          | After x1, After x2 ->
-            if x1 < x2 then cand
-            else if x2 < x1 then prev
-            else if prev.str_depth < cand.str_depth then prev
-            else cand)
-        candidates      
+    List.reduce ~f:(fun prev cand ->
+        match prev.callid, cand.callid with
+        | Beginning, _ -> prev
+        | _, Beginning -> cand
+        | After x1, After x2 ->
+          if x1 < x2 then prev
+          else if x2 < x1 then cand
+          else if prev.str_depth < cand.str_depth then prev
+          else cand)
+      candidates
   in
   Option.bind (Int64.Map.find !known_addresses addr)
-    (fun lst ->
+    ~f:(fun lst ->
        Option.map ~f:(fun addr_sp -> addr_sp.value)
          (find_the_right (legit_candidates lst)))
 
@@ -569,11 +531,7 @@ let moment_to_str = function
 
 let find_first_known_address addr tt at =
   lprintf "looking for first %Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
-  find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:true
-
-let find_last_known_address addr tt at =
-  lprintf "looking for last %Ld : %s at %s\n" addr (ttype_to_str tt) (moment_to_str at);
-  find_first_known_address_comply addr tt at (fun _ -> true) ~earliest:false
+  find_first_known_address_comply addr tt at (fun _ -> true)
 
 let rec printable_tterm cand =
   lprintf "checking for printability: %s\n" (render_tterm cand);
@@ -589,7 +547,7 @@ let find_first_symbol_by_address addr tt at =
   lprintf "looking for a first symbol at *%Ld : %s at %s\n"
     addr (ttype_to_str tt) (moment_to_str at);
   find_first_known_address_comply addr tt at
-    (fun candidate -> printable_tterm candidate.value) ~earliest:true
+    (fun candidate -> printable_tterm candidate.value)
 
 let find_first_known_address_or_dummy addr t at =
   match find_first_known_address addr t at with
@@ -934,28 +892,6 @@ let get_basic_vars ftype_of tpref =
                      ~init:String.Map.empty ~f:get_vars) in
   let tip_vars = (List.fold tpref.tip_calls ~init:hist_vars ~f:get_vars) in
   tip_vars
-
-let allocate_tip_ret_dummies ftype_of tip_calls (rets:var_spec Int.Map.t) =
-  let alloc_dummy_for_call (rets, acc_dummies) call =
-    let ret_type = get_fun_ret_type ftype_of call.id in
-    let add_the_dummy_to_tables value =
-      let name = (Int.Map.find_exn rets call.id).name in
-      let dummy_name = "tip_ret_dummy"^(Int.to_string call.id) in
-      (Int.Map.add_exn rets ~key:call.id
-         ~data:{name;value={t=ret_type;v=Addr {v=Id dummy_name;
-                                               t=get_pointee ret_type}}},
-       Int.Map.add_exn acc_dummies ~key:call.id
-         ~data:{name=dummy_name;value=value})
-    in
-    match call.ret with
-    | Some {value=_;ptr=Apathptr} ->
-      add_the_dummy_to_tables {t=get_pointee ret_type;v=Undef}
-    | Some {value=_;ptr=Curioptr ptee} ->
-      let t = get_pointee ret_type in
-      add_the_dummy_to_tables (get_struct_val_value ptee.after t)
-    | _ -> (rets, acc_dummies)
-  in
-  List.fold tip_calls ~init:(rets, Int.Map.empty) ~f:alloc_dummy_for_call
 
 let allocate_rets ftype_of tpref =
   let alloc_call_ret acc_rets call =
@@ -1476,12 +1412,6 @@ let extract_hist_call ftype_of call rets =
     {context=extract_common_call_context
          ftype_of call None args;
      result={args_post_conditions;ret_val={t=Unknown;v=Undef;};post_statements}}
-
-let split_common_assumptions a1 a2 =
-  let as1 = convert_ctxt_list a1 in
-  let as2 = convert_ctxt_list a2 in
-  List.partition_tf as1 ~f:(fun assumption ->
-      List.exists as2 ~f:(fun other -> other = assumption))
 
 let extract_tip_calls ftype_of calls rets =
   lprintf "extract tip call: %s\n" (List.hd_exn calls).fun_name;

@@ -593,14 +593,6 @@ let render_assignments args =
                                               rhs=arg.value})
               ~f:render_assignment)))
 
-let render_equality_assumptions args =
-  String.concat ~sep:"\n"
-    (List.map (String.Map.data args) ~f:(fun arg ->
-         match arg.value.v with
-         | Undef -> ""
-         | _ -> "//@ assume(" ^ arg.name ^ " == "
-                ^ (render_tterm arg.value) ^ ");"))
-
 let render_tip_fun_call
     {context;results}
     export_point hist_symbols
