@@ -133,8 +133,7 @@ echo 'PATH='"$HOME/.opam/system/bin"':$PATH' >> "$PATHSFILE"
 echo ". $HOME/.opam/opam-init/init.sh" >> "$PATHSFILE"
 . "$PATHSFILE"
 
-# For Z3 ml bindings
-# VeriFast requires Z3 in ocamlfind; install it now so that it puts itself in ocamlfind
+# for Z3 ML bindings
 # Num is required for Big_int
 opam install ocamlfind num -y
 
@@ -167,6 +166,8 @@ pushd "$BUILDDIR/z3"
       # Install the new libz3.so
       sudo ln -s "$BUILDDIR/z3/build/libz3.so" "/usr/lib/libz3.so"
       sudo ldconfig
+      # Install it in .opam as well, VeriFast wants it there...
+      ln -s /usr/lib/libz3.so ~/.opam/4.06.0/.
   popd
 popd
 
