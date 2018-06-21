@@ -68,6 +68,7 @@ int expire_items_single_map/*@ <kt> @*/(struct DoubleChain* chain,
                                         time_t time);
 /*@ requires mapp<kt>(map, ?kp, ?hsh, ?recp, mapc(?cap, ?m, ?addrs)) &*&
              vectorp<kt>(vector, kp, ?v, ?vaddrs) &*&
+             true == forall2(v, vaddrs, (kkeeper)(addrs)) &*&
              double_chainp(?ch, chain) &*&
              length(v) == cap &*&
              dchain_index_range_fp(ch) < INT_MAX &*&
