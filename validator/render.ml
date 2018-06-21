@@ -601,8 +601,6 @@ let render_tip_fun_call
   (render_extra_pre_conditions context) ^ "\n" ^
   (render_fcall_with_prelemmas context) ^
   (render_postlemmas context) ^
-  (* "// The legibility of these assignments is ensured by analysis.ml\n" ^ *)
-  (* (render_equality_assumptions free_vars) ^ "\n" ^ *)
   (render_export_point export_point) ^
   (if render_assertions then
      let dtree = build_decision_tree

@@ -935,34 +935,6 @@ let allocate_rets ftype_of tpref =
           | `Ok new_map -> new_map
           | `Duplicate -> rets (* nevermind *))
 
-(* let alloc_or_update_address addr name str_value (tterm:tterm) call_id = *)
-(*   lprintf "looking for *%Ld /name:%s\n" addr name; *)
-(*   match Int64.Map.find !known_addresses addr with *)
-(*   | Some specs -> begin *)
-(*       known_addresses := Int64.Map.remove !known_addresses addr; *)
-(*       match List.find specs ~f:(fun spec -> spec.tt = tterm.t) with *)
-(*       | Some spec -> *)
-(*         add_to_known_addresses (update_tterm spec.value tterm) *)
-(*           str_value.break_down addr call_id 0; *)
-(*         None *)
-(*       | None -> (\* The existing spec does not contain a piece of the type tterm.t *)
-(*                    this means it is inferior to tterm, and if we add tterm, it will *)
-(*                    also re-add the inferior parts. *)
-(*                    TODO: there may be a problem in relating the added tterm to the *)
-(*                    spec that was there before. *\) *)
-(*         add_to_known_addresses *)
-(*           {v=Addr {v=Id name;t=tterm.t};t=Ptr tterm.t} *)
-(*           str_value.break_down *)
-(*           addr call_id 0; *)
-(*         Some {name=name;value=tterm} *)
-(*     end *)
-(*   | None -> *)
-(*     add_to_known_addresses *)
-(*       {v=Addr {v=Id name;t=tterm.t};t=Ptr tterm.t} *)
-(*       str_value.break_down *)
-(*       addr call_id 0; *)
-(*     Some {name=name;value=tterm} *)
-
 let moment_before call_id =
   if 0 < call_id then After (call_id - 1) else Beginning
 
@@ -1464,12 +1436,6 @@ let collect_context pref =
      assert (List.for_all tail ~f:(fun tip ->
          call_context = convert_ctxt_list tip.call_context));
      call_context)
-   (* | hd :: [] -> (convert_ctxt_list hd.call_context) *)
-   (* | hd1 :: hd2 :: [] -> *)
-   (*   let call_context = convert_ctxt_list hd1.call_context in *)
-   (*   assert (call_context = (convert_ctxt_list hd2.call_context)); *)
-   (*   call_context *)
-   (* | _ -> failwith "More than two tip alternative tipcalls are not supported.") *)
 
 let strip_context call =
   (* TODO: why do we erase the return value? *)

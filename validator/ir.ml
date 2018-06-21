@@ -247,36 +247,6 @@ let simplify_tterm tterm =
         Some field.value.v
       | _ -> None) tterm
 
-let rec replace_term_in_term old_t new_t term =
-  if term_eq term old_t then new_t else
-    match term with
-    | Bop (opa,lhs,rhs) ->
-      Bop (opa,replace_term_in_tterm old_t new_t lhs,
-           replace_term_in_tterm old_t new_t rhs)
-    | Apply (f,args) -> Apply (f,replace_term_in_tterms old_t new_t args)
-    | Id x -> Id x
-    | Struct (name,fields) ->
-      Struct (name, List.map fields ~f:(fun field ->
-          {field with value = replace_term_in_tterm old_t new_t field.value}))
-    | Int _ -> term
-    | Bool _ -> term
-    | Not t -> Not (replace_term_in_tterm old_t new_t t)
-    | Str_idx (term,field) ->
-      Str_idx (replace_term_in_tterm old_t new_t term,field)
-    | Deref term -> Deref (replace_term_in_tterm old_t new_t term)
-    | Fptr _ -> term
-    | Addr tterm -> Addr (replace_term_in_tterm old_t new_t tterm)
-    | Cast (ctype,tterm) ->
-      Cast (ctype,replace_term_in_tterm old_t new_t tterm)
-    | Undef -> Undef
-    | Zeroptr -> Zeroptr
-    | Utility util -> Utility util
-and replace_term_in_tterm old_t new_t tterm =
-  {tterm with v=replace_term_in_term old_t new_t tterm.v}
-and replace_term_in_tterms old_t new_t tterm_list =
-  List.map tterm_list ~f:(replace_term_in_tterm old_t new_t)
-
-
 let rec replace_tterm old_tt new_tt tterm =
   if tterm = old_tt then new_tt else 
   match tterm.v with
@@ -358,51 +328,3 @@ let rec collect_nodes f tterm =
     | Undef -> []
     | Zeroptr -> []
     | Utility _ -> []
-
-let rec term_contains_term super sub =
-  if term_eq super sub then true else
-    match super with
-    | Bop (_,lhs,rhs) ->
-      tterm_contains_term lhs sub || tterm_contains_term rhs sub
-    | Apply (_,args) -> tterms_contain_term args sub
-    | Id _ -> false
-    | Struct (_,fields) ->
-      List.exists fields ~f:(fun field ->
-        tterm_contains_term field.value sub)
-    | Int _ -> false
-    | Bool _ -> false
-    | Not t -> tterm_contains_term t sub
-    | Str_idx (term,_) ->
-      tterm_contains_term term sub
-    | Deref term -> tterm_contains_term term sub
-    | Fptr _ -> false
-    | Addr tterm -> tterm_contains_term tterm sub
-    | Cast (_,tterm) ->
-      tterm_contains_term tterm sub
-    | Undef -> false
-    | Zeroptr -> false
-    | Utility _ -> false
-and tterm_contains_term super sub =
-  term_contains_term super.v sub
-and tterms_contain_term supers sub =
-  List.exists supers ~f:(fun sup -> tterm_contains_term sup sub)
-
-let rec is_const term =
-  match term with
-  | Bop (_,lhs,rhs) -> (is_constt lhs) && (is_constt rhs)
-  | Apply (_,args) -> List.for_all args ~f:is_constt
-  | Id _ -> false
-  | Struct (_,fields) -> List.for_all fields
-                           ~f:(fun field -> is_constt field.value)
-  | Int _ -> true
-  | Bool _ -> true
-  | Not t -> is_constt t
-  | Str_idx (tterm,_) -> is_constt tterm
-  | Deref tterm -> is_constt tterm
-  | Fptr _ -> true
-  | Addr tterm -> is_constt tterm
-  | Cast (_,tterm) -> is_constt tterm
-  | Undef -> true
-  | Zeroptr -> true
-  | Utility _ -> false
-and is_constt tterm = is_const tterm.v

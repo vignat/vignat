@@ -1,5 +1,4 @@
 open Core
-open Parser_util
 
 type verification_outcome =
   | Valid
@@ -48,22 +47,3 @@ let verify_ir ir verifast fname outf proj_root lino_fname =
       else Invalid_rez err
     end
   end
-
-let export_assumptions
-    ir verifast src_file
-    assu_file lino_fname outf proj_root =
-  Render.render_ir ir src_file ~render_assertions:false;
-  (* TODO: check consistency first (as in verify_ir,
-     but that function is obsolete now)*)
-  let _ = (* locate the line to dump VeriFast assumptions *)
-    Sys.command ("sed -n '/" ^ ir.Ir.export_point ^ "/=' " ^
-                 src_file ^ " > " ^ lino_fname)
-  in
-  let export_lino = String.strip (In_channel.read_all lino_fname) in
-  let _ =
-    Sys.command ( verifast ^ " -c -prover z3v4.5 -I " ^ proj_root ^ " -I ../nf/lib/stubs/dpdk" ^
-                  " -exportpoint " ^ export_lino ^
-                  " -context_export_file " ^ assu_file ^ " " ^
-                  src_file ^ " > " ^ outf )
-  in
-  parse_file assu_file
