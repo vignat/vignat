@@ -592,7 +592,7 @@ let fun_types =
                             expire_preserves_index_range(" ^
                            (tmp_gen "cur_ch") ^ ", " ^
                            (List.nth_exn args 2) ^
-                           ");\n
+                           ");\n\
                            length_nonnegative(\
                             dchain_get_expired_indexes_fp(" ^
                            (tmp_gen "cur_ch") ^ ", " ^
@@ -739,7 +739,7 @@ let fun_types =
                               "sent_on_port = " ^ (List.nth_exn params.args 1) ^ ";\n" ^
                               "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
-                 lemmas_after = [(fun params -> "a_packet_sent = true;\n");];
+                 lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
                  };
      "stub_core_trace_free", {
                    ret_type = Static Void;

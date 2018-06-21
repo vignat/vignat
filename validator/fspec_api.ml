@@ -31,7 +31,7 @@ let on_rez_nz f = (fun params ->
 
 let rec render_deep_assignment {lhs;rhs} =
   match rhs.t with
-  | Str (name,fields) ->
+  | Str (_,fields) ->
     String.concat ~sep: "\n"
       (List.map fields
          ~f:(fun (name,t) ->

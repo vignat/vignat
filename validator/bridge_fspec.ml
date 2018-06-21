@@ -65,7 +65,7 @@ let generate_2step_dereference tterm tmpgen =
   let (binding2,x) = innermost_dereference x tmpgen in
   ([binding1;binding2],x)
 
-let hide_the_other_mapp {arg_types;tmp_gen;args;arg_exps;_} =
+let hide_the_other_mapp {arg_types;tmp_gen;args=_;arg_exps=_;_} =
   match List.nth_exn arg_types 1 with
   | Ptr (Str ("ether_addr", _)) ->
     "//@ assert mapp<stat_keyi>(?" ^ (tmp_gen "stm_ptr") ^
@@ -84,7 +84,7 @@ let hide_the_other_mapp {arg_types;tmp_gen;args;arg_exps;_} =
     ");\n"
   | _ -> "#error unexpected key type"
 
-let reveal_the_other_mapp : lemma = fun {arg_types;tmp_gen;args;_} ->
+let reveal_the_other_mapp : lemma = fun {arg_types;tmp_gen;args=_;_} ->
   match List.nth_exn arg_types 1 with
   | Ptr (Str ("ether_addr", _)) ->
     "//@ open hide_mapp<stat_keyi>(" ^
@@ -331,7 +331,7 @@ let fun_types =
                                  extra_ptr_types = [];
                                  lemmas_before = [
                                    capture_chain "cur_ch" 0;
-                                   (fun {args;tmp_gen;_} ->
+                                   (fun {args=_;tmp_gen;_} ->
                                       "/*@ {\n\
                                         assert map_vec_chain_coherent<\
                                        ether_addri>(?" ^
@@ -513,7 +513,7 @@ let fun_types =
                  extra_ptr_types = [];
                  lemmas_before = [
                    hide_the_other_mapp;
-                   (fun ({arg_types;tmp_gen;args;arg_exps;_} as params) ->
+                   (fun ({arg_types;tmp_gen;args=_;arg_exps;_} as params) ->
                       match List.nth_exn arg_types 1 with
                       | Ptr (Str ("ether_addr", _)) ->
                         let (bindings,expr) =
@@ -638,7 +638,7 @@ let fun_types =
                               "sent_on_port = " ^ (List.nth_exn params.args 1) ^ ";\n" ^
                               "sent_packet_type = (" ^
                               sent_pkt ^ ")->packet_type;"));];
-                 lemmas_after = [(fun params -> "a_packet_sent = true;\n");];
+                 lemmas_after = [(fun _ -> "a_packet_sent = true;\n");];
                  };
      "stub_core_trace_free", {
                    ret_type = Static Void;
@@ -690,7 +690,7 @@ let fun_types =
                               (ether_addrp, sizeof(struct ether_addr))(a) \
                               {\
                               call();\
-                              }\n
+                              }\n\
                               }\n\
                               } else {\n\
                               produce_function_pointer_chunk \
@@ -886,7 +886,7 @@ let fun_types =
                                                     Ptr ether_addr_struct]];
                               extra_ptr_types = [];
                               lemmas_before = [
-                                (fun {args;tmp_gen;arg_types;_} ->
+                                (fun {args;tmp_gen=_;arg_types;_} ->
                                    match List.nth_exn arg_types 2 with
                                    | Ptr (Str (name, _)) ->
                                      if String.equal name "StaticKey" then

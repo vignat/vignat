@@ -94,18 +94,18 @@ let guess_type exp t =
 
 let int64_of_sexp value =
   let str = Sexp.to_string value in
-  let prefix = String.sub str 0 5 in
+  let prefix = String.sub str ~pos:0 ~len:5 in
   assert(prefix = "(w64 ");
-  Int64.of_string (String.sub str 5 ((String.length str) - 6)) (* -5 for begining -1 for end paren *)
+  Int64.of_string (String.sub str ~pos:5 ~len:((String.length str) - 6)) (* -5 for begining -1 for end paren *)
 
 (* TODO: this should spit out a type to help the validator *)
 let int_str_of_sexp value =
   let str = Sexp.to_string value in
-  let prefix = String.sub str 0 3 in
+  let prefix = String.sub str ~pos:0 ~len:3 in
   if prefix = "(w8" then
-    String.sub str 4 ((String.length str - 5))
+    String.sub str ~pos:4 ~len:((String.length str - 5))
   else if prefix = "(w1" || prefix = "(w3" || prefix = "(w6" then (* 16, 32, 64 *)
-    String.sub str 5 ((String.length str - 6))
+    String.sub str ~pos:5 ~len:((String.length str - 6))
   else str
 
 let infer_signed_type w =
@@ -185,7 +185,7 @@ let expand_shorted_sexp sexp =
     in
     let new_map =
       String.Map.of_alist_exn (List.map new_map_expanded
-                                 ~f:(fun (name,(new_el,changed)) -> (name,new_el)))
+                                 ~f:(fun (name,(new_el,_)) -> (name,new_el)))
     in
     (new_map,changed)
   in
@@ -211,18 +211,18 @@ let expand_shorted_sexp sexp =
   end;
   (fst (expand_exp (remove_defs sexp) defs))
 
-let get_fun_arg_type (ftype_of,type_guesses) (call : Trace_prefix.call_node) arg_num =
+let get_fun_arg_type (_,type_guesses) (call : Trace_prefix.call_node) arg_num =
   List.nth_exn (Int.Map.find_exn type_guesses call.id).arg_types arg_num
 
 let get_fun_extra_ptr_type
-    (ftype_of,type_guesses)
+    (_,type_guesses)
     (call : Trace_prefix.call_node)
     exptr_name =
   String.Map.find_exn
     (Int.Map.find_exn type_guesses call.id).extra_ptr_types
     exptr_name
 
-let get_fun_ret_type (ftype_of, type_guesses) call_id =
+let get_fun_ret_type (_, type_guesses) call_id =
   (Int.Map.find_exn type_guesses call_id).ret_type
 
 let get_num_args ((ftype_of:string->fun_spec), _) call =
@@ -235,7 +235,7 @@ let to_symbol str =
 
 let get_var_name_of_sexp exp =
   match exp with
-  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.List [Sexp.Atom posw; Sexp.Atom pos]; Sexp.Atom name]
+  | Sexp.List [Sexp.Atom rd; Sexp.Atom _; Sexp.List [Sexp.Atom _; Sexp.Atom pos]; Sexp.Atom name]
     when ( String.equal rd "ReadLSB" ||
            String.equal rd "Read") -> Some (to_symbol name ^ "_" ^ pos)
   | _ -> None
@@ -254,11 +254,9 @@ let sexp_is_of_this_width sexp w =
 
 let rec canonicalize_sexp sexp =
   match expand_shorted_sexp sexp with
-  | Sexp.List [Sexp.Atom f1; Sexp.Atom w1; Sexp.Atom offset;
-               Sexp.List [Sexp.Atom f2; Sexp.Atom w2; arg];]
-    when (String.equal f1 "Extract") && (String.equal f2 "ZExt") &&
-         (String.equal offset "0") &&
-         sexp_is_of_this_width arg w1 ->
+  | Sexp.List [Sexp.Atom "Extract"; Sexp.Atom w; Sexp.Atom "0";
+               Sexp.List [Sexp.Atom "ZExt"; Sexp.Atom _; arg];]
+    when sexp_is_of_this_width arg w ->
     lprintf "canonicalized: %s\n" (Sexp.to_string arg);
     (* TODO: make sure no sign-magic breaks here *)
     canonicalize_sexp arg
@@ -909,7 +907,7 @@ let get_basic_vars ftype_of tpref =
             complex_value_vars arg.value arg.ptr arg_type false acc)
     in
     let extra_ptr_vars = List.fold call.extra_ptrs ~init:arg_vars
-        ~f:(fun acc {pname;value;ptee} ->
+        ~f:(fun acc {pname;value=_;ptee} ->
             let ptee_type =
               (get_pointee (get_fun_extra_ptr_type ftype_of call pname)) in
           get_extra_ptr_pointee_vars ptee ptee_type acc)
@@ -1154,7 +1152,7 @@ let make_lemma_args_hack (args: tterm list) =
 let get_lemmas_before (ftype_of,_) fun_name =
   (ftype_of fun_name).lemmas_before
 
-let get_fun_exptr_types (ftype_of,guessed_types) call_id =
+let get_fun_exptr_types (_,guessed_types) call_id =
   (Int.Map.find_exn guessed_types call_id).extra_ptr_types
 
 let compose_pre_lemmas ftype_of fun_name call_id args arg_types tmp_gen ~is_tip =
@@ -1213,10 +1211,9 @@ let extract_fun_args ftype_of (call:Trace_prefix.call_node) =
                                         (Int.to_string x) ^ " -> " ^
                                         (Int64.to_string (int64_of_sexp arg.value)))
                 end
-              | x -> get_allocated_arg arg a_type
+              | _ -> get_allocated_arg arg a_type
             end
-          | _ ->
-            get_allocated_arg arg a_type)
+          | _ -> get_allocated_arg arg a_type)
 
 let get_lemmas_after (ftype_of, _) fun_name =
   (ftype_of fun_name).lemmas_after
@@ -1238,10 +1235,8 @@ let deref_tterm {v;t} =
   simplify_tterm {v = Deref {v;t};
                   t = get_pointee t}
 
-let rec is_empty_struct_val {sname;full;break_down} =
-  full = None &&
-  (List.for_all break_down ~f:(fun {fname;value;addr} ->
-     is_empty_struct_val value))
+let rec is_empty_struct_val {sname=_;full;break_down} =
+  full = None && (List.for_all break_down ~f:(fun {fname=_;value;addr=_} -> is_empty_struct_val value))
 
 let compose_args_post_conditions (call:Trace_prefix.call_node) ftype_of fun_args =
   List.filter_mapi call.args ~f:(fun i arg ->
@@ -1428,8 +1423,7 @@ let fixup_placeholder_ptrs_in_eq_cond moment {lhs;rhs} =
      rhs=fixup_placeholder_ptrs_in_tterm moment rhs ~need_symbol:false}
 
 let extract_common_call_context
-    ~is_tip ftype_of call ret_spec args
-    (free_vars:var_spec String.Map.t) =
+    ftype_of call ret_spec args =
   let ret_type = get_fun_ret_type ftype_of call.id in
   let pre_lemmas = ["Render lemmas at the last moment"] in
   let application =
@@ -1459,7 +1453,7 @@ let extract_common_call_context
 let convert_ctxt_list l = List.map l ~f:(fun e ->
     (get_sexp_value e Boolean))
 
-let extract_hist_call ftype_of call rets free_vars =
+let extract_hist_call ftype_of call rets =
   lprintf "extract hist call: %s\n" call.fun_name;
   let args = extract_fun_args ftype_of call in
   let args_post_conditions = compose_args_post_conditions call ftype_of args in
@@ -1476,12 +1470,11 @@ let extract_hist_call ftype_of call rets free_vars =
   match Int.Map.find rets call.id with
   | Some ret ->
     {context=extract_common_call_context
-         ~is_tip:false ftype_of call (Some ret) args free_vars;
+         ftype_of call (Some ret) args;
      result={args_post_conditions;ret_val=ret.value;post_statements}}
   | None ->
     {context=extract_common_call_context
-         ~is_tip:false ftype_of call None args
-         free_vars;
+         ftype_of call None args;
      result={args_post_conditions;ret_val={t=Unknown;v=Undef;};post_statements}}
 
 let split_common_assumptions a1 a2 =
@@ -1490,13 +1483,12 @@ let split_common_assumptions a1 a2 =
   List.partition_tf as1 ~f:(fun assumption ->
       List.exists as2 ~f:(fun other -> other = assumption))
 
-let extract_tip_calls ftype_of calls rets free_vars =
+let extract_tip_calls ftype_of calls rets =
   lprintf "extract tip call: %s\n" (List.hd_exn calls).fun_name;
   let call = List.hd_exn calls in
   let args = extract_fun_args ftype_of call in
   let context = extract_common_call_context
-      ~is_tip:true ftype_of call (Int.Map.find rets call.id) args
-      free_vars
+      ftype_of call (Int.Map.find rets call.id) args
   in
   let get_ret_val call =
     match Int.Map.find rets call.id with
@@ -1524,12 +1516,12 @@ let extract_tip_calls ftype_of calls rets free_vars =
   lprintf "got %d results for tip-call\n" (List.length results);
   {context;results}
 
-let extract_calls_info ftype_of tpref rets (free_vars:var_spec String.Map.t) =
+let extract_calls_info ftype_of tpref rets =
   let hist_funs =
     (List.map tpref.history ~f:(fun call ->
-         extract_hist_call ftype_of call rets free_vars))
+         extract_hist_call ftype_of call rets))
   in
-  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets free_vars in
+  let tip_calls = extract_tip_calls ftype_of tpref.tip_calls rets in
   hist_funs, tip_calls
 
 let collect_context pref =
@@ -1633,14 +1625,14 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
          | Some sname ->
            if String.equal sname struct_name then begin
              assert (List.for_all str_val.break_down
-                       ~f:(fun {fname;value;addr=_} ->
+                       ~f:(fun {fname;value=_;addr=_} ->
                            List.exists fields ~f:(fun (name,_) ->
                                String.equal name fname)));
              true
            end else false
          | None ->
            List.for_all str_val.break_down
-             ~f:(fun {fname;value;addr=_} ->
+             ~f:(fun {fname;value=_;addr=_} ->
                  List.exists fields ~f:(fun (name,_) -> String.equal name fname)
                  (* One level introspection should be enough *))
        end
@@ -1648,10 +1640,9 @@ let guess_dynamic_types (basic_ftype_of : string -> fun_spec) pref =
   in
   let find_type_match ts str_val val_name call =
     match List.find ts ~f:(fun (tag,t) -> type_match tag t str_val) with
-    | Some (tag,tt) -> lprintf "guessed %s for %s/%d#%s\n"
-                   (ttype_to_str tt)
-                   call.fun_name call.id val_name;
-      tt
+    | Some (_,tt) -> lprintf "guessed %s for %s/%d#%s\n" (ttype_to_str tt)
+                             call.fun_name call.id val_name;
+                     tt
     | None -> failwith
                 ("Can not guess a dynamic type for " ^
                  call.fun_name ^ "/" ^ Int.to_string call.id ^
@@ -1830,7 +1821,7 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let arguments = (allocate_args ftype_of pref (name_gen "arg"))@arguments in
   let rets = allocate_rets ftype_of pref in
   (* let (rets, tip_dummies) = allocate_tip_ret_dummies ftype_of pref.tip_calls rets in *)
-  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets free_vars in
+  let (hist_calls,tip_call) = extract_calls_info ftype_of pref rets in
   let arguments = fixup_placeholder_ptrs Beginning arguments in
   let hist_calls = render_hist_lemmas ftype_of hist_calls in
   let tip_call = render_tip_lemmas ftype_of tip_call in
@@ -1841,11 +1832,11 @@ let build_ir fun_types fin preamble boundary_fun finishing_fun
   let known_vars = (arguments@(String.Map.data free_vars)@(String.Map.data cmplxs)) in
   let fix_condition cond = {lhs=fix_term known_vars cond.lhs;rhs=fix_term known_vars cond.rhs} in
   let context_assumptions = List.map context_assumptions ~f:(fix_term known_vars) in
-  let hist_calls = List.map hist_calls ~f:(fun c -> {c with context={c.context with extra_pre_conditions=(List.map c.context.extra_pre_conditions ~f:fix_condition)};
-                                                            result={c.result with args_post_conditions=(List.map c.result.args_post_conditions ~f:fix_condition)}}) in
-  let tip_call = {tip_call with context={tip_call.context with extra_pre_conditions=(List.map tip_call.context.extra_pre_conditions ~f:fix_condition)};
-                                results=List.map tip_call.results ~f:(fun r -> {r with args_post_conditions=(List.map r.args_post_conditions ~f:fix_condition);
-                                                                                       post_statements=List.map r.post_statements ~f:(fix_term known_vars)})} in
+  let hist_calls = List.map hist_calls ~f:(fun c -> {context={c.context with extra_pre_conditions=(List.map c.context.extra_pre_conditions ~f:fix_condition)};
+                                                     result={c.result with args_post_conditions=(List.map c.result.args_post_conditions ~f:fix_condition)}}) in
+  let tip_call = {context={tip_call.context with extra_pre_conditions=(List.map tip_call.context.extra_pre_conditions ~f:fix_condition)};
+                  results=List.map tip_call.results ~f:(fun r -> {r with args_post_conditions=(List.map r.args_post_conditions ~f:fix_condition);
+                                                                         post_statements=List.map r.post_statements ~f:(fix_term known_vars)})} in
 
   (* Do not render the allocated_dummies *)
   {preamble;free_vars;arguments;

@@ -159,7 +159,7 @@ let rec render_tterm (t:tterm) =
              fname3) ->
     x ^ "." ^ fname1 ^ "." ^ fname2 ^ "." ^ fname3
   | Str_idx ({v=Deref {v=Id x;t=_};t=_},field_name) -> x ^ "->" ^ field_name
-  | Str_idx ({v=Deref x;t},field_name) -> "(" ^ (render_tterm x) ^ ")->" ^ field_name
+  | Str_idx ({v=Deref x;_},field_name) -> "(" ^ (render_tterm x) ^ ")->" ^ field_name
   | Str_idx (t,field_name) -> "(" ^ (render_tterm t) ^ ")." ^ field_name
   | Deref t -> "*(" ^ (render_tterm t) ^ ")"
   | Fptr f -> f
@@ -201,9 +201,6 @@ let rec term_eq a b =
   | _, _ -> false
 
 let rec call_recursively_on_tterm (f:tterm -> tterm option) tterm =
-  let recursion_in_utility f = function
-    | Ptr_placeholder x -> Ptr_placeholder x
-  in
   let tterm =
     {v= begin
         match tterm.v with
@@ -225,7 +222,7 @@ let rec call_recursively_on_tterm (f:tterm -> tterm option) tterm =
         | Cast (ctype,tt) -> Cast (ctype,call_recursively_on_tterm f tt)
         | Undef -> Undef
         | Zeroptr -> Zeroptr
-        | Utility u -> Utility (recursion_in_utility f u)
+        | Utility u -> Utility u
       end;
      t=tterm.t} in
   match f tterm with
@@ -240,7 +237,7 @@ let call_recursively_on_term (f:term -> term option) tterm =
 let simplify_tterm tterm =
   call_recursively_on_term (function
       | Deref {t=_;v=Addr x} -> Some x.v
-      | Str_idx ({v=Struct (strname,fields);
+      | Str_idx ({v=Struct (_,fields);
                   t=_},
                  fname) ->
         let field =
@@ -251,9 +248,6 @@ let simplify_tterm tterm =
       | _ -> None) tterm
 
 let rec replace_term_in_term old_t new_t term =
-  let replace_in_utility old_t new_t = function
-    | Ptr_placeholder x -> Ptr_placeholder x
-  in
   if term_eq term old_t then new_t else
     match term with
     | Bop (opa,lhs,rhs) ->
@@ -276,7 +270,7 @@ let rec replace_term_in_term old_t new_t term =
       Cast (ctype,replace_term_in_tterm old_t new_t tterm)
     | Undef -> Undef
     | Zeroptr -> Zeroptr
-    | Utility util -> Utility (replace_in_utility old_t new_t util)
+    | Utility util -> Utility util
 and replace_term_in_tterm old_t new_t tterm =
   {tterm with v=replace_term_in_term old_t new_t tterm.v}
 and replace_term_in_tterms old_t new_t tterm_list =
@@ -307,7 +301,7 @@ let rec append_id_in_term_id_starting_with prefix suffix term = match term with
   | Bop (opa, lhs, rhs) -> Bop(opa, append_id_in_tterm_id_starting_with prefix suffix lhs, append_id_in_tterm_id_starting_with prefix suffix rhs)
   | Apply (f, args) -> Apply(f, List.map args ~f:(append_id_in_tterm_id_starting_with prefix suffix))
   | Id x -> if String.is_prefix x ~prefix:prefix then Id (x ^ suffix) else Id x
-  | Struct (name, fields) -> failwith "not supported here, too lazy"
+  | Struct _ -> failwith "not supported here, too lazy"
   | Int _ -> term
   | Bool _ -> term
   | Not tt -> Not (append_id_in_tterm_id_starting_with prefix suffix tt)
@@ -343,9 +337,6 @@ let rec fix_type_of_id_in_tterm (vars: var_spec list) tterm = match tterm.v with
   | Utility _ -> tterm
 
 let rec collect_nodes f tterm =
-  let collect_on_utility f = function
-    | Ptr_placeholder _ -> []
-  in
   match f tterm with
   | Some x -> [x]
   | None ->
@@ -366,12 +357,9 @@ let rec collect_nodes f tterm =
     | Cast (_,v) -> collect_nodes f v
     | Undef -> []
     | Zeroptr -> []
-    | Utility u -> collect_on_utility f u
+    | Utility _ -> []
 
 let rec term_contains_term super sub =
-  let utility_contains sub = function
-    | Ptr_placeholder _ -> false
-  in
   if term_eq super sub then true else
     match super with
     | Bop (_,lhs,rhs) ->
@@ -393,16 +381,13 @@ let rec term_contains_term super sub =
       tterm_contains_term tterm sub
     | Undef -> false
     | Zeroptr -> false
-    | Utility u -> utility_contains sub u
+    | Utility _ -> false
 and tterm_contains_term super sub =
   term_contains_term super.v sub
 and tterms_contain_term supers sub =
   List.exists supers ~f:(fun sup -> tterm_contains_term sup sub)
 
 let rec is_const term =
-  let is_utility_const = function
-    | Ptr_placeholder _ -> false
-  in
   match term with
   | Bop (_,lhs,rhs) -> (is_constt lhs) && (is_constt rhs)
   | Apply (_,args) -> List.for_all args ~f:is_constt
@@ -419,5 +404,5 @@ let rec is_const term =
   | Cast (_,tterm) -> is_constt tterm
   | Undef -> true
   | Zeroptr -> true
-  | Utility u -> is_utility_const u
+  | Utility _ -> false
 and is_constt tterm = is_const tterm.v

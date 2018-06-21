@@ -12,14 +12,14 @@ let rec render_eq_sttmt ~is_assert out_arg (out_val:tterm) =
       | Id oaid, Str (_, (fname,_)::_) -> "//@ " ^ head ^ "(" ^ oaid ^ "." ^ fname ^ " == " ^ ovid ^ ");\n"
       | _, _ -> "//@ " ^ head ^ "(" ^ (render_tterm out_arg) ^ " == " ^ (render_tterm out_val) ^ ");\n"
     end
-  | Id ovid, Ptr _ -> (* HUGE HACK assume the type is wrongly guessed and it's actually an integer *)
+  | Id _, Ptr _ -> (* HUGE HACK assume the type is wrongly guessed and it's actually an integer *)
       render_eq_sttmt ~is_assert:is_assert out_arg {v=out_val.v;t=Uint16}
   (* Don't use == over structs, VeriFast doesn't understand it and returns a confusing message about dereferencing pointers *)
   | Id ovid, Str (_, ovfields) ->
     begin match out_arg.v, out_arg.t with
-    | Id oaid, Ptr oat -> (* HUGE HACK assume the type is wrongly guessed and it's actually an integer *)
+    | Id _, Ptr _ -> (* HUGE HACK assume the type is wrongly guessed and it's actually an integer *)
       render_eq_sttmt ~is_assert:is_assert out_val {v=out_arg.v;t=Uint16}
-    | Id oaid, Uint16 ->
+    | Id _, Uint16 ->
       render_eq_sttmt ~is_assert:is_assert out_val out_arg
     | Id oaid, _ ->
       if out_val.t <> out_arg.t then failwith ("not the right type! " ^ ovid ^ ":" ^ (ttype_to_str out_val.t) ^ " <> " ^ oaid ^ ":" ^ (ttype_to_str out_arg.t));
@@ -98,7 +98,7 @@ let rec gen_plain_equalities {lhs;rhs} =
   | Str (_, fields), Struct (_, fvals) ->
     List.join
       (List.map fields ~f:(fun (name,ttype) ->
-           let v = List.find_exn fvals ~f:(fun {name=vname;value} ->
+           let v = List.find_exn fvals ~f:(fun {name=vname;_} ->
                String.equal vname name)
            in
            gen_plain_equalities
@@ -228,7 +228,7 @@ let split_assignments assignments =
       | Id _ -> (concrete,assignment::symbolic)
       | Int _ -> (assignment::concrete,symbolic)
       | Bool _ -> (assignment::concrete,symbolic)
-      | Bop (Add, ({v=Id _;t=_} as symb), ({v=Int x;t=_} as delta)) ->
+      | Bop (Add, ({v=Id _;t=_} as symb), ({v=Int _;t=_} as delta)) ->
         (concrete,
          {lhs=symb;
           rhs={v=Bop (Sub, assignment.rhs, delta);
@@ -319,8 +319,7 @@ let bubble_equalities tterms =
 let is_there_device_constraint constraints =
   List.exists constraints ~f:(fun tterm ->
       match tterm.v with
-      | Bop (Eq, lhs, {v=Id x; t}) when String.equal x "device_0" ->
-        true
+      | Bop (Eq, _, {v=Id "device_0"; _}) -> true
       | _ -> false)
 
 let guess_support_assignments constraints symbs =
@@ -342,7 +341,7 @@ let guess_support_assignments constraints symbs =
           ({lhs={v=Id x;t};rhs=lhs}::assignments, String.Set.remove symbs x)
         | Bop (Le, {v=Int i;t=lt}, {v=Id x;t}) when String.Set.mem symbs x ->
           (* Stupid hack. If the variable is constrained to not be equal to another variable, we assume they have the same lower bound and assign the second one to bound+2 *)
-          if List.exists constraints (fun cstr -> match cstr with {v=Bop (Eq,{v=Bool false;_},{v=Bop (Eq,{v=Id _;_},{v=Id r;_});_});_} when r = x -> true | _ -> false) then
+          if List.exists constraints ~f:(fun cstr -> match cstr with {v=Bop (Eq,{v=Bool false;_},{v=Bop (Eq,{v=Id _;_},{v=Id r;_});_});_} when r = x -> true | _ -> false) then
               ({lhs={v=Id x;t};rhs={v=Int (i+2);t=lt}}::assignments, String.Set.remove symbs x)
           else if there_is_a_device_constraint then (*Dirty hack for a difficult case, analyzed by hand*)
               ({lhs={v=Id x;t};rhs={v=Int 1;t=lt}}::assignments, String.Set.remove symbs x)
@@ -560,7 +559,7 @@ let rec render_post_assertions dtree ret_name ret_type hist_symbs cmplxs =
        res.ret_val ret_name ret_type
        res.post_statements hist_symbs
        res.args_post_conditions cmplxs) ^ "\n"
-  | Alternative_by_constraint ((sttmt1,dtree1),(sttmt2,dtree2)) ->
+  | Alternative_by_constraint ((sttmt1,dtree1),(_,dtree2)) ->
     "if (" ^ (render_tterm sttmt1) ^ ") {\n" ^
       (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
     "} else {\n" ^
@@ -604,7 +603,7 @@ let render_equality_assumptions args =
 
 let render_tip_fun_call
     {context;results}
-    export_point free_vars hist_symbols
+    export_point hist_symbols
     ~render_assertions
     cmplxs =
   (render_extra_pre_conditions context) ^ "\n" ^
@@ -751,7 +750,6 @@ let render_ir ir fout ~render_assertions =
       Out_channel.output_string cout (render_semantic_checks ir.semantic_checks);
       Out_channel.output_string cout (render_tip_fun_call
                                         ir.tip_call ir.export_point
-                                        ir.free_vars
                                         hist_symbols
                                         ~render_assertions
                                         ir.cmplxs);
