@@ -541,3 +541,20 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     assume(false);//TODO
   }
   @*/
+
+/*@
+  lemma void kkeeper_add_one<t>(list<void*> addrs,
+                                list<pair<t, bool> > contents,
+                                list<pair<t, void*> > addr_map,
+                                t v,
+                                int index);
+  requires 0 <= index &*& index < length(contents) &*&
+           true == forall2(contents, addrs, (kkeeper)(addr_map));
+  ensures true == forall2(update(index, pair(v, false), contents),
+                          addrs,
+                          (kkeeper)(map_put_fp(addr_map, v,
+                                               nth(index, addrs))));
+  {
+    assume(false);//TODO
+  }
+  @*/

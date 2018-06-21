@@ -583,6 +583,21 @@ let fun_types =
                       (tmp_gen "dm") ^ ", " ^
                       (tmp_gen "dv") ^ ", " ^
                       (tmp_gen "dh") ^ ");\n} @*/");
+                   (fun {tmp_gen;args;_} ->
+                      let arg1 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn args 1) in
+                   "/*@ { \n\
+                    assert mapp<ether_addri>(_, _, _, _, mapc(_, _, ?dm_addrs)); \n\
+                    assert vector_accp<ether_addri>(_, _, ?the_dv, ?dv_addrs, _, _); \n\
+                    ether_addri vvv = eaddrc(" ^ arg1 ^
+                   "->a, " ^ arg1 ^
+                   "->b, " ^ arg1 ^
+                   "->c, " ^ arg1 ^
+                   "->d, " ^ arg1 ^
+                   "->e, " ^ arg1 ^
+                   "->f); \n\
+                    kkeeper_add_one(dv_addrs, the_dv, dm_addrs, vvv, " ^ (List.nth_exn args 2) ^
+                   "); \n\
+                    } @*/");
                    hide_the_other_mapp];
                  lemmas_after = [
                    (fun {tmp_gen;args;_} -> let arg1 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn args 1) in

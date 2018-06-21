@@ -134,7 +134,8 @@ int expire_items_single_map/*@ <kt> @*/(struct DoubleChain* chain,
             nv == vector_erase_all_fp(v, dchain_get_expired_indexes_fp(ch, time)) &*&
             map_vec_chain_coherent<kt>(nm, nv, nch) &*&
             length(nv) == length(v) &*&
-            result == length(dchain_get_expired_indexes_fp(ch, time)); @*/
+            result == length(dchain_get_expired_indexes_fp(ch, time)) &*&
+            true == forall2(nv, vaddrs, (kkeeper)(naddrs)); @*/
 {
   int count = 0;
   int index = -1;
