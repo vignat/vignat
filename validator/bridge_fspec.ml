@@ -585,18 +585,18 @@ let fun_types =
                       (tmp_gen "dh") ^ ");\n} @*/");
                    hide_the_other_mapp];
                  lemmas_after = [
-                   (fun {tmp_gen;args;_} ->
+                   (fun {tmp_gen;args;_} -> let arg1 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn args 1) in
                       "\n/*@ {\n\
                        assert map_vec_chain_coherent<ether_addri>(" ^ (tmp_gen "dm") ^
                       ", ?" ^ (tmp_gen "dv") ^
                       ", ?" ^ (tmp_gen "dh") ^
                       ");\n\
-                       ether_addri " ^ (tmp_gen "ea") ^ " = eaddrc(" ^ (List.nth_exn args 1) ^
-                      "->a, " ^ (List.nth_exn args 1) ^
-                      "->b, " ^ (List.nth_exn args 1) ^
-                      "->c, " ^ (List.nth_exn args 1) ^
-                      "->d, " ^ (List.nth_exn args 1) ^
-                      "->e, " ^ (List.nth_exn args 1) ^
+                       ether_addri " ^ (tmp_gen "ea") ^ " = eaddrc(" ^ arg1 ^
+                      "->a, " ^ arg1 ^
+                      "->b, " ^ arg1 ^
+                      "->c, " ^ arg1 ^
+                      "->d, " ^ arg1 ^
+                      "->e, " ^ arg1 ^
                       "->f);\n\
                        mvc_coherent_put<ether_addri>(" ^ (tmp_gen "dm") ^
                       ", " ^ (tmp_gen "dv") ^

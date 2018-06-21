@@ -670,6 +670,8 @@ let rec get_sexp_value exp ?(at=Beginning) t =
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Ult") ->
     {v=Bop (Lt,(get_sexp_value lhs Uunknown ~at),(get_sexp_value rhs Uunknown ~at));t}
+  | Sexp.List [Sexp.Atom "Eq"; Sexp.List [Sexp.Atom "w32"; Sexp.Atom "0"]; Sexp.List ((Sexp.Atom "ReadLSB" :: tl))] ->
+    {v=Bop (Eq, {v=Int 0;t=Uint32}, (get_sexp_value (Sexp.List (Sexp.Atom "ReadLSB" :: tl)) Uint32 ~at));t=Boolean}
   | Sexp.List [Sexp.Atom f; lhs; rhs]
     when (String.equal f "Eq") ->
     let ty = guess_type_l [lhs;rhs] Unknown in
