@@ -1,0 +1,2 @@
+<beep>/basic-negative.c
+<beep>/basic-negative.c(167,15-17): Assertion might not hold: (= (- 0 1) ret0)
