@@ -26,7 +26,6 @@
                       nop_true,
                       mapc(capacity, ?dm, ?daddrs)) &*&
     vectorp<ether_addri>(dyn_keys, ether_addrp, ?dks, ?dkaddrs) &*&
-    true == forall2(dks, dkaddrs, (kkeeper)(daddrs)) &*&
     vectorp<uint16_t>(dyn_vals, dyn_valp, ?dvs, ?dvaddrs) &*&
     mapp<stat_keyi>(st_map, static_keyp,
                     st_key_hash,
@@ -43,6 +42,7 @@
     true == forall(sm, (st_entry_bound)(dev_count));
 
     //TODO: true == forall2(sv, skaddrs, (kkeeper)(saddrs))  ?
+    //TODO: true == forall2(dks, dkaddrs, (kkeeper)(daddrs)) ?
   @*/
 
 void bridge_loop_invariant_consume(struct DoubleChain** dyn_heap,
