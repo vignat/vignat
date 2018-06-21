@@ -486,7 +486,7 @@ let make_cmplx_val exp t =
 let eliminate_false_eq_0 exp t =
   match (exp,t) with
   | Sexp.List [Sexp.Atom eq1; Sexp.Atom fls;
-               Sexp.List [Sexp.Atom eq2; Sexp.Atom zero; e]],
+               Sexp.List [Sexp.Atom eq2; Sexp.List [Sexp.Atom _; Sexp.Atom zero]; e]],
     Boolean
     when (String.equal eq1 "Eq") && (String.equal fls "false") &&
          (String.equal eq2 "Eq") && (String.equal zero "0") ->
@@ -688,8 +688,8 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     when (String.equal f "And") ->
     begin
       match rhs with
-      | Sexp.Atom n when is_int n ->
-        {v=Bop (Bit_and,(get_sexp_value lhs Uint32 ~at),(get_sexp_value rhs Uint32 ~at));t=Uint32}
+      | Sexp.List [Sexp.Atom "w32"; Sexp.Atom n] when is_int n ->
+        {v=Bop (Eq, (get_sexp_value rhs Uint32 ~at), {v=Bop (Bit_and,(get_sexp_value lhs Uint32 ~at),(get_sexp_value rhs Uint32 ~at));t=Uint32});t=Boolean}
       | _ ->
         let ty = guess_type_l [lhs;rhs] t in
         lprintf "interesting And case{%s}: %s "

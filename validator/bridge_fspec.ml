@@ -610,9 +610,9 @@ let fun_types =
                  ret_type = Static Void;
                  arg_types = stt [Ptr (Ptr rte_mbuf_struct);];
                  extra_ptr_types = estt ["incoming_package",
-                                         rte_mbuf_struct;
+                                         Ptr rte_mbuf_struct;
                                          "user_buf_addr",
-                                         stub_mbuf_content_struct];
+                                         Ptr stub_mbuf_content_struct];
                  lemmas_before = [];
                  lemmas_after = [(fun params -> "a_packet_received = true;\n" ^
                                        let arg0 = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
@@ -628,7 +628,7 @@ let fun_types =
                  ret_type = Static Uint8;
                  arg_types = stt [Ptr rte_mbuf_struct; Uint16];
                  extra_ptr_types = estt ["user_buf_addr",
-                                         stub_mbuf_content_struct];
+                                         Ptr stub_mbuf_content_struct];
                  lemmas_before = [
                      (fun params ->
                           let sent_pkt = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
@@ -644,13 +644,13 @@ let fun_types =
                    ret_type = Static Void;
                    arg_types = stt [Ptr rte_mbuf_struct;];
                    extra_ptr_types = estt ["user_buf_addr",
-                                           stub_mbuf_content_struct];
+                                           Ptr stub_mbuf_content_struct];
                    lemmas_before = [];
                    lemmas_after = [];};
      "flood", {ret_type = Static Ir.Sint32;
                arg_types = stt [Ptr rte_mbuf_struct; Ir.Uint16; Ir.Uint16];
                extra_ptr_types = estt ["user_buf_addr",
-                                       stub_mbuf_content_struct];
+                                       Ptr stub_mbuf_content_struct];
                lemmas_before = [
                (fun params ->
                  let sent_pkt = Str.global_replace (Str.regexp_string "bis") "" (List.nth_exn params.args 0) in
@@ -732,11 +732,11 @@ let fun_types =
                                                   Ptr (Ptr dynamic_value_struct)]];
                             extra_ptr_types = ["borrowed_cell",
                                                Dynamic ["StaticKey",
-                                                        static_key_struct;
+                                                        Ptr static_key_struct;
                                                         "ether_addr",
-                                                        ether_addr_struct;
+                                                        Ptr ether_addr_struct;
                                                         "DynamicValue",
-                                                        dynamic_value_struct]];
+                                                        Ptr dynamic_value_struct]];
                             lemmas_before = [
                               (fun {arg_types;tmp_gen;args;_} ->
                                  match List.nth_exn arg_types 2 with
@@ -793,9 +793,9 @@ let fun_types =
                                                   Ptr (Ptr ether_addr_struct)]];
                             extra_ptr_types = ["borrowed_cell",
                                                Dynamic ["StaticKey",
-                                                        static_key_struct;
+                                                        Ptr static_key_struct;
                                                         "ether_addr",
-                                                        ether_addr_struct]];
+                                                        Ptr ether_addr_struct]];
                             lemmas_before = [
                               (fun {arg_types;_} ->
                                  match List.nth_exn arg_types 2 with
