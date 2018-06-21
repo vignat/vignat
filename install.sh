@@ -48,7 +48,7 @@ sudo apt-get install -y \
                      wget build-essential git python `# for more or less everything`
 
 # On the Linux subsystem for Windows, uname -r includes a "-Microsoft" token
-KERNEL_VER=$(uname -r | sed 's/-Microsoft//')
+KERNEL_VER=$(uname -r | sed 's/-Microsoft//' | sed 's/-generic//')
 
 # Install the right headers; we do *not* install headers on Docker since it uses the underlying kernel
 if [ "$OS" = 'microsoft' ]; then
@@ -56,7 +56,12 @@ if [ "$OS" = 'microsoft' ]; then
   sudo apt install "linux-headers-$KERNEL_VER-generic"
   export RTE_KERNELDIR="/usr/src/linux-headers-$KERNEL_VER-generic/"
 elif [ "$OS" = 'linux' -o "$OS" = 'docker' ]; then
+  if [ "$OS" = 'docker' ]; then
+      echo "Warning: the host($HOST_KERNEL_VER) and guest($KERNEL_VER)\
+          OS kernels must be somewhat compatible (because the guest uses the host kernel)"
+  fi
   sudo apt-get install -y "linux-headers-$KERNEL_VER"
+  sudo apt-get install -y "linux-headers-${KERNEL_VER}-generic"
 fi
 
 
