@@ -52,11 +52,12 @@ assert_file_exists "$PREFIX.validator_result" "the validator result"
 assert_file_exists "$PREFIX.verify.stdout" "the VeriFast result"
 assert_file_exists "$PLUGIN" "the validator plugin"
 
-mkdir "$TEST_DIR"
+mkdir -p "$TEST_DIR"
 cp "$PREFIX.src" "$TEST_DIR/trace"
 cp "$PREFIX.validator_result" "$TEST_DIR/expected"
 cp "$PREFIX.verify.stdout" "$TEST_DIR/verify.stdout.expected"
 echo "FSPEC_PLUGIN=$PLUGIN" > "$TEST_DIR/config"
+echo "ORIG_PREFIX=$PREFIX" >> "$TEST_DIR/config"
 
 # Canonicalize the file name in the VeriFast report.
 sed -i "s:$PREFIX:<beep>/$TEST_NAME:g" "$TEST_DIR/verify.stdout.expected"
