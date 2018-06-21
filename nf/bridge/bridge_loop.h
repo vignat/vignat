@@ -27,6 +27,7 @@
                       mapc(capacity, ?dm, ?daddrs)) &*&
     vectorp<ether_addri>(dyn_keys, ether_addrp, ?dks, ?dkaddrs) &*&
     vectorp<uint16_t>(dyn_vals, dyn_valp, ?dvs, ?dvaddrs) &*&
+    true == forall2(dks, dkaddrs, (kkeeper)(daddrs)) &*&
     mapp<stat_keyi>(st_map, static_keyp,
                     st_key_hash,
                     nop_true,
