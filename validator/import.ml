@@ -74,7 +74,9 @@ let guess_type exp t =
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "Concat") && (String.equal w "w32") -> Uint32
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
-        when (String.equal f "Concat") && (String.equal w "w64") -> failwith "guess_type w64 not supported yet"
+        when (String.equal f "Concat") && (String.equal w "w64") -> Uint64
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "Read") && (String.equal w "w8") -> Uint8
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "ReadLSB") && (String.equal w "w16") -> Uint16
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
@@ -93,6 +95,8 @@ let guess_type exp t =
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "Concat") && (String.equal w "w32") -> Sint32
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+        when (String.equal f "Read") && (String.equal w "w8") -> Sint8
+      | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "ReadLSB") && (String.equal w "w16") -> Sint16
       | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
         when (String.equal f "ReadLSB") && (String.equal w "w32") -> Sint32
@@ -107,6 +111,8 @@ let guess_type exp t =
     | Sexp.List [Sexp.Atom w; _] when w = "w16" -> Uint16
     | Sexp.List [Sexp.Atom w; _] when w = "w32" -> Uint32
     | Sexp.List [Sexp.Atom w; _] when w = "w64" -> Uint64
+    | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
+      when (String.equal f "Read") && (String.equal w "w8") -> Uint8
     | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
       when (String.equal f "ReadLSB") && (String.equal w "w16") -> Uint16
     | Sexp.List ((Sexp.Atom f) :: (Sexp.Atom w) :: _)
@@ -138,6 +144,7 @@ let infer_type_sign f =
   else if String.equal f "Slt" then Sure Sgn
   else if String.equal f "Ule" then Sure Unsgn
   else if String.equal f "Ult" then Sure Unsgn
+  else if String.equal f "Eq" then Sure Unsgn
   else Noidea
 
 let expand_shorted_sexp sexp =
@@ -735,7 +742,7 @@ let update_ptee_variants nval older =
 let rec add_to_known_addresses
     (base_value: tterm) breakdown addr
     callid depth =
-  lprintf "ATK %s : %s at %s\n" (render_tterm base_value) (ttype_to_str base_value.t) (moment_to_str callid);
+  (*lprintf "ATK %s : %s at %s\n" (render_tterm base_value) (ttype_to_str base_value.t) (moment_to_str callid);*)
   begin match base_value.t with
   | Ptr (Str (_,fields) as ptee_type) ->
     let fields = List.fold fields ~init:String.Map.empty
@@ -755,12 +762,6 @@ let rec add_to_known_addresses
           b_value value.break_down
           addr callid (depth+1);)
   | _ ->
-    if (List.length breakdown) <> 0 then
-      lprintf "ATK %s : %s type with %d fields\n" (render_tterm base_value)
-        (ttype_to_str base_value.t) (List.length breakdown)
-    else
-      lprintf "ATK %s : %s type with ZERO fields\n" (render_tterm base_value)
-        (ttype_to_str base_value.t);
     assert((List.length breakdown) = 0)
   end;
   lprintf "allocating *%Ld = %s : %s at %s\n"
@@ -789,8 +790,8 @@ let rec add_to_known_addresses
    it as a pointee into known_addresses*)
 let rec add_known_symbol_at_address (value: tterm) addr callid depth =
   let prev = match Int64.Map.find !known_addresses addr with
-    | Some v -> lprintf "AKS HAS PREV %Ld: %s\n" addr (render_tterm value); v
-    | None -> lprintf "AKS NO PREV %Ld: %s\n" addr (render_tterm value); []
+    | Some v -> v
+    | None -> []
   in
   let find_field_addr strname fieldname fieldtype =
     List.find_map prev ~f:(fun aspec ->
@@ -801,15 +802,12 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
           String.Map.find aspec.breakdown fieldname
         | _ -> None)
   in
-  lprintf "AKS addr: %Ld looking for %s\n" addr (ttype_to_str value.t);
   begin match value.t with
   | Ptr (Str (strname,fields)) ->
-    lprintf "Pdestruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
         lprintf "for %s.%s : %s\n" strname fname (ttype_to_str ftype);
         begin match find_field_addr strname fname ftype with
-        | Some fa -> lprintf "AKS recursing: %s\n" (render_tterm value);
-                     add_known_symbol_at_address
+        | Some fa -> add_known_symbol_at_address
                      {v=Addr {v=Str_idx ({v=Deref value; t=Str (strname,fields)}, fname);
                               t=ftype};
                       t=Ptr ftype}
@@ -817,29 +815,24 @@ let rec add_known_symbol_at_address (value: tterm) addr callid depth =
         | None -> failwith ("failed to find field " ^ fname ^ " at the address " ^ (Int64.to_string addr))
         end)
   | Str (strname,fields) ->
-    lprintf "destruct\n";
     List.iter fields ~f:(fun (fname,ftype) ->
         let field_addr = match find_field_addr strname fname ftype with
           | Some fa -> fa
           | None -> failwith ("failed to find field " ^ fname ^
                               " at the address " ^ (Int64.to_string addr))
         in
-        lprintf "AKS recurse struct %s\n" (render_tterm value);
         add_known_symbol_at_address
           {v=Addr {v=Str_idx (value, fname); t=ftype}; t=Ptr ftype}
           field_addr callid (depth + 1))
   | Ptr (Ptr ptee) ->
     List.iter prev ~f:(fun aspec ->
-        lprintf "ptr ptr %s\n"
-          (render_tterm (simplify_tterm aspec.value));
         match (simplify_tterm aspec.value).v with
         | Addr {v=Utility (Ptr_placeholder addr);t=_} ->
-          lprintf "AKS recursing ptr ptr %s %Ld\n" (render_tterm value) addr;
           add_known_symbol_at_address {v=Deref value;
                                        t=Ptr ptee}
             addr callid (depth + 1)
-        | _ -> lprintf "AKS nonplaceholder %s\n" (render_tterm (simplify_tterm aspec.value)))
-  | _ -> lprintf "AKS nope %s\n" (render_tterm value);
+        | _ -> ())
+  | _ -> ()
   end;
   add_to_known_addresses (simplify_tterm value) [] addr callid depth
 
