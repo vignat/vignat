@@ -176,6 +176,8 @@ let term_utility_eq a b =
 
 let rec term_eq a b =
   match a,b with
+  | Bop (Eq, lhsa, rhsa), Bop (Eq, lhsb, rhsb) ->
+    ((term_eq lhsa.v lhsb.v) && (term_eq rhsa.v rhsb.v)) || ((term_eq lhsa.v rhsb.v) && (term_eq rhsa.v lhsb.v))
   | Bop (opa,lhsa,rhsa), Bop (opb,lhsb,rhsb) ->
     opa = opb && (term_eq lhsa.v lhsb.v) && (term_eq rhsa.v rhsb.v)
   | Apply (fa,argsa), Apply (fb, argsb) ->
@@ -328,3 +330,26 @@ let rec collect_nodes f tterm =
     | Undef -> []
     | Zeroptr -> []
     | Utility _ -> []
+
+let rec is_const term =
+  let is_utility_const = function
+    | Ptr_placeholder _ -> false
+  in
+  match term with
+  | Bop (_,lhs,rhs) -> (is_constt lhs) && (is_constt rhs)
+  | Apply (_,args) -> List.for_all args ~f:is_constt
+  | Id _ -> false
+  | Struct (_,fields) -> List.for_all fields
+                           ~f:(fun field -> is_constt field.value)
+  | Int _ -> true
+  | Bool _ -> true
+  | Not t -> is_constt t
+  | Str_idx (tterm,_) -> is_constt tterm
+  | Deref tterm -> is_constt tterm
+  | Fptr _ -> true
+  | Addr tterm -> is_constt tterm
+  | Cast (_,tterm) -> is_constt tterm
+  | Undef -> true
+  | Zeroptr -> true
+  | Utility u -> is_utility_const u
+and is_constt tterm = is_const tterm.v

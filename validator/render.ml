@@ -192,25 +192,6 @@ let render_hist_fun_call {context;result} =
   (render_args_post_conditions ~is_assert:false result.args_post_conditions) ^ (* ret can influence whether args are accessible *)
   (render_post_assumptions result.post_statements)
 
-let find_known_complementaries (sttmts:tterm list) =
-  List.filter_map sttmts ~f:(fun sttmt ->
-      match sttmt.v with
-      | Bop (Eq,{v=Bool false;t=_},rhs) -> Some (sttmt,rhs)
-      | Bop (Eq,{v=Int 0;t=_}, rhs) -> Some (sttmt,rhs)
-      | _ -> None)
-
-let find_complementary_sttmts sttmts1 sttmts2 =
-  let find_from_left sttmts1 (sttmts2:tterm list) =
-    List.find_map (find_known_complementaries sttmts1) ~f:(fun (orig,complement) ->
-        if List.exists sttmts2 ~f:(fun sttmt2 -> term_eq complement.v sttmt2.v) then
-          Some (orig,complement)
-        else None)
-  in
-  match find_from_left sttmts1 sttmts2 with
-  | Some (st1,st2) -> Some (st1,st2)
-  | None -> find_from_left sttmts2 sttmts1
-
-
 let gen_ret_equalities ret_val ret_name ret_type =
   match ret_name with
   | Some ret_name ->
@@ -279,9 +260,6 @@ let ids_from_eq_conditions eq_conds =
 let split_constraints tterms symbols =
   List.partition_tf tterms ~f:(fun tterm ->
       Set.for_all (ids_from_term tterm) ~f:(String.Set.mem symbols))
-
-let render_some_assignments_as_assumptions assignments =
-  String.concat ~sep:"\n" (List.map assignments ~f:(fun {lhs;rhs} -> render_eq_sttmt ~is_assert:false lhs rhs))
 
 let render_concrete_assignments_as_assertions assignments =
   String.concat ~sep:"\n"
@@ -372,7 +350,7 @@ let fix_mistyped_tip_ret tterm =
   | _ -> tterm
 
 
-let render_output_check
+let output_check_and_assignments
     ret_val ret_name ret_type model_constraints
     hist_symbs args_post_conditions cmplxs
   =
@@ -414,171 +392,95 @@ let render_output_check
   let upd_model_constraints =
     apply_assignments symbolic_var_assignments output_constraints
   in
-  "// Output check\n" ^
-  "// Input assumptions\n" ^
-  (render_input_assumptions input_constraints) ^ "\n" ^
-  "// Support assignments of unbound symbols\n" ^
-  (* VV For the "if (...)" condition, which involves
-     VV the original value (non-renamed)*)
-  (render_some_assignments_as_assumptions symbolic_var_assignments) ^ "\n" ^
-  "// Concrete equalities: \n" ^
-  (render_concrete_assignments_as_assertions concrete_assignments) ^ "\n" ^
-  "// Model constraints: \n" ^
-  (String.concat ~sep:"\n"
-     (List.map upd_model_constraints ~f:(fun constr -> match (fix_mistyped_tip_ret constr) with
-                                                       | {v=Bop (Eq, lhs, rhs);t=_} -> render_eq_sttmt ~is_assert:true lhs rhs
-                                                       | c -> "/*@ assert(" ^ (render_tterm c) ^ "); @*/")))
-
-let tterm_list_to_string tterms =
-  String.concat ~sep:"\n" (List.map tterms ~f:render_tterm)
-
-type decision_tree = Single_result of Ir.hist_call_result
-                   | Alternative_by_ret of
-                       ((Ir.tterm*decision_tree)*(Ir.tterm*decision_tree))
-                   | Alternative_by_constraint of
-                       ((Ir.tterm*decision_tree)*(Ir.tterm*decision_tree))
-
-let statements_aligned_with_constraint constr sttmts =
-  List.exists sttmts ~f:(fun sttmt ->
-      match sttmt.v, constr.v with
-      | Bop (Bit_and,x,_), _ when (term_eq x.v constr.v) -> true
-      | Bop (Eq,{v=Int x;t=_},y),Bop (Eq,{v=Bool false;t=_},{v=Bop (Eq,{v=Int z;t=_},w);t=_})
-        when (term_eq y.v w.v) && x <> z ->
-        true
-      | _ -> term_eq constr.v sttmt.v)
-
-let rec build_decision_tree results =
-  let handle_two_constraints hd1 hd2 =
-    let results = hd1::hd2::[] in
-    match find_complementary_sttmts hd1.post_statements hd2.post_statements with
-    | None ->
-      failwith ("No complementary statements found.")
-    | Some (sttmt1,sttmt2) ->
-      let results_pro1 = List.filter results ~f:(fun res ->
-          statements_aligned_with_constraint sttmt1 res.post_statements)
-      in
-      let results_pro2 = List.filter results ~f:(fun res ->
-          statements_aligned_with_constraint sttmt2 res.post_statements)
-      in
-      assert (0 < List.length results_pro1);
-      assert (0 < List.length results_pro2);
-      if (List.length results_pro1) + (List.length results_pro2) <>
-         (List.length results) then
-        failwith ("Statements " ^ (render_tterm sttmt1) ^ " and " ^
-                  (render_tterm sttmt2) ^
-                  " do not cleanly divide results set. Leftover " ^
-                  "post statements: \n" ^
-                  (String.concat ~sep:" \n AND \n "
-                     (List.map (List.filter results ~f:(fun res ->
-                          not (statements_aligned_with_constraint
-                                 sttmt1 res.post_statements) &&
-                          not (statements_aligned_with_constraint
-                                 sttmt2 res.post_statements)))
-                         ~f:(fun res -> tterm_list_to_string res.post_statements))));
-      Alternative_by_constraint ((sttmt1, build_decision_tree results_pro1),(sttmt2, build_decision_tree results_pro2))
+  let output_check =
+    "// Output check\n" ^
+    "// Input assumptions\n" ^
+    (render_input_assumptions input_constraints) ^ "\n" ^
+    "// Concrete equalities: \n" ^
+    (render_concrete_assignments_as_assertions concrete_assignments) ^ "\n" ^
+    "// Model constraints: \n" ^
+    (String.concat ~sep:"\n"
+       (List.map upd_model_constraints ~f:(fun constr -> match (fix_mistyped_tip_ret constr) with
+                                                         | {v=Bop (Eq, lhs, rhs);t=_} -> render_eq_sttmt ~is_assert:true lhs rhs
+                                                         | c -> "/*@ assert(" ^ (render_tterm c) ^ "); @*/")))
   in
-  match results with
-  | [] -> failwith "There must be at least one tip-call result"
-  | hd :: [] -> Single_result hd
-  | hd1 :: hd2 :: [] ->
-    if term_eq hd1.ret_val.v hd2.ret_val.v then
-      handle_two_constraints hd1 hd2
-    else
-      let results_pro1 = List.filter results ~f:(fun res ->
-        term_eq res.ret_val.v hd1.ret_val.v) in
-      let results_pro2 = List.filter results ~f:(fun res ->
-        term_eq res.ret_val.v hd2.ret_val.v) in
-      assert (0 < List.length results_pro1);
-      assert (0 < List.length results_pro2);
-      assert ((List.length results_pro1) + (List.length results_pro2) =
-              (List.length results));
-      Alternative_by_ret ((hd1.ret_val, build_decision_tree results_pro1),
-                          (hd2.ret_val, build_decision_tree results_pro2))
-  | _ ->
-    assert (4 = List.length results); (* This is special-cased. *)
-    assert (List.for_all results ~f:(fun res -> term_eq res.ret_val.v (List.nth_exn results 0).ret_val.v)); (* No alternative by ret *)
-    (* All results have 2 statements except one *)
-    let single_statement_result = List.find_exn results ~f:(fun rs -> List.length rs.post_statements = 1) in
-    (* Add a statement to make the rest easier - it is implied by the existing statement, anyway *)
-    let results = List.map results ~f:(fun rs -> 
-      if rs = single_statement_result then
-        match rs.post_statements with
-          (* 0 != (x & N) for any N implies 0 != x *)
-        | {v=Bop (Bit_and, {v=Id var_v;t=var_t}, {v=_;t=_});t=_} :: [] ->
-            let new_post = {v=Id var_v;t=var_t} in
-            {args_post_conditions=rs.args_post_conditions;
-             ret_val=rs.ret_val;
-             post_statements=new_post::rs.post_statements}
-        | _ -> failwith "Sorry, you're on your own, welcome to special-case world!"
-      else rs)
-    in
-    assert (List.for_all results ~f:(fun res -> List.length res.post_statements = 2));
-    (* From the given 'results', find the element that has a matching post-statement with 'result' *)
-    (* Return (the matching element, the matching statement, the other elements) *)
-    let rec find_matching_result res results =
-      match results with
-      | hd :: tl ->
-          begin
-          match List.find res.post_statements ~f:(fun st ->
-                  List.exists hd.post_statements ~f:(fun st2 -> term_eq st2.v st.v)) with
-          | Some st -> (hd, st, tl)
-          | None ->
-              let (mate, mats, rest) = find_matching_result res tl in
-              (mate, mats, hd :: rest)
-          end
-      | [] -> failwith "Can't find a matching result!"
-    in
-    let remove_statement res stmt =
-      {args_post_conditions=res.args_post_conditions;
-       ret_val=res.ret_val;
-       post_statements=List.filter res.post_statements ~f:(fun st -> not(term_eq st.v stmt.v))}
-    in
-    match results with
-    | hd1 :: tl1 ->
-        begin
-        let (mat1, st1, rest) = find_matching_result hd1 tl1 in
-        assert (2 = List.length rest);
-        match rest with
-        | hd2 :: tl2 ->
-            let (mat2, st2, rest) = find_matching_result hd2 tl2 in
-            assert (0 = List.length rest);
-            (* Now that we have cleanly grouped our 4 statements into 2, we make a proper 2-level decision tree *)
-            Alternative_by_constraint ((st1,
-                                        (handle_two_constraints (remove_statement hd1 st1) (remove_statement mat1 st1))),
-                                       (st2,
-                                        (handle_two_constraints (remove_statement hd2 st2) (remove_statement mat2 st2))))
-        | _ -> failwith "should not happen"
-        end
-    | _ -> failwith "should not happen, bis"
+  (output_check, symbolic_var_assignments)
 
-let rec render_post_assertions dtree ret_name ret_type hist_symbs cmplxs =
-  match dtree with
-  | Single_result res ->
-   (render_args_post_conditions ~is_assert:false res.args_post_conditions) ^ "\n" ^
-   (render_output_check
-       res.ret_val ret_name ret_type
-       res.post_statements hist_symbs
-       res.args_post_conditions cmplxs) ^ "\n"
-  | Alternative_by_constraint ((sttmt1,dtree1),(_,dtree2)) ->
-    "if (" ^ (render_tterm sttmt1) ^ ") {\n" ^
-      (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
-    "} else {\n" ^
-      (render_post_assertions dtree2 ret_name ret_type hist_symbs cmplxs) ^
-    "}\n"
-  | Alternative_by_ret ((ret1,dtree1),(ret2,dtree2)) ->
-    let rname = match ret_name with
-      | Some n -> n
-      | None -> failwith ("When two tip-call results are " ^
-                          " differentiated by ret value:" ^
-                          (render_tterm ret1) ^ " vs. " ^
-                          (render_tterm ret2) ^ ", the ret name" ^
-                          " must be present.")
+let eq_cond_to_tterm {lhs;rhs} =
+  {v=Bop (Eq, lhs, rhs);t=Boolean}
+
+let render_context_condition conditions =
+  match conditions with
+  | [] -> "true"
+  | _ -> String.concat ~sep:" && " (List.map conditions ~f:render_tterm)
+
+type rendered_result =
+  { conditions: tterm list;
+    output_check: string;
+    args_conditions: string; }
+
+let render_post_assertions results ret_name ret_type hist_symbs cmplxs =
+  let render_context_conditions results =
+    let rec do_render results =
+      match results with
+      | res :: tl ->
+        "if (" ^ (render_context_condition res.conditions) ^ ") {\n" ^
+          res.args_conditions ^ "\n" ^
+          res.output_check ^ "\n" ^ 
+        "} else " ^
+        (do_render tl)
+      | [] -> "{\n//@ assert(false);\n}\n"
     in
-    "if (" ^ rname ^ " == " ^ (render_tterm ret1) ^ ") {\n" ^
-    (render_post_assertions dtree1 ret_name ret_type hist_symbs cmplxs) ^
-    "} else {\n " ^
-    (render_post_assertions dtree2 ret_name ret_type hist_symbs cmplxs) ^
-    "}"
+    let render_result result = 
+      let (output_check, assignments) =
+        output_check_and_assignments
+          result.ret_val ret_name ret_type
+          result.post_statements hist_symbs
+          result.args_post_conditions cmplxs in
+      let conditions = result.post_statements@(List.map assignments ~f:eq_cond_to_tterm) in
+      let args_post_conds_tterms = List.map result.args_post_conditions ~f:eq_cond_to_tterm in
+      let conditions = List.filter conditions ~f:(fun s -> not(List.exists args_post_conds_tterms ~f:(fun c -> term_eq s.v c.v))) in
+      let args_conditions = render_args_post_conditions ~is_assert:false result.args_post_conditions in
+      {conditions;output_check;args_conditions}
+    in
+    let render_conditions conds =
+      String.concat ~sep:"\n" (List.map conds ~f:(fun c -> "//@ assume(" ^ (render_tterm c) ^ ");\n"))
+    in
+
+    let rendered_results = List.map results ~f:render_result in
+    let condition_sets = List.map rendered_results ~f:(fun r -> Set.Poly.of_list r.conditions) in
+    let common_conditions = 
+      match List.reduce condition_sets ~f:Set.inter with
+      | Some conds -> Set.to_list conds
+      | None -> failwith "Not possible, there must be at least one result"
+    in
+    (render_conditions common_conditions) ^ "\n" ^ (do_render rendered_results)
+  in
+
+  let rec render_ret_conditions groups =
+    match groups with
+    | (retval, results) :: tl ->
+      let cond = begin match ret_name with
+      | Some ret_name -> ret_name ^ " == " ^ (render_term retval)
+      | None -> "true" end in
+        "if (" ^ cond ^ ") {\n" ^
+          (render_context_conditions results) ^
+        "} else " ^
+        (render_ret_conditions tl)
+    | [] -> "{\n//@ assert(false);\n}\n"
+  in
+
+  (* We only have different return values when the return values are constants, e.g. 0 or 1. *)
+  let all_const = List.for_all results ~f:(fun r -> is_constt r.ret_val) in
+  let none_const = List.for_all results ~f:(fun r -> not(is_constt r.ret_val)) in
+  assert(all_const || none_const);
+  if all_const then
+    let groups = Map.Poly.of_alist_multi (List.map results ~f:(fun r -> (r.ret_val.v, r))) in
+    (render_ret_conditions (Map.to_alist groups))
+  else
+    let all_same = List.for_all results ~f:(fun r -> term_eq r.ret_val.v (List.nth_exn results 0).ret_val.v) in
+    if all_same then (render_context_conditions results)
+    else failwith "expected all non-constant retvals to be the same"
 
 let render_export_point name =
   "int " ^ name ^ ";\n"
@@ -603,13 +505,8 @@ let render_tip_fun_call
   (render_postlemmas context) ^
   (render_export_point export_point) ^
   (if render_assertions then
-     let dtree = build_decision_tree
-         (List.sort ~compare:(fun res1 res2 ->
-              (List.length res1.post_statements) -
-              (List.length res2.post_statements))
-         results) in
      render_post_assertions
-       dtree context.ret_name context.ret_type hist_symbols cmplxs
+       results context.ret_name context.ret_type hist_symbols cmplxs
    else
      "")
 

@@ -36,6 +36,31 @@ type guessed_types = {ret_type: ttype;
 
 let known_addresses : address_spec list Int64.Map.t ref = ref Int64.Map.empty
 
+
+let ttype_of_guess = function
+  | {precise=Unknown;s=Tentative Sgn;w;}
+  | {precise=Unknown;s=Sure Sgn;w;} -> begin match w with
+      | Noidea -> Sunknown
+      | Sure W1 | Tentative W1 -> Boolean
+      | Sure W8 | Tentative W8 -> Sint8
+      | Sure W16 | Tentative W16 -> Sint16
+      | Sure W32 | Tentative W32 -> Sint32
+      | Sure W64 | Tentative W64 -> Sint64
+      end
+  | {precise=Unknown;s=Tentative Unsgn;w;}
+  | {precise=Unknown;s=Sure Unsgn;w;} -> begin match w with
+      | Noidea -> Uunknown
+      | Sure W1 | Tentative W1 -> Boolean
+      | Sure W8 | Tentative W8 -> Uint8
+      | Sure W16 | Tentative W16 -> Uint16
+      | Sure W32 | Tentative W32 -> Uint32
+      | Sure W64 | Tentative W64 -> Uint64
+      end
+  | {precise=Unknown;s=Noidea;w=Sure W1;}
+  | {precise=Unknown;s=Noidea;w=Tentative W1;} -> Boolean
+  | {precise=Unknown;s=Noidea;w=_;} -> Unknown
+  | {precise;s=_;w=_} -> precise
+
 (* TODO: elaborate. *)
 let guess_type exp t =
   match t with
@@ -251,11 +276,7 @@ let rec canonicalize_sexp sexp =
   | _ -> sexp
 
 let map_set_n_update_alist mp lst =
-  List.fold lst ~init:mp ~f:(fun acc (key,data) ->
-      (match String.Map.add acc ~key ~data
-       with
-       | `Ok new_map -> new_map
-       | `Duplicate -> acc))
+  List.fold lst ~init:mp ~f:(fun acc (key,data) -> String.Map.set acc ~key ~data)
 
 let parse_int str =
   (* As a hack: handle -10 in 64bits.
@@ -336,15 +357,14 @@ let is_bool_fun fname =
   else if String.equal fname "Ult" then true
   else false
 
-let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.Map.t) : typed_var list =
+(* TODO this is crazy, we parse a bunch of sexps and give the proper types in another method and here we redo the whole work *)
+let rec get_var_decls_of_sexp exp guess (known_vars:typed_var String.Map.t) : typed_var list =
   match get_var_name_of_sexp exp, get_read_width_of_sexp exp with
   | Some name, Some w ->
-    let precise = begin match precise with
-    | Unknown -> guess_type exp Unknown
-    | _ -> precise end in
+    let precise = ttype_of_guess {guess with w = convert_str_to_width_confidence w} in
     begin match String.Map.find known_vars name with
-      | Some spec -> [update_var_spec spec {precise;s;w=convert_str_to_width_confidence w}]
-      | None -> [{vname = name; t={precise;s;w=convert_str_to_width_confidence w}}]
+      | Some spec -> [update_var_spec spec {precise;s=guess.s;w=convert_str_to_width_confidence w}]
+      | None -> [{vname = name; t={precise;s=guess.s;w=convert_str_to_width_confidence w}}]
     end
   | None, None ->
     begin
@@ -356,6 +376,7 @@ let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.M
       (get_var_decls_of_sexp rhs {s;w=Noidea;precise=Unknown;} known_vars)
     | Sexp.List (Sexp.Atom f :: Sexp.Atom w :: tl)
       when (String.equal w "w64") || (String.equal w "w32") || (String.equal w "w16") || (String.equal w "w8") ->
+      let wi = convert_str_to_width_confidence w in
       if String.equal f "ZExt" then
         match tl with
         | [tl] -> get_var_decls_of_sexp
@@ -364,14 +385,14 @@ let rec get_var_decls_of_sexp exp {s;w=_;precise} (known_vars:typed_var String.M
           lprintf "ZExt may have only one argument: %s\n" (Sexp.to_string exp);
           failwith "ZExt may have only one argument (besides w..)."
       else
-        let si = choose_guess (infer_type_sign f) s in
+        let si = choose_guess (infer_type_sign f) guess.s in
         (List.join (List.map tl ~f:(fun e ->
-             get_var_decls_of_sexp e {s=si;w=Noidea;precise} known_vars)))
+             get_var_decls_of_sexp e {s=si;w=wi;precise=guess.precise} known_vars)))
     | Sexp.List (Sexp.Atom f :: tl) when f <> "w8" && f <> "w16" && f <> "w32" && f <> "w64" ->
       let si = choose_guess (infer_type_sign f)
-          (choose_guess (guess_sign_l tl known_vars) s)
+          (choose_guess (guess_sign_l tl known_vars) guess.s)
       in
-      List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e {s=si;w=Noidea;precise} known_vars))
+      List.join (List.map tl ~f:(fun e -> get_var_decls_of_sexp e {s=si;w=Noidea;precise=guess.precise} known_vars))
     | _ -> []
     end
   | _,_ -> failwith ("inconsistency in get_var_name/get_read_width: " ^ (Sexp.to_string exp))
@@ -644,10 +665,13 @@ let rec get_sexp_value exp ?(at=Beginning) t =
     {v=Bop (And,(get_sexp_value lhs Boolean ~at),(get_sexp_value rhs Boolean ~at));t}
   | Sexp.List [Sexp.Atom f; Sexp.Atom _; lhs; rhs]
     when (String.equal f "And") ->
-    begin
+    begin 
       match rhs with
       | Sexp.List [Sexp.Atom "w32"; Sexp.Atom n] when is_int n ->
-        {v=Bop (Eq, (get_sexp_value rhs Uint32 ~at), {v=Bop (Bit_and,(get_sexp_value lhs Uint32 ~at),(get_sexp_value rhs Uint32 ~at));t=Uint32});t=Boolean}
+        if t = Boolean then
+          {v=Bop (Eq, (get_sexp_value rhs Uint32 ~at), {v=Bop (Bit_and,(get_sexp_value lhs Uint32 ~at),(get_sexp_value rhs Uint32 ~at));t=Uint32});t=Boolean}
+        else
+          {v=Bop (Bit_and,(get_sexp_value lhs Uint32 ~at),(get_sexp_value rhs Uint32 ~at));t=Uint32}
       | _ ->
         let ty = guess_type_l [lhs;rhs] t in
         lprintf "interesting And case{%s}: %s "
@@ -1479,30 +1503,6 @@ let distribute_ids pref =
    tip_calls =
      List.mapi pref.tip_calls ~f:(fun i call ->
          {call with id = tips_start_from + i})}
-
-let ttype_of_guess = function
-  | {precise=Unknown;s=Tentative Sgn;w;}
-  | {precise=Unknown;s=Sure Sgn;w;} -> begin match w with
-      | Noidea -> Sunknown
-      | Sure W1 | Tentative W1 -> Boolean
-      | Sure W8 | Tentative W8 -> Sint8
-      | Sure W16 | Tentative W16 -> Sunknown (* TODO need to support Sint16... *)
-      | Sure W32 | Tentative W32 -> Sint32
-      | Sure W64 | Tentative W64 -> Sint64
-      end
-  | {precise=Unknown;s=Tentative Unsgn;w;}
-  | {precise=Unknown;s=Sure Unsgn;w;} -> begin match w with
-      | Noidea -> Uunknown
-      | Sure W1 | Tentative W1 -> Boolean
-      | Sure W8 | Tentative W8 -> Uint8
-      | Sure W16 | Tentative W16 -> Uint16
-      | Sure W32 | Tentative W32 -> Uint32
-      | Sure W64 | Tentative W64 -> Uint64
-      end
-  | {precise=Unknown;s=Noidea;w=Sure W1;}
-  | {precise=Unknown;s=Noidea;w=Tentative W1;} -> Boolean
-  | {precise=Unknown;s=Noidea;w=_;} -> Unknown
-  | {precise;s=_;w=_} -> precise
 
 let typed_vars_to_varspec free_vars =
   List.fold (String.Map.data free_vars) ~init:String.Map.empty
