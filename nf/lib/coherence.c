@@ -605,7 +605,8 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           length(v) == dchain_index_range_fp(ch);
   {
-    assume(false);//TODO
+    open map_vec_chain_coherent(m, v, ch);
+    close map_vec_chain_coherent(m, v, ch);
   }
   @*/
 
