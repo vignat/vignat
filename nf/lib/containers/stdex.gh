@@ -28,6 +28,30 @@ fixpoint bool forall2<t1,t2>(list<t1> l1, list<t2> l2, fixpoint (t1,t2,bool) f) 
   }
 }
 
+fixpoint bool forall_idx<t>(list<t> values, int idx, fixpoint (int,t,bool) prop) {
+  switch(values) {
+    case nil: return true;
+    case cons(h,t):
+      return prop(idx, h) && forall_idx(t, idx + 1, prop);
+  }
+}
+
+lemma void extract_prop_by_idx<t>(list<t> v, fixpoint (int,t,bool) prop,
+                                  int start_index, int index)
+requires true == forall_idx(v, start_index, prop) &*&
+         0 <= index - start_index &*& index - start_index < length(v);
+ensures true == prop(index, nth(index - start_index, v));
+{
+  switch(v) {
+    case nil:
+    case cons(h, t):
+      if (start_index == index){
+      } else {
+        extract_prop_by_idx(t, prop, start_index + 1, index);
+      }
+  }
+}
+
 lemma void some_get_some<t>(option<t> x)
 requires x != none;
 ensures some(get_some(x)) == x;

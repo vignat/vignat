@@ -508,11 +508,28 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   }
   @*/
 
+/*@
+  fixpoint bool consistent_pair<kt>(list<pair<kt, int> > m,
+                                    dchain ch,
+                                    int idx, pair<kt, bool> el) {
+    switch(el) {
+      case pair(car, cdr):
+        return cdr ?
+          (false == dchain_allocated_fp(ch, idx))
+          :
+          (map_has_fp(m, car) &&
+           map_get_fp(m, car) == idx &&
+           dchain_allocated_fp(ch, idx));
+    }
+  }
+  @*/
+
 
 /*@
   predicate map_vec_chain_coherent<kt>(list<pair<kt, int> > m,
                                        list<pair<kt, bool> > v, dchain ch) =
-    dchain_index_range_fp(ch) == length(v);
+    dchain_index_range_fp(ch) == length(v) &*&
+    true == forall_idx(v, 0, (consistent_pair)(m, ch));
   @*/
 
 /*@
@@ -526,18 +543,27 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     close map_vec_chain_coherent(m, v, ch);
   }
   @*/
+
 /*@
   lemma void mvc_coherent_index_busy<kt>(list<pair<kt, int> > m,
                                          list<pair<kt, bool> > v, dchain ch,
                                          uint32_t index)
   requires map_vec_chain_coherent<kt>(m, v, ch) &*&
-           true == dchain_allocated_fp(ch, index);
+           true == dchain_allocated_fp(ch, index) &*&
+           0 <= index &*& index < dchain_index_range_fp(ch);
   ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           nth(index, v) == pair(?key, false) &*&
           true == map_has_fp(m, key) &*&
           map_get_fp(m, key) == index;
   {
-    assume(false);//TODO
+    mvc_coherent_bounds(m, v, ch);
+    open map_vec_chain_coherent(m, v, ch);
+    extract_prop_by_idx(v, (consistent_pair)(m, ch), 0, index);
+    pair<kt, bool> p = nth(index, v);
+    switch(p) {
+      case pair(car, cdr):
+    }
+    close map_vec_chain_coherent(m, v, ch);
   }
   @*/
 /*@
@@ -599,6 +625,23 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   @*/
 
 /*@
+  lemma void consistent_pairs_no_key<kt>(list<pair<kt, int> > m,
+                                         list<pair<kt, bool> > v, dchain ch,
+                                         kt key,
+                                         int start_idx)
+  requires true == forall_idx(v, start_idx, (consistent_pair)(m, ch)) &*&
+           false == map_has_fp(m, key);
+  ensures false == mem(pair(key, false), v);
+  {
+    switch(v) {
+      case nil:
+      case cons(h, t):
+        consistent_pairs_no_key(m, t, ch, key, start_idx + 1);
+    }
+  }
+  @*/
+
+/*@
   lemma void mvc_coherent_key_abscent<kt>(list<pair<kt, int> > m,
                                           list<pair<kt, bool> > v, dchain ch,
                                           kt key)
@@ -607,7 +650,10 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           false == mem(pair(key, false), v);
   {
-    assume(false);//TODO
+    mvc_coherent_bounds(m, v, ch);
+    open map_vec_chain_coherent(m, v, ch);
+    consistent_pairs_no_key(m, v, ch, key, 0);
+    close map_vec_chain_coherent(m, v, ch);
   }
   @*/
 

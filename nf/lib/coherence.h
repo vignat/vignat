@@ -36,7 +36,8 @@
                                          list<pair<kt, bool> > v, dchain ch,
                                          uint32_t index);
   requires map_vec_chain_coherent<kt>(m, v, ch) &*&
-           true == dchain_allocated_fp(ch, index);
+           true == dchain_allocated_fp(ch, index) &*&
+           0 <= index &*& index < dchain_index_range_fp(ch);
   ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           nth(index, v) == pair(?key, false) &*&
           true == map_has_fp(m, key) &*&
