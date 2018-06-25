@@ -496,7 +496,15 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
            true == forall(contents, snd);
   ensures true == forall2(contents, addrs, (kkeeper)(addr_map));
   {
-    assume(false);//TODO
+    switch(contents) {
+      case nil: return;
+      case cons(h1,t1):
+        switch(addrs) {
+          case nil: return;
+            case cons(h2,t2):
+              empty_kkeeper(t2, t1, addr_map, capacity - 1);
+        }
+    }
   }
   @*/
 
