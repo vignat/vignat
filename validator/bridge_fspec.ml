@@ -588,6 +588,7 @@ let fun_types =
                    "/*@ { \n\
                     assert mapp<ether_addri>(_, _, _, _, mapc(_, _, ?dm_addrs)); \n\
                     assert vector_accp<ether_addri>(_, _, ?the_dv, ?dv_addrs, _, _); \n\
+                    assert map_vec_chain_coherent<ether_addri>(?the_dm, the_dv, ?the_dh);\n\
                     ether_addri vvv = eaddrc(" ^ arg1 ^
                    "->a, " ^ arg1 ^
                    "->b, " ^ arg1 ^
@@ -595,6 +596,7 @@ let fun_types =
                    "->d, " ^ arg1 ^
                    "->e, " ^ arg1 ^
                    "->f); \n\
+                    mvc_coherent_key_abscent(the_dm, the_dv, the_dh, vvv);\n\
                     kkeeper_add_one(dv_addrs, the_dv, dm_addrs, vvv, " ^ (List.nth_exn args 2) ^
                    "); \n\
                     } @*/");

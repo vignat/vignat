@@ -89,6 +89,16 @@
   @*/
 
 /*@
+lemma void mvc_coherent_key_abscent<kt>(list<pair<kt, int> > m,
+                                        list<pair<kt, bool> > v, dchain ch,
+                                        kt key);
+  requires map_vec_chain_coherent<kt>(m, v, ch) &*&
+           false == map_has_fp(m, key);
+  ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
+          false == mem(pair(key, false), v);
+  @*/
+
+/*@
   lemma void mvc_coherent_same_len<kt>(list<pair<kt, int> > m,
                                        list<pair<kt, bool> > v, dchain ch);
   requires map_vec_chain_coherent<kt>(m, v, ch);
@@ -167,7 +177,8 @@
                                 t v,
                                 int index);
   requires 0 <= index &*& index < length(contents) &*&
-           true == forall2(contents, addrs, (kkeeper)(addr_map));
+           true == forall2(contents, addrs, (kkeeper)(addr_map)) &*&
+           false == mem(pair(v, false), contents);
   ensures true == forall2(update(index, pair(v, false), contents),
                           addrs,
                           (kkeeper)(map_put_fp(addr_map, v,
