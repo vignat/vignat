@@ -535,7 +535,7 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
                                        list<pair<kt, bool> > v, dchain ch) =
     dchain_index_range_fp(ch) == length(v) &*&
     true == forall_idx(v, 0, (consistent_pair)(m, ch)) &*&
-    true == subset(map(fst, m), map(fst, filter(engaged_cell, v)));
+    true == msubset(map(fst, m), map(fst, filter(engaged_cell, v)));
   @*/
 
 /*@
@@ -615,6 +615,7 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     mvc_coherent_bounds(m, v, ch);
     open map_vec_chain_coherent(m, v, ch);
     map_has_to_mem(m, k);
+    msubset_subset(map(fst, m), map(fst, filter(engaged_cell, v)));
     subset_mem_trans(map(fst, m), map(fst, filter(engaged_cell, v)), k);
     pairs_consistent_get_index(m, v, ch, k, 0);
     close map_vec_chain_coherent(m, v, ch);
@@ -825,6 +826,34 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   @*/
 
 /*@
+  lemma void filter_engaged_len<kt>(list<pair<kt, int> > m,
+                                    list<pair<kt, bool> > v,
+                                    dchain ch, int start_idx)
+  requires true == forall_idx(v, start_idx, (consistent_pair)(m, ch));
+          //&*& length(dchain_indexes_fp(ch)) <= length(v);
+  ensures length(filter(engaged_cell, v)) == length(dchain_indexes_fp(ch));
+  {
+    assume(false);//TODO
+    switch(v) {
+      case nil:
+      case cons(h, t):
+        switch(h) { case pair(car,cdr):
+          if (!cdr) {
+            assume(true == forall_idx(v, start_idx, (consistent_pair)(m, dchain_remove_index_fp(ch, start_idx))));
+            dchain_remove_idx_from_indexes(ch, start_idx);
+            dchain_indexes_contain_index(ch, start_idx);
+            assert length(dchain_indexes_fp(dchain_remove_index_fp(ch, start_idx))) <
+                   length(dchain_indexes_fp(ch));
+            filter_engaged_len(m, t, dchain_remove_index_fp(ch, start_idx), start_idx + 1);
+          } else {
+            filter_engaged_len(m, t, ch, start_idx + 1);
+          }
+        }
+    }
+  }
+  @*/
+
+/*@
   lemma void mvc_coherent_dchain_non_out_of_space_map_nonfull<kt>(list<pair<kt, int> > m,
                                                                   list<pair<kt, bool> > v, dchain ch)
   requires map_vec_chain_coherent<kt>(m, v, ch) &*&
@@ -832,7 +861,17 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           map_size_fp(m) < dchain_index_range_fp(ch);
   {
-    assume(false);//TODO
+    open map_vec_chain_coherent(m, v, ch);
+    msubset_length(map(fst, m), map(fst, filter(engaged_cell, v)));
+    map_preserves_length(fst, m);
+    assert length(m) == length(map(fst, m));
+    assert length(m) <= length(map(fst, filter(engaged_cell, v)));
+    map_preserves_length(fst, filter(engaged_cell, v));
+    assert length(map(fst, filter(engaged_cell, v))) <= length(filter(engaged_cell, v));
+    filter_engaged_len(m, v, ch, 0);
+    dchain_out_of_space_to_indexes_size(ch);
+    assert length(filter(engaged_cell, v)) < length(v);
+    close map_vec_chain_coherent(m, v, ch);
   }
   @*/
 

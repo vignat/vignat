@@ -402,4 +402,15 @@ ensures true == msubset(append(l1, l2), append(l2, l1));
   }
 }//took 8m
 
+lemma void msubset_length<t>(list<t> l1, list<t> l2)
+requires true == msubset(l1, l2);
+ensures length(l1) <= length(l2);
+{
+  switch(l1) {
+    case nil:
+    case cons(h,t):
+      msubset_length(t, remove(h, l2));
+  }
+}
+
 #endif// MULTISUBSET_GH
