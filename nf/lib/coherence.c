@@ -693,7 +693,10 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   ensures map_vec_chain_coherent<kt>(m, v, ch) &*&
           snd(nth(index, v)) != dchain_allocated_fp(ch, index);
   {
-    assume(false);//TODO
+    open map_vec_chain_coherent(m, v, ch);
+    extract_prop_by_idx(v, (consistent_pair)(m, ch), 0, index);
+    switch(nth(index, v)) {case pair(car, cdr):}
+    close map_vec_chain_coherent(m, v, ch);
   }
   @*/
 
