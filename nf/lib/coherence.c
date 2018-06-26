@@ -524,12 +524,18 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   }
   @*/
 
+/*@
+  fixpoint bool engaged_cell<kt>(pair<kt, bool> p) {
+    return !snd(p);
+  }
+  @*/
 
 /*@
   predicate map_vec_chain_coherent<kt>(list<pair<kt, int> > m,
                                        list<pair<kt, bool> > v, dchain ch) =
     dchain_index_range_fp(ch) == length(v) &*&
-    true == forall_idx(v, 0, (consistent_pair)(m, ch));
+    true == forall_idx(v, 0, (consistent_pair)(m, ch)) &*&
+    true == subset(map(fst, m), map(fst, filter(engaged_cell, v)));
   @*/
 
 /*@
@@ -566,6 +572,34 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
     close map_vec_chain_coherent(m, v, ch);
   }
   @*/
+
+/*@
+  lemma int pairs_consistent_get_index<kt>(list<pair<kt, int> > m,
+                                           list<pair<kt, bool> > v, dchain ch,
+                                           kt k, int start_idx)
+  requires true == forall_idx(v, start_idx, (consistent_pair)(m, ch)) &*&
+           true == map_has_fp(m, k) &*&
+           true == mem(k, map(fst, filter(engaged_cell, v)));
+  ensures 0 <= result - start_idx &*& result - start_idx < length(v) &*&
+          true == consistent_pair(m, ch, result, nth(result - start_idx, v)) &*&
+          result == map_get_fp(m, k) &*&
+          true == dchain_allocated_fp(ch, result) &*&
+          false == snd(nth(result - start_idx, v));
+  {
+    switch(v) {
+      case nil:
+        return 0;
+      case cons(h, t):
+        switch(h) { case pair(car, cdr):}
+        if (h == pair(k, false)) {
+          return start_idx;
+        } else {
+          return pairs_consistent_get_index(m, t, ch, k, start_idx + 1);
+        }
+    }
+  }
+  @*/
+
 /*@
   lemma void mvc_coherent_map_get_bounded<kt>(list<pair<kt, int> > m,
                                               list<pair<kt, bool> > v, dchain ch,
@@ -575,9 +609,15 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   ensures 0 <= map_get_fp(m, k) &*& map_get_fp(m, k) < length(v) &*&
           dchain_index_range_fp(ch) == length(v) &*&
           map_vec_chain_coherent<kt>(m, v, ch) &*&
-          true == dchain_allocated_fp(ch, map_get_fp(m, k));
+          true == dchain_allocated_fp(ch, map_get_fp(m, k)) &*&
+          false == snd(nth(map_get_fp(m, k), v));
   {
-    assume(false);//TODO
+    mvc_coherent_bounds(m, v, ch);
+    open map_vec_chain_coherent(m, v, ch);
+    map_has_to_mem(m, k);
+    subset_mem_trans(map(fst, m), map(fst, filter(engaged_cell, v)), k);
+    pairs_consistent_get_index(m, v, ch, k, 0);
+    close map_vec_chain_coherent(m, v, ch);
   }
   @*/
 
@@ -593,7 +633,7 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
           true == dchain_allocated_fp(ch, map_get_fp(m, k)) &*&
           false == snd(nth(map_get_fp(m, k), v));
   {
-    assume(false);//TODO
+    mvc_coherent_map_get_bounded(m, v, ch, k);
   }
   @*/
 
