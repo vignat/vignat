@@ -1,0 +1,2 @@
+FSPEC_PLUGIN=bridge_fspec.cmo
+ORIG_PREFIX=brr/000006

@@ -800,12 +800,27 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   @*/
 
 /*@
+  lemma void empty_map_vec_dchain_consistent_pairs<kt>(list<pair<kt, bool> > vec, int len, int start_idx)
+  requires true == forall(vec, snd);
+  ensures true == forall_idx(vec, start_idx, (consistent_pair)(nil, empty_dchain_fp(len, 0)));
+  {
+    switch(vec) {
+      case nil:
+      case cons(h, t):
+        switch(h) {case pair(car, cdr):}
+        empty_map_vec_dchain_consistent_pairs(t, len, start_idx + 1);
+    }
+  }
+  @*/
+
+/*@
   lemma void empty_map_vec_dchain_coherent<kt>(list<pair<kt, bool> > vec)
-  requires vec != nil;
+  requires true == forall(vec, snd);
   ensures map_vec_chain_coherent<kt>(nil, vec,
                                      empty_dchain_fp(length(vec), 0));
   {
-    assume(false);//TODO
+    empty_map_vec_dchain_consistent_pairs(vec, length(vec), 0);
+    close map_vec_chain_coherent<kt>(nil, vec, empty_dchain_fp(length(vec), 0));
   }
   @*/
 

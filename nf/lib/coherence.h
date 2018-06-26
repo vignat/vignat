@@ -109,7 +109,7 @@ lemma void mvc_coherent_key_abscent<kt>(list<pair<kt, int> > m,
 
 /*@
   lemma void empty_map_vec_dchain_coherent<kt>(list<pair<kt, bool> > vec);
-  requires vec != nil;
+  requires true == forall(vec, snd);
   ensures map_vec_chain_coherent<kt>(nil, vec,
                                      empty_dchain_fp(length(vec), 0));
   @*/
