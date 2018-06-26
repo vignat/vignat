@@ -638,6 +638,36 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
   @*/
 
 /*@
+  lemma void rejuvenate_pairs_still_consistent<kt>(list<pair<kt, int> > m,
+                                                   list<pair<kt, bool> > v, dchain ch,
+                                                   int index, time_t time,
+                                                   int start_idx)
+  requires true == forall_idx(v, start_idx, (consistent_pair)(m, ch)) &*&
+           true == dchain_allocated_fp(ch, index);
+  ensures true == forall_idx(v, start_idx, (consistent_pair)(m, dchain_rejuvenate_fp(ch, index, time)));
+  {
+    switch(v) {
+      case nil:
+      case cons(h, t):
+        switch(h) {
+          case pair(car, cdr):
+            dchain_rejuvenate_preserves_indexes_set(ch, index, time);
+            dchain nch = dchain_rejuvenate_fp(ch, index, time);
+            dchain_indexes_contain_index(ch, start_idx);
+            dchain_indexes_contain_index(nch, start_idx);
+            if (!cdr) {
+              subset_mem_trans(dchain_indexes_fp(ch), dchain_indexes_fp(nch), start_idx);
+            } else {
+              if (dchain_allocated_fp(nch, start_idx))
+                subset_mem_trans(dchain_indexes_fp(nch), dchain_indexes_fp(ch), start_idx);
+            }
+            rejuvenate_pairs_still_consistent(m, t, ch, index, time, start_idx + 1);
+        }
+    }
+  }
+  @*/
+
+/*@
   lemma void mvc_rejuvenate_preserves_coherent<kt>(list<pair<kt, int> > m,
                                                    list<pair<kt, bool> > v, dchain ch,
                                                    int index, time_t time)
@@ -647,7 +677,10 @@ ensures dmappingp<t1,t2,vt>(m, a, b, c, d, e, g, h, i, j, k, l, n, f) &*&
                                                                 index,
                                                                 time));
   {
-    assume(false);//TODO
+    open map_vec_chain_coherent(m, v, ch);
+    rejuvenate_pairs_still_consistent(m, v, ch, index, time, 0);
+    rejuvenate_preserves_index_range(ch, index, time);
+    close map_vec_chain_coherent(m, v, dchain_rejuvenate_fp(ch, index, time));
   }
   @*/
 
