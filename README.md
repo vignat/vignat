@@ -37,8 +37,8 @@ $ ./build/nat
 # Verify the data structures (can be done at any time)
 $ make verifast
 
-# Symbolically execute VigNAT to generate traces
-$ make verify-dpdk
+# Symbolically execute VigNAT to generate traces, modeling the hardware
+$ make verify-hardware
 
 # Verify the traces
 $ cd ../../validator
