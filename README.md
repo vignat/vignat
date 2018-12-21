@@ -5,6 +5,14 @@ This repository contains the Vigor verification toolchain, along with the verifi
 **For the version of the code presented at SIGCOMM 2018 KBNets, use the `kbnets18` branch.**
 The main files of interest for this version are the patches in `install/`, and the stubs in `nf/lib/stubs/`.
 
+# Prerequisites
+
+The install script assumes you are using Ubuntu 16.04, though Debian may also work. You could also install the dependencies manually.
+
+To run verification with hardware models, you need a lot of RAM (100+ GB).
+
+To run the NAT (but not to verify it), you need to set up hugepages for DPDK; see the [DPDK documentation](https://doc.dpdk.org/guides/linux_gsg/sys_reqs.html#linux-gsg-hugepages).
+
 
 # Dependencies
 
