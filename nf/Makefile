@@ -156,6 +156,8 @@ verify-dpdk:
 	$(VERIF_COMMAND) $(NF_VERIF_BASE_ARGS) $(NF_VERIF_ARGS)
 	$(CLEAN_COMMAND)
 
+# DO NOT USE THIS
+# not part of the paper, leftover from an earlier version, doesn't work any more
 verify-driver:
 	$(CLEAN_COMMAND)
 	# Use DPDK stuff + stub driver
