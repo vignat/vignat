@@ -35,10 +35,10 @@ $ make
 This will compile and link VigNAT in the `build` directory. See `nf/vignat/testbed` for hints how to run it.
 ### Verify the NAT
 Vigor approach consists of three steps:
-1. Verification of the VigLib datastructures with theorem proving by running VeriFast on the annotated code.
+1. Verification of the VigLib data structures with theorem proving by running VeriFast on the annotated code.
 2. Verification of the VigNAT safety with symbolic execution using KLEE.
-3. Validation of the symbolic models used in the previous step against the formal contracts, and verificaiton against a semantic property formulated in `validator/forwarding_property.tmpl`.
-First step relies only on the formal contracts for the datastructures and can be performed at any time independently.
+3. Validation of the symbolic models used in the previous step against the formal contracts, and verification against a semantic property formulated in `validator/forwarding_property.tmpl`.
+First step relies only on the formal contracts for the data structures and can be performed at any time independently.
 The other two steps are dependent.
 The last step works with symbolic call traces produced in the second step, so they should be run in order.
 #### Theorem proving
@@ -62,9 +62,9 @@ $ ./test_all.sh ../nf/vignat/klee-last aaa ../nf nat_fspec.cmo
 
 Here is a brief description of the contents of the project, which is essentially a collection of weakly connected artifacts. Please, look also for README.md files in the subdirectories.
 
-* verification.docker - A Docker config file that contains full instructions to setup proper build and verificaiton environment for VigNAT
+* verification.docker - A Docker config file that contains full instructions to setup proper build and verification environment for VigNAT
 * doc - contains all the documents/specs/justifications for Vigor approach
 * example - contains a small example that demonstrates the Vigor approach. It is a more complete version of the example used for our paper.
 * map-verification-attempts
-* nf - contains the library of the verifiec Vigor data structures and all the NF involved in the projects, some of them are verified some are not
+* nf - contains the library of the verified Vigor data structures and all the NF involved in the projects, some of them are verified some are not
 * validator - the validator, one of the steps in the Vigor approach.
