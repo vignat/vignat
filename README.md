@@ -38,6 +38,7 @@ Vigor approach consists of three steps:
 1. Verification of the VigLib data structures with theorem proving by running VeriFast on the annotated code.
 2. Verification of the VigNAT safety with symbolic execution using KLEE.
 3. Validation of the symbolic models used in the previous step against the formal contracts, and verification against a semantic property formulated in `validator/forwarding_property.tmpl`.
+
 First step relies only on the formal contracts for the data structures and can be performed at any time independently.
 The other two steps are dependent.
 The last step works with symbolic call traces produced in the second step, so they should be run in order.
