@@ -1,3 +1,6 @@
+# Vigor project continues [here](https://github.com/vigor-nf/vigor).
+# This repository is left for archival purposes.
+
 # VigNAT
 This repository contains the VigNAT code together with the Vigor verification toolchain.
 
